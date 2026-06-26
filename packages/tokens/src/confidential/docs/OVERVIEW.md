@@ -78,8 +78,8 @@ Merge is the gate between received funds and spendable funds. It is deliberately
 | 1 | Sender | Specifies the recipient address and amount in the wallet. |
 | 2 | Wallet | Generates a zero-knowledge proof covering: balance sufficiency, correct computation of the new sender commitment, ECDH-derived blinding for the transfer commitment (so the recipient can decrypt), dual-auditor encrypted ciphertexts, and range validity of all values. |
 | 3 | Wallet | Encrypts the transfer amount under an ephemeral shared secret with the recipient's public viewing key. Also produces encrypted ciphertexts for both auditors: the recipient's auditor receives the transfer amount, and the sender's auditor receives the transfer amount plus the sender's post-transfer balance. |
-| 4 | Wallet | Submits the transaction containing the proof, the new sender commitment, the transfer commitment, the ephemeral public key, the encrypted amount, the encrypted balance scalar (for owner recovery), and the auditor ciphertexts. |
-| 5 | Contract | Verifies the proof, replaces the sender's spendable balance commitment, and adds the transfer commitment to the recipient's receiving balance via homomorphic addition. Emits an event carrying the ephemeral public key, the encrypted amount, the encrypted balance scalar, and the auditor ciphertexts. |
+| 4 | Wallet | Submits the transaction containing the proof, the new sender commitment, the transfer commitment, the ephemeral public key, the salt, the encrypted amount, the encrypted balance scalar (for owner recovery), and the auditor ciphertexts. |
+| 5 | Contract | Verifies the proof, replaces the sender's spendable balance commitment, and adds the transfer commitment to the recipient's receiving balance via homomorphic addition. Emits an event carrying the ephemeral public key, the salt, the encrypted amount, the encrypted balance scalar, and the auditor ciphertexts. |
 | 6 | Recipient wallet | Observes the event, performs ECDH with the ephemeral public key to recover the shared secret, decrypts the transfer amount, derives the blinding factor, and updates its local receiving-balance accumulator. |
 
 **On-chain, an observer sees:** that address A transacted with address B. The transfer amount and both parties' balances remain hidden.
@@ -92,7 +92,7 @@ Merge is the gate between received funds and spendable funds. It is deliberately
 |:-----|:----|:-------------|
 | 1 | Account holder | Specifies the withdrawal amount in the wallet. This amount will be publicly visible on-chain once the transaction executes. |
 | 2 | Wallet | Generates a zero-knowledge proof demonstrating balance sufficiency, correct construction of the new spendable balance commitment with deterministic randomness, and a sender-auditor encrypted balance checkpoint produced via ephemeral ECDH with the sender's auditor key. |
-| 3 | Contract | Verifies the proof, replaces the spendable balance commitment, and transfers the corresponding amount of regular tokens from the contract back to the account holder. Emits an event carrying the ephemeral public key, the encrypted balance scalar (for owner recovery), and the sender-auditor balance ciphertext. |
+| 3 | Contract | Verifies the proof, replaces the spendable balance commitment, and transfers the corresponding amount of regular tokens from the contract back to the account holder. Emits an event carrying the ephemeral public key, the salt, the encrypted balance scalar (for owner recovery), and the sender-auditor balance ciphertext. |
 
 ---
 
@@ -108,7 +108,7 @@ Spenders enable use cases like automated trading bots, payment processors, or cu
 | 3 | Contract | Verifies the proof, deducts the allowance from the owner's spendable balance commitment, and stores the spender delegation (allowance commitment, encrypted allowance, escrowed `dvk`, allowance salt, expiration). Emits an event with the owner's post-operation balance checkpoint and the owner-auditor ciphertexts. |
 | **Operation** | | |
 | 4 | Spender | Initiates a confidential transfer from the escrowed allowance to any registered recipient. A proof accompanies each transfer, covering allowance sufficiency, ECDH-derived encryption for the recipient, and dual-auditor ciphertexts for the recipient's and owner's auditors. |
-| 5 | Contract | Verifies the proof, updates the allowance commitment, and adds the transfer commitment to the recipient's receiving balance. The owner's spendable balance is not involved. Emits an event with the auditor ciphertexts. |
+| 5 | Contract | Verifies the proof, updates the allowance commitment, and adds the transfer commitment to the recipient's receiving balance. The owner's spendable balance is not involved. Emits an event with the ephemeral public key, the salt, and the auditor ciphertexts. |
 | **Revocation** | | |
 | 6 | Owner | Revokes the delegation at any time via a proof. The remaining escrowed allowance is folded back into the owner's spendable balance, and the proof produces ciphertexts for the owner's auditor (reclaimed amount and post-revocation balance checkpoint). The contract emits an event carrying these ciphertexts alongside the owner's balance checkpoint. |
 

@@ -445,7 +445,7 @@ These are the only on-chain dependencies. Disclosure proofs are otherwise self-c
 
 The diagram below shows the D-recipient case. D-sender and D-auditor follow the same shape with different prover roles and a different `circuit_id` in step (4); D-balance (§9) differs in that no $\text{ref}_E$ is exchanged — see §9 for its bundle shape.
 
-```
+```text
    Recipient/Verifier                                Holder Wallet
          |                                                |
          |  (1) request: "disclose event E to me"         |
