@@ -231,6 +231,12 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 /// where `from` and `to` resolve to the same identity are no-ops: no debit,
 /// no credit, no cap check.
 ///
+/// When `from`'s live identity entry has already been removed by account
+/// recovery, the sender is resolved through the IRS recovery record rather than
+/// reverting on the source lookup, so a forced/recovery transfer still updates
+/// the books. Once `from` recovered to `to`, both sides resolve to the same
+/// identity and the movement is a same-identity no-op.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
@@ -266,8 +272,22 @@ pub fn on_transfer(
     require_non_negative_amount(e, amount);
 
     let irs = get_irs_client(e, token);
-    let id_from = irs.stored_identity(from);
     let id_to = irs.stored_identity(to);
+
+    // `from`'s live identity entry may have been removed by account recovery
+    // (`recover_identity` moves the identity to the new wallet and deletes the
+    // old mapping). When the live lookup fails, resolve the sender through the
+    // recovery record so a forced/recovery transfer stays bookkeeping-correct
+    // instead of reverting here. A sender that was never registered (no live
+    // identity and no recovery record) still reverts via the final
+    // `stored_identity`, exactly as before.
+    let id_from = match irs.try_stored_identity(from) {
+        Ok(Ok(id)) => id,
+        _ => match irs.get_recovered_to(from) {
+            Some(recovered_wallet) => irs.stored_identity(&recovered_wallet),
+            None => irs.stored_identity(from),
+        },
+    };
 
     if id_from == id_to {
         return;
