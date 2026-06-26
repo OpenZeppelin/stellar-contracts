@@ -178,7 +178,7 @@ impl FungibleVotes {
     ///
     /// # Events
     ///
-    /// * topics - `["Burn", from: Address]`
+    /// * topics - `["burn", from: Address]`
     /// * data - `[amount: i128]`
     ///
     /// * topics - `["delegate_votes_changed", delegate: Address]`

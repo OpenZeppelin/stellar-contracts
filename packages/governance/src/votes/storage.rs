@@ -247,7 +247,7 @@ pub fn get_voting_units(e: &Env, account: &Address) -> u128 {
 /// * data - `[from_delegate: Option<Address>, to_delegate: Address]`
 ///
 /// * topics - `["delegate_votes_changed", delegate: Address]`
-/// * data - `[old_votes: u128, new_votes: u128]`
+/// * data - `[previous_votes: u128, new_votes: u128]`
 ///
 /// # Errors
 ///

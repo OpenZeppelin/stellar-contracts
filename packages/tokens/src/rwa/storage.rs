@@ -631,7 +631,7 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - ["identity_verifier_set", identity_verifier: Address]
+    /// * topics - `["identity_verifier_set", identity_verifier: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning

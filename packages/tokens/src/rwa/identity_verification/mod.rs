@@ -102,7 +102,7 @@ pub trait IdentityVerifier {
     ///
     /// # Events
     ///
-    /// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers:
+    /// * topics - `["claim_topics_and_issuers_set", claim_topics_and_issuers:
     ///   Address]`
     /// * data - `[]`
     ///

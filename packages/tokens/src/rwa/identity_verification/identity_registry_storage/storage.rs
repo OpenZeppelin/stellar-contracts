@@ -332,7 +332,7 @@ pub fn get_recovered_to(e: &Env, old_account: &Address) -> Option<Address> {
 /// * data - `[]`
 ///
 /// Emits for each country data added:
-/// * topics - `["country_added", account: Address]`
+/// * topics - `["country_data_added", account: Address]`
 /// * data - `[country_data: Val]`
 ///
 /// # Security Warning
@@ -441,7 +441,7 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
 /// * data - `[]`
 ///
 /// Emits for each country data removed:
-/// * topics - `["country_removed", account: Address]`
+/// * topics - `["country_data_removed", account: Address]`
 /// * data - `[country_data: Val]`
 ///
 /// # Security Warning
@@ -575,7 +575,7 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
 /// # Events
 ///
 /// Emits for each country data added:
-/// * topics - `["country_added", account: Address]`
+/// * topics - `["country_data_added", account: Address]`
 /// * data - `[country_data: Val]`
 ///
 /// # Security Warning
@@ -629,7 +629,7 @@ pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &
 ///
 /// # Events
 ///
-/// * topics - `["country_modified", account: Address]`
+/// * topics - `["country_data_modified", account: Address]`
 /// * data - `[country_data: Val]`
 ///
 /// # Security Warning
@@ -673,7 +673,7 @@ pub fn modify_country_data(e: &Env, account: &Address, index: u32, country_data:
 ///
 /// # Events
 ///
-/// * topics - `["country_removed", account: Address]`
+/// * topics - `["country_data_removed", account: Address]`
 /// * data - `[country_data: Val]`
 ///
 /// # Security Warning

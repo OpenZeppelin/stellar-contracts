@@ -188,7 +188,7 @@ pub fn get_claim_ids_by_topic(e: &Env, topic: u32) -> Vec<BytesN<32>> {
 ///
 /// # Events
 ///
-/// * topics - `["claim_removed", claim_id: BytesN<32>, topic: u32]`
+/// * topics - `["claim_removed", claim: Claim]`
 /// * data - `[]`
 ///
 /// # Security Warning

@@ -256,7 +256,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// * topics - `["transfer", old_account: Address, new_account: Address]`
     /// * data - `[amount: i128]`
-    /// * topics - `["recovery", old_account: Address, new_account: Address]`
+    /// * topics - `["recovery_success", old_account: Address, new_account:
+    ///   Address]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -452,7 +453,7 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Events
     ///
-    /// * topics - ["identity_verifier_set", identity_verifier: Address]
+    /// * topics - `["identity_verifier_set", identity_verifier: Address]`
     /// * data - `[]`
     ///
     /// # Notes
