@@ -58,7 +58,7 @@ When `sac_passthrough = true` and the underlying SEP-41 is a Stellar Asset Contr
 
 $$\text{permitted}(a) = \neg \text{frozen}(a) \;\land\; \text{policy\\\_ok}(a) \;\land\; (\neg \text{sac\\\_passthrough} \;\lor\; \text{sac.authorized}(a))$$
 
-Off by default. Issuer-led deployments using a SAC underlying opt in at construction. The cost is one extra cross-contract invocation per named account per operation.
+Off by default. Issuer-led deployments using a SAC underlying opt in at construction. The cost is one extra cross-contract invocation per named account per operation. This is the *transitive compliance* pattern: the issuer's own freeze/deauthorize, driven through the SAC's standardized admin interface (`set_authorized`, CAP-0046-06), takes effect at the confidential layer with no state mirrored by the token admin.
 
 ---
 
@@ -83,6 +83,8 @@ Membership management, list semantics, and identity proofs live entirely inside 
 Externalizing the policy also lets a single registry serve multiple tokens. An issuer running several confidential tokens (different denominations, jurisdictions, or product lines) can point every token at the same KYC or sanctions contract and maintain one source of truth, rather than mirroring lists into each token. The `token` argument to `is_authorized` lets the registry apply per-token rules when needed (e.g., a jurisdiction filter) without giving up the shared baseline.
 
 The policy address is rotatable via `set_compliance_config` (§6) under admin auth (§1.1). Setting it to `None` disables the gate. The policy is part of the deployment's trust surface.
+
+**Why the policy is optional.** Making it required would assume every deployment needs address-level gating, which is not the case. A confidential token deployed over a Stellar Asset Contract can rely on the base asset's own restriction configuration (the issuer's `set_authorized`/freeze, surfaced through `sac_passthrough`, §2.2) instead of a separate policy gate. Non-production deployments — testnet demos where a lightweight dapp suffices — likewise need none.
 
 ---
 
@@ -114,7 +116,9 @@ impl Hooks for PermissiveDepositHooks {
 }
 ```
 
-When `from` is not registered with the contract, the freeze and policy gates are skipped; checks on `to` (the registered recipient) are unaffected. This pattern fits regulated deployments that accept inbound payments from non-listed external counterparties (e.g., an exchange wallet depositing into a payroll pool) while keeping recipient-side guarantees intact.
+When `from` is not registered with the contract, this example skips the freeze and policy gates on the sender; checks on `to` (the registered recipient) are unaffected. The pattern fits deployments that accept inbound payments from external counterparties that never register (e.g., an exchange wallet depositing into a payroll pool) while keeping recipient-side guarantees intact.
+
+Skipping the *policy* gate on an unregistered sender is a deliberate trade-off, not a recommendation. The policy contract screens an address and its history (SDN, KYT) and does not require that address to be a registered wrapper user, so a deployment that must screen every inbound counterparty can instead call `storage::check_policy(e, from, &config)` for the unregistered `from` and skip only the registration-dependent freeze check. The default `ComplianceHooks` gates both parties unconditionally.
 
 ### 4.2 Permit Deposits Only For Oneself
 
@@ -139,6 +143,13 @@ These two examples are illustrative; the same surface accommodates per-deposit r
 
 ## 5. Clawback (Outline Only)
 
+This section specifies seizing value from a single confidential account: extracting a bounded amount and settling it to the issuer over a transparent path. It is separate from **freeze** (§2), and the two must not be conflated.
+
+- **Freeze is immediate and unilateral.** It needs no coordination and is the correct response to an urgent order: a frozen account can neither send, receive, deposit, nor withdraw. It can be triggered by the token admin (§2) or — when the base asset is a SAC and `sac_passthrough` is set — by the issuer's own `set_authorized`/freeze surfacing through the SAC `authorized()` check (§2.2, the *transitive compliance* path), with no state mirrored by the token admin.
+- **Seize is the multi-step, coordinated flow** specified below. It is normally preceded by a freeze and relies on it: the freeze is what keeps the target's commitments from changing between proof construction and submission (§5.3, *Anti-replay*).
+
+**Terminology.** This flow is called *clawback* because it mirrors the clawback semantics of Stellar Classic / SAC assets, but it is a distinct mechanism.
+
 ### 5.1 The Pooled-Custody Problem
 
 Once an account deposits into the contract, the underlying SEP-41 ledger lists the token contract as the holder of those funds, not the depositor. An issuer's SAC-level `clawback(token_address, amount)` call would drain the pool, debiting unrelated accounts. The contract therefore does not forward SAC-level clawback to individual confidential accounts; it must instead extract value from a single targeted account's confidential balance and settle that value to the issuer through a transparent path.
@@ -147,10 +158,13 @@ The challenge is that the contract does not know the targeted account's balance.
 
 ### 5.2 Admin + Auditor Coordination
 
-The clawback flow requires cooperation between two roles:
+Three roles bear on this flow:
 
-- **Admin** authorizes the action on-chain: freezes the target, calls the clawback entry point, and settles the recovered amount to the issuer.
-- **Auditor** unlocks knowledge of the target's balance. Two halves of the target's confidential position are covered by the two auditor channels (see `DESIGN.md` §8.1, §8.2). The **sender-auditor** decrypts the spendable-balance checkpoint $\tilde{b}_{\text{aud,s}}$ from the target's most recent owner-initiated event, recovering $v_s$. The **recipient-auditor** decrypts the per-transfer pairs $(v_{\text{tx},i}, r_{\text{tx},i})$ from every inbound transfer and spender-transfer since the last merge, recovering the full Pedersen opening $(v_r, r_r)$ of the target's `receiving_balance`. The auditor then produces a zero-knowledge proof bounding the clawback amount by $v_s + v_r$, without revealing either summand.
+- **Token admin** — the access-control authority on the confidential-token contract (§1.1). Authorizes the freeze, the seize entry point, and settlement.
+- **Issuer (SAC admin)** — when the base asset is a Stellar Asset Contract, the holder of its standardized admin interface (`mint`, `clawback`, `set_authorized`; CAP-0046-06). Seized value settles to the issuer over the transparent SEP-41 path, and the issuer can freeze independently of the token admin via SAC passthrough (§2.2).
+- **Auditor** — holder of the off-chain auditor decryption key bound to the account at registration (`DESIGN.md` §8). Governs visibility of confidential balances; cannot move funds or change contract state.
+
+The seize itself is carried out by the token admin and the auditor together. The admin authorizes the on-chain action per the role above; the auditor unlocks knowledge of the target's balance. Two halves of the target's confidential position are covered by the two auditor channels (see `DESIGN.md` §8.1, §8.2). The **sender-auditor** decrypts the spendable-balance checkpoint $\tilde{b}_{\text{aud,s}}$ from the target's most recent owner-initiated event, recovering $v_s$. The **recipient-auditor** decrypts the per-transfer pairs $(v_{\text{tx},i}, r_{\text{tx},i})$ from every inbound transfer and spender-transfer since the last merge, recovering the full Pedersen opening $(v_r, r_r)$ of the target's `receiving_balance`. The auditor then produces a zero-knowledge proof bounding the clawback amount by $v_s + v_r$, without revealing either summand.
 
 Neither party can act alone: the admin cannot produce the proof, and the auditor cannot freeze the account or move funds. This is the same trust separation present in the core protocol (admin governs state transitions, auditor governs visibility) extended to a write surface.
 
