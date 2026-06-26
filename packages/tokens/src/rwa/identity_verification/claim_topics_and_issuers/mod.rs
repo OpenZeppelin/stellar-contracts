@@ -39,7 +39,7 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// # Events
     ///
-    /// * topics - `["claim_added", claim_topic: u32]`
+    /// * topics - `["claim_topic_added", claim_topic: u32]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -67,7 +67,7 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// # Events
     ///
-    /// * topics - `["claim_removed", claim_topic: u32]`
+    /// * topics - `["claim_topic_removed", claim_topic: u32]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -117,7 +117,7 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// # Events
     ///
-    /// * topics - `["issuer_added", trusted_issuer: Address]`
+    /// * topics - `["trusted_issuer_added", trusted_issuer: Address]`
     /// * data - `[claim_topics: Vec<u32>]`
     ///
     /// # Notes
@@ -152,7 +152,7 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// # Events
     ///
-    /// * topics - `["issuer_removed", trusted_issuer: Address]`
+    /// * topics - `["trusted_issuer_removed", trusted_issuer: Address]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -191,7 +191,7 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// # Events
     ///
-    /// * topics - `["topics_updated", trusted_issuer: Address]`
+    /// * topics - `["issuer_topics_updated", trusted_issuer: Address]`
     /// * data - `[claim_topics: Vec<u32>]`
     ///
     /// # Notes

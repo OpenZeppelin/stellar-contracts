@@ -239,7 +239,7 @@ pub trait FungibleToken {
     ///
     /// # Events
     ///
-    /// * topics - `["approve", from: Address, spender: Address]`
+    /// * topics - `["approve", owner: Address, spender: Address]`
     /// * data - `[amount: i128, live_until_ledger: u32]`
     fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32) {
         Self::ContractType::approve(e, &owner, &spender, amount, live_until_ledger);

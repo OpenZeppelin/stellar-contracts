@@ -51,7 +51,7 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// # Events
     ///
-    /// * topics - `["allow", user: Address]`
+    /// * topics - `["user_allowed", user: Address]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -72,7 +72,7 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// # Events
     ///
-    /// * topics - `["disallow", user: Address]`
+    /// * topics - `["user_disallowed", user: Address]`
     /// * data - `[]`
     ///
     /// # Notes

@@ -613,7 +613,7 @@ pub fn validate_no_canonical_duplicates(e: &Env, signers: &Vec<Signer>) {
 ///
 /// # Events
 ///
-/// * topics - `["context_rule_added", id: u32]`
+/// * topics - `["context_rule_added", context_rule_id: u32]`
 /// * data - `[name: String, context_type: ContextRuleType, valid_until:
 ///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]`
 ///

@@ -73,7 +73,7 @@ impl AllowList {
     ///
     /// # Events
     ///
-    /// * topics - `["allow", user: Address]`
+    /// * topics - `["user_allowed", user: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -106,7 +106,7 @@ impl AllowList {
     ///
     /// # Events
     ///
-    /// * topics - `["disallow", user: Address]`
+    /// * topics - `["user_disallowed", user: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning

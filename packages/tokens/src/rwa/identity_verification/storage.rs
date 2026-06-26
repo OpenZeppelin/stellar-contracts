@@ -164,7 +164,8 @@ pub fn recovery_target(e: &Env, old_account: &Address) -> Option<Address> {
 ///
 /// # Events
 ///
-/// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers: Address]`
+/// * topics - `["claim_topics_and_issuers_set", claim_topics_and_issuers:
+///   Address]`
 /// * data - `[]`
 ///
 /// # Security Warning

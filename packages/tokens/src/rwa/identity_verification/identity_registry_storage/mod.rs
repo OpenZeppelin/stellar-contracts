@@ -367,7 +367,7 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// * data - `[]`
     ///
     /// Emits for each country data removed:
-    /// * topics - `["country_removed", account: Address]`
+    /// * topics - `["country_data_removed", account: Address]`
     /// * data - `[country_data: Val]`
     ///
     /// # Notes
@@ -471,7 +471,7 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     /// # Events
     ///
     /// Emits for each country data entry added:
-    /// * topics - `["country_added", account: Address]`
+    /// * topics - `["country_data_added", account: Address]`
     /// * data - `[country_data: Val]`
     ///
     /// # Notes
@@ -498,7 +498,7 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// # Events
     ///
-    /// * topics - `["country_modified", account: Address]`
+    /// * topics - `["country_data_modified", account: Address]`
     /// * data - `[country_data: Val]`
     ///
     /// # Notes
@@ -527,7 +527,7 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// # Events
     ///
-    /// * topics - `["country_removed", account: Address]`
+    /// * topics - `["country_data_removed", account: Address]`
     /// * data - `[country_data: Val]`
     ///
     /// # Notes

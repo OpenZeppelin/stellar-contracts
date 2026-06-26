@@ -73,7 +73,7 @@ impl BlockList {
     ///
     /// # Events
     ///
-    /// * topics - `["block", user: Address]`
+    /// * topics - `["user_blocked", user: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -106,7 +106,7 @@ impl BlockList {
     ///
     /// # Events
     ///
-    /// * topics - `["unblock", user: Address]`
+    /// * topics - `["user_unblocked", user: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning

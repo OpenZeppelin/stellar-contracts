@@ -31,12 +31,12 @@ pub trait IdentityClaims {
     ///
     /// # Events
     ///
-    /// * topics - `["claim_added", claim_id: BytesN<32>, topic: u32]`
+    /// * topics - `["claim_added", claim: Claim]`
     /// * data - `[]`
     ///
     /// OR (for updates):
     ///
-    /// * topics - `["claim_changed", claim_id: BytesN<32>, topic: u32]`
+    /// * topics - `["claim_changed", claim: Claim]`
     /// * data - `[]`
     ///
     /// # Notes
