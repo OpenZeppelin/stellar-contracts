@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype,
+    contract, contractimpl, contracttype, panic_with_error,
     testutils::{Address as _, Events as _},
     vec, Address, Env, Val, Vec,
 };
@@ -18,7 +18,7 @@ use crate::rwa::{
         },
         TransferKind,
     },
-    identity_registry_storage::{CountryDataManager, IdentityRegistryStorage},
+    identity_registry_storage::{CountryDataManager, IRSError, IdentityRegistryStorage},
     utils::token_binder::TokenBinder,
 };
 
@@ -29,6 +29,8 @@ struct MockIRSContract;
 #[derive(Clone)]
 enum MockIRSStorageKey {
     Identity(Address),
+    RecoveredTo(Address),
+    Removed(Address),
 }
 
 #[contractimpl]
@@ -76,10 +78,25 @@ impl IdentityRegistryStorage for MockIRSContract {
     }
 
     fn stored_identity(e: &Env, account: Address) -> Address {
-        e.storage()
+        if let Some(identity) = e
+            .storage()
             .persistent()
-            .get(&MockIRSStorageKey::Identity(account.clone()))
-            .unwrap_or(account)
+            .get::<_, Address>(&MockIRSStorageKey::Identity(account.clone()))
+        {
+            identity
+        } else if e.storage().persistent().has(&MockIRSStorageKey::RecoveredTo(account.clone()))
+            || e.storage().persistent().has(&MockIRSStorageKey::Removed(account.clone()))
+        {
+            // Model the real IRS: once the mapping is gone (recovery or
+            // `remove_identity`), the lookup reverts with `IdentityNotFound`.
+            panic_with_error!(e, IRSError::IdentityNotFound)
+        } else {
+            account
+        }
+    }
+
+    fn get_recovered_to(e: &Env, old_account: Address) -> Option<Address> {
+        e.storage().persistent().get(&MockIRSStorageKey::RecoveredTo(old_account))
     }
 }
 
@@ -117,6 +134,24 @@ impl CountryDataManager for MockIRSContract {
 impl MockIRSContract {
     pub fn set_identity(e: &Env, account: Address, identity: Address) {
         e.storage().persistent().set(&MockIRSStorageKey::Identity(account), &identity);
+    }
+
+    /// Models `recover_identity`: moves the identity from `old_account` to
+    /// `new_account`, removes the old mapping, and records the recovery target.
+    pub fn recover(e: &Env, old_account: Address, new_account: Address) {
+        let old_key = MockIRSStorageKey::Identity(old_account.clone());
+        let identity: Address =
+            e.storage().persistent().get(&old_key).expect("identity must be set before recovery");
+        e.storage().persistent().set(&MockIRSStorageKey::Identity(new_account.clone()), &identity);
+        e.storage().persistent().remove(&old_key);
+        e.storage().persistent().set(&MockIRSStorageKey::RecoveredTo(old_account), &new_account);
+    }
+
+    /// Models `remove_identity`: deletes the mapping without recording a
+    /// recovery target, so the lookup reverts like the real IRS.
+    pub fn remove(e: &Env, account: Address) {
+        e.storage().persistent().remove(&MockIRSStorageKey::Identity(account.clone()));
+        e.storage().persistent().set(&MockIRSStorageKey::Removed(account), &());
     }
 }
 
@@ -331,6 +366,116 @@ fn on_transfer_forced_bypasses_cap_but_updates_books() {
 
         assert_eq!(get_id_balance(&e, &token, &from_id), 25);
         assert_eq!(get_id_balance(&e, &token, &to_id), 55);
+    });
+}
+
+// Regression: after `recover_identity` removes the old wallet's identity, the
+// RWA recovery flow moves the balance via a forced transfer to the recovery
+// target. The hook must not revert on the now-missing source identity; it
+// resolves `from` through the recovery record, finds the same identity on both
+// sides, and leaves the per-identity book untouched (a same-identity no-op).
+#[test]
+fn forced_transfer_after_recovery_is_noop_and_does_not_revert() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let old_wallet = Address::generate(&e);
+    let new_wallet = Address::generate(&e);
+    let identity = Address::generate(&e);
+
+    irs.set_identity(&old_wallet, &identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_max_balance(&e, &token, 100);
+        on_created(&e, &old_wallet, 80, &token);
+    });
+
+    // Identity recovery moves the identity to the new wallet and removes the
+    // old mapping, so `stored_identity(old_wallet)` now reverts.
+    irs.recover(&old_wallet, &new_wallet);
+
+    e.as_contract(&module_id, || {
+        // The documented recovery move: forced transfer of the whole balance
+        // from the (now identity-less) old wallet to the recovery target.
+        on_transfer(&e, &old_wallet, &new_wallet, 80, &TransferKind::Forced, &token);
+
+        // Same identity on both sides => the aggregate is unchanged and correct.
+        assert_eq!(get_id_balance(&e, &token, &identity), 80);
+    });
+}
+
+// Regression: a forced transfer out of a recovered (identity-less) wallet to a
+// *different* identity must still keep the books straight. The source resolves
+// through the recovery record to its identity, which differs from the
+// recipient's, so the move debits and credits both aggregates as normal.
+#[test]
+fn forced_transfer_after_recovery_to_third_party_updates_books() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let old_wallet = Address::generate(&e);
+    let new_wallet = Address::generate(&e);
+    let third_wallet = Address::generate(&e);
+    let identity = Address::generate(&e);
+    let third_id = Address::generate(&e);
+
+    irs.set_identity(&old_wallet, &identity);
+    irs.set_identity(&third_wallet, &third_id);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_max_balance(&e, &token, 100);
+        on_created(&e, &old_wallet, 80, &token);
+    });
+
+    irs.recover(&old_wallet, &new_wallet);
+
+    e.as_contract(&module_id, || {
+        on_transfer(&e, &old_wallet, &third_wallet, 30, &TransferKind::Forced, &token);
+
+        // `identity` (resolved via the recovery record) is debited; `third_id`
+        // is credited unchecked because the transfer is forced.
+        assert_eq!(get_id_balance(&e, &token, &identity), 50);
+        assert_eq!(get_id_balance(&e, &token, &third_id), 30);
+    });
+}
+
+// Regression: a sender whose identity was removed *without* recovery has no
+// record to fall back to, so the hook re-raises the IRS error it captured
+// (`IdentityNotFound`, #321) rather than silently swallowing it.
+#[test]
+#[should_panic(expected = "Error(Contract, #321)")]
+fn on_transfer_reraises_irs_error_when_source_unregistered() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let from_wallet = Address::generate(&e);
+    let to_wallet = Address::generate(&e);
+    let from_id = Address::generate(&e);
+    let to_id = Address::generate(&e);
+
+    irs.set_identity(&from_wallet, &from_id);
+    irs.set_identity(&to_wallet, &to_id);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_max_balance(&e, &token, 100);
+        on_created(&e, &from_wallet, 50, &token);
+    });
+
+    // Identity removed without recovery: the source lookup reverts and there is
+    // no recovery record, so the captured error must propagate unchanged.
+    irs.remove(&from_wallet);
+
+    e.as_contract(&module_id, || {
+        on_transfer(&e, &from_wallet, &to_wallet, 10, &TransferKind::Standard, &token);
     });
 }
 
