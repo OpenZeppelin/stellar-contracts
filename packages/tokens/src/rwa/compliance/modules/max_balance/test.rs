@@ -30,6 +30,7 @@ struct MockIRSContract;
 enum MockIRSStorageKey {
     Identity(Address),
     RecoveredTo(Address),
+    Removed(Address),
 }
 
 #[contractimpl]
@@ -83,9 +84,11 @@ impl IdentityRegistryStorage for MockIRSContract {
             .get::<_, Address>(&MockIRSStorageKey::Identity(account.clone()))
         {
             identity
-        } else if e.storage().persistent().has(&MockIRSStorageKey::RecoveredTo(account.clone())) {
-            // Model the real IRS: once recovery removes the mapping, the lookup
-            // reverts with `IdentityNotFound`.
+        } else if e.storage().persistent().has(&MockIRSStorageKey::RecoveredTo(account.clone()))
+            || e.storage().persistent().has(&MockIRSStorageKey::Removed(account.clone()))
+        {
+            // Model the real IRS: once the mapping is gone (recovery or
+            // `remove_identity`), the lookup reverts with `IdentityNotFound`.
             panic_with_error!(e, IRSError::IdentityNotFound)
         } else {
             account
@@ -142,6 +145,13 @@ impl MockIRSContract {
         e.storage().persistent().set(&MockIRSStorageKey::Identity(new_account.clone()), &identity);
         e.storage().persistent().remove(&old_key);
         e.storage().persistent().set(&MockIRSStorageKey::RecoveredTo(old_account), &new_account);
+    }
+
+    /// Models `remove_identity`: deletes the mapping without recording a
+    /// recovery target, so the lookup reverts like the real IRS.
+    pub fn remove(e: &Env, account: Address) {
+        e.storage().persistent().remove(&MockIRSStorageKey::Identity(account.clone()));
+        e.storage().persistent().set(&MockIRSStorageKey::Removed(account), &());
     }
 }
 
@@ -432,6 +442,40 @@ fn forced_transfer_after_recovery_to_third_party_updates_books() {
         // is credited unchecked because the transfer is forced.
         assert_eq!(get_id_balance(&e, &token, &identity), 50);
         assert_eq!(get_id_balance(&e, &token, &third_id), 30);
+    });
+}
+
+// Regression: a sender whose identity was removed *without* recovery has no
+// record to fall back to, so the hook re-raises the IRS error it captured
+// (`IdentityNotFound`, #321) rather than silently swallowing it.
+#[test]
+#[should_panic(expected = "Error(Contract, #321)")]
+fn on_transfer_reraises_irs_error_when_source_unregistered() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let from_wallet = Address::generate(&e);
+    let to_wallet = Address::generate(&e);
+    let from_id = Address::generate(&e);
+    let to_id = Address::generate(&e);
+
+    irs.set_identity(&from_wallet, &from_id);
+    irs.set_identity(&to_wallet, &to_id);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_max_balance(&e, &token, 100);
+        on_created(&e, &from_wallet, 50, &token);
+    });
+
+    // Identity removed without recovery: the source lookup reverts and there is
+    // no recovery record, so the captured error must propagate unchanged.
+    irs.remove(&from_wallet);
+
+    e.as_contract(&module_id, || {
+        on_transfer(&e, &from_wallet, &to_wallet, 10, &TransferKind::Standard, &token);
     });
 }
 

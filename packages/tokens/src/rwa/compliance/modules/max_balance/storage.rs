@@ -276,17 +276,19 @@ pub fn on_transfer(
 
     // `from`'s live identity entry may have been removed by account recovery
     // (`recover_identity` moves the identity to the new wallet and deletes the
-    // old mapping). When the live lookup fails, resolve the sender through the
-    // recovery record so a forced/recovery transfer stays bookkeeping-correct
-    // instead of reverting here. A sender that was never registered (no live
-    // identity and no recovery record) still reverts via the final
-    // `stored_identity`, exactly as before.
+    // old mapping). When the live lookup fails with a contract error, resolve
+    // the sender through the recovery record so a forced/recovery transfer stays
+    // bookkeeping-correct instead of reverting here. A sender that was never
+    // registered (failed lookup, no recovery record) re-raises the IRS error.
     let id_from = match irs.try_stored_identity(from) {
         Ok(Ok(id)) => id,
-        _ => match irs.get_recovered_to(from) {
+        Err(Ok(err)) => match irs.get_recovered_to(from) {
             Some(recovered_wallet) => irs.stored_identity(&recovered_wallet),
-            None => irs.stored_identity(from),
+            None => panic_with_error!(e, err),
         },
+        // A conversion failure or host-level invoke error is unreachable with a
+        // correctly configured IRS; terminate by re-issuing the call.
+        _ => irs.stored_identity(from),
     };
 
     if id_from == id_to {
