@@ -1,7 +1,6 @@
 extern crate std;
 
-use soroban_sdk::{contract, Bytes, Env};
-use stellar_event_assertion::EventAssertion;
+use soroban_sdk::{contract, testutils::Events, Bytes, Env};
 
 use crate::confidential::verifier::{
     storage::{
@@ -29,7 +28,7 @@ fn register_and_get_verification_key_works() {
 
         assert_eq!(get_verification_key(&e, CircuitType::Register), vk);
 
-        EventAssertion::new(&e, address.clone()).assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -120,7 +119,7 @@ fn update_emits_update_event() {
         update_verification_key(&e, CircuitType::SpenderTransfer, &new);
 
         // 2 events: VerificationKeyRegistered + VerificationKeyUpdated.
-        EventAssertion::new(&e, address.clone()).assert_event_count(2);
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 

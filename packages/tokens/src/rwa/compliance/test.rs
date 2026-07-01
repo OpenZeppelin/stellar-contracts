@@ -1,7 +1,10 @@
 extern crate std;
 
-use soroban_sdk::{contract, contractimpl, testutils::Address as _, vec, Address, Env};
-use stellar_event_assertion::EventAssertion;
+use soroban_sdk::{
+    contract, contractimpl,
+    testutils::{Address as _, Events},
+    vec, Address, Env,
+};
 
 use crate::rwa::{
     compliance::{
@@ -44,7 +47,7 @@ fn add_module_to_works() {
         let modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
         assert_eq!(modules.len(), 1);
         assert_eq!(modules.get(0).unwrap(), module);
-        EventAssertion::new(&e, address.clone()).assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -138,7 +141,7 @@ fn remove_module_from_works() {
         let modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
         assert!(modules.is_empty());
         // 1 ModuleAdded + 1 ModuleRemoved
-        EventAssertion::new(&e, address.clone()).assert_event_count(2);
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 

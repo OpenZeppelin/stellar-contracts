@@ -1,7 +1,10 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Env};
-use stellar_event_assertion::EventAssertion;
+use soroban_sdk::{
+    contract,
+    testutils::{Address as _, Events},
+    Address, Env,
+};
 
 use crate::rwa::compliance::modules::supply_limit::storage::{
     get_supply_count, get_supply_limit, on_created, on_destroyed, set_supply_limit,
@@ -54,7 +57,7 @@ fn on_created_increments_counter_and_emits_event() {
 
         assert_eq!(get_supply_count(&e, &token), 70);
         // SupplyLimitSet + two SupplyCountUpdated emissions.
-        EventAssertion::new(&e, module_id.clone()).assert_event_count(3);
+        assert_eq!(e.events().all().events().len(), 3);
     });
 }
 

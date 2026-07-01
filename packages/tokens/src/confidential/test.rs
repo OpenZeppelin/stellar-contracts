@@ -2,12 +2,11 @@ extern crate std;
 
 use soroban_sdk::{
     contract, contractimpl,
-    testutils::{Address as _, Ledger},
+    testutils::{Address as _, Events, Ledger},
     token::StellarAssetClient,
     xdr::ToXdr,
     Address, Bytes, BytesN, Env,
 };
-use stellar_event_assertion::EventAssertion;
 
 use crate::confidential::{
     auditor::{storage as auditor_storage, ConfidentialAuditor},
@@ -261,7 +260,7 @@ fn register_stores_account_with_identity_balances() {
     let alice = Address::generate(&h.e);
 
     h.token.register(&alice, &1u32, &register_data(&h.e));
-    EventAssertion::new(&h.e, h.token_addr.clone()).assert_event_count(1);
+    assert_eq!(h.e.events().all().events().len(), 1);
 
     let account: ConfidentialAccount = h.token.confidential_balance(&alice);
     assert_eq!(account.spending_key, fixture_point(&h.e));
@@ -373,7 +372,7 @@ fn deposit_credits_receiving_balance() {
 
     h.token.deposit(&depositor, &alice, &500i128);
     // 1 SAC transfer event + 1 Deposit event.
-    EventAssertion::new(&h.e, h.token_addr.clone()).assert_event_count(2);
+    assert_eq!(h.e.events().all().events().len(), 2);
 
     // Receiving balance must move off identity.
     let account = h.token.confidential_balance(&alice);
@@ -437,7 +436,7 @@ fn merge_folds_receiving_into_spendable() {
 
     let pre = h.token.confidential_balance(&alice);
     h.token.merge(&alice);
-    EventAssertion::new(&h.e, h.token_addr.clone()).assert_event_count(1);
+    assert_eq!(h.e.events().all().events().len(), 1);
 
     let post = h.token.confidential_balance(&alice);
 
@@ -471,7 +470,7 @@ fn withdraw_transfers_tokens_and_updates_spendable() {
 
     h.token.withdraw(&alice, &beneficiary, &300i128, &withdraw_data(&h.e));
     // 1 SAC transfer event + 1 Withdraw event.
-    EventAssertion::new(&h.e, h.token_addr.clone()).assert_event_count(2);
+    assert_eq!(h.e.events().all().events().len(), 2);
 
     let token_client = soroban_sdk::token::TokenClient::new(&h.e, &h.sac_addr);
     assert_eq!(token_client.balance(&beneficiary), 300);
@@ -519,7 +518,7 @@ fn confidential_transfer_updates_both_sides() {
     h.token.merge(&alice);
 
     h.token.confidential_transfer(&alice, &bob, &transfer_data(&h.e));
-    EventAssertion::new(&h.e, h.token_addr.clone()).assert_event_count(1);
+    assert_eq!(h.e.events().all().events().len(), 1);
 
     // Sender's spendable balance was overwritten.
     let alice_acc = h.token.confidential_balance(&alice);
@@ -541,7 +540,7 @@ fn set_spender_stores_delegation() {
     h.token.register(&spender, &1u32, &register_data(&h.e));
 
     h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
-    EventAssertion::new(&h.e, h.token_addr.clone()).assert_event_count(1);
+    assert_eq!(h.e.events().all().events().len(), 1);
 
     let delegation = h.token.get_spender_delegation(&alice, &spender);
     assert_eq!(delegation.live_until_ledger, 1_000);
@@ -572,7 +571,7 @@ fn revoke_spender_deletes_delegation() {
     h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
 
     h.token.revoke_spender(&alice, &spender, &revoke_spender_data(&h.e));
-    EventAssertion::new(&h.e, h.token_addr.clone()).assert_event_count(1);
+    assert_eq!(h.e.events().all().events().len(), 1);
 
     assert!(!h.token.is_spender(&alice, &spender));
 }
@@ -611,7 +610,7 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
     h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
 
     h.token.confidential_transfer_from(&spender, &alice, &bob, &spender_transfer_data(&h.e));
-    EventAssertion::new(&h.e, h.token_addr.clone()).assert_event_count(1);
+    assert_eq!(h.e.events().all().events().len(), 1);
 
     // Delegation allowance commitment was rotated.
     let delegation = h.token.get_spender_delegation(&alice, &spender);
@@ -720,7 +719,7 @@ fn set_underlying_asset_emits_event() {
     let token = Address::generate(&e);
     e.as_contract(&bare, || {
         token_storage::set_underlying_asset(&e, &token);
-        EventAssertion::new(&e, bare.clone()).assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -731,7 +730,7 @@ fn set_verifier_emits_event() {
     let verifier = Address::generate(&e);
     e.as_contract(&bare, || {
         token_storage::set_verifier(&e, &verifier);
-        EventAssertion::new(&e, bare.clone()).assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -742,7 +741,7 @@ fn set_auditor_emits_event() {
     let auditor = Address::generate(&e);
     e.as_contract(&bare, || {
         token_storage::set_auditor(&e, &auditor);
-        EventAssertion::new(&e, bare.clone()).assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -752,7 +751,7 @@ fn set_address_as_field_element_emits_event() {
     let bare = e.register(BareContract, ());
     e.as_contract(&bare, || {
         token_storage::set_address_as_field_element(&e);
-        EventAssertion::new(&e, bare.clone()).assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 

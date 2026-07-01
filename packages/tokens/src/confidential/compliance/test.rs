@@ -2,12 +2,11 @@ extern crate std;
 
 use soroban_sdk::{
     contract, contractimpl,
-    testutils::Address as _,
+    testutils::{Address as _, Events},
     token::StellarAssetClient,
     xdr::{AccountFlags, ToXdr},
     Address, Bytes, BytesN, Env, IntoVal, Val,
 };
-use stellar_event_assertion::EventAssertion;
 
 use crate::confidential::{
     compliance::{
@@ -252,7 +251,7 @@ fn freeze_then_unfreeze_round_trip() {
     });
 
     // 1 ComplianceConfigChanged + 1 Frozen + 1 Unfrozen.
-    EventAssertion::new(&h.e, h.host.clone()).assert_event_count(3);
+    assert_eq!(h.e.events().all().events().len(), 3);
 }
 
 #[test]
@@ -525,7 +524,7 @@ fn set_compliance_config_overwrites_atomically() {
     });
 
     // 2 ComplianceConfigChanged events.
-    EventAssertion::new(&h.e, h.host.clone()).assert_event_count(2);
+    assert_eq!(h.e.events().all().events().len(), 2);
 }
 
 // ################## COMBINED GATES ##################

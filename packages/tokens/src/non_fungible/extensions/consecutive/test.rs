@@ -1,17 +1,23 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env, String, Vec};
-use stellar_event_assertion::EventAssertion;
+use soroban_sdk::{
+    contract,
+    testutils::{Address as _, Events},
+    vec, Address, Env, Event, String, Vec,
+};
 
 use crate::non_fungible::{
-    extensions::consecutive::{
-        storage::{
-            find_bit_in_bucket, find_bit_in_item, NFTConsecutiveStorageKey, IDS_IN_BUCKET,
-            IDS_IN_ITEM, MAX_TOKENS_IN_BATCH,
+    extensions::{
+        burnable::Burn,
+        consecutive::{
+            storage::{
+                find_bit_in_bucket, find_bit_in_item, NFTConsecutiveStorageKey, IDS_IN_BUCKET,
+                IDS_IN_ITEM, MAX_TOKENS_IN_BATCH,
+            },
+            Consecutive, ConsecutiveMint,
         },
-        Consecutive,
     },
-    sequential, Base,
+    sequential, Approve, Base, Transfer,
 };
 
 #[contract]
@@ -193,9 +199,13 @@ fn consecutive_batch_mint_works() {
     e.as_contract(&address, || {
         Consecutive::batch_mint(&e, &owner, amount);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
-        event_assert.assert_consecutive_mint(&owner, 0, 31_999);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 1);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &ConsecutiveMint { to: owner.clone(), from_token_id: 0, to_token_id: 31_999 }
+                .to_xdr(&e, &address)
+        );
 
         assert_eq!(sequential::next_token_id(&e), amount);
         assert_eq!(Base::balance(&e, &owner), amount);
@@ -313,10 +323,18 @@ fn consecutive_transfer_works() {
             .unwrap();
         assert_eq!(_owner, owner);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
-        event_assert.assert_consecutive_mint(&owner, 0, 99);
-        event_assert.assert_non_fungible_transfer(&owner, &recipient, 50);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 2);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &ConsecutiveMint { to: owner.clone(), from_token_id: 0, to_token_id: 99 }
+                .to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &Transfer { from: owner.clone(), to: recipient.clone(), token_id: 50 }
+                .to_xdr(&e, &address)
+        );
     });
 }
 
@@ -333,9 +351,13 @@ fn consecutive_transfer_edge_works() {
     e.as_contract(&address, || {
         Consecutive::batch_mint(&e, &owner, amount);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
-        event_assert.assert_consecutive_mint(&owner, 0, 99);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 1);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &ConsecutiveMint { to: owner.clone(), from_token_id: 0, to_token_id: 99 }
+                .to_xdr(&e, &address)
+        );
 
         assert_eq!(Consecutive::owner_of(&e, 0), owner);
         Consecutive::transfer(&e, &owner, &recipient, 0);
@@ -373,11 +395,27 @@ fn consecutive_transfer_from_works() {
 
         assert_eq!(Consecutive::owner_of(&e, token_id + 1), owner);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(3);
-        event_assert.assert_consecutive_mint(&owner, 0, 99);
-        event_assert.assert_non_fungible_approve(&owner, &spender, token_id, 100);
-        event_assert.assert_non_fungible_transfer(&owner, &recipient, token_id);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 3);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &ConsecutiveMint { to: owner.clone(), from_token_id: 0, to_token_id: 99 }
+                .to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &Approve {
+                approver: owner.clone(),
+                token_id,
+                approved: spender.clone(),
+                live_until_ledger: 100,
+            }
+            .to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(2).unwrap(),
+            &Transfer { from: owner.clone(), to: recipient.clone(), token_id }.to_xdr(&e, &address)
+        );
     });
 }
 
@@ -408,10 +446,17 @@ fn consecutive_burn_works() {
             .unwrap();
         assert_eq!(_owner, owner);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
-        event_assert.assert_consecutive_mint(&owner, 0, 99);
-        event_assert.assert_non_fungible_burn(&owner, token_id);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 2);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &ConsecutiveMint { to: owner.clone(), from_token_id: 0, to_token_id: 99 }
+                .to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &Burn { from: owner.clone(), token_id }.to_xdr(&e, &address)
+        );
     });
 
     e.as_contract(&address, || {
@@ -450,11 +495,27 @@ fn consecutive_burn_from_works() {
         assert!(burned);
         assert_eq!(Consecutive::owner_of(&e, token_id + 1), owner);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(3);
-        event_assert.assert_consecutive_mint(&owner, 0, 99);
-        event_assert.assert_non_fungible_approve(&owner, &spender, token_id, 100);
-        event_assert.assert_non_fungible_burn(&owner, token_id);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 3);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &ConsecutiveMint { to: owner.clone(), from_token_id: 0, to_token_id: 99 }
+                .to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &Approve {
+                approver: owner.clone(),
+                token_id,
+                approved: spender.clone(),
+                live_until_ledger: 100,
+            }
+            .to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(2).unwrap(),
+            &Burn { from: owner.clone(), token_id }.to_xdr(&e, &address)
+        );
     });
 }
 
