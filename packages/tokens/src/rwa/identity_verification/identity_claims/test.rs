@@ -1,7 +1,8 @@
 extern crate std;
 
-use soroban_sdk::{contract, symbol_short, Address, Bytes, BytesN, Env, String, Vec};
-use stellar_event_assertion::EventAssertion;
+use soroban_sdk::{
+    contract, symbol_short, testutils::Events, Address, Bytes, BytesN, Env, String, Vec,
+};
 
 use crate::rwa::identity_verification::identity_claims::storage::{
     add_claim, get_claim, get_claim_ids_by_topic, remove_claim, remove_claim_from_topic_index,
@@ -76,7 +77,7 @@ fn add_claim_success() {
         let claim_ids = get_claim_ids_by_topic(&e, topic);
         assert_eq!(claim_ids.len(), 1);
         assert_eq!(claim_ids.get(0).unwrap(), claim_id);
-        EventAssertion::new(&e, contract_id.clone()).assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -130,7 +131,7 @@ fn update_existing_claim() {
         let claim_ids = get_claim_ids_by_topic(&e, topic);
         assert_eq!(claim_ids.len(), 1);
         // 1 ClaimAdded + 1 ClaimChanged
-        EventAssertion::new(&e, contract_id.clone()).assert_event_count(2);
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 
@@ -227,7 +228,7 @@ fn claim_removal() {
         let claim_ids_after = get_claim_ids_by_topic(&e, topic);
         assert_eq!(claim_ids_after.len(), 0);
         // 1 ClaimAdded + 1 ClaimRemoved
-        EventAssertion::new(&e, contract_id.clone()).assert_event_count(2);
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 

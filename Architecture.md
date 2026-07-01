@@ -14,7 +14,6 @@ stellar-contracts/
 │   ├── access/                  # Role-based access controls and ownable patterns
 │   ├── contract-utils/          # Utilities (pausable, upgradeable, cryptography)
 │   ├── macros/                  # Procedural and derive macros
-│   ├── test-utils/              # Testing utilities and helpers
 │   └── tokens/                  # Token implementations (fungible, non-fungible)
 │       ├── src/
 │       │   ├── fungible/        # Fungible token implementation

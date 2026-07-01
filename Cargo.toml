@@ -33,7 +33,6 @@ members = [
     "packages/fee-abstraction",
     "packages/governance",
     "packages/macros",
-    "packages/test-utils/*",
     "packages/tokens",
     "packages/zk-email",
 ]
@@ -73,7 +72,6 @@ serde-json-core = { version = "0.6.0", default-features = false }
 stellar-access = { path = "packages/access", version = "0.7.1" }
 stellar-accounts = { path = "packages/accounts", version = "0.7.1" }
 stellar-contract-utils = { path = "packages/contract-utils", version = "0.7.1" }
-stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-fee-abstraction = { path = "packages/fee-abstraction", version = "0.7.1" }
 stellar-governance = { path = "packages/governance", version = "0.7.1" }
 stellar-tokens = { path = "packages/tokens", version = "0.7.1" }

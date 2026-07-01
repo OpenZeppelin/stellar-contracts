@@ -259,8 +259,8 @@ followed by `mod contract;` and `#[cfg(test)] mod test;`.
 - Crate name: `stellar-<scope>` (`stellar-access`, `stellar-tokens`).
   Internal Rust module names are snake_case.
 - All library packages are `#![no_std]`. `[dependencies]` must not pull in
-  `std`-only crates. The `[dev-dependencies]` block may
-  (`stellar-event-assertion`, `soroban-sdk` with `testutils`).
+  `std`-only crates. The `[dev-dependencies]` block may (`soroban-sdk` with
+  `testutils`).
 - Workspace fields use the `field.workspace = true` shorthand
   (`edition.workspace = true`, `version.workspace = true`,
   `license.workspace = true`, `repository.workspace = true`,
@@ -493,9 +493,13 @@ followed by `mod contract;` and `#[cfg(test)] mod test;`.
   test through it.
 - Authorisation in tests uses `e.mock_all_auths()` — never hand-build auth
   payloads unless explicitly testing the auth machinery.
-- Event assertions use `EventAssertion::new(&e, address.clone())` from the
-  `stellar-event-assertion` dev-dependency. Hand-decoding
-  `e.events().all()` is a violation when an `assert_*` helper exists.
+- Event assertions compare the emitted entry against the typed
+  `#[contractevent]` struct serialized with `.to_xdr(&e, &address)`, e.g.
+  `assert_eq!(events.events().first().unwrap(), &Transfer { .. }.to_xdr(&e, &address))`,
+  with the count checked via `e.events().all().events().len()`. Use
+  `.first()` for index 0 and `.get(i)` afterwards. Hand-decoding topics/data
+  field-by-field out of `e.events().all()` is a violation — build the event
+  struct and let `to_xdr` produce the wire form.
 - Panic tests use
   `#[should_panic(expected = "Error(Contract, #<code>)")]` — the numeric
   code must match the `#[repr(u32)]` value of the expected enum variant.
