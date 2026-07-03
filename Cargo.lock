@@ -2384,7 +2384,6 @@ name = "stellar-access"
 version = "0.7.1"
 dependencies = [
  "soroban-sdk",
- "stellar-event-assertion",
 ]
 
 [[package]]
@@ -2398,7 +2397,6 @@ dependencies = [
  "serde-json-core",
  "soroban-sdk",
  "soroban-test-helpers",
- "stellar-event-assertion",
 ]
 
 [[package]]
@@ -2412,15 +2410,6 @@ dependencies = [
  "hex-literal 1.1.0",
  "proptest",
  "soroban-sdk",
- "stellar-event-assertion",
-]
-
-[[package]]
-name = "stellar-event-assertion"
-version = "0.7.1"
-dependencies = [
- "soroban-sdk",
- "stellar-tokens",
 ]
 
 [[package]]
@@ -2480,7 +2469,6 @@ dependencies = [
  "soroban-sdk",
  "soroban-test-helpers",
  "stellar-contract-utils",
- "stellar-event-assertion",
  "stellar-governance",
 ]
 

@@ -2,10 +2,9 @@ extern crate std;
 
 use soroban_sdk::{
     contract,
-    testutils::{Address as _, Ledger},
+    testutils::{Address as _, Events, Ledger},
     Address, Env,
 };
-use stellar_event_assertion::EventAssertion;
 
 use crate::{
     ownable::{
@@ -38,8 +37,7 @@ fn transfer_ownership_sets_pending() {
             e.storage().temporary().get(&OwnableStorageKey::PendingOwner);
         assert_eq!(pending.map(|p| p.address), Some(new_owner));
 
-        let assert = EventAssertion::new(&e, contract.clone());
-        assert.assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -61,8 +59,7 @@ fn accept_ownership_completes_transfer() {
         let stored_owner = get_owner(&e);
         assert_eq!(stored_owner, Some(new_owner));
 
-        let assert = EventAssertion::new(&e, contract.clone());
-        assert.assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -83,8 +80,7 @@ fn renounce_ownership_removes_owner() {
 
         assert_eq!(get_owner(&e), None);
 
-        let assert = EventAssertion::new(&e, contract.clone());
-        assert.assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 

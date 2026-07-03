@@ -2,10 +2,9 @@ extern crate std;
 
 use soroban_sdk::{
     contract, symbol_short,
-    testutils::{Address as _, Ledger},
+    testutils::{Address as _, Events, Ledger},
     Address, Env, Symbol,
 };
-use stellar_event_assertion::EventAssertion;
 
 use crate::access_control::{
     accept_admin_transfer, add_to_role_enumeration, ensure_if_admin_or_admin_role, get_admin,
@@ -38,8 +37,7 @@ fn admin_functions_work() {
         assert!(has_role(&e, &user, &USER_ROLE).is_some());
 
         // Test events
-        let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 
     e.as_contract(&address, || {
@@ -48,8 +46,7 @@ fn admin_functions_work() {
         assert!(has_role(&e, &user, &USER_ROLE).is_none());
 
         // Test events
-        let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -223,8 +220,7 @@ fn admin_transfer_works_with_admin_auth() {
         assert_eq!(get_admin(&e), Some(new_admin));
 
         // Verify events
-        let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -246,8 +242,7 @@ fn admin_transfer_cancel_works() {
         transfer_admin_role(&e, &new_admin, 1000);
 
         // Verify events
-        let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 
     e.as_contract(&address, || {
@@ -258,8 +253,7 @@ fn admin_transfer_cancel_works() {
         assert_eq!(get_admin(&e), Some(admin));
 
         // Verify events
-        let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 

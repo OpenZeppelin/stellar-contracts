@@ -1,7 +1,10 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Env, Vec};
-use stellar_event_assertion::EventAssertion;
+use soroban_sdk::{
+    contract,
+    testutils::{Address as _, Events},
+    Address, Env, Vec,
+};
 
 use crate::rwa::utils::token_binder::{
     storage::{
@@ -59,7 +62,7 @@ fn bind_tokens_fits_current_bucket() {
             assert_eq!(get_token_by_index(&e, i), batch.get(i).unwrap());
         }
         // one TokenBound per token
-        EventAssertion::new(&e, address.clone()).assert_event_count(10);
+        assert_eq!(e.events().all().events().len(), 10);
 
         linked_tokens(&e)
     });
@@ -137,7 +140,7 @@ fn bind_single_token() {
         assert!(is_token_bound(&e, &token));
         assert_eq!(get_token_by_index(&e, 0), token);
         assert_eq!(get_token_index(&e, &token), 0);
-        EventAssertion::new(&e, address.clone()).assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -196,7 +199,7 @@ fn unbind_single_token() {
         assert_eq!(linked_token_count(&e), 0);
         assert!(!is_token_bound(&e, &token));
         // 1 TokenBound + 1 TokenUnbound
-        EventAssertion::new(&e, address.clone()).assert_event_count(2);
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 
