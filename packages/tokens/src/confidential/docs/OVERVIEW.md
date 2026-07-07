@@ -6,7 +6,7 @@ The Confidential Token is a Soroban smart contract that adds **private balances 
 
 **What is hidden:** how much someone holds and how much moves between two parties.
 
-**What stays visible:** the sender address, the recipient address, and any deposit/withdrawal amounts that cross the boundary between the contract and the underlying token.
+**What stays visible:** the sender address, the recipient address, and any deposit/withdrawal amounts that cross the boundary between the confidential token contract and the underlying non-confidential token.
 
 The system provides **confidentiality**, not anonymity.
 
