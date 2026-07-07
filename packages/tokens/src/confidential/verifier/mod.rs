@@ -69,7 +69,7 @@
 //!   generated against the previous VK fails verification the instant the new
 //!   VK is activated, so the corresponding transactions revert at the
 //!   proof-verification boundary. Wallets must regenerate against the new VK
-//!   and resubmit (DESIGN §8.6 discusses this for the related auditor-key
+//!   and resubmit (DESIGN §8.3 discusses this for the related auditor-key
 //!   rotation case; the same reasoning applies here).
 //! - **Should be gated.** Implementors are expected to put the update path
 //!   behind strong access control (multisig + timelock at a minimum) and to
