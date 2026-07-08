@@ -10,7 +10,8 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, MuxedAddress, String};
 use stellar_tokens::fungible::{
     capped::{check_cap, set_cap},
-    Base, FungibleToken,
+    total_supply::{self, FungibleTotalSupply, TotalSupply},
+    FungibleToken,
 };
 
 #[contract]
@@ -23,12 +24,15 @@ impl ExampleContract {
     }
 
     pub fn mint(e: &Env, to: Address, amount: i128) {
-        check_cap(e, amount, Base::total_supply(e));
-        Base::mint(e, &to, amount);
+        check_cap(e, amount, total_supply::total_supply(e));
+        total_supply::mint(e, &to, amount);
     }
 }
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
-    type ContractType = Base;
+    type ContractType = TotalSupply;
 }
+
+#[contractimpl(contracttrait)]
+impl FungibleTotalSupply for ExampleContract {}

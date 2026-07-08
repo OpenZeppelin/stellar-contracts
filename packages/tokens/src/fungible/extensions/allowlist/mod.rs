@@ -8,6 +8,14 @@ pub use storage::AllowList;
 
 use crate::fungible::FungibleToken;
 
+/// Marker trait for contract types that enforce the allowlist transfer
+/// policy: [`AllowList`] itself, or
+/// [`crate::fungible::combinations::TotalSupplyAllowList`], which combines it
+/// with total supply tracking.
+pub trait AllowListContractType {}
+
+impl AllowListContractType for AllowList {}
+
 /// AllowList Trait for Fungible Token
 ///
 /// The `FungibleAllowList` trait extends the `FungibleToken` trait to
@@ -30,7 +38,7 @@ use crate::fungible::FungibleToken;
 /// "storage.rs", because the authorizations are to be handled in the access
 /// control helpers or directly implemented
 #[contracttrait]
-pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
+pub trait FungibleAllowList: FungibleToken<ContractType: AllowListContractType> {
     /// Returns the allowed status of an account.
     ///
     /// # Arguments

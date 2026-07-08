@@ -8,7 +8,7 @@ use stellar_contract_utils::pausable;
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
-    fungible::ContractOverrides,
+    fungible::{total_supply::TotalSupplyOverrides, ContractOverrides},
     rwa::{
         compliance::{AccountSnapshot, TransferKind},
         storage::RWAStorageKey,

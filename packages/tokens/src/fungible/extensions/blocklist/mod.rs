@@ -8,6 +8,14 @@ pub use storage::BlockList;
 
 use crate::fungible::FungibleToken;
 
+/// Marker trait for contract types that enforce the blocklist transfer
+/// policy: [`BlockList`] itself, or
+/// [`crate::fungible::combinations::TotalSupplyBlockList`], which combines it
+/// with total supply tracking.
+pub trait BlockListContractType {}
+
+impl BlockListContractType for BlockList {}
+
 /// BlockList Trait for Fungible Token
 ///
 /// The `FungibleBlockList` trait extends the `FungibleToken` trait to
@@ -30,7 +38,7 @@ use crate::fungible::FungibleToken;
 /// "storage.rs", because the authorizations are to be handled in the access
 /// control helpers or directly implemented.
 #[contracttrait]
-pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
+pub trait FungibleBlockList: FungibleToken<ContractType: BlockListContractType> {
     /// Returns the blocked status of an account.
     ///
     /// # Arguments

@@ -3,8 +3,7 @@ use soroban_sdk::{Address, Env};
 use crate::fungible::{extensions::burnable::emit_burn, Base};
 
 impl Base {
-    /// Destroys `amount` of tokens from `from`. Updates the total
-    /// supply accordingly.
+    /// Destroys `amount` of tokens from `from`.
     ///
     /// # Arguments
     ///
@@ -32,7 +31,6 @@ impl Base {
 
     /// Destroys `amount` of tokens from `from` using the allowance mechanism.
     /// `amount` is then deducted from `spender` allowance.
-    /// Updates the total supply accordingly.
     ///
     /// # Arguments
     ///

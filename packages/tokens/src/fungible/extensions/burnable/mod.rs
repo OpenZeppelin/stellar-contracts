@@ -39,8 +39,9 @@ use crate::fungible::{overrides::BurnableOverrides, FungibleToken};
 /// background.
 #[contracttrait]
 pub trait FungibleBurnable: FungibleToken<ContractType: BurnableOverrides> {
-    /// Destroys `amount` of tokens from `from`. Updates the total
-    /// supply accordingly.
+    /// Destroys `amount` of tokens from `from`. For supply-aware contract
+    /// types (e.g. [`crate::fungible::total_supply::TotalSupply`]), the total
+    /// supply is updated accordingly.
     ///
     /// # Arguments
     ///
@@ -63,8 +64,9 @@ pub trait FungibleBurnable: FungibleToken<ContractType: BurnableOverrides> {
         Self::ContractType::burn(e, &from, amount);
     }
 
-    /// Destroys `amount` of tokens from `from`. Updates the total
-    /// supply accordingly.
+    /// Destroys `amount` of tokens from `from`. For supply-aware contract
+    /// types (e.g. [`crate::fungible::total_supply::TotalSupply`]), the total
+    /// supply is updated accordingly.
     ///
     /// # Arguments
     ///
