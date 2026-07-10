@@ -235,8 +235,8 @@ The account holder is the recipient of an on-chain confidential transfer (either
 |:--|:---|
 | D1 | $$vk\_A = \text{Poseidon}(\delta\_{\text{vk}}, sk\_A, \text{addr\\\_f})$$ (viewing key correctly derived, binds proof to contract; mirrors DESIGN.md R2/T2/W2/S2/V2) |
 | D2 | $$\text{PVK}\_A = vk\_A \cdot H$$ (binds proof to on-chain account) |
-| D3 | $$S = vk\_A \cdot R\_e$$ (recipient-side ECDH) |
-| D4 | $$v\_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, S.x, \sigma\_E)$$ (correct decryption of event amount; matches DESIGN.md T9 for `Transfer` and O9 for `SpenderTransfer`) |
+| D3 | $$s = \text{ECDH}(vk\_A, R\_e)$$ (recipient-side ECDH shared scalar, DESIGN.md §2.4) |
+| D4 | $$v\_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s, \sigma\_E)$$ (correct decryption of event amount; matches DESIGN.md T9 for `Transfer` and O9 for `SpenderTransfer`) |
 | D5 | $$v\_{\text{tx}} \in [0, 2^{127})$$ (range, DESIGN.md §2.6) |
 | U1–U3 | Disclosure ciphertext to recipient (§4) |
 
@@ -261,7 +261,7 @@ $$r\_e = \text{Poseidon2}(\delta\_{\text{eph}}, vk, \sigma\_E)$$
 
 where $$\delta\_{\text{eph}}$$ is a dedicated domain separator (the `EPHEMERAL_KEY` tag, §2.2), $$vk$$ is the originator's viewing key ($$vk\_A$$ for `Transfer`, $$vk\_{\text{op}}$$ for `SpenderTransfer`), and $$\sigma\_E$$ is the event nonce ($$\sigma$$ or $$\sigma\_a$$). This is the same construction the protocol already uses for the normalized spend randomness $$r' = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk, \sigma)$$ and the encrypted-balance mask $$\text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk, \sigma)$$ (DESIGN.md §5.2, §5.5): $$r\_e$$ joins the family of per-operation secrets recoverable from $$(vk, \sigma\_E)$$ alone. Because $$vk$$ is secret, $$r\_e$$ stays secret to everyone but the originator's wallet; because $$\sigma\_E$$ is published in the event, the wallet recomputes $$r\_e$$ at disclosure time having stored nothing.
 
-Once $$r\_e$$ is recovered the disclosed amount follows, $$v\_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, (r\_e \cdot \text{PVK}\_B).x, \sigma\_E)$$ with $$\text{PVK}\_B$$ read from the event's `to` address, so D-sender needs **no** per-transfer wallet state — only the wallet's $$vk$$ and an on-chain read of the event, matching the storage-free posture of D-recipient (§6). This is a wallet-side convention applied when *constructing* outgoing transfers; the contract and the six circuits are untouched (T5/T6 hold for any $$r\_e$$), and it is forward-looking — a transfer whose $$r\_e$$ was sampled randomly and not retained remains undiscloseable.
+Once $$r\_e$$ is recovered the disclosed amount follows, $$v\_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, \text{ECDH}(r\_e, \text{PVK}\_B), \sigma\_E)$$ (DESIGN.md §2.4) with $$\text{PVK}\_B$$ read from the event's `to` address, so D-sender needs **no** per-transfer wallet state — only the wallet's $$vk$$ and an on-chain read of the event, matching the storage-free posture of D-recipient (§6). This is a wallet-side convention applied when *constructing* outgoing transfers; the contract and the six circuits are untouched (T5/T6 hold for any $$r\_e$$), and it is forward-looking — a transfer whose $$r\_e$$ was sampled randomly and not retained remains undiscloseable.
 
 **Security note.** Deriving $$r\_e$$ from $$\sigma\_E$$ makes $$\sigma\_E$$ the sole freshness input for the whole transfer, including the recipient and auditor channels that otherwise draw independent freshness from a separately sampled $$r\_e$$. This is safe under the protocol's existing requirement that $$\sigma$$ be unique per operation: the balance channel $$\tilde{b} = v + \text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk, \sigma)$$ and the normalized $$r'$$ already depend on $$\sigma$$ alone, so a $$\sigma$$ collision is already disallowed and is negligible under the rejection sampling of DESIGN.md §2.2. The cost is the loss of $$r\_e$$ as an independent second freshness source; a deployment that wants defense-in-depth against $$\sigma$$ misuse on the recipient and auditor channels should keep sampling $$r\_e$$ and storing it instead.
 
@@ -287,8 +287,8 @@ In the symbols below, $$A$$ denotes the **originating** address — the holder's
 | D1 | $$vk\_A = \text{Poseidon}(\delta\_{\text{vk}}, sk\_A, \text{addr\\\_f})$$ |
 | D2 | $$\text{PVK}\_A = vk\_A \cdot H$$ |
 | DS3 | $$R\_e = r\_e \cdot H$$ (prover knows the ephemeral scalar used at transfer time; same shape as DESIGN.md T6 for `Transfer` and O6 for `SpenderTransfer`) |
-| DS4 | $$S\_B = r\_e \cdot \text{PVK}\_B$$ (sender-side ECDH to recipient) |
-| DS5 | $$v\_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, S\_B.x, \sigma\_E)$$ |
+| DS4 | $$s\_B = \text{ECDH}(r\_e, \text{PVK}\_B)$$ (sender-side ECDH shared scalar to recipient, DESIGN.md §2.4) |
+| DS5 | $$v\_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s\_B, \sigma\_E)$$ |
 | D5 | $$v\_{\text{tx}} \in [0, 2^{127})$$ |
 | U1–U3 | Disclosure ciphertext to recipient (§4) |
 
@@ -329,8 +329,8 @@ The constraints below parameterize the channel as $$\delta\_{\text{aud}} \in \\{
 | # | Constraint |
 |:--|:---|
 | A1 | $$K\_{\text{aud}} = aud\_{sk} \cdot H$$ (auditor key ownership) |
-| A2 | $$S\_{\text{aud}} = aud\_{sk} \cdot R\_e$$ (auditor-side ECDH; mirrors the prover-side $$r\_e \cdot K\_{\text{aud}}$$ from DESIGN.md T_a1 / T_a5) |
-| A3 | $$(m\_v, m\_2) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud}}, S\_{\text{aud}}.x, \sigma\_E)$$ (auditor channel sponge; same construction as DESIGN.md §2.5, §8.1) |
+| A2 | $$s\_{\text{aud}} = \text{ECDH}(aud\_{sk}, R\_e)$$ (auditor-side ECDH shared scalar; mirrors the prover-side $$\text{ECDH}(r\_e, K\_{\text{aud}})$$ from DESIGN.md T_a1 / T_a5) |
+| A3 | $$(m\_v, m\_2) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud}}, s\_{\text{aud}}, \sigma\_E)$$ (auditor channel sponge; same construction as DESIGN.md §2.5, §8.1) |
 | A4 | $$v\_{\text{tx}} = \tilde{v}\_{\text{aud}} - m\_v$$ (correct decryption of the channel's amount slot, the first squeeze) |
 | D5 | $$v\_{\text{tx}} \in [0, 2^{127})$$ |
 | U1–U3 | Disclosure ciphertext to recipient (§4) |
@@ -413,8 +413,8 @@ For statements of the form "this account received at least $$X$$ from counterpar
 | # | Constraint |
 |:--|:---|
 | D1, D2 | As in §6 |
-| For each $$i$$: D3$$\_i$$ | $$S\_i = vk\_A \cdot R\_{e,i}$$ |
-| For each $$i$$: D4$$\_i$$ | $$v\_{\text{tx},i} = \tilde{v}\_i - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, S\_i.x, \sigma\_{E,i})$$ |
+| For each $$i$$: D3$$\_i$$ | $$s\_i = \text{ECDH}(vk\_A, R\_{e,i})$$ |
+| For each $$i$$: D4$$\_i$$ | $$v\_{\text{tx},i} = \tilde{v}\_i - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s\_i, \sigma\_{E,i})$$ |
 | For each $$i$$: D5$$\_i$$ | $$v\_{\text{tx},i} \in [0, 2^{127})$$ |
 | AGG | $$V\_{\text{total}} = \sum\_{i=1}^n v\_{\text{tx},i}$$ |
 | THRESH (optional) | $$V\_{\text{total}} \geq V\_{\text{threshold}}$$ |

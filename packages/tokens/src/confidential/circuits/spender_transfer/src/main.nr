@@ -30,18 +30,19 @@ mod tests;
 //                                                           non-negative range
 //                                                           (Section 3.4).
 // Recipient ECDH + transfer commitment (Section 5.3, 5.4)
-//   O5  S          = r_e * PVK_recipient                    Recipient ECDH
-//                                                           shared secret.
+//   O5  s          = ecdh(r_e, PVK_recipient)               Recipient ECDH
+//                                                           shared-secret
+//                                                           scalar (2.4).
 //   O6  R_e        = r_e * H                                Ephemeral public
 //                                                           key.
-//   O7  r_tx       = Poseidon2(delta_tx_blind, S.x,
+//   O7  r_tx       = Poseidon2(delta_tx_blind, s,
 //                              sigma_a)                     Anti-poisoning
 //                                                           binding for the
 //                                                           transfer blinding.
 //   O8  C_tx       = v_tx * G + r_tx * H                    Transfer
 //                                                           commitment.
 //   O9  v_tilde    = v_tx
-//                       + Poseidon2(delta_tx_amount, S.x,
+//                       + Poseidon2(delta_tx_amount, s,
 //                                   sigma_a)                Encrypted amount
 //                                                           (emitted).
 // Allowance state (new)
@@ -64,20 +65,20 @@ mod tests;
 //                                                           and S, S_{a,r},
 //                                                           S_{a,s} = O.
 // Auditor block (dual-channel visibility, Section 8.1 + Section 8.4)
-//   O_a1 S_{a,r}   = r_e * K_aud_r                          Recipient-auditor
-//                                                           ECDH shared secret
+//   O_a1 s_{a,r}   = ecdh(r_e, K_aud_r)                     Recipient-auditor
+//                                                           ECDH shared scalar
 //                                                           (reuses r_e).
 //   O_a2 (m_v_r, m_r_r)
 //                  = SpongeSqueeze_2(delta_aud_r,
-//                                    S_{a,r}.x, sigma_a)    Recipient-channel
+//                                    s_{a,r}, sigma_a)      Recipient-channel
 //                                                           sponge: two masks.
 //   O_a3 v_tilde_aud_r = v_tx + m_v_r                       Recipient-auditor
 //                                                           encrypted amount.
 //   O_a4 r_tilde_aud_r = r_tx + m_r_r                       Recipient-auditor
 //                                                           encrypted transfer
 //                                                           randomness.
-//   O_a5 S_{a,s}   = r_e * K_aud_s                          Owner-auditor ECDH
-//                                                           shared secret
+//   O_a5 s_{a,s}   = ecdh(r_e, K_aud_s)                     Owner-auditor ECDH
+//                                                           shared scalar
 //                                                           (reuses r_e); the
 //                                                           sender-channel
 //                                                           visibility points
@@ -87,7 +88,7 @@ mod tests;
 //                                                           8.4).
 //   O_a6 (m_v_s, m_a_s)
 //                  = SpongeSqueeze_2(delta_aud_s,
-//                                    S_{a,s}.x, sigma_a)    Owner-channel
+//                                    s_{a,s}, sigma_a)      Owner-channel
 //                                                           sponge: two masks.
 //   O_a7 v_tilde_aud_s = v_tx + m_v_s                       Owner-auditor
 //                                                           encrypted amount.
@@ -112,7 +113,7 @@ mod tests;
 // `sigma_a` serves as the freshness nonce for THREE distinct uses in this
 // circuit: the allowance-randomness Poseidon (O3), the recipient ECDH chain
 // (O7 / O9), and both auditor-channel sponges (O_a2 / O_a6). Soundness derives
-// from ECDH shared-secret unpredictability (S.x is unknown to anyone but the
+// from ECDH shared-secret unpredictability (s is unknown to anyone but the
 // recipient and the prover); `sigma_a` itself is public and need not be
 // secret. Only the new-allowance constraints O10 and O12 use the fresh
 // `sigma_a'`.
@@ -292,7 +293,7 @@ fn main(
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_s);
 
-    // O_a1 (recipient-auditor shared secret x-coordinate)
+    // O_a1 (recipient-auditor shared-secret scalar)
     let s_a_r_x = ecdh(r_e, k_aud_r);
 
     // O_a2 (recipient-channel masks: amount, then r_tx)
@@ -304,7 +305,7 @@ fn main(
     // O_a4
     assert(r_tx + m_r[1] == r_tilde_aud_r);
 
-    // O_a5 (owner-auditor shared secret x-coordinate)
+    // O_a5 (owner-auditor shared-secret scalar)
     let s_a_s_x = ecdh(r_e, k_aud_s);
 
     // O_a6 (owner-channel masks: amount, then post-transfer allowance)

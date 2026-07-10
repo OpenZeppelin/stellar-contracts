@@ -34,42 +34,43 @@ mod tests;
 //                                                           Encrypted balance
 //                                                           scalar (emitted).
 // Recipient ECDH + transfer commitment (Section 5.3, 5.4)
-//   T5  S           = r_e * PVK_B                           Recipient ECDH
-//                                                           shared secret.
+//   T5  s           = ecdh(r_e, PVK_B)                      Recipient ECDH
+//                                                           shared-secret
+//                                                           scalar (2.4).
 //   T6  R_e         = r_e * H                               Ephemeral public
 //                                                           key.
-//   T7  r_tx        = Poseidon2(delta_tx_blind, S.x, sigma) Anti-poisoning
+//   T7  r_tx        = Poseidon2(delta_tx_blind, s, sigma)   Anti-poisoning
 //                                                           binding: r_tx is
 //                                                           uniquely determined
-//                                                           by (S.x, sigma).
+//                                                           by (s, sigma).
 //   T8  C_tx        = v_tx * G + r_tx * H                   Transfer
 //                                                           commitment.
 //   T9  v_tilde     = v_tx
-//                       + Poseidon2(delta_tx_amount, S.x, sigma)
+//                       + Poseidon2(delta_tx_amount, s, sigma)
 //                                                           Encrypted amount
 //                                                           (emitted).
 //   T13 r_e != 0                                            Rules out R_e = O
 //                                                           and S, S_{a,r},
 //                                                           S_{a,s} = O.
 // Auditor block (dual-channel visibility, Section 8.1)
-//   T_a1 S_{a,r}    = r_e * K_aud_r                         Recipient-auditor
-//                                                           ECDH shared secret
+//   T_a1 s_{a,r}    = ecdh(r_e, K_aud_r)                    Recipient-auditor
+//                                                           ECDH shared scalar
 //                                                           (reuses r_e).
 //   T_a2 (m_v_r, m_r_r)
 //                  = SpongeSqueeze_2(delta_aud_r,
-//                                    S_{a,r}.x, sigma)      Recipient-channel
+//                                    s_{a,r}, sigma)        Recipient-channel
 //                                                           sponge: two masks.
 //   T_a3 v_tilde_aud_r = v_tx + m_v_r                       Recipient-auditor
 //                                                           encrypted amount.
 //   T_a4 r_tilde_aud_r = r_tx + m_r_r                       Recipient-auditor
 //                                                           encrypted transfer
 //                                                           randomness.
-//   T_a5 S_{a,s}    = r_e * K_aud_s                         Sender-auditor ECDH
-//                                                           shared secret
+//   T_a5 s_{a,s}    = ecdh(r_e, K_aud_s)                    Sender-auditor ECDH
+//                                                           shared scalar
 //                                                           (reuses r_e).
 //   T_a6 (m_v_s, m_b_s)
 //                  = SpongeSqueeze_2(delta_aud_s,
-//                                    S_{a,s}.x, sigma)      Sender-channel
+//                                    s_{a,s}, sigma)        Sender-channel
 //                                                           sponge: two masks.
 //   T_a7 v_tilde_aud_s = v_tx + m_v_s                       Sender-auditor
 //                                                           encrypted amount.
@@ -232,7 +233,7 @@ fn main(
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_s);
 
-    // T_a1 (recipient-auditor shared secret x-coordinate)
+    // T_a1 (recipient-auditor shared-secret scalar)
     let s_a_r_x = ecdh(r_e, k_aud_r);
 
     // T_a2 (recipient-channel masks: amount, then r_tx)
@@ -244,7 +245,7 @@ fn main(
     // T_a4
     assert(r_tx + m_r[1] == r_tilde_aud_r);
 
-    // T_a5 (sender-auditor shared secret x-coordinate)
+    // T_a5 (sender-auditor shared-secret scalar)
     let s_a_s_x = ecdh(r_e, k_aud_s);
 
     // T_a6 (sender-channel masks: amount, then balance)
