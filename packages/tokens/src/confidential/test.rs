@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl,
+    contract, contractimpl, symbol_short,
     testutils::{Address as _, Events, Ledger},
     token::StellarAssetClient,
     xdr::ToXdr,
@@ -96,6 +96,29 @@ impl ConfidentialVerifier for AlwaysFailVerifier {
     fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
         false
     }
+}
+
+/// Accepts every proof but records the public-input blob it received, so
+/// tests can assert on the exact bytes the token assembles for the verifier.
+#[contract]
+struct RecordingVerifier;
+
+#[contractimpl(contracttrait)]
+impl ConfidentialVerifier for RecordingVerifier {
+    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn verify_proof(e: &Env, _ct: CircuitType, pi: Bytes, _proof: Bytes) -> bool {
+        e.storage().instance().set(&symbol_short!("last_pi"), &pi);
+        true
+    }
+}
+
+fn recorded_pi(h: &Harness, verifier: &Address) -> Bytes {
+    h.e.as_contract(verifier, || {
+        h.e.storage().instance().get::<_, Bytes>(&symbol_short!("last_pi")).unwrap()
+    })
 }
 
 #[contract]
@@ -269,6 +292,30 @@ fn register_stores_account_with_identity_balances() {
     // Initial balances are identity (all-zero encoding).
     assert_eq!(account.spendable_balance.to_array(), [0u8; 64]);
     assert_eq!(account.receiving_balance.to_array(), [0u8; 64]);
+}
+
+#[test]
+fn register_public_inputs_bind_account() {
+    let e = Env::default();
+    let verifier_addr = e.register(RecordingVerifier, ());
+    let h = setup_with_verifier_addr(e, verifier_addr.clone());
+
+    let alice = Address::generate(&h.e);
+    let bob = Address::generate(&h.e);
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    let pi_alice = recorded_pi(&h, &verifier_addr);
+    h.token.register(&bob, &1u32, &register_data(&h.e));
+    let pi_bob = recorded_pi(&h, &verifier_addr);
+
+    // Blob layout (DESIGN §7.2): Y(64) ‖ PVK(64) ‖ addr_f(32) ‖ acct_f(32).
+    assert_eq!(pi_alice.len(), 192);
+    assert_eq!(pi_bob.len(), 192);
+    // Identical payloads on the same contract share the first 160 bytes...
+    assert_eq!(pi_alice.slice(..160), pi_bob.slice(..160));
+    // ...but the trailing acct_f limb differs per registering address, so a
+    // proof published by one account cannot be replayed by another.
+    assert_ne!(pi_alice.slice(160..), pi_bob.slice(160..));
 }
 
 #[test]

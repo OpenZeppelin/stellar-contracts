@@ -505,6 +505,9 @@ An account provides a Grumpkin spending key $$Y$$, a public viewing key $$\text{
 |:---|:---|
 | $$Y$$, $$\text{PVK}$$ | Prover-supplied; written to `account.spending_key` and `account.viewing_public_key` on success |
 | $$\text{addr\\\_f}$$ | Loaded from instance storage; set once at construction (§3.5) |
+| $$\text{acct\\\_f}$$ | Binds the proof to the registering address that is authenticated with `require_auth()`|
+
+$$\text{acct\\\_f}$$ is referenced by no circuit constraint; its membership in the public-input set is the binding. The verifier absorbs every public input into the proof transcript, so a proof produced for one account fails verification when the contract assembles the blob for any other address. Without this input, the register proof and its public keys — all published on-chain by a legitimate registration — could be replayed by any caller to create duplicate-key accounts under fresh addresses.
 
 **Private witnesses:** $$sk$$.
 

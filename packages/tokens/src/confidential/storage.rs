@@ -430,11 +430,16 @@ pub fn register(
     let _k_aud = auditor.get_key(&auditor_id);
     let addr_f = get_address_as_field_element(e);
 
-    // PI order (DESIGN §7.2): Y, PVK, addr_f.
+    // PI order (DESIGN §7.2): Y, PVK, addr_f, acct_f. Recomputing acct_f
+    // from `account` (never accepting it from caller bytes) is what binds
+    // the proof to the registering address: any other caller assembles a
+    // different blob, so published registration material cannot be
+    // replayed into duplicate-key accounts.
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &payload.y);
     append_point(&mut pi, &payload.pvk);
     append_field(&mut pi, &addr_f);
+    append_field(&mut pi, &address_to_field(e, account));
 
     verify(e, CircuitType::Register, &pi, proof);
 
