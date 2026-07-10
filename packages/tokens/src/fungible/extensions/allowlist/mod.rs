@@ -9,9 +9,9 @@ pub use storage::AllowList;
 use crate::fungible::FungibleToken;
 
 /// Marker trait for contract types that enforce the allowlist transfer
-/// policy: [`AllowList`] itself, or
-/// [`crate::fungible::combinations::TotalSupplyAllowList`], which combines it
-/// with total supply tracking.
+/// policy: [`AllowList`] itself, or a combination resolved by
+/// [`crate::fungible::combinations::Build`] that includes it, e.g.
+/// `Build<(AllowList, TotalSupply)>`.
 pub trait AllowListContractType {}
 
 impl AllowListContractType for AllowList {}

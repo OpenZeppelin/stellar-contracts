@@ -103,9 +103,9 @@ impl BurnableOverrides for Base {}
 /// [`crate::fungible::total_supply::FungibleTotalSupply`] with an empty body
 /// is enough, and the right behavior is picked based on the contract's
 /// `ContractType`. The library ships implementations for its supply-aware
-/// contract types ([`crate::fungible::total_supply::TotalSupply`],
-/// [`crate::fungible::combinations::TotalSupplyAllowList`],
-/// [`crate::fungible::combinations::TotalSupplyBlockList`], `RWA`, `Vault`,
+/// contract types ([`crate::fungible::total_supply::TotalSupply`], the
+/// combined contract types resolved by
+/// [`crate::fungible::combinations::Build`], `RWA`, `Vault`,
 /// `FungibleVotes`).
 ///
 /// Unlike `BurnableOverrides`, there is deliberately no implementation for

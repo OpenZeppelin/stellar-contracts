@@ -9,9 +9,9 @@ pub use storage::BlockList;
 use crate::fungible::FungibleToken;
 
 /// Marker trait for contract types that enforce the blocklist transfer
-/// policy: [`BlockList`] itself, or
-/// [`crate::fungible::combinations::TotalSupplyBlockList`], which combines it
-/// with total supply tracking.
+/// policy: [`BlockList`] itself, or a combination resolved by
+/// [`crate::fungible::combinations::Build`] that includes it, e.g.
+/// `Build<(BlockList, TotalSupply)>`.
 pub trait BlockListContractType {}
 
 impl BlockListContractType for BlockList {}

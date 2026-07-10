@@ -121,15 +121,15 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// * [`crate::fungible::total_supply::TotalSupply`] (additionally tracking the
 ///   total supply, enabling the compatibility and overrides for
 ///   [`crate::fungible::total_supply::FungibleTotalSupply`]) trait.
-/// * [`crate::fungible::combinations::TotalSupplyAllowList`] (combining the
-///   allowlist transfer policy with total supply tracking, enabling the
-///   compatibility and overrides for
-///   [`crate::fungible::allowlist::FungibleAllowList`] and
+/// * `Build<(AllowList, TotalSupply)>` (refer to
+///   [`crate::fungible::combinations::Build`]; combining the allowlist transfer
+///   policy with total supply tracking, enabling the compatibility and
+///   overrides for [`crate::fungible::allowlist::FungibleAllowList`] and
 ///   [`crate::fungible::total_supply::FungibleTotalSupply`]) traits.
-/// * [`crate::fungible::combinations::TotalSupplyBlockList`] (combining the
-///   blocklist transfer policy with total supply tracking, enabling the
-///   compatibility and overrides for
-///   [`crate::fungible::blocklist::FungibleBlockList`] and
+/// * `Build<(BlockList, TotalSupply)>` (refer to
+///   [`crate::fungible::combinations::Build`]; combining the blocklist transfer
+///   policy with total supply tracking, enabling the compatibility and
+///   overrides for [`crate::fungible::blocklist::FungibleBlockList`] and
 ///   [`crate::fungible::total_supply::FungibleTotalSupply`]) traits.
 ///
 /// The default implementations of this trait for `Base`, `Allowlist`,
@@ -147,6 +147,9 @@ pub trait FungibleToken {
     /// not using
     /// [`crate::fungible::allowlist::AllowList`] or
     /// [`crate::fungible::blocklist::BlockList`] extensions.
+    /// Multiple extensions are combined with
+    /// [`crate::fungible::combinations::Build`], e.g.
+    /// `Build<(AllowList, TotalSupply)>`.
     type ContractType: ContractOverrides;
 
     /// Returns the amount of tokens held by `account`.

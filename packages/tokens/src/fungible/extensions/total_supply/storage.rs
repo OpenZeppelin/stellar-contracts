@@ -11,8 +11,8 @@ use crate::fungible::{
 ///
 /// For combining total supply tracking with the allowlist or blocklist
 /// transfer policies, refer to
-/// [`crate::fungible::combinations::TotalSupplyAllowList`] and
-/// [`crate::fungible::combinations::TotalSupplyBlockList`].
+/// [`crate::fungible::combinations::Build`], e.g.
+/// `Build<(AllowList, TotalSupply)>`.
 pub struct TotalSupply;
 
 /// Storage keys for the data associated with the total supply extension of
