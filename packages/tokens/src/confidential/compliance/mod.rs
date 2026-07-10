@@ -164,21 +164,36 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 /// the active [`ComplianceConfig`]. Wire as `type Hooks = ComplianceHooks;`
 /// on a contract that implements [`ConfidentialToken`].
 ///
-/// Each callback follows the same three-stage sequence when a configuration
+/// Each gated party is checked against up to three gates when a configuration
 /// is present:
 ///
-/// 1. Reverts [`ComplianceError::AccountFrozen`] if the address is frozen (with
-///    the exception for `spender`).
+/// 1. Reverts [`ComplianceError::AccountFrozen`] if the address is frozen.
 /// 2. When `config.policy = Some(p)`, calls `p.is_authorized` and reverts
 ///    [`ComplianceError::NotAuthorizedByPolicy`] on `false`.
 /// 3. When `config.sac_passthrough = true`, calls the underlying SEP-41 token's
 ///    `authorized` view and reverts [`ComplianceError::NotAuthorizedBySac`] on
 ///    `false`.
 ///
-/// Special cases:
+/// Which parties pass which gates:
 ///
-/// * [`on_register`](Hooks::on_register) skips the freeze branch but still
-///   applies policy and SAC.
+/// * [`on_deposit`](Hooks::on_deposit), [`on_withdraw`](Hooks::on_withdraw),
+///   [`on_transfer`](Hooks::on_transfer): `from` and `to` pass all three gates.
+///   [`on_merge`](Hooks::on_merge): `account` passes all three.
+/// * [`on_register`](Hooks::on_register): `account` skips the freeze gate
+///   (registration predates the account entry) but passes policy and SAC.
+/// * [`on_spender_transfer`](Hooks::on_spender_transfer): `from` and `to` pass
+///   all three gates; `spender` passes only the policy gate.
+/// * [`on_set_spender`](Hooks::on_set_spender): the delegating `account` passes
+///   all three gates; `spender` passes only the policy gate, so a delegation to
+///   a policy-denied spender fails at grant time rather than at spend time.
+/// * [`on_revoke_spender`](Hooks::on_revoke_spender): `account` passes all
+///   three gates; `spender` is not gated at all. Revocation is the owner's
+///   escape hatch — blocking it once the spender turns non-compliant would
+///   entrench the bad delegation.
+///
+/// The spender is exempt from the freeze and SAC gates everywhere: both
+/// target fund ownership, and the spender holds no funds in this model,
+/// mirroring the fungible and rwa allowance models.
 ///
 /// Deployments that need additional behaviour (audit mirroring, rate
 /// limiting, or alternative deposit semantics — see
@@ -228,7 +243,7 @@ impl Hooks for ComplianceHooks {
 
     fn on_spender_transfer(
         e: &Env,
-        _spender: &Address,
+        spender: &Address,
         from: &Address,
         to: &Address,
         _payload: Val,
@@ -236,16 +251,18 @@ impl Hooks for ComplianceHooks {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };
-        // Gate `from` and `to` only, consistent with the fungible and rwa allowance
-        // models.
+        // `from` and `to` pass all three gates; the spender holds no funds, so
+        // it skips freeze and SAC (consistent with the fungible and rwa
+        // allowance models) but must still clear the external policy.
         storage::gate_account(e, from, &config);
         storage::gate_account(e, to, &config);
+        storage::check_policy(e, spender, &config);
     }
 
     fn on_set_spender(
         e: &Env,
         account: &Address,
-        _spender: &Address,
+        spender: &Address,
         _live_until_ledger: u32,
         _payload: Val,
     ) {
@@ -253,6 +270,7 @@ impl Hooks for ComplianceHooks {
             return;
         };
         storage::gate_account(e, account, &config);
+        storage::check_policy(e, spender, &config);
     }
 
     fn on_revoke_spender(e: &Env, account: &Address, _spender: &Address, _payload: Val) {
