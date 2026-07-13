@@ -14,7 +14,7 @@ This project is composed of the following documents:
 - Confidential Token: [Compliance Extensions](./COMPLIANCE.md)
 - Confidential Token: [Selective Disclosure](./SELECTIVE_DISCLOSURE.md)
 - Confidential Token: [User Flows Overview](./OVERVIEW.md)
-- Indexing and Off-Chain State Recovery (to be added)
+- Confidential Token: [Indexing and Off-Chain State Recovery](./INDEXER.md)
 - SDK (to be added)
 
 ---
