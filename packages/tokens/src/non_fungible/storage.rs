@@ -474,7 +474,13 @@ impl Base {
         if live_until_ledger == 0 {
             e.storage().temporary().remove(&key);
 
-            emit_approve(e, approver, approved, token_id, live_until_ledger);
+            if let Some(ApprovalData { approved: revoked, .. }) =
+                e.storage().temporary().get::<_, ApprovalData>(&key)
+            {
+                e.storage().temporary().remove(&key);
+                emit_approve(e, approver, &revoked, token_id, live_until_ledger);
+            }
+
             return;
         }
 
