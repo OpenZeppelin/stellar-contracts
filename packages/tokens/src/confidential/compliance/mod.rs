@@ -179,6 +179,9 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 ///
 /// * [`on_register`](Hooks::on_register) skips the freeze branch but still
 ///   applies policy and SAC.
+/// * [`on_register`](Hooks::on_register) does not restrict the caller-selected
+///   `auditor_id`. Deployments that must limit which auditors an account may
+///   bind to override it with a custom gate (see [`docs/COMPLIANCE.md`] §4.3).
 ///
 /// Deployments that need additional behaviour (audit mirroring, rate
 /// limiting, or alternative deposit semantics — see

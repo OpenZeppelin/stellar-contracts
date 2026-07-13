@@ -139,6 +139,30 @@ The depositor is required to be the recipient — no one can deposit on someone 
 
 These two examples are illustrative; the same surface accommodates per-deposit rate limits, allowlists keyed off the deposit amount, mirror writes to an audit log, or any other synchronous policy. The token's only agreement with the `Hooks` impl is that callbacks revert (via `panic_with_error!`) when the operation must be rejected.
 
+### 4.3 Restrict Auditor Selection
+
+At `register`, the account owner chooses which `auditor_id` the account binds to. The core validates only that the id exists in the auditor registry ([DESIGN.md](DESIGN.md) §7.2), and the default `ComplianceHooks::on_register` deliberately does not restrict the choice. On a shared auditor registry, a deployment with designated auditors gates the selection against its own approved set:
+
+```rust
+impl Hooks for ApprovedAuditorHooks {
+    fn on_register(e: &Env, account: &Address, auditor_id: u32, payload: Val) {
+        let approved: Vec<u32> = e
+            .storage()
+            .instance()
+            .get(&DataKey::ApprovedAuditors)
+            .unwrap_or_else(|| Vec::new(e));
+        if !approved.contains(auditor_id) {
+            panic_with_error!(e, DeploymentError::AuditorNotApproved);
+        }
+        ComplianceHooks::on_register(e, account, auditor_id, payload);
+    }
+
+    // …other callbacks delegate to ComplianceHooks defaults…
+}
+```
+
+`ApprovedAuditors` is a deployment-maintained instance-storage allowlist (populated at construction or through an admin entry point) and `AuditorNotApproved` a deployment-defined error. Because `auditor_id` is immutable once the account is registered ([DESIGN.md](DESIGN.md) §6.1), this gate is the single point where a deployment controls which auditors may ever observe an account's flows.
+
 ---
 
 ## 5. Clawback (Outline Only)

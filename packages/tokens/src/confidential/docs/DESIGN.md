@@ -510,6 +510,8 @@ An account provides a Grumpkin spending key $$Y$$, a public viewing key $$\text{
 
 **Post-verification state:** The contract validates that `auditor_id` exists in the auditor contract and points to a valid key, then stores `spending_key`, `viewing_public_key`, `auditor_id`, and initializes `spendable_balance = receiving_balance = ` $$\mathcal{O}$$.
 
+**Auditor selection.** The registering account owner chooses `auditor_id` freely: the register proof does not constrain it, and the core validates only that the id exists in the auditor registry. On a shared auditor registry, deployments that must restrict which auditors an account may bind to MUST enforce that restriction in their `Hooks::on_register` implementation — the default `ComplianceHooks::on_register` deliberately does not restrict it. See [COMPLIANCE.md](./COMPLIANCE.md) §4.3 for a worked example.
+
 ### 7.3 Deposit
 
 Transparent tokens flow from the depositor to the contract via `token.transfer(from, self, amount)`. The amount $$a$$ is public and typed as `i128`. The contract checks $$a \ge 0$$ at the entrypoint and reverts on violation (Section 3.4). The contract then computes the deposit commitment with zero blinding:
