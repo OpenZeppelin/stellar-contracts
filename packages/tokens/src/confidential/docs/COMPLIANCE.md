@@ -38,7 +38,7 @@ The contract maintains a `frozen(account) -> bool` entry per account. Before app
 
 Full freeze (rather than outbound-only) keeps semantics clean: no further accumulation is possible after the freeze takes effect.
 
-The spender named by the delegation flows (`set_spender`, `confidential_transfer_from`, `revoke_spender`) is not an account for the purposes of the freeze check: the freeze targets fund ownership, and the spender holds no funds — the value being moved stays the owner's, and freezing the owner halts the delegation. This mirrors the allowance models of the library's fungible and rwa tokens. The spender is instead gated by the policy contract (§3).
+The spender named by the delegation flows (`set_spender`, `confidential_transfer_from`) is not an account for the purposes of the freeze check: the freeze targets fund ownership, and the spender holds no funds — the value being moved stays the owner's, and freezing the owner halts the delegation. This mirrors the allowance models of the library's fungible and rwa tokens. The spender is instead gated by the policy contract (§3).
 
 ### 2.1 Core Interface Additions
 
