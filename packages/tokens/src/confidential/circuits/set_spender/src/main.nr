@@ -101,11 +101,11 @@ mod tests;
 //   Idx  Param                Symbol            Source / Note
 //   ---  -----                ------            -----------------------------
 //   0    c_spend_x            C_spend.x         Loaded from
-//   1    c_spend_y            C_spend.y           `from.spendable_balance`.
+//   1    c_spend_y            C_spend.y           `from.spendable_commitment`.
 //   2    y_x                  Y.x               Loaded from
-//   3    y_y                  Y.y                 `from.spending_key`.
+//   3    y_y                  Y.y                 `from.spending_public_key`.
 //   4    y_op_x               Y_op.x            Loaded from spender
-//   5    y_op_y               Y_op.y              account's `spending_key`.
+//   5    y_op_y               Y_op.y              account's `spending_public_key`.
 //                                                Spender must be registered.
 //   6    op_i                 op_i              address_to_field(`spender`),
 //                                                computed off-circuit by the
@@ -114,7 +114,7 @@ mod tests;
 //   8    k_aud_s_x            K_aud_s.x         Fetched from the auditor
 //   9    k_aud_s_y            K_aud_s.y           contract by `from.auditor_id`.
 //   10   c_spend_new_x        C_spend'.x        Prover-supplied; written to
-//   11   c_spend_new_y        C_spend'.y          `from.spendable_balance`.
+//   11   c_spend_new_y        C_spend'.y          `from.spendable_commitment`.
 //   12   c_a_x                C_a.x             Prover-supplied; written to
 //   13   c_a_y                C_a.y               `(from, op).allowance`.
 //   14   escrowed_dvk_r_x     R_x               Prover-supplied; the first
