@@ -5,7 +5,7 @@ use soroban_sdk::{
     testutils::{Address as _, Events},
     token::StellarAssetClient,
     xdr::{AccountFlags, ToXdr},
-    Address, Bytes, BytesN, Env, IntoVal, Val,
+    Address, Bytes, BytesN, Env,
 };
 
 use crate::confidential::{
@@ -17,7 +17,8 @@ use crate::confidential::{
     storage::{set_address_as_field_element, set_auditor, set_underlying_asset, set_verifier},
     verifier::CircuitType,
     ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, Hooks, RegisterData,
-    RegisterPayload, SpenderDelegation,
+    RegisterPayload, RevokeSpenderPayload, SetSpenderPayload, SpenderDelegation,
+    SpenderTransferPayload, TransferPayload, WithdrawPayload,
 };
 
 // ################## MOCK CONTRACTS ##################
@@ -171,8 +172,76 @@ fn base_config() -> ComplianceConfig {
     ComplianceConfig { policy: None, sac_passthrough: false }
 }
 
-fn void_val(e: &Env) -> Val {
-    ().into_val(e)
+fn pt(e: &Env) -> BytesN<64> {
+    BytesN::from_array(e, &[0u8; 64])
+}
+
+fn fr(e: &Env) -> BytesN<32> {
+    BytesN::from_array(e, &[0u8; 32])
+}
+
+fn register_payload(e: &Env) -> RegisterPayload {
+    RegisterPayload { y: pt(e), pvk: pt(e) }
+}
+
+fn withdraw_payload(e: &Env) -> WithdrawPayload {
+    WithdrawPayload { c_spend_new: pt(e), b_tilde: fr(e), r_e: pt(e), sigma: fr(e), b_aud_s: fr(e) }
+}
+
+fn transfer_payload(e: &Env) -> TransferPayload {
+    TransferPayload {
+        c_spend_new: pt(e),
+        c_tx: pt(e),
+        r_e: pt(e),
+        v_tilde: fr(e),
+        b_tilde: fr(e),
+        sigma: fr(e),
+        v_aud_r: fr(e),
+        r_aud_r: fr(e),
+        v_aud_s: fr(e),
+        b_aud_s: fr(e),
+    }
+}
+
+fn spender_transfer_payload(e: &Env) -> SpenderTransferPayload {
+    SpenderTransferPayload {
+        c_a_new: pt(e),
+        c_tx: pt(e),
+        r_e: pt(e),
+        v_tilde: fr(e),
+        a_tilde_new: fr(e),
+        sigma_a_new: fr(e),
+        v_aud_r: fr(e),
+        r_aud_r: fr(e),
+        v_aud_s: fr(e),
+        a_aud_s: fr(e),
+    }
+}
+
+fn set_spender_payload(e: &Env) -> SetSpenderPayload {
+    SetSpenderPayload {
+        c_spend_new: pt(e),
+        c_a: pt(e),
+        escrowed_dvk: pt(e),
+        b_tilde: fr(e),
+        a_tilde: fr(e),
+        r_e: pt(e),
+        sigma: fr(e),
+        sigma_a: fr(e),
+        v_aud_s: fr(e),
+        b_aud_s: fr(e),
+    }
+}
+
+fn revoke_spender_payload(e: &Env) -> RevokeSpenderPayload {
+    RevokeSpenderPayload {
+        c_spend_new: pt(e),
+        b_tilde: fr(e),
+        r_e: pt(e),
+        sigma: fr(e),
+        v_aud_s: fr(e),
+        b_aud_s: fr(e),
+    }
 }
 
 // ################## NO-CONFIG SHORT-CIRCUIT ##################
@@ -186,13 +255,19 @@ fn hooks_short_circuit_without_config() {
     h.e.as_contract(&h.host, || {
         // No config written — every hook must be a silent no-op.
         ComplianceHooks::on_merge(&h.e, &alice);
-        ComplianceHooks::on_transfer(&h.e, &alice, &bob, void_val(&h.e));
+        ComplianceHooks::on_transfer(&h.e, &alice, &bob, &transfer_payload(&h.e));
         ComplianceHooks::on_deposit(&h.e, &alice, &bob, 0);
-        ComplianceHooks::on_register(&h.e, &alice, 0, void_val(&h.e));
-        ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, void_val(&h.e));
-        ComplianceHooks::on_spender_transfer(&h.e, &op, &alice, &bob, void_val(&h.e));
-        ComplianceHooks::on_set_spender(&h.e, &alice, &op, 0, void_val(&h.e));
-        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, void_val(&h.e));
+        ComplianceHooks::on_register(&h.e, &alice, 0, &register_payload(&h.e));
+        ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, &withdraw_payload(&h.e));
+        ComplianceHooks::on_spender_transfer(
+            &h.e,
+            &op,
+            &alice,
+            &bob,
+            &spender_transfer_payload(&h.e),
+        );
+        ComplianceHooks::on_set_spender(&h.e, &alice, &op, 0, &set_spender_payload(&h.e));
+        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, &revoke_spender_payload(&h.e));
         assert!(compliance_config(&h.e).is_none());
         assert!(!is_frozen(&h.e, &alice));
     });
@@ -275,7 +350,7 @@ fn on_transfer_panics_when_sender_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &alice);
-        ComplianceHooks::on_transfer(&h.e, &alice, &bob, void_val(&h.e));
+        ComplianceHooks::on_transfer(&h.e, &alice, &bob, &transfer_payload(&h.e));
     });
 }
 
@@ -288,7 +363,7 @@ fn on_transfer_panics_when_recipient_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &bob);
-        ComplianceHooks::on_transfer(&h.e, &alice, &bob, void_val(&h.e));
+        ComplianceHooks::on_transfer(&h.e, &alice, &bob, &transfer_payload(&h.e));
     });
 }
 
@@ -301,7 +376,13 @@ fn on_spender_transfer_when_spender_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &op);
-        ComplianceHooks::on_spender_transfer(&h.e, &op, &alice, &bob, void_val(&h.e));
+        ComplianceHooks::on_spender_transfer(
+            &h.e,
+            &op,
+            &alice,
+            &bob,
+            &spender_transfer_payload(&h.e),
+        );
     });
 }
 
@@ -314,7 +395,7 @@ fn on_withdraw_panics_when_sender_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &alice);
-        ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, void_val(&h.e));
+        ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, &withdraw_payload(&h.e));
     });
 }
 
@@ -327,7 +408,7 @@ fn on_withdraw_panics_when_recipient_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &bob);
-        ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, void_val(&h.e));
+        ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, &withdraw_payload(&h.e));
     });
 }
 
@@ -340,7 +421,7 @@ fn on_set_spender_panics_when_account_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &alice);
-        ComplianceHooks::on_set_spender(&h.e, &alice, &op, 0, void_val(&h.e));
+        ComplianceHooks::on_set_spender(&h.e, &alice, &op, 0, &set_spender_payload(&h.e));
     });
 }
 
@@ -352,7 +433,7 @@ fn on_set_spender_when_spender_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &op);
-        ComplianceHooks::on_set_spender(&h.e, &alice, &op, 0, void_val(&h.e));
+        ComplianceHooks::on_set_spender(&h.e, &alice, &op, 0, &set_spender_payload(&h.e));
     });
 }
 
@@ -365,7 +446,7 @@ fn on_revoke_spender_panics_when_account_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &alice);
-        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, void_val(&h.e));
+        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, &revoke_spender_payload(&h.e));
     });
 }
 
@@ -377,7 +458,7 @@ fn on_revoke_spender_when_spender_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &op);
-        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, void_val(&h.e));
+        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, &revoke_spender_payload(&h.e));
     });
 }
 
@@ -392,7 +473,7 @@ fn on_register_skips_freeze_check() {
         freeze(&h.e, &alice);
         // No panic: register predates the account entry, so the freeze
         // gate is intentionally skipped.
-        ComplianceHooks::on_register(&h.e, &alice, 0, void_val(&h.e));
+        ComplianceHooks::on_register(&h.e, &alice, 0, &register_payload(&h.e));
     });
 }
 

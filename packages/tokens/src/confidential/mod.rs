@@ -110,9 +110,7 @@ pub mod verifier;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{
-    contracterror, contractevent, contracttrait, Address, Bytes, BytesN, Env, IntoVal, Val,
-};
+use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Bytes, BytesN, Env};
 pub use storage::{
     ConfidentialAccount, ConfidentialTokenStorageKey, RegisterData, RegisterPayload,
     RevokeSpenderData, RevokeSpenderPayload, SetSpenderData, SetSpenderPayload, SpenderDelegation,
@@ -131,9 +129,8 @@ pub use storage::{
 /// observability, prefer subscribing to the token's events instead.
 ///
 /// For ops that carry a `data: Bytes` argument, the last parameter
-/// `payload` on the matching hook is the decoded operation payload as
-/// `Val` (e.g. [`TransferPayload`] for [`Self::on_transfer`]); the hook
-/// reconstructs the typed value via `T::from_val(e, &payload)`. The proof
+/// `payload` on the matching hook is a reference to the decoded operation
+/// payload (e.g. [`TransferPayload`] for [`Self::on_transfer`]). The proof
 /// is not forwarded. The proofless ops [`Self::on_deposit`] and
 /// [`Self::on_merge`] receive no `payload`.
 ///
@@ -142,10 +139,9 @@ pub use storage::{
 #[allow(unused_variables)]
 pub trait Hooks {
     /// Invoked after `register`'s auth and payload decode, before account
-    /// creation. `payload: Val` carries a [`RegisterPayload`]. `auditor_id`
-    /// is the caller-selected auditor key index — forwarded so the hook
-    /// can enforce an approved-auditor policy.
-    fn on_register(e: &Env, account: &Address, auditor_id: u32, payload: Val) {}
+    /// creation. `auditor_id` is the caller-selected auditor key index —
+    /// forwarded so the hook can enforce an approved-auditor policy.
+    fn on_register(e: &Env, account: &Address, auditor_id: u32, payload: &RegisterPayload) {}
 
     /// Invoked after `deposit`'s auth, before SEP-41 transfer and balance
     /// update.
@@ -155,32 +151,40 @@ pub trait Hooks {
     fn on_merge(e: &Env, account: &Address) {}
 
     /// Invoked after `withdraw`'s auth and decode, before proof verification.
-    /// `payload: Val` carries a [`WithdrawPayload`].
-    fn on_withdraw(e: &Env, from: &Address, to: &Address, amount: i128, payload: Val) {}
-
-    /// Invoked after `confidential_transfer`'s auth and decode. `payload:
-    /// Val` carries a [`TransferPayload`].
-    fn on_transfer(e: &Env, from: &Address, to: &Address, payload: Val) {}
-
-    /// Invoked after `confidential_transfer_from`'s auth and decode.
-    /// `payload: Val` carries an [`SpenderTransferPayload`].
-    fn on_spender_transfer(e: &Env, spender: &Address, from: &Address, to: &Address, payload: Val) {
+    fn on_withdraw(e: &Env, from: &Address, to: &Address, amount: i128, payload: &WithdrawPayload) {
     }
 
-    /// Invoked after `set_spender`'s auth and decode. `payload: Val`
-    /// carries a [`SetSpenderPayload`].
+    /// Invoked after `confidential_transfer`'s auth and decode.
+    fn on_transfer(e: &Env, from: &Address, to: &Address, payload: &TransferPayload) {}
+
+    /// Invoked after `confidential_transfer_from`'s auth and decode.
+    fn on_spender_transfer(
+        e: &Env,
+        spender: &Address,
+        from: &Address,
+        to: &Address,
+        payload: &SpenderTransferPayload,
+    ) {
+    }
+
+    /// Invoked after `set_spender`'s auth and decode.
     fn on_set_spender(
         e: &Env,
         account: &Address,
         spender: &Address,
         live_until_ledger: u32,
-        payload: Val,
+        payload: &SetSpenderPayload,
     ) {
     }
 
-    /// Invoked after `revoke_spender`'s auth and decode. `payload: Val`
-    /// carries a [`RevokeSpenderPayload`].
-    fn on_revoke_spender(e: &Env, account: &Address, spender: &Address, payload: Val) {}
+    /// Invoked after `revoke_spender`'s auth and decode.
+    fn on_revoke_spender(
+        e: &Env,
+        account: &Address,
+        spender: &Address,
+        payload: &RevokeSpenderPayload,
+    ) {
+    }
 }
 
 /// Zero-cost [`Hooks`] implementation whose every callback is an empty
@@ -230,7 +234,7 @@ pub trait ConfidentialToken {
         account.require_auth();
 
         let decoded: RegisterData = storage::decode_data(e, &data);
-        Self::Hooks::on_register(e, &account, auditor_id, decoded.payload.clone().into_val(e));
+        Self::Hooks::on_register(e, &account, auditor_id, &decoded.payload);
         storage::register(e, &account, auditor_id, &decoded.payload, &decoded.proof);
     }
 
@@ -316,7 +320,7 @@ pub trait ConfidentialToken {
         from.require_auth();
 
         let decoded: WithdrawData = storage::decode_data(e, &data);
-        Self::Hooks::on_withdraw(e, &from, &to, amount, decoded.payload.clone().into_val(e));
+        Self::Hooks::on_withdraw(e, &from, &to, amount, &decoded.payload);
         storage::withdraw(e, &from, &to, amount, &decoded.payload, &decoded.proof);
     }
 
@@ -343,7 +347,7 @@ pub trait ConfidentialToken {
         from.require_auth();
 
         let decoded: TransferData = storage::decode_data(e, &data);
-        Self::Hooks::on_transfer(e, &from, &to, decoded.payload.clone().into_val(e));
+        Self::Hooks::on_transfer(e, &from, &to, &decoded.payload);
         storage::confidential_transfer(e, &from, &to, &decoded.payload, &decoded.proof);
     }
 
@@ -380,13 +384,7 @@ pub trait ConfidentialToken {
         spender.require_auth();
 
         let decoded: SpenderTransferData = storage::decode_data(e, &data);
-        Self::Hooks::on_spender_transfer(
-            e,
-            &spender,
-            &from,
-            &to,
-            decoded.payload.clone().into_val(e),
-        );
+        Self::Hooks::on_spender_transfer(e, &spender, &from, &to, &decoded.payload);
         storage::confidential_transfer_from(
             e,
             &spender,
@@ -433,13 +431,7 @@ pub trait ConfidentialToken {
         account.require_auth();
 
         let decoded: SetSpenderData = storage::decode_data(e, &data);
-        Self::Hooks::on_set_spender(
-            e,
-            &account,
-            &spender,
-            live_until_ledger,
-            decoded.payload.clone().into_val(e),
-        );
+        Self::Hooks::on_set_spender(e, &account, &spender, live_until_ledger, &decoded.payload);
         storage::set_spender(
             e,
             &account,
@@ -474,7 +466,7 @@ pub trait ConfidentialToken {
         account.require_auth();
 
         let decoded: RevokeSpenderData = storage::decode_data(e, &data);
-        Self::Hooks::on_revoke_spender(e, &account, &spender, decoded.payload.clone().into_val(e));
+        Self::Hooks::on_revoke_spender(e, &account, &spender, &decoded.payload);
         storage::revoke_spender(e, &account, &spender, &decoded.payload, &decoded.proof);
     }
 
