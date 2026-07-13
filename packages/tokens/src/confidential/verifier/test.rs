@@ -13,7 +13,7 @@ use crate::confidential::verifier::{
 #[contract]
 struct MockContract;
 
-fn vk_bytes(e: &Env, seed: u8) -> Bytes {
+fn verification_key_bytes(e: &Env, seed: u8) -> Bytes {
     Bytes::from_array(e, &[seed; 32])
 }
 
@@ -21,12 +21,12 @@ fn vk_bytes(e: &Env, seed: u8) -> Bytes {
 fn register_and_get_verification_key_works() {
     let e = Env::default();
     let address = e.register(MockContract, ());
-    let vk = vk_bytes(&e, 0xab);
+    let verification_key = verification_key_bytes(&e, 0xab);
 
     e.as_contract(&address, || {
-        register_verification_key(&e, CircuitType::Register, &vk);
+        register_verification_key(&e, CircuitType::Register, &verification_key);
 
-        assert_eq!(get_verification_key(&e, CircuitType::Register), vk);
+        assert_eq!(get_verification_key(&e, CircuitType::Register), verification_key);
 
         assert_eq!(e.events().all().events().len(), 1);
     });
@@ -49,9 +49,9 @@ fn register_each_circuit_round_trips() {
         .into_iter()
         .enumerate()
         {
-            let vk = vk_bytes(&e, i as u8);
-            register_verification_key(&e, circuit, &vk);
-            assert_eq!(get_verification_key(&e, circuit), vk);
+            let verification_key = verification_key_bytes(&e, i as u8);
+            register_verification_key(&e, circuit, &verification_key);
+            assert_eq!(get_verification_key(&e, circuit), verification_key);
         }
     });
 }
@@ -63,8 +63,8 @@ fn register_twice_panics_with_already_registered() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        register_verification_key(&e, CircuitType::Withdraw, &vk_bytes(&e, 0x01));
-        register_verification_key(&e, CircuitType::Withdraw, &vk_bytes(&e, 0x02));
+        register_verification_key(&e, CircuitType::Withdraw, &verification_key_bytes(&e, 0x01));
+        register_verification_key(&e, CircuitType::Withdraw, &verification_key_bytes(&e, 0x02));
     });
 }
 
@@ -85,8 +85,8 @@ fn update_verification_key_replaces_in_place() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let old = vk_bytes(&e, 0x10);
-        let new = vk_bytes(&e, 0x20);
+        let old = verification_key_bytes(&e, 0x10);
+        let new = verification_key_bytes(&e, 0x20);
 
         register_verification_key(&e, CircuitType::Transfer, &old);
         update_verification_key(&e, CircuitType::Transfer, &new);
@@ -102,7 +102,7 @@ fn update_unregistered_panics_with_not_registered() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        update_verification_key(&e, CircuitType::SetSpender, &vk_bytes(&e, 0xff));
+        update_verification_key(&e, CircuitType::SetSpender, &verification_key_bytes(&e, 0xff));
     });
 }
 
@@ -112,8 +112,8 @@ fn update_emits_update_event() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let old = vk_bytes(&e, 0x10);
-        let new = vk_bytes(&e, 0x20);
+        let old = verification_key_bytes(&e, 0x10);
+        let new = verification_key_bytes(&e, 0x20);
 
         register_verification_key(&e, CircuitType::SpenderTransfer, &old);
         update_verification_key(&e, CircuitType::SpenderTransfer, &new);
@@ -129,14 +129,14 @@ fn storage_key_round_trip() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let vk = vk_bytes(&e, 0x77);
-        register_verification_key(&e, CircuitType::RevokeSpender, &vk);
+        let verification_key = verification_key_bytes(&e, 0x77);
+        register_verification_key(&e, CircuitType::RevokeSpender, &verification_key);
 
         let stored: Bytes = e
             .storage()
             .instance()
-            .get(&VerifierStorageKey::Vk(CircuitType::RevokeSpender))
+            .get(&VerifierStorageKey::VerificationKey(CircuitType::RevokeSpender))
             .unwrap();
-        assert_eq!(stored, vk);
+        assert_eq!(stored, verification_key);
     });
 }

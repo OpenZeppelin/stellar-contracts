@@ -127,7 +127,7 @@ pub trait ConfidentialVerifier {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `circuit_type` - The circuit to register the key under.
-    /// * `vk` - The serialized UltraHonk verification key.
+    /// * `verification_key` - The serialized UltraHonk verification key.
     /// * `operator` - The address authorizing the invocation.
     ///
     /// # Errors
@@ -138,7 +138,7 @@ pub trait ConfidentialVerifier {
     /// # Events
     ///
     /// * topics - `["verification_key_registered", circuit_type: CircuitType]`
-    /// * data - `[vk: Bytes]`
+    /// * data - `[verification_key: Bytes]`
     ///
     /// # Notes
     ///
@@ -146,7 +146,12 @@ pub trait ConfidentialVerifier {
     /// operation that requires custom access control. Access control should
     /// be enforced on `operator` before calling
     /// [`storage::register_verification_key`] for the implementation.
-    fn register_verification_key(e: &Env, circuit_type: CircuitType, vk: Bytes, operator: Address);
+    fn register_verification_key(
+        e: &Env,
+        circuit_type: CircuitType,
+        verification_key: Bytes,
+        operator: Address,
+    );
 
     /// Replaces the UltraHonk verification key registered under `circuit_type`.
     ///
@@ -174,7 +179,8 @@ pub trait ConfidentialVerifier {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `circuit_type` - The circuit whose key is being updated.
-    /// * `new_vk` - The new serialized UltraHonk verification key.
+    /// * `new_verification_key` - The new serialized UltraHonk verification
+    ///   key.
     /// * `operator` - The address authorizing the invocation.
     ///
     /// # Errors
@@ -185,7 +191,7 @@ pub trait ConfidentialVerifier {
     /// # Events
     ///
     /// * topics - `["verification_key_updated", circuit_type: CircuitType]`
-    /// * data - `[old_vk: Bytes, new_vk: Bytes]`
+    /// * data - `[old_verification_key: Bytes, new_verification_key: Bytes]`
     ///
     /// # Notes
     ///
@@ -196,7 +202,7 @@ pub trait ConfidentialVerifier {
     fn update_verification_key(
         e: &Env,
         circuit_type: CircuitType,
-        new_vk: Bytes,
+        new_verification_key: Bytes,
         operator: Address,
     );
 
@@ -265,7 +271,7 @@ pub enum VerifierError {
 pub struct VerificationKeyRegistered {
     #[topic]
     pub circuit_type: CircuitType,
-    pub vk: Bytes,
+    pub verification_key: Bytes,
 }
 
 /// Emits an event indicating a verification key has been registered.
@@ -274,9 +280,14 @@ pub struct VerificationKeyRegistered {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `circuit_type` - The circuit the key was registered under.
-/// * `vk` - The serialized UltraHonk verification key.
-pub fn emit_verification_key_registered(e: &Env, circuit_type: CircuitType, vk: &Bytes) {
-    VerificationKeyRegistered { circuit_type, vk: vk.clone() }.publish(e);
+/// * `verification_key` - The serialized UltraHonk verification key.
+pub fn emit_verification_key_registered(
+    e: &Env,
+    circuit_type: CircuitType,
+    verification_key: &Bytes,
+) {
+    VerificationKeyRegistered { circuit_type, verification_key: verification_key.clone() }
+        .publish(e);
 }
 
 /// Event emitted when a verification key is updated.
@@ -285,8 +296,8 @@ pub fn emit_verification_key_registered(e: &Env, circuit_type: CircuitType, vk: 
 pub struct VerificationKeyUpdated {
     #[topic]
     pub circuit_type: CircuitType,
-    pub old_vk: Bytes,
-    pub new_vk: Bytes,
+    pub old_verification_key: Bytes,
+    pub new_verification_key: Bytes,
 }
 
 /// Emits an event indicating a verification key has been updated.
@@ -295,14 +306,18 @@ pub struct VerificationKeyUpdated {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `circuit_type` - The circuit whose key was updated.
-/// * `old_vk` - The previously registered verification key.
-/// * `new_vk` - The newly registered verification key.
+/// * `old_verification_key` - The previously registered verification key.
+/// * `new_verification_key` - The newly registered verification key.
 pub fn emit_verification_key_updated(
     e: &Env,
     circuit_type: CircuitType,
-    old_vk: &Bytes,
-    new_vk: &Bytes,
+    old_verification_key: &Bytes,
+    new_verification_key: &Bytes,
 ) {
-    VerificationKeyUpdated { circuit_type, old_vk: old_vk.clone(), new_vk: new_vk.clone() }
-        .publish(e);
+    VerificationKeyUpdated {
+        circuit_type,
+        old_verification_key: old_verification_key.clone(),
+        new_verification_key: new_verification_key.clone(),
+    }
+    .publish(e);
 }

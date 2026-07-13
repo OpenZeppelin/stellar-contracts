@@ -104,7 +104,7 @@ impl crate::confidential::verifier::ConfidentialVerifier for MockVerifier {
     fn register_verification_key(
         _e: &Env,
         _ct: crate::confidential::verifier::CircuitType,
-        _vk: Bytes,
+        _verification_key: Bytes,
         _op: Address,
     ) {
     }
@@ -112,7 +112,7 @@ impl crate::confidential::verifier::ConfidentialVerifier for MockVerifier {
     fn update_verification_key(
         _e: &Env,
         _ct: crate::confidential::verifier::CircuitType,
-        _vk: Bytes,
+        _verification_key: Bytes,
         _op: Address,
     ) {
     }

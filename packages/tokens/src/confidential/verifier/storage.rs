@@ -8,7 +8,7 @@ use crate::confidential::verifier::{
 #[contracttype]
 pub enum VerifierStorageKey {
     /// Maps [`CircuitType`] to its serialized UltraHonk verification key.
-    Vk(CircuitType),
+    VerificationKey(CircuitType),
 }
 
 // ################## QUERY STATE ##################
@@ -27,7 +27,7 @@ pub enum VerifierStorageKey {
 pub fn get_verification_key(e: &Env, circuit_type: CircuitType) -> Bytes {
     e.storage()
         .instance()
-        .get(&VerifierStorageKey::Vk(circuit_type))
+        .get(&VerifierStorageKey::VerificationKey(circuit_type))
         .unwrap_or_else(|| panic_with_error!(e, VerifierError::VerificationKeyNotRegistered))
 }
 
@@ -39,7 +39,7 @@ pub fn get_verification_key(e: &Env, circuit_type: CircuitType) -> Bytes {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `circuit_type` - The circuit to register the key under.
-/// * `vk` - The serialized UltraHonk verification key.
+/// * `verification_key` - The serialized UltraHonk verification key.
 ///
 /// # Errors
 ///
@@ -49,7 +49,7 @@ pub fn get_verification_key(e: &Env, circuit_type: CircuitType) -> Bytes {
 /// # Events
 ///
 /// * topics - `["verification_key_registered", circuit_type: CircuitType]`
-/// * data - `[vk: Bytes]`
+/// * data - `[verification_key: Bytes]`
 ///
 /// # Security Warning
 ///
@@ -60,14 +60,14 @@ pub fn get_verification_key(e: &Env, circuit_type: CircuitType) -> Bytes {
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn register_verification_key(e: &Env, circuit_type: CircuitType, vk: &Bytes) {
-    let key = VerifierStorageKey::Vk(circuit_type);
+pub fn register_verification_key(e: &Env, circuit_type: CircuitType, verification_key: &Bytes) {
+    let key = VerifierStorageKey::VerificationKey(circuit_type);
     if e.storage().instance().has(&key) {
         panic_with_error!(e, VerifierError::VerificationKeyAlreadyRegistered);
     }
 
-    e.storage().instance().set(&key, vk);
-    emit_verification_key_registered(e, circuit_type, vk);
+    e.storage().instance().set(&key, verification_key);
+    emit_verification_key_registered(e, circuit_type, verification_key);
 }
 
 /// Replaces the UltraHonk verification key registered under `circuit_type`.
@@ -78,10 +78,10 @@ pub fn register_verification_key(e: &Env, circuit_type: CircuitType, vk: &Bytes)
 /// treated as an emergency response, not a maintenance task. Concretely:
 ///
 /// - **A wrong VK silently breaks soundness.** This function writes the
-///   `new_vk` bytes verbatim; nothing here checks that they correspond to the
-///   audited circuit. A corrupted, misderived, or maliciously crafted
-///   replacement will happily verify forged proofs — minting tokens, draining
-///   accounts, impersonating registered users.
+///   `new_verification_key` bytes verbatim; nothing here checks that they
+///   correspond to the audited circuit. A corrupted, misderived, or maliciously
+///   crafted replacement will happily verify forged proofs — minting tokens,
+///   draining accounts, impersonating registered users.
 /// - **The update invalidates every in-flight proof for the affected circuit.**
 ///   Any proof generated against the previous VK fails the instant the new VK
 ///   is activated; wallets must regenerate against the new VK and resubmit.
@@ -98,7 +98,7 @@ pub fn register_verification_key(e: &Env, circuit_type: CircuitType, vk: &Bytes)
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `circuit_type` - The circuit whose key is being updated.
-/// * `new_vk` - The new serialized UltraHonk verification key.
+/// * `new_verification_key` - The new serialized UltraHonk verification key.
 ///
 /// # Errors
 ///
@@ -108,7 +108,7 @@ pub fn register_verification_key(e: &Env, circuit_type: CircuitType, vk: &Bytes)
 /// # Events
 ///
 /// * topics - `["verification_key_updated", circuit_type: CircuitType]`
-/// * data - `[old_vk: Bytes, new_vk: Bytes]`
+/// * data - `[old_verification_key: Bytes, new_verification_key: Bytes]`
 ///
 /// # Security Warning
 ///
@@ -119,14 +119,14 @@ pub fn register_verification_key(e: &Env, circuit_type: CircuitType, vk: &Bytes)
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn update_verification_key(e: &Env, circuit_type: CircuitType, new_vk: &Bytes) {
-    let key = VerifierStorageKey::Vk(circuit_type);
-    let old_vk: Bytes = e
+pub fn update_verification_key(e: &Env, circuit_type: CircuitType, new_verification_key: &Bytes) {
+    let key = VerifierStorageKey::VerificationKey(circuit_type);
+    let old_verification_key: Bytes = e
         .storage()
         .instance()
         .get(&key)
         .unwrap_or_else(|| panic_with_error!(e, VerifierError::VerificationKeyNotRegistered));
 
-    e.storage().instance().set(&key, new_vk);
-    emit_verification_key_updated(e, circuit_type, &old_vk, new_vk);
+    e.storage().instance().set(&key, new_verification_key);
+    emit_verification_key_updated(e, circuit_type, &old_verification_key, new_verification_key);
 }
