@@ -101,6 +101,17 @@
 //! Deploying this contract over any other token implementation is the
 //! deployer's responsibility — verify that `transfer` does not skim a fee
 //! or otherwise diverge from exact-transfer semantics before doing so.
+//!
+//! **Issuer control over a SAC underlying locks the pool.** All deposits
+//! sit in a single pooled balance held by the contract's own address, and
+//! every withdrawal pays out of it via `token.transfer`. If the underlying
+//! is a Stellar Asset Contract, its issuer can freeze, deauthorize, or claw
+//! back that pooled balance at any time — one issuer action against a
+//! single address blocks every deposit and withdrawal, for all holders, for
+//! as long as the action stands (DESIGN §3.4). Confidential transfers
+//! between registered accounts keep working, but no value can enter or
+//! exit until the issuer restores authorization. Issuer-led SAC deployments
+//! must weigh this explicitly alongside the exact-transfer assumption.
 
 pub mod auditor;
 pub mod compliance;

@@ -1051,8 +1051,10 @@ pub fn revoke_spender(
 /// - During contract initialization/construction
 /// - In admin functions that implement their own authorization logic
 ///
-/// Using this function in public-facing methods may create significant
-/// security risks as it could allow unauthorized modifications.
+/// The value can be set only once — subsequent calls revert — so the risk
+/// of exposing this function un-gated is not later modification but
+/// initialization front-running: an arbitrary caller could set the value
+/// first, permanently locking in a hostile configuration.
 pub fn set_underlying_asset(e: &Env, underlying_asset: &Address) {
     if e.storage().instance().has(&ConfidentialTokenStorageKey::UnderlyingAsset) {
         panic_with_error!(e, ConfidentialTokenError::UnderlyingAssetAlreadySet);
@@ -1162,8 +1164,11 @@ pub fn set_auditor(e: &Env, auditor: &Address) {
 /// - During contract initialization/construction
 /// - In admin functions that implement their own authorization logic
 ///
-/// Using this function in public-facing methods may create significant
-/// security risks as it could allow unauthorized modifications.
+/// The value can be set only once — subsequent calls revert — and is
+/// computed from the contract's own address rather than taken from the
+/// caller, so an un-gated caller can at most trigger initialization early
+/// with the correct value. Calling it from the constructor keeps
+/// initialization explicit.
 pub fn set_address_as_field_element(e: &Env) {
     if e.storage().instance().has(&ConfidentialTokenStorageKey::AddressAsField) {
         panic_with_error!(e, ConfidentialTokenError::AddressAsFieldAlreadySet);
