@@ -1,7 +1,7 @@
 {
   "primitive": "encrypt_auditor_sender_balance",
-  "design_doc_refs": ["Constraint W_a3", "Constraint W_a4", "Constraint S_a3", "Constraint S_a5", "Constraint V_a3", "Constraint V_a5"],
-  "description": "Sender-auditor encrypted balance/allowance checkpoint via the single-squeeze sender channel sponge: b_tilde_aud_s = v_new + SpongeSqueeze_1(AUDITOR_SENDER, s_a_s_x, sigma). Used by Withdraw, RevokeOperator, and SetOperator -- the three sender-side proofs whose auditor block emits only a balance mask.",
+  "design_doc_refs": ["Constraint W_a3", "Constraint W_a4"],
+  "description": "Sender-auditor encrypted balance checkpoint via the second squeeze of the sender channel sponge: b_tilde_aud_s = v_new + SpongeSqueeze_2(AUDITOR_SENDER, s_a_s_x, sigma)[1]. Used by Withdraw, the only sender-side proof whose auditor block emits a single ciphertext. The second squeeze is the balance slot shared with Transfer/SetSpender/RevokeSpender; the first-squeeze amount slot is left unused so the checkpoint pad never coincides with an amount pad, even under (r_e, sigma) reuse.",
   "vectors": [
     {
       "inputs": {
@@ -9,7 +9,7 @@
         "s_a_s_x": "0x12345",
         "sigma": "0x01"
       },
-      "output": "0x2787d1e01bbca7828e13e9b2b3fa11cfcfe9c3d2b121b9e17543146822fe23d3"
+      "output": "0x27f3739a132c6353cd5af3edac0ac75faf7fc606acb61367774e4f764ec17f5f"
     }
   ]
 }
