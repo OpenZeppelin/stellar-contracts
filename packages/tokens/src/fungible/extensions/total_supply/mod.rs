@@ -15,7 +15,7 @@
 //! - A supply-aware contract type, so that burns performed through
 //!   [`crate::fungible::burnable::FungibleBurnable`] decrease the supply:
 //!   [`TotalSupply`] for the vanilla behavior, or a combination resolved by
-//!   [`crate::fungible::combinations::Build`] (e.g. `Build<(AllowList,
+//!   [`crate::fungible::combinations::Compose`] (e.g. `Compose<(AllowList,
 //!   TotalSupply)>`) to pair tracking with the allowlist or blocklist policy.
 //!
 //! Minting has to go through [`mint`] (instead of
@@ -26,7 +26,7 @@
 //! ```ignore
 //! #[contractimpl(contracttrait)]
 //! impl FungibleToken for MyToken {
-//!     type ContractType = TotalSupply;
+//!     type ContractType = Compose<(TotalSupply,)>;
 //! }
 //!
 //! #[contractimpl(contracttrait)]
@@ -67,8 +67,8 @@ use crate::fungible::FungibleToken;
 /// accounts for the total supply:
 ///
 /// * [`TotalSupply`] (vanilla behavior),
-/// * `Build<(AllowList, TotalSupply)>` and `Build<(BlockList, TotalSupply)>`
-///   (refer to [`crate::fungible::combinations::Build`]),
+/// * `Compose<(AllowList, TotalSupply)>` and `Compose<(BlockList,
+///   TotalSupply)>` (refer to [`crate::fungible::combinations::Compose`]),
 /// * [`crate::rwa::RWA`],
 /// * [`crate::vault::Vault`],
 /// * [`crate::fungible::votes::FungibleVotes`] (the supply is served from the

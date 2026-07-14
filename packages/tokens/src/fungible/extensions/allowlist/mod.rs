@@ -10,8 +10,8 @@ use crate::fungible::FungibleToken;
 
 /// Marker trait for contract types that enforce the allowlist transfer
 /// policy: [`AllowList`] itself, or a combination resolved by
-/// [`crate::fungible::combinations::Build`] that includes it, e.g.
-/// `Build<(AllowList, TotalSupply)>`.
+/// [`crate::fungible::combinations::Compose`] that includes it, e.g.
+/// `Compose<(AllowList, TotalSupply)>`.
 pub trait AllowListContractType {}
 
 impl AllowListContractType for AllowList {}

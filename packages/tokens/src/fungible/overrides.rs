@@ -27,7 +27,7 @@ use crate::fungible::extensions::total_supply::total_supply;
 /// ```rust
 /// #[contractimpl(contracttrait)]
 /// impl FungibleToken for ExampleContract {
-///     type ContractType = Base;
+///     type ContractType = Compose<(Base,)>;
 /// }
 /// ```
 pub trait ContractOverrides {
@@ -105,7 +105,7 @@ impl BurnableOverrides for Base {}
 /// `ContractType`. The library ships implementations for its supply-aware
 /// contract types ([`crate::fungible::total_supply::TotalSupply`], the
 /// combined contract types resolved by
-/// [`crate::fungible::combinations::Build`], `RWA`, `Vault`,
+/// [`crate::fungible::combinations::Compose`], `RWA`, `Vault`,
 /// `FungibleVotes`).
 ///
 /// Unlike `BurnableOverrides`, there is deliberately no implementation for

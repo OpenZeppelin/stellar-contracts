@@ -5,9 +5,9 @@
 //! controlled token transfers by an admin who can allow or disallow specific
 //! accounts.
 //!
-//! It also demonstrates combining extensions: the contract type is resolved
-//! with `Build<(AllowList, TotalSupply)>`, pairing the allowlist transfer
-//! policy with total supply tracking.
+//! It also demonstrates composing the contract type: `Compose<(AllowList,
+//! TotalSupply)>` pairs the allowlist transfer policy with total supply
+//! tracking.
 
 use soroban_sdk::{
     contract, contractimpl, symbol_short, Address, Env, MuxedAddress, String, Symbol, Vec,
@@ -17,7 +17,7 @@ use stellar_macros::only_role;
 use stellar_tokens::fungible::{
     allowlist::{AllowList, FungibleAllowList},
     burnable::FungibleBurnable,
-    combinations::Build,
+    combinations::Compose,
     total_supply::{self, FungibleTotalSupply, TotalSupply},
     Base, FungibleToken,
 };
@@ -52,7 +52,7 @@ impl ExampleContract {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
-    type ContractType = Build<(AllowList, TotalSupply)>;
+    type ContractType = Compose<(AllowList, TotalSupply)>;
 }
 
 #[contractimpl(contracttrait)]

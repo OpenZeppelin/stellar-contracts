@@ -26,7 +26,7 @@ use soroban_sdk::{Address, Env, String};
 /// ```rust
 /// #[contractimpl(contracttrait)]
 /// impl NonFungibleToken for ExampleContract {
-///     type ContractType = Consecutive;
+///     type ContractType = Compose<(Consecutive,)>;
 /// }
 /// ```
 pub trait ContractOverrides {

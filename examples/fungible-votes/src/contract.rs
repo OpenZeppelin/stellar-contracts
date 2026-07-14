@@ -4,7 +4,7 @@ use stellar_governance::votes::Votes;
 use stellar_macros::only_owner;
 use stellar_tokens::fungible::{
     burnable::FungibleBurnable, total_supply::FungibleTotalSupply, votes::FungibleVotes, Base,
-    FungibleToken,
+    Compose, FungibleToken,
 };
 
 #[contract]
@@ -25,7 +25,7 @@ impl ExampleContract {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
-    type ContractType = FungibleVotes;
+    type ContractType = Compose<(FungibleVotes,)>;
 }
 
 // The total supply is served from the voting checkpoints.

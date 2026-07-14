@@ -74,7 +74,10 @@ mod utils;
 #[cfg(test)]
 mod test;
 
-pub use extensions::{allowlist, blocklist, burnable, capped, combinations, total_supply, votes};
+pub use extensions::{
+    allowlist, blocklist, burnable, capped, combinations, combinations::Compose, total_supply,
+    votes,
+};
 pub use overrides::{Base, ContractOverrides};
 use soroban_sdk::{
     contracterror, contractevent, contracttrait, Address, Env, MuxedAddress, String,
@@ -115,26 +118,27 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 ///   incompatible with [`crate::fungible::allowlist::AllowList`] trait and
 ///   [`crate::rwa::RWA`] trait.
 /// * [`crate::rwa::RWA`] (enabling the compatibility and overrides for
-///   [`crate::rwa::RWAToken`]) trait, incompatible with
-///   [`crate::fungible::allowlist::AllowList`] trait and
+///   [`crate::rwa::RWAToken`] and
+///   [`crate::fungible::total_supply::FungibleTotalSupply`]) traits,
+///   incompatible with [`crate::fungible::allowlist::AllowList`] trait and
 ///   [`crate::fungible::blocklist::BlockList`] trait.
 /// * [`crate::fungible::total_supply::TotalSupply`] (additionally tracking the
 ///   total supply, enabling the compatibility and overrides for
 ///   [`crate::fungible::total_supply::FungibleTotalSupply`]) trait.
-/// * `Build<(AllowList, TotalSupply)>` (refer to
-///   [`crate::fungible::combinations::Build`]; combining the allowlist transfer
-///   policy with total supply tracking, enabling the compatibility and
-///   overrides for [`crate::fungible::allowlist::FungibleAllowList`] and
+/// * [`crate::vault::Vault`] (enabling the compatibility and overrides for
+///   [`crate::vault::FungibleVault`] and
 ///   [`crate::fungible::total_supply::FungibleTotalSupply`]) traits.
-/// * `Build<(BlockList, TotalSupply)>` (refer to
-///   [`crate::fungible::combinations::Build`]; combining the blocklist transfer
-///   policy with total supply tracking, enabling the compatibility and
-///   overrides for [`crate::fungible::blocklist::FungibleBlockList`] and
+/// * [`crate::fungible::votes::FungibleVotes`] (enabling the compatibility and
+///   overrides for [`stellar_governance::votes::Votes`] and
 ///   [`crate::fungible::total_supply::FungibleTotalSupply`]) traits.
 ///
-/// The default implementations of this trait for `Base`, `Allowlist`,
-/// `Blocklist` and `RWA` can be found by navigating to:
-/// `ContractType::{method_name}`.
+/// Contract types that can work together (e.g. `AllowList` with
+/// `TotalSupply`) are combined by listing them in
+/// [`crate::fungible::combinations::Compose`]; invalid combinations are
+/// rejected at compile time.
+///
+/// The default implementations of this trait for each contract type can be
+/// found by navigating to: `ContractType::{method_name}`.
 ///
 /// For example, the implementation of [`FungibleToken::transfer`] for the
 /// `Allowlist` contract type can be found at
@@ -143,13 +147,13 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 pub trait FungibleToken {
     /// Helper type that allows some of the functionality of the base trait to
     /// be overridden based on the extensions implemented.
-    /// [`crate::fungible::Base`] should be used as the type when
-    /// not using
-    /// [`crate::fungible::allowlist::AllowList`] or
-    /// [`crate::fungible::blocklist::BlockList`] extensions.
-    /// Multiple extensions are combined with
-    /// [`crate::fungible::combinations::Build`], e.g.
-    /// `Build<(AllowList, TotalSupply)>`.
+    /// The contract type is selected with
+    /// [`crate::fungible::combinations::Compose`], by listing the contract
+    /// types that override the `Base` behavior: `Compose<(Base,)>` for the
+    /// vanilla case, `Compose<(AllowList, TotalSupply)>` for a combination,
+    /// and so on. Extensions that add functionality without overriding
+    /// behavior (e.g. [`crate::fungible::burnable::FungibleBurnable`]) have
+    /// no contract type and do not appear in the list.
     type ContractType: ContractOverrides;
 
     /// Returns the amount of tokens held by `account`.

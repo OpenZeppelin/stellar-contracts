@@ -5,16 +5,16 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env, MuxedAddress}
 use crate::fungible::{
     allowlist::AllowList,
     blocklist::BlockList,
-    extensions::combinations::Build,
+    extensions::combinations::Compose,
     overrides::BurnableOverrides,
     total_supply::{mint, total_supply, TotalSupply},
     Base, ContractOverrides,
 };
 
-type AllowListWithSupply = Build<(AllowList, TotalSupply)>;
+type AllowListWithSupply = Compose<(AllowList, TotalSupply)>;
 // deliberately the swapped order, asserting that the list is
 // order-insensitive
-type BlockListWithSupply = Build<(TotalSupply, BlockList)>;
+type BlockListWithSupply = Compose<(TotalSupply, BlockList)>;
 
 #[contract]
 struct MockContract;

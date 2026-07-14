@@ -18,7 +18,7 @@ use stellar_macros::when_not_paused;
 use stellar_tokens::fungible::{
     burnable::FungibleBurnable,
     total_supply::{self, FungibleTotalSupply, TotalSupply},
-    Base, ContractOverrides, FungibleToken,
+    Base, Compose, ContractOverrides, FungibleToken,
 };
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
@@ -94,7 +94,7 @@ impl Pausable for ExampleContract {
 
 #[contractimpl]
 impl FungibleToken for ExampleContract {
-    type ContractType = TotalSupply;
+    type ContractType = Compose<(TotalSupply,)>;
 
     fn balance(e: &Env, account: Address) -> i128 {
         Self::ContractType::balance(e, &account)

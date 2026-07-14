@@ -10,8 +10,8 @@ use crate::fungible::FungibleToken;
 
 /// Marker trait for contract types that enforce the blocklist transfer
 /// policy: [`BlockList`] itself, or a combination resolved by
-/// [`crate::fungible::combinations::Build`] that includes it, e.g.
-/// `Build<(BlockList, TotalSupply)>`.
+/// [`crate::fungible::combinations::Compose`] that includes it, e.g.
+/// `Compose<(BlockList, TotalSupply)>`.
 pub trait BlockListContractType {}
 
 impl BlockListContractType for BlockList {}
