@@ -153,9 +153,9 @@ The net effect is that a disclosure leaves no on-chain trace: no transaction, no
 
 An **event reference** $$\text{ref}\_E$$ uniquely identifies one on-chain transfer-family event:
 
-$$\text{ref}\_E = (\text{tx\\\_hash}, \text{op\\\_index}, \text{log\\\_index})$$
+$$\text{ref}\_E = (\text{tx\\\_hash}, \text{op\\\_index}, \text{event\\\_index})$$
 
-where `tx_hash` is the Soroban transaction hash that emitted the event, `op_index` selects the contract invocation within that transaction, and `log_index` selects the event among those emitted by that invocation. This triple is the canonical Stellar event identifier and is what indexers key on (cf. DESIGN.md §5.2 *Event durability requirement*). Implementations MAY substitute an equivalent canonical identifier exposed by the indexer in use, provided it deterministically resolves to a single on-chain event.
+where `tx_hash` is the Soroban transaction hash that emitted the event and `event_index` selects the event among those the transaction emitted; `op_index` is always 0, since a Soroban transaction carries a single operation. This triple deterministically resolves to exactly one on-chain event, which is all the verifier's lookup (§5.3) needs — it is a resolver, not an ordering key. Its `tx_hash` and `event_index` are the same fields the durable indexer keys on; the indexer's full event-identity and ordering scheme is defined in [INDEXER.md](./INDEXER.md) §2 — `(ledger_seq, tx_hash, event_index)` for identity, `(ledger_seq, tx_application_order, event_index)` for order. Implementations MAY substitute any identifier the indexer in use exposes, provided it deterministically resolves to a single on-chain event.
 
 ### 5.2 Proof Bundle
 

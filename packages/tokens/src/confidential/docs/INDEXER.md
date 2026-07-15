@@ -19,7 +19,7 @@ Stellar RPC retains events for a **7-day window** only. A wallet that loses loca
 
 - **Checkpoint** — an owner-initiated proof-carrying event (`Withdraw`, sender-side `Transfer`, `SetSpender`, `RevokeSpender`) that publishes `(b_tilde, sigma)` for the owner's spendable balance (DESIGN_cont §9.5).
 - **Replay window** — for the spendable side, the range from an account's latest checkpoint to the current ledger; for the receiving side, the range from the last `Merge` (or registration, if never merged) to the current ledger.
-- **Event id** — the triple `(ledger_seq, tx_hash, event_index)`, unique per emitted event and totally ordered by `(ledger_seq, tx_application_order, event_index)`. The same event MUST carry the same id whether served from the archive or from RPC, so a hybrid client can deduplicate across the seam.
+- **Event id** — the triple `(ledger_seq, tx_hash, event_index)`, unique per emitted event: `tx_hash` is globally unique, and `event_index` is unambiguous because a Soroban transaction carries a single operation. The same event MUST carry the same id whether served from the archive or from RPC, so a hybrid client can deduplicate across the seam. The id does not by itself encode position within a ledger — `tx_hash` conveys no ordering — so the canonical total order is instead `(ledger_seq, tx_application_order, event_index)`, where `tx_application_order` is persisted as its own field (§3.1) and drives §3.4.
 - **Seam** — in a hybrid client (§1) that reads the recent tail from Stellar RPC and older history from the archive, the ledger at which it switches sources. A client sets the seam at or below the RPC retention floor (`getHealth().oldestLedger`) so the RPC side is always served from live retention, and requires the archive's ingested-through ledger (§6 C4) to reach the seam.
 
 ## 3. Data Model
@@ -34,10 +34,11 @@ For every in-scope event the indexer MUST persist:
 | `ledger_seq` | Ledger sequence the event was emitted in. |
 | `ledger_close_time` | Close time of that ledger. |
 | `tx_hash` | Transaction hash. |
+| `tx_application_order` | Position of the transaction within its ledger; supplies the intra-ledger ordering that `tx_hash` does not (§3.4). |
 | `event_index` | Index of the event within the transaction. |
 | `topics`, `data` | The event's topics and data payload — verbatim XDR (RECOMMENDED) or a pinned decoded encoding (see note). |
 
-Verbatim XDR is the RECOMMENDED payload: the wallet decodes it directly and, being the on-chain wire form, it survives field renames in the Rust bindings without a schema migration. A decoded representation — for example the JSON a managed indexing pipeline emits — MAY be served instead. Whichever form is served, it MUST reproduce the on-chain event exactly under that decoder; the archive is a faithful mirror, not a re-interpretation. Indexers MAY additionally store decoded columns for querying.
+Verbatim XDR is the RECOMMENDED payload: the wallet decodes it directly and, being the on-chain wire form, it survives field renames in the Rust bindings without a schema migration. A decoded representation — for example the JSON a managed indexing pipeline emits — MAY be served instead. Whichever form is served, it MUST reproduce the on-chain event exactly under that decoder. Indexers MAY additionally store decoded columns for querying.
 
 ### 3.2 Events in scope
 
@@ -62,7 +63,7 @@ The indexer MAY apply this attribution server-side (per-account queries, §6 C2)
 
 ### 3.4 Ordering
 
-The indexer MUST preserve and expose the total order `(ledger_seq, tx_application_order, event_index)`. Replay correctness depends on it: interleaved deposits, transfers, and merges only reconstruct the right openings when applied in emission order (DESIGN §5.2 step 5).
+The indexer MUST preserve and expose the total order `(ledger_seq, tx_application_order, event_index)` — all three components are persisted per §3.1. Replay correctness depends on it: interleaved deposits, transfers, and merges only reconstruct the right openings when applied in emission order (DESIGN §5.2 step 5).
 
 ## 4. Ingestion Contract
 
