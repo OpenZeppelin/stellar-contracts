@@ -6,6 +6,11 @@ use stellar_confidential_lib::{pvk_from_vk, vk_from_sk};
 // contract and the per-circuit happy path tied to the same vectors.
 global SK: Field = 0xdead;
 global ADDR_F: Field = 0xbeef;
+// Binding-only public input (no gate references it, so no `should_fail`
+// test can exercise it at the execution level; the replay protection it
+// provides lives in the verifier's transcript, not in the constraint
+// system). Any value works here.
+global ACCT_F: Field = 0xf00d;
 global Y_X: Field = 0x1b46b003b88a6c34549dc74115f088f4b231a151397526bc10cbf1d15b457646;
 global Y_Y: Field = 0x29116280600c10ead1fdbd9ab4b571896030679bf554d7f1ebf681e5147de21b;
 global PVK_X: Field = 0x2e7421c0e86a4c8eed823edf851c364ecee448bf70eae2a95befe3dd9364cc45;
@@ -13,27 +18,27 @@ global PVK_Y: Field = 0x0b060655740aabef84e7305bb886b75da8d258f346381f03925d6964
 
 #[test]
 fn matches_fixture() {
-    main(SK, Y_X, Y_Y, PVK_X, PVK_Y, ADDR_F);
+    main(SK, Y_X, Y_Y, PVK_X, PVK_Y, ADDR_F, ACCT_F);
 }
 
 #[test(should_fail)]
 fn rejects_tampered_pvk() {
     // PVK.x +1: R3 sees pvk_derived != (pvk_x, pvk_y).
-    main(SK, Y_X, Y_Y, PVK_X + 1, PVK_Y, ADDR_F);
+    main(SK, Y_X, Y_Y, PVK_X + 1, PVK_Y, ADDR_F, ACCT_F);
 }
 
 #[test(should_fail)]
 fn rejects_wrong_addr_f() {
     // Y / PVK match (sk, addr_f=0xbeef). A different addr_f recomputes vk under
     // that addr_f; PVK = vk*H then mismatches under R3.
-    main(SK, Y_X, Y_Y, PVK_X, PVK_Y, 0xcafe);
+    main(SK, Y_X, Y_Y, PVK_X, PVK_Y, 0xcafe, ACCT_F);
 }
 
 #[test(should_fail)]
 fn rejects_off_curve_y() {
     // (1, 2) is off-curve. R1 fails because scalar_mul(sk, H) yields an
     // on-curve point that cannot equal (1, 2).
-    main(SK, 1, 2, PVK_X, PVK_Y, ADDR_F);
+    main(SK, 1, 2, PVK_X, PVK_Y, ADDR_F, ACCT_F);
 }
 
 #[test(should_fail)]
@@ -41,7 +46,7 @@ fn rejects_identity_y() {
     // Y = (0, 0) is the identity encoding. To pass R1, sk*H would have to
     // equal (0, 0), which means sk = 0 -- but R4 rules that out before R1
     // can see it. Either way: rejected.
-    main(SK, 0, 0, PVK_X, PVK_Y, ADDR_F);
+    main(SK, 0, 0, PVK_X, PVK_Y, ADDR_F, ACCT_F);
 }
 
 #[test(should_fail)]
@@ -50,7 +55,7 @@ fn rejects_sk_zero() {
     // publish Y = O and collapse every ECDH involving the spending key.
     // Y / PVK are fixture values that would otherwise be rejected here
     // because they don't derive from sk = 0 -- R4 fires first.
-    main(0, Y_X, Y_Y, PVK_X, PVK_Y, ADDR_F);
+    main(0, Y_X, Y_Y, PVK_X, PVK_Y, ADDR_F, ACCT_F);
 }
 
 #[test]
