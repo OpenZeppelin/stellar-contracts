@@ -9,7 +9,7 @@ The key words MUST, MUST NOT, SHOULD, and MAY are to be interpreted as in RFC 21
 
 ## 1. Why the Indexer Is Load-Bearing
 
-Confidential balances are Pedersen commitments; the on-chain entry alone does not reveal the opening `(v, r)` needed to spend. A wallet that loses its local cache reconstructs the opening deterministically from the master secret plus the account's event history: the latest *checkpoint* event supplies `(b_tilde, sigma)` from which the spendable opening is derived, and replaying subsequent events rebuilds the receiving-side state (DESIGN_cont §9.5).
+Confidential balances are Pedersen commitments; the on-chain entry alone does not reveal the opening `(v, r)` needed to spend. A wallet that loses its local cache reconstructs the opening deterministically from the master secret plus the account's event history: the latest *checkpoint* event supplies `(b_tilde, sigma)` from which the spendable opening is derived (DESIGN_cont §9.5), while the receiving-side opening is rebuilt by replaying deposits and incoming transfers back to the account's last `Merge`, or to registration if it has never merged (§2).
 
 Stellar RPC retains events for a **7-day window** only. A wallet that loses local state after that window can still see that its funds exist (the commitment remains on-chain) but cannot reconstruct the opening required to spend them — unless a durable archive holds the missing events. That archive is this document's subject. Without a conforming indexer, recovery from seed is not guaranteed, and deployments MUST treat wallet-local state as unrecoverable after the RPC window.
 
