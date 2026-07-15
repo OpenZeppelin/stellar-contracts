@@ -144,7 +144,9 @@ pub trait Hooks {
     /// Invoked after `register`'s auth and payload decode, before account
     /// creation. `payload: Val` carries a [`RegisterPayload`]. `auditor_id`
     /// is the caller-selected auditor key index — forwarded so the hook
-    /// can enforce an approved-auditor policy.
+    /// can enforce an approved-auditor policy. The core checks only that
+    /// the id exists in the auditor registry; restricting which auditors
+    /// an account may bind to is the deployment's responsibility.
     fn on_register(e: &Env, account: &Address, auditor_id: u32, payload: Val) {}
 
     /// Invoked after `deposit`'s auth, before SEP-41 transfer and balance

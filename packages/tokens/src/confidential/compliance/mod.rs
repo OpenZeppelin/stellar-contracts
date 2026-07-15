@@ -181,6 +181,9 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 ///   [`on_merge`](Hooks::on_merge): `account` passes all three.
 /// * [`on_register`](Hooks::on_register): `account` skips the freeze gate
 ///   (registration predates the account entry) but passes policy and SAC.
+/// * [`on_register`](Hooks::on_register) does not restrict the caller-selected
+///   `auditor_id`. Deployments that must limit which auditors an account may
+///   bind to override it with a custom gate (see [`docs/COMPLIANCE.md`] §4.3).
 /// * [`on_spender_transfer`](Hooks::on_spender_transfer): `from` and `to` pass
 ///   all three gates; `spender` passes only the policy gate.
 /// * [`on_set_spender`](Hooks::on_set_spender): the delegating `account` passes

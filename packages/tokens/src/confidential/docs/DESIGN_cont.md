@@ -29,7 +29,7 @@ $$S\_{a,s} = r\_e \cdot K\_{\text{aud,s}}, \qquad s\_{a,s} = S\_{a,s}.x$$
 $$(m\_{v,s}, m\_{b,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$
 $$\tilde{v}\_{\text{aud,s}} = v\_{\text{tx}} + m\_{v,s}, \qquad \tilde{b}\_{\text{aud,s}} = (v\_A - v\_{\text{tx}}) + m\_{b,s}$$
 
-The transfer circuit (constraints T\_a1--T\_a8) enforces correct computation. The contract fetches both auditor keys from the auditor contract using the respective account `auditor_id` fields; neither the sender nor the recipient can substitute a different key.
+The transfer circuit (constraints T\_a1--T\_a8) enforces correct computation. At operation time, the contract fetches both auditor keys from the auditor contract using the *stored* `auditor_id` field of each account; neither the sender nor the recipient can substitute a different key for the operation being proven. This guarantee is scoped to operation time: *which* auditor an account is bound to is chosen by the account owner at registration (DESIGN §7.2), subject only to existence in the auditor registry unless the deployment gates the selection in its `Hooks::on_register` implementation ([COMPLIANCE.md](./COMPLIANCE.md) §4.3).
 
 Each auditor decrypts using their secret key $$k$$. For example, the sender's auditor:
 
