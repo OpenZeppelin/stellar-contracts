@@ -1,7 +1,8 @@
 # Indexing and Off-Chain State Recovery
 
-Companion specification to [DESIGN.md](./DESIGN.md) §5.2 (Wallet State and
-Recovery) and [DESIGN_cont.md](./DESIGN_cont.md) §9.5 (State Recovery). It
+Companion specification to [DESIGN.md](./DESIGN.md) §5.2 (Off-Chain
+Opening Maintenance) and [DESIGN_cont.md](./DESIGN_cont.md) §9.5 (State
+Recovery). It
 specifies the durable event archive — the *indexer* — that those sections
 assume: its data model, ingestion contract, retention obligations, and
 recommended API surface.
@@ -67,8 +68,8 @@ be returned byte-for-byte.
 
 ### 3.2 Events in scope
 
-All events emitted by the confidential token (DESIGN §12) with the
-following recovery roles:
+All events emitted by the confidential token (DESIGN_cont §11.2) with
+the following recovery roles:
 
 | Event | Role in recovery |
 |:--|:--|
@@ -77,7 +78,7 @@ following recovery roles:
 | `Transfer` (recipient side) | Receiving-side replay: carries the recipient-channel ciphertexts for `(v_tx, r_tx)`. |
 | `SpenderTransfer` (recipient side) | Receiving-side replay, as above. |
 | `Merge` | Folds the receiving opening into the spendable opening; resets the receiving side. |
-| `Withdraw`, `Transfer` (sender side), `SetSpender`, `RevokeSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the spendable balance. `SetSpender`/`SpenderTransfer`/`RevokeSpender` additionally carry the allowance-channel ciphertexts a spender wallet needs. |
+| `Withdraw`, `Transfer` (sender side), `SetSpender`, `RevokeSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the owner's spendable balance. `SetSpender`/`RevokeSpender` are in scope as owner checkpoints only — a spender recovers allowance state from the on-chain delegation entry (`allowance_commitment`, `encrypted_allowance`, `escrowed_dvk`, `allowance_salt`), not from the archive. The auditor-channel ciphertexts these events also carry are out of scope for wallet recovery. |
 
 Configuration events (`UnderlyingAssetSet`, `VerifierSet`, `AuditorSet`,
 `AddressAsFieldSet`, verification-key events) are not needed for balance
