@@ -38,6 +38,8 @@ The contract maintains a `frozen(account) -> bool` entry per account. Before app
 
 Full freeze (rather than outbound-only) keeps semantics clean: no further accumulation is possible after the freeze takes effect.
 
+The spender named by the delegation flows (`set_spender`, `confidential_transfer_from`) is not an account for the purposes of the freeze check: the freeze targets fund ownership, and the spender holds no funds — the value being moved stays the owner's, and freezing the owner halts the delegation. This mirrors the allowance models of the library's fungible and rwa tokens. The spender is instead gated by the policy contract (§3).
+
 ### 2.1 Core Interface Additions
 
 Three functions are added to the core contract interface:
@@ -60,6 +62,8 @@ $$\text{permitted}(a) = \neg \text{frozen}(a) \\;\land\\; \text{policy\\\_ok}(a)
 
 Off by default. Issuer-led deployments using a SAC underlying opt in at construction. The cost is one extra cross-contract invocation per named account per operation. This is the *transitive compliance* pattern: the issuer's own freeze/deauthorize, driven through the SAC's standardized admin interface (`set_authorized`, CAP-0046-06), takes effect at the confidential layer with no state mirrored by the token admin.
 
+Like the contract-level freeze (§2), the SAC check names only fund-holding parties: the spender of a delegated flow is exempt.
+
 ---
 
 ## 3. Policy Contract
@@ -81,6 +85,8 @@ This single hook covers the common deployment modes without baking them into the
 Membership management, list semantics, and identity proofs live entirely inside the policy contract. The token's only agreement with the policy is the boolean return value.
 
 Externalizing the policy also lets a single registry serve multiple tokens. An issuer running several confidential tokens (different denominations, jurisdictions, or product lines) can point every token at the same KYC or sanctions contract and maintain one source of truth, rather than mirroring lists into each token. The `token` argument to `is_authorized` lets the registry apply per-token rules when needed (e.g., a jurisdiction filter) without giving up the shared baseline.
+
+**Spender gating.** Unlike the freeze (§2) and SAC (§2.2) checks, the policy gate also names the spender of a delegated flow: `set_spender` checks the spender at grant time — a delegation to a policy-denied spender fails when it is established, not only when it is exercised — and `confidential_transfer_from` checks the spender at spend time, alongside `from` and `to`. `revoke_spender` deliberately does not gate the spender: revocation is the owner's escape hatch, and blocking it once the spender turns non-compliant would entrench the bad delegation (the owner is still gated on revocation, as on every other operation).
 
 The policy address is rotatable via `set_compliance_config` (§6) under admin auth (§1.1). Setting it to `None` disables the gate. The policy is part of the deployment's trust surface.
 
