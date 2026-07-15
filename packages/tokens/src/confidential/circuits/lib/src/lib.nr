@@ -179,6 +179,11 @@ pub fn assert_on_curve_non_identity(p: EmbeddedCurvePoint) {
 /// Poseidon2 sponge with rate=3, capacity=1, matching Noir stdlib's hasher and
 /// Barretenberg's Poseidon2 sponge. IV = `len * 2^64` placed at the capacity
 /// position; absorb `RATE` field elements per permutation; squeeze `state[0]`.
+/// The empty input still applies the squeeze permutation, returning
+/// `poseidon2_permutation([0, 0, 0, 0], 4)[0]` -- the same convention as the
+/// on-chain sponge, which always permutes before squeezing. That branch is
+/// comptime-dead for every `M >= 1` instantiation, and `poseidon_with_domain`
+/// guarantees `M >= 1` on every reachable path.
 fn sponge<let M: u32>(inputs: [Field; M]) -> Field {
     let iv: Field = (M as Field) * POSEIDON2_IV_BASE;
     let mut state: [Field; 4] = [0, 0, 0, iv];
@@ -192,7 +197,7 @@ fn sponge<let M: u32>(inputs: [Field; M]) -> Field {
     }
 
     let remainder: u32 = M - full * 3;
-    if remainder != 0 {
+    if (remainder != 0) | (M == 0) {
         for i in 0..remainder {
             state[i] += inputs[full * 3 + i];
         }
