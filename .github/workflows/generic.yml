@@ -48,6 +48,8 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
+            # `code` is exposed as steps.changes.outputs.code below and is
+            # true whenever any non-markdown file changed.
             code:
               - '!**.md'
 
