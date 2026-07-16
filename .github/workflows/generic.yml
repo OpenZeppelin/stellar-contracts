@@ -4,11 +4,7 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - "**.md"
   pull_request:
-    paths-ignore:
-      - "**.md"
   workflow_dispatch:
 
 # If new code is pushed to a PR branch, then cancel in progress workflows for
@@ -41,10 +37,28 @@ jobs:
       - name: git checkout
         uses: actions/checkout@v4
 
+      # This job is a required status check, so it must always run (no
+      # workflow-level path filter) to report on every PR — including
+      # markdown-only ones. Otherwise the required check sits forever at
+      # "Expected — waiting for status to be reported" and blocks the merge.
+      # The heavy steps below are gated on an actual code change instead, so
+      # docs-only PRs finish in seconds while still reporting success.
+      - name: Detect code changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            # `code` is exposed as steps.changes.outputs.code below and is
+            # true whenever any non-markdown file changed.
+            code:
+              - '!**/*.md'
+
       - name: Run sccache
+        if: steps.changes.outputs.code == 'true'
         uses: mozilla-actions/sccache-action@v0.0.8
 
       - name: install rust toolchain
+        if: steps.changes.outputs.code == 'true'
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable, nightly
@@ -52,12 +66,15 @@ jobs:
           target: wasm32v1-none
 
       - name: Install cargo-llvm-cov
+        if: steps.changes.outputs.code == 'true'
         run: cargo install cargo-llvm-cov
 
       - name: Check format
+        if: steps.changes.outputs.code == 'true'
         run: cargo +nightly fmt --all -- --check
 
       - name: Check clippy
+        if: steps.changes.outputs.code == 'true'
         run: cargo +stable clippy --release --locked --all-targets -- -D warnings
 
       # TODO: re-enable this after we find a stable solution to same name functions across multiple contracts
@@ -65,9 +82,11 @@ jobs:
       #   run: cargo build --target wasm32v1-none --release
 
       - name: Run tests with coverage
+        if: steps.changes.outputs.code == 'true'
         run: cargo +stable llvm-cov --workspace --lcov --fail-under-lines 90 --output-path lcov.info
 
       - name: Upload coverage to Codecov
+        if: steps.changes.outputs.code == 'true'
         uses: codecov/codecov-action@v3
         with:
           files: ./lcov.info
