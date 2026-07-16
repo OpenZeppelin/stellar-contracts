@@ -14,7 +14,7 @@ This project is composed of the following documents:
 - Confidential Token: [Compliance Extensions](./COMPLIANCE.md)
 - Confidential Token: [Selective Disclosure](./SELECTIVE_DISCLOSURE.md)
 - Confidential Token: [User Flows Overview](./OVERVIEW.md)
-- Indexing and Off-Chain State Recovery (to be added)
+- Confidential Token: [Indexing and Off-Chain State Recovery](./INDEXER.md)
 - SDK (to be added)
 
 ---
@@ -360,7 +360,7 @@ After every owner-initiated operation that produces a proof, $$r\_s$$ resets to 
 
 Steps 1-3 require $$(\tilde{b}, \sigma)$$ from the latest owner event and $$vk$$. No full event replay is needed. Step 5 replays only events since the last checkpoint and correctly handles any number of interleaved deposits, transfers, and merges. A wallet that spends regularly produces frequent checkpoints, bounding the replay window. In the worst case (funds received but never spent), the replay window extends back to registration.
 
-**Event durability requirement.** Recovery depends on the wallet being able to retrieve every event since the last checkpoint, plus the checkpoint event itself, in ledger order. Stellar RPC retains event history for a 7-days window only, so a wallet that loses local state after that window cannot recover from RPC alone. The protocol therefore assumes a durable event archive that retains the full per-account history of `Withdraw`, `Transfer` (both directions), `SpenderTransfer` (recipient side), `Deposit`, `Merge`, `SetSpender`, and `RevokeSpender` events forever. The data model, ingestion contract, retention obligations, and recommended API surface for that archive are specified in the indexing document (INDEXER.md, to be added). Wallets and SDKs MUST consume an indexer that meets that contract for recovery.
+**Event durability requirement.** Recovery depends on the wallet being able to retrieve every event since the last checkpoint, plus the checkpoint event itself, in ledger order. Stellar RPC retains event history for a 7-days window only, so a wallet that loses local state after that window cannot recover from RPC alone. The protocol therefore assumes a durable event archive that retains the full per-account history of `Withdraw`, `Transfer` (both directions), `SpenderTransfer` (recipient side), `Deposit`, `Merge`, `SetSpender`, and `RevokeSpender` events forever. The data model, ingestion contract, retention obligations, and recommended API surface for that archive are specified in [INDEXER.md](./INDEXER.md). Wallets and SDKs MUST consume an indexer that meets that contract for recovery.
 
 ### 5.3 ECDH-Derived Blinding
 
