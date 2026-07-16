@@ -20,7 +20,10 @@ pub struct ComplianceConfig {
     /// policy gate.
     pub policy: Option<Address>,
     /// When `true`, the gates additionally consult the underlying SAC's
-    /// `authorized()` view.
+    /// `authorized()` view. Requires the underlying token to be a Stellar
+    /// Asset Contract — `authorized` is not part of SEP-41, and enabling
+    /// this flag over a non-SAC underlying makes every gated operation trap
+    /// (see [`check_sac`]).
     pub sac_passthrough: bool,
 }
 
@@ -214,8 +217,14 @@ pub fn check_policy(e: &Env, account: &Address, config: &ComplianceConfig) {
     }
 }
 
-/// Asserts that the underlying SEP-41 token's `authorized` view returns `true`
+/// Asserts that the underlying token's `authorized` view returns `true`
 /// for `account`. A no-op when `config.sac_passthrough` is `false`.
+///
+/// The `authorized` view belongs to the Stellar Asset Contract admin
+/// interface, not to generic SEP-41 (DESIGN §3.4). Enabling
+/// `sac_passthrough` over a non-SAC underlying (e.g. a plain SEP-41 token)
+/// makes this call — and with it every gated operation — trap on the
+/// missing function.
 ///
 /// # Arguments
 ///

@@ -104,7 +104,7 @@ impl crate::confidential::verifier::ConfidentialVerifier for MockVerifier {
     fn register_verification_key(
         _e: &Env,
         _ct: crate::confidential::verifier::CircuitType,
-        _vk: Bytes,
+        _verification_key: Bytes,
         _op: Address,
     ) {
     }
@@ -112,7 +112,7 @@ impl crate::confidential::verifier::ConfidentialVerifier for MockVerifier {
     fn update_verification_key(
         _e: &Env,
         _ct: crate::confidential::verifier::CircuitType,
-        _vk: Bytes,
+        _verification_key: Bytes,
         _op: Address,
     ) {
     }
@@ -434,6 +434,48 @@ fn rotating_policy_to_none_skips_policy_gate() {
     });
 }
 
+#[test]
+#[should_panic(expected = "Error(Contract, #3602)")]
+fn on_spender_transfer_rejects_policy_denied_spender() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let bob = Address::generate(&h.e);
+    let op = Address::generate(&h.e);
+    let policy = h.e.register(DenyOnePolicy, (op.clone(),));
+    h.e.as_contract(&h.host, || {
+        set_compliance_config(&h.e, &ComplianceConfig { policy: Some(policy), ..base_config() });
+        ComplianceHooks::on_spender_transfer(&h.e, &op, &alice, &bob, void_val(&h.e));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3602)")]
+fn on_set_spender_rejects_policy_denied_spender() {
+    // Delegating to a policy-denied spender fails at grant time.
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let op = Address::generate(&h.e);
+    let policy = h.e.register(DenyOnePolicy, (op.clone(),));
+    h.e.as_contract(&h.host, || {
+        set_compliance_config(&h.e, &ComplianceConfig { policy: Some(policy), ..base_config() });
+        ComplianceHooks::on_set_spender(&h.e, &alice, &op, 0, void_val(&h.e));
+    });
+}
+
+#[test]
+fn on_revoke_spender_allows_policy_denied_spender() {
+    // Revocation is the owner's escape hatch: it must stay possible even
+    // after the spender turns non-compliant.
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let op = Address::generate(&h.e);
+    let policy = h.e.register(DenyOnePolicy, (op.clone(),));
+    h.e.as_contract(&h.host, || {
+        set_compliance_config(&h.e, &ComplianceConfig { policy: Some(policy), ..base_config() });
+        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, void_val(&h.e));
+    });
+}
+
 // ################## SAC PASSTHROUGH ##################
 
 #[test]
@@ -458,6 +500,21 @@ fn panics_when_sac_unauthorized() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &ComplianceConfig { sac_passthrough: true, ..base_config() });
         ComplianceHooks::on_merge(&h.e, &alice);
+    });
+}
+
+#[test]
+fn on_spender_transfer_when_spender_sac_unauthorized() {
+    // The SAC gate targets fund ownership; the spender holds no funds and is
+    // intentionally exempt.
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let bob = Address::generate(&h.e);
+    let op = Address::generate(&h.e);
+    h.sac.set_authorized(&op, &false);
+    h.e.as_contract(&h.host, || {
+        set_compliance_config(&h.e, &ComplianceConfig { sac_passthrough: true, ..base_config() });
+        ComplianceHooks::on_spender_transfer(&h.e, &op, &alice, &bob, void_val(&h.e));
     });
 }
 
