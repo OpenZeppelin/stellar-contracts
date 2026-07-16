@@ -41,9 +41,15 @@ mod tests;
 //                                                      auditor ECDH.
 //   W_a2 S_{a,s}     = r_e * K_{aud,s}                 Sender-auditor ECDH
 //                                                      shared secret.
-//   W_a3 m_b         = SpongeSqueeze_1(delta_aud_s,
-//                                     S_{a,s}.x, sigma) Sender-channel
-//                                                      sponge, single squeeze.
+//   W_a3 m_b         = SpongeSqueeze_2(delta_aud_s,
+//                                     S_{a,s}.x,
+//                                     sigma)[1]         Sender-channel sponge,
+//                                                      second squeeze (the
+//                                                      balance slot; the
+//                                                      first-squeeze amount
+//                                                      slot is unused -- the
+//                                                      withdrawal amount is
+//                                                      public).
 //   W_a4 b_tilde_aud_s = (v - a) + m_b                  Sender-auditor
 //                                                      encrypted balance
 //                                                      checkpoint (emitted).

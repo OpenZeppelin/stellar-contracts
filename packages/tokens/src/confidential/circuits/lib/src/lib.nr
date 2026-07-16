@@ -307,14 +307,17 @@ pub fn sponge_squeeze_2(d: Field, s_x: Field, sigma: Field) -> [Field; 2] {
     [state[0], state[1]]
 }
 
-/// Sender-auditor encrypted balance/allowance checkpoint for circuits whose
-/// auditor block emits a single ciphertext (Withdraw W_a3/W_a4, RevokeSpender
-/// V_a3/V_a5, SetSpender S_a3/S_a5).
+/// Sender-auditor encrypted balance checkpoint for circuits whose auditor
+/// block emits a single ciphertext (Withdraw W_a3/W_a4).
 ///
-/// `b_tilde_aud_s = v_new + Poseidon2(AUDITOR_SENDER, s_a_s_x, sigma)`.
-/// The two-squeeze sender-channel form (Transfer T_a6-T_a8, SpenderTransfer
-/// O_a6-O_a8) is a different composition that callers spell out directly with
-/// `sponge_squeeze_2`.
+/// `b_tilde_aud_s = v_new + sponge_squeeze_2(AUDITOR_SENDER, s_a_s_x, sigma)[1]`.
+/// The pad is the sponge's *second* squeeze -- the slot every two-ciphertext
+/// sender channel (Transfer T_a6-T_a8, SetSpender S_a3-S_a5, RevokeSpender
+/// V_a3-V_a5, SpenderTransfer O_a6-O_a8) uses for its balance/allowance mask.
+/// The first squeeze is reserved for amount masks, so a balance checkpoint
+/// never shares a pad with an amount ciphertext even if a `(r_e, sigma)` pair
+/// is mistakenly reused across operations (the pair must be unique per proof;
+/// DESIGN Section 2.5).
 pub fn encrypt_auditor_sender_balance(v_new: Field, s_a_s_x: Field, sigma: Field) -> Field {
-    v_new + poseidon_with_domain(domain::AUDITOR_SENDER, [s_a_s_x, sigma])
+    v_new + sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, sigma)[1]
 }

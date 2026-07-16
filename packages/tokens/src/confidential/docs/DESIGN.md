@@ -129,7 +129,9 @@ The system uses **Poseidon2**, the algebraic hash function native to Noir's stan
 
 **Sponge mode for auditor channels.** The per-transfer auditor ciphertexts (Section 8) use Poseidon2 in sponge mode. A single absorb of $$(\delta\_{\text{channel}}, S.x, \sigma)$$ is followed by $$n$$ sequential squeezes producing $$(m\_1, \ldots, m\_n) \in \mathbb{F}\_r^n$$, denoted $$\text{SpongeSqueeze}\_n(\delta\_{\text{channel}}, S.x, \sigma)$$. Two channel tags are used: $$\delta\_{\text{aud\\\_s}}$$ for the sender-auditor channel keyed by $$S\_{a,s}.x = (r\_e \cdot K\_{\text{aud,s}}).x$$, and $$\delta\_{\text{aud\\\_r}}$$ for the recipient-auditor channel keyed by $$S\_{a,r}.x = (r\_e \cdot K\_{\text{aud,r}}).x$$.
 
-Squeeze order is canonical. Where $$n = 2$$, the first squeezed mask is the amount mask and the second is the balance or randomness mask, fixed per operation by the formulas in Sections 7 and 8.
+Squeeze order is canonical. The first squeezed mask is always an amount mask and the second is always a balance, allowance, or randomness mask, fixed per operation by the formulas in Sections 7 and 8. Single-ciphertext channels (the Withdraw balance checkpoint, W\_a3) take the *second* squeeze and leave the amount slot unused, so a checkpoint pad can never coincide with an amount pad.
+
+A $$(r\_e, \sigma)$$ pair MUST be unique per proof. The sponge masks are deterministic in $$(S.x, \sigma)$$, so reusing the pair across two operations reuses every pad slot they share, and a slot whose plaintext is known in one operation (e.g. a transfer amount known to its recipient) decrypts the other operation's ciphertext in that slot. The canonical slot assignment above limits the blast radius of such reuse to same-slot pairs, but does not eliminate it; provers and wallets MUST sample a fresh $$(r\_e, \sigma)$$ for every proof (Section 9.6 already guarantees $$\sigma$$ freshness on retry).
 
 All references to "Poseidon" in this document denote this Poseidon2 instantiation.
 
@@ -569,7 +571,7 @@ The owner withdraws a public amount $$a$$ (typed `i128`) from their spendable ba
 | W8 | $$r\_e \neq 0$$ (rules out $$R\_e = \mathcal{O}$$ and $$S\_{a,s} = \mathcal{O}$$, which would reduce $$m\_b$$ to a constant function of $$\sigma$$) |
 | W\_a1 | $$R\_e = r\_e \cdot H$$ (ephemeral key for auditor ECDH) |
 | W\_a2 | $$S\_{a,s} = r\_e \cdot K\_{\text{aud,s}}$$ (sender-auditor ECDH shared secret) |
-| W\_a3 | $$m\_b = \text{SpongeSqueeze}\_1(\delta\_{\text{aud\\\_s}}, S\_{a,s}.x, \sigma)$$ (sender-auditor channel sponge, single squeeze) |
+| W\_a3 | $$(\cdot, m\_b) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, S\_{a,s}.x, \sigma)$$ (sender-auditor channel sponge; $$m\_b$$ is the second squeeze — the balance slot, matching T\_a6/S\_a3/V\_a3. The first-squeeze amount slot is unused: the withdrawal amount is public, and skipping the slot keeps the checkpoint pad distinct from every amount pad even under $$(r\_e, \sigma)$$ reuse, Section 2.5) |
 | W\_a4 | $$\tilde{b}\_{\text{aud,s}} = (v - a) + m\_b$$ (sender-auditor encrypted balance checkpoint) |
 
 **Public inputs (15 fields):**
