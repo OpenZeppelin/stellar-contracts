@@ -129,7 +129,9 @@ The system uses **Poseidon2**, the algebraic hash function native to Noir's stan
 
 **Sponge mode for auditor channels.** The per-transfer auditor ciphertexts (Section 8) use Poseidon2 in sponge mode. A single absorb of $$(\delta\_{\text{channel}}, S.x, \sigma)$$ is followed by $$n$$ sequential squeezes producing $$(m\_1, \ldots, m\_n) \in \mathbb{F}\_r^n$$, denoted $$\text{SpongeSqueeze}\_n(\delta\_{\text{channel}}, S.x, \sigma)$$. Two channel tags are used: $$\delta\_{\text{aud\\\_s}}$$ for the sender-auditor channel keyed by $$S\_{a,s}.x = (r\_e \cdot K\_{\text{aud,s}}).x$$, and $$\delta\_{\text{aud\\\_r}}$$ for the recipient-auditor channel keyed by $$S\_{a,r}.x = (r\_e \cdot K\_{\text{aud,r}}).x$$.
 
-Squeeze order is canonical. Where $$n = 2$$, the first squeezed mask is the amount mask and the second is the balance or randomness mask, fixed per operation by the formulas in Sections 7 and 8.
+Squeeze order is canonical. The first squeezed mask is always an amount mask and the second is always a balance, allowance, or randomness mask, fixed per operation by the formulas in Sections 7 and 8. Single-ciphertext channels (the Withdraw balance checkpoint, W\_a3) take the *second* squeeze and leave the amount slot unused, so a checkpoint pad can never coincide with an amount pad.
+
+A $$(r\_e, \sigma)$$ pair MUST be unique per proof. The sponge masks are deterministic in $$(S.x, \sigma)$$, so reusing the pair across two operations reuses every pad slot they share, and a slot whose plaintext is known in one operation (e.g. a transfer amount known to its recipient) decrypts the other operation's ciphertext in that slot. The canonical slot assignment above limits the blast radius of such reuse to same-slot pairs, but does not eliminate it; provers and wallets MUST sample a fresh $$(r\_e, \sigma)$$ for every proof (Section 9.6 already guarantees $$\sigma$$ freshness on retry).
 
 All references to "Poseidon" in this document denote this Poseidon2 instantiation.
 
@@ -406,15 +408,15 @@ Each registered account stores a `ConfidentialAccount` in persistent storage, ke
 
 ```rust
 ConfidentialAccount {
-    spending_key:         BytesN<64>,   // Y = sk · H
+    spending_public_key:         BytesN<64>,   // Y = sk · H
     viewing_public_key:   BytesN<64>,   // PVK = vk · H
-    spendable_balance:    BytesN<64>,   // C_spend: single Pedersen commitment
-    receiving_balance:    BytesN<64>,   // C_receive: single Pedersen commitment
+    spendable_commitment:    BytesN<64>,   // C_spend: single Pedersen commitment
+    receiving_commitment:    BytesN<64>,   // C_receive: single Pedersen commitment
     auditor_id:           u32,
 }
 ```
 
-**`spending_key`**
+**`spending_public_key`**
 
 $$Y = sk \cdot H$$. Set once at registration. Authorizes all spending operations.
 
@@ -422,12 +424,12 @@ $$Y = sk \cdot H$$. Set once at registration. Authorizes all spending operations
 
 $$\text{PVK} = vk \cdot H$$. Set once at registration. Used by senders for ECDH key agreement. The registration proof enforces derivation from the same $$sk$$ as $$Y$$.
 
-**`spendable_balance`**
+**`spendable_commitment`**
 
 The commitment the owner can spend from. Modified only by owner-authorized operations: transfers out, withdrawals, merge, `set_spender`, `revoke_spender`. Encoded as a single Grumpkin affine point (64 bytes).
 
 
-**`receiving_balance`**
+**`receiving_commitment`**
 
 Accumulates incoming deposits and transfers via homomorphic addition. The contract adds to this without any proof from the recipient. Reset to $$\mathcal{O}$$ on merge. Encoded as a single Grumpkin affine point (64 bytes).
 
@@ -442,7 +444,7 @@ Spender delegations are stored in persistent storage, keyed by `(owner, spender)
 ```rust
 SpenderDelegation {
     allowance_commitment: BytesN<64>,   // Single Pedersen commitment
-    encrypted_allowance:  BytesN<32>,   // Poseidon-encrypted allowance scalar
+    a_tilde:  BytesN<32>,   // Poseidon-encrypted allowance scalar
     escrowed_dvk:         BytesN<64>,   // ECDH escrow of dvk_i under spender key
     allowance_salt:       BytesN<32>,
     live_until_ledger:    u32,
@@ -453,7 +455,7 @@ SpenderDelegation {
 
 The spender's remaining escrowed allowance, a single Pedersen commitment: $$C\_a = \text{Com}(v\_a, r\_a)$$ where $$r\_a = \text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a)$$. One Grumpkin point (64 bytes).
 
-**`encrypted_allowance`**
+**`a_tilde`**
 
 Poseidon-encrypted allowance scalar: $$\tilde{a} = v\_a + \text{Poseidon}(\delta\_{\text{enc\\\_allow}}, dvk\_i, \sigma\_a)$$. Enables the spender (who holds $$dvk\_i$$ via `escrowed_dvk`) to read the current allowance without DLP when constructing an `SpenderTransfer` witness. The owner can also read it via $$vk \rightarrow dvk\_i$$. The auditor does not consume this field; allowance visibility for the auditor is provided by the per-event ciphertexts (Section 8.5).
 
@@ -479,7 +481,7 @@ The `(owner, spender)` storage entry holds at most one delegation. `set_spender`
 
 ### 7.1 Public Input Sources
 
-UltraHonk verifies the relation between a proof and its public-input vector. The verifier sees only field elements -- it has no knowledge of which account, contract, or auditor those values are supposed to describe. Binding each public input to the correct provenance is the contract's responsibility. If the contract takes a value that should come from trusted state (e.g. the sender's `spending_key`) and instead reads it from caller-controlled invocation inputs, a soundly proven statement can verify for the wrong account.
+UltraHonk verifies the relation between a proof and its public-input vector. The verifier sees only field elements -- it has no knowledge of which account, contract, or auditor those values are supposed to describe. Binding each public input to the correct provenance is the contract's responsibility. If the contract takes a value that should come from trusted state (e.g. the sender's `spending_public_key`) and instead reads it from caller-controlled invocation inputs, a soundly proven statement can verify for the wrong account.
 
 Each operation below lists, for every public input, where the contract loads it from -- persistent account storage, the delegation entry, the contract's own contract address, an auditor-contract lookup, an invocation argument, or a prover-supplied value that the circuit binds.
 
@@ -503,7 +505,7 @@ An account provides a Grumpkin spending key $$Y$$, a public viewing key $$\text{
 
 | Input | Notes |
 |:---|:---|
-| $$Y$$, $$\text{PVK}$$ | Prover-supplied; written to `account.spending_key` and `account.viewing_public_key` on success |
+| $$Y$$, $$\text{PVK}$$ | Prover-supplied; written to `account.spending_public_key` and `account.viewing_public_key` on success |
 | $$\text{addr\\\_f}$$ | Loaded from instance storage; set once at construction (§3.5) |
 | $$\text{acct\\\_f}$$ | Binds the proof to the registering address that is authenticated with `require_auth()`|
 
@@ -511,7 +513,7 @@ $$\text{acct\\\_f}$$ is referenced by no circuit constraint; its membership in t
 
 **Private witnesses:** $$sk$$.
 
-**Post-verification state:** The contract validates that `auditor_id` exists in the auditor contract and points to a valid key, then stores `spending_key`, `viewing_public_key`, `auditor_id`, and initializes `spendable_balance = receiving_balance = ` $$\mathcal{O}$$.
+**Post-verification state:** The contract validates that `auditor_id` exists in the auditor contract and points to a valid key, then stores `spending_public_key`, `viewing_public_key`, `auditor_id`, and initializes `spendable_commitment = receiving_commitment = ` $$\mathcal{O}$$.
 
 **Auditor selection.** The registering account owner chooses `auditor_id` freely: the register proof does not constrain it, and the core validates only that the id exists in the auditor registry. On a shared auditor registry, deployments that must restrict which auditors an account may bind to MUST enforce that restriction in their `Hooks::on_register` implementation — the default `ComplianceHooks::on_register` deliberately does not restrict it. See [COMPLIANCE.md](./COMPLIANCE.md) §4.3 for a worked example.
 
@@ -569,25 +571,25 @@ The owner withdraws a public amount $$a$$ (typed `i128`) from their spendable ba
 | W8 | $$r\_e \neq 0$$ (rules out $$R\_e = \mathcal{O}$$ and $$S\_{a,s} = \mathcal{O}$$, which would reduce $$m\_b$$ to a constant function of $$\sigma$$) |
 | W\_a1 | $$R\_e = r\_e \cdot H$$ (ephemeral key for auditor ECDH) |
 | W\_a2 | $$S\_{a,s} = r\_e \cdot K\_{\text{aud,s}}$$ (sender-auditor ECDH shared secret) |
-| W\_a3 | $$m\_b = \text{SpongeSqueeze}\_1(\delta\_{\text{aud\\\_s}}, S\_{a,s}.x, \sigma)$$ (sender-auditor channel sponge, single squeeze) |
+| W\_a3 | $$(\cdot, m\_b) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, S\_{a,s}.x, \sigma)$$ (sender-auditor channel sponge; $$m\_b$$ is the second squeeze — the balance slot, matching T\_a6/S\_a3/V\_a3. The first-squeeze amount slot is unused: the withdrawal amount is public, and skipping the slot keeps the checkpoint pad distinct from every amount pad even under $$(r\_e, \sigma)$$ reuse, Section 2.5) |
 | W\_a4 | $$\tilde{b}\_{\text{aud,s}} = (v - a) + m\_b$$ (sender-auditor encrypted balance checkpoint) |
 
 **Public inputs (15 fields):**
 
 | Input | Notes |
 |:---|:---|
-| $$C\_{\text{spend}}$$ | Loaded from `from.spendable_balance` |
-| $$Y$$ | Loaded from `from.spending_key` |
+| $$C\_{\text{spend}}$$ | Loaded from `from.spendable_commitment` |
+| $$Y$$ | Loaded from `from.spending_public_key` |
 | $$\text{addr\\\_f}$$ | Loaded from instance storage; set once at construction (§3.5) |
 | $$K\_{\text{aud,s}}$$ | Fetched from the auditor contract using `from.auditor_id` |
 | $$a$$ | Public withdrawal amount from invocation inputs |
-| $$C\_{\text{spend}}'$$, $$\sigma$$, $$\tilde{b}$$, $$R\_e$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to `from.spendable_balance`, the rest emitted in event |
+| $$C\_{\text{spend}}'$$, $$\sigma$$, $$\tilde{b}$$, $$R\_e$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to `from.spendable_commitment`, the rest emitted in event |
 
 $$\text{to}$$ is bound under `from.require_auth()` and does not appear in the proof.
 
 **Private witnesses:** $$sk$$, $$vk$$, $$v$$, $$r$$, $$r\_e$$.
 
-**Post-verification:** The contract verifies the proof, sets `from`.`spendable_balance` $$= C\_{\text{spend}}'$$, and calls `token.transfer(self, to, a)`. Emits event with $$(R\_e, \sigma, \tilde{b}, \tilde{b}\_{\text{aud,s}})$$.
+**Post-verification:** The contract verifies the proof, sets `from`.`spendable_commitment` $$= C\_{\text{spend}}'$$, and calls `token.transfer(self, to, a)`. Emits event with $$(R\_e, \sigma, \tilde{b}, \tilde{b}\_{\text{aud,s}})$$.
 
 ### 7.6 Confidential Transfer
 
@@ -642,26 +644,26 @@ The sender (account $$A$$, spending key $$sk\_A$$) transfers a hidden amount $$v
 
 | Input | Notes |
 |:---|:---|
-| $$C\_{\text{spend}}^A$$ | Loaded from sender's `spendable_balance` |
-| $$Y\_A$$ | Loaded from sender's `spending_key` |
+| $$C\_{\text{spend}}^A$$ | Loaded from sender's `spendable_commitment` |
+| $$Y\_A$$ | Loaded from sender's `spending_public_key` |
 | $$\text{PVK}\_B$$ | Loaded from recipient's `viewing_public_key`. Recipient must be registered. |
 | $$\text{addr\\\_f}$$ | Loaded from instance storage; set once at construction (§3.5) |
 | $$K\_{\text{aud,r}}$$ | Fetched from the auditor contract using recipient's `auditor_id` |
 | $$K\_{\text{aud,s}}$$ | Fetched from the auditor contract using sender's `auditor_id` |
-| $$C\_{\text{spend}}'$$, $$C\_{\text{tx}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\sigma$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to sender's `spendable_balance`, $$C\_{\text{tx}}$$ added to recipient's `receiving_balance`, the rest emitted in event |
+| $$C\_{\text{spend}}'$$, $$C\_{\text{tx}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\sigma$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to sender's `spendable_commitment`, $$C\_{\text{tx}}$$ added to recipient's `receiving_commitment`, the rest emitted in event |
 
 **Private witnesses:** $$sk\_A$$, $$vk\_A$$, $$v\_A$$, $$r\_A$$, $$v\_{\text{tx}}$$, $$r\_e$$.
 
 **Post-verification:** The contract verifies the proof, then:
-- Sets $$A$$`.spendable_balance` $$= C\_{\text{spend}}'$$
-- Adds to recipient: $$B$$`.receiving_balance` $$\mathrel{+}= C\_{\text{tx}}$$
+- Sets $$A$$`.spendable_commitment` $$= C\_{\text{spend}}'$$
+- Adds to recipient: $$B$$`.receiving_commitment` $$\mathrel{+}= C\_{\text{tx}}$$
 - Emits event with $$(R\_e, \tilde{v}, \sigma, \tilde{b}, \tilde{v}\_{\text{aud,r}}, \tilde{r}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}, \tilde{b}\_{\text{aud,s}})$$
 
 **Recipient processing.** Upon observing the event, the recipient computes $$S = vk \cdot R\_e$$, derives amount and blinding. The decryption flow is independent of whether the sender was the owner or an spender.
 
 ### 7.7 Set Spender
 
-The owner locks funds from their spendable balance into a per-spender escrow. The spender must be a registered account in the contract, so that $$Y\_{\text{op}}$$ (needed for $$dvk\_i$$ escrow) can be looked up from the spender's stored `spending_key`.
+The owner locks funds from their spendable balance into a per-spender escrow. The spender must be a registered account in the contract, so that $$Y\_{\text{op}}$$ (needed for $$dvk\_i$$ escrow) can be looked up from the spender's stored `spending_public_key`.
 
 **Circuit constraints (SetSpender):**
 
@@ -690,17 +692,17 @@ The owner locks funds from their spendable balance into a per-spender escrow. Th
 
 | Input | Notes |
 |:---|:---|
-| $$C\_{\text{spend}}$$ | Loaded from owner's `spendable_balance` |
-| $$Y$$ | Loaded from owner's `spending_key` |
-| $$Y\_{\text{op}}$$ | Loaded from spender account's `spending_key`. Spender must be registered. |
+| $$C\_{\text{spend}}$$ | Loaded from owner's `spendable_commitment` |
+| $$Y$$ | Loaded from owner's `spending_public_key` |
+| $$Y\_{\text{op}}$$ | Loaded from spender account's `spending_public_key`. Spender must be registered. |
 | $$\text{op}\_i$$ | $$\text{address\\\_to\\\_field}$$(`spender` argument), computed per-call by the contract (§2.7) |
 | $$\text{addr\\\_f}$$ | Loaded from instance storage; set once at construction (§3.5) |
 | $$K\_{\text{aud,s}}$$ | Fetched from the auditor contract using owner's `auditor_id` |
-| $$C\_{\text{spend}}'$$, $$C\_a$$, escrowed\_dvk, $$\tilde{b}$$, $$\tilde{a}$$, $$\sigma$$, $$\sigma\_a$$, $$R\_e$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to owner's `spendable_balance`, the delegation fields written to storage, the rest emitted in event |
+| $$C\_{\text{spend}}'$$, $$C\_a$$, escrowed\_dvk, $$\tilde{b}$$, $$\tilde{a}$$, $$\sigma$$, $$\sigma\_a$$, $$R\_e$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to owner's `spendable_commitment`, the delegation fields written to storage, the rest emitted in event |
 
 **Private witnesses:** $$sk$$, $$vk$$, $$v$$, $$r$$, $$v\_a$$, $$r\_e$$.
 
-**Post-verification:** The contract verifies the proof, sets `spendable_balance` $$= C\_{\text{spend}}'$$ and stores the `SpenderDelegation`. Emits event with $$(R\_e, \sigma, \tilde{b}, \tilde{v}\_{\text{aud,s}}, \tilde{b}\_{\text{aud,s}})$$.
+**Post-verification:** The contract verifies the proof, sets `spendable_commitment` $$= C\_{\text{spend}}'$$ and stores the `SpenderDelegation`. Emits event with $$(R\_e, \sigma, \tilde{b}, \tilde{v}\_{\text{aud,s}}, \tilde{b}\_{\text{aud,s}})$$.
 
 ### 7.8 Spender Transfer
 
@@ -737,15 +739,15 @@ The spender transfers from the owner's escrowed allowance to a recipient.
 | Input | Notes |
 |:---|:---|
 | $$C\_a$$, $$\sigma\_a$$ | Loaded from the `(from, spender)` delegation entry |
-| $$Y\_{\text{op}}$$ | Loaded from spender's `spending_key`; matches the auth principal |
+| $$Y\_{\text{op}}$$ | Loaded from spender's `spending_public_key`; matches the auth principal |
 | $$\text{PVK}\_{\text{recipient}}$$ | Loaded from recipient's `viewing_public_key` |
 | $$K\_{\text{aud,r}}$$ | Fetched from the auditor contract using recipient's `auditor_id` |
 | $$K\_{\text{aud,s}}$$ | Fetched from the auditor contract using **owner's** `auditor_id`, not spender's. The visibility model points balance- and allowance-checkpoint ciphertexts at the funds' owner. |
-| $$C\_a'$$, $$C\_{\text{tx}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{a}'$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$ | Prover-supplied; allowance fields written to delegation storage, $$C\_{\text{tx}}$$ added to recipient's `receiving_balance`, the rest emitted in event |
+| $$C\_a'$$, $$C\_{\text{tx}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{a}'$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$ | Prover-supplied; allowance fields written to delegation storage, $$C\_{\text{tx}}$$ added to recipient's `receiving_commitment`, the rest emitted in event |
 
 **Private witnesses:** $$sk\_{\text{op}}$$, $$dvk\_i$$, $$v\_a$$, $$r\_a$$ (single-limb $$\mathbb{F}\_r$$; pinned by O3 to $$\text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a)$$), $$v\_{\text{tx}}$$, $$r\_e$$.
 
-**Post-verification:** The contract checks `ledger.sequence() <= live_until_ledger`, updates `allowance_commitment`, `encrypted_allowance`, stores `new_allowance_salt`, and adds $$C\_{\text{tx}}$$ to the recipient's `receiving_balance`. Emits event with $$(R\_e, \tilde{v}, \sigma\_a, \tilde{v}\_{\text{aud,r}}, \tilde{r}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}, \tilde{a}\_{\text{aud,s}})$$.
+**Post-verification:** The contract checks `ledger.sequence() <= live_until_ledger`, updates `allowance_commitment`, `a_tilde`, stores `new_allowance_salt`, and adds $$C\_{\text{tx}}$$ to the recipient's `receiving_commitment`. Emits event with $$(R\_e, \tilde{v}, \sigma\_a, \tilde{v}\_{\text{aud,r}}, \tilde{r}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}, \tilde{a}\_{\text{aud,s}})$$.
 
 **Recipient uniformity.** The recipient processes the incoming transfer identically to a direct transfer: compute $$S = vk \cdot R\_e$$, derive amount and blinding. The decryption flow is independent of whether the sender was the owner or an spender.
 
@@ -779,17 +781,17 @@ The owner reclaims the remaining escrowed allowance.
 
 | Input | Notes |
 |:---|:---|
-| $$C\_{\text{spend}}$$ | Loaded from owner's `spendable_balance` |
+| $$C\_{\text{spend}}$$ | Loaded from owner's `spendable_commitment` |
 | $$C\_a$$, $$\sigma\_a$$ | Loaded from the `(account, spender)` delegation entry |
-| $$Y$$ | Loaded from owner's `spending_key` |
+| $$Y$$ | Loaded from owner's `spending_public_key` |
 | $$\text{op}\_i$$ | $$\text{address\\\_to\\\_field}$$(`spender` argument), computed per-call by the contract (§2.7) |
 | $$\text{addr\\\_f}$$ | Loaded from instance storage; set once at construction (§3.5) |
 | $$K\_{\text{aud,s}}$$ | Fetched from the auditor contract using owner's `auditor_id` |
-| $$C\_{\text{spend}}'$$, $$\tilde{b}$$, $$\sigma$$, $$R\_e$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to owner's `spendable_balance`, delegation entry deleted, the rest emitted in event |
+| $$C\_{\text{spend}}'$$, $$\tilde{b}$$, $$\sigma$$, $$R\_e$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to owner's `spendable_commitment`, delegation entry deleted, the rest emitted in event |
 
 **Private witnesses:** $$sk$$, $$vk$$, $$dvk\_i$$, $$v\_a$$, $$r\_a$$, $$v\_s$$, $$r\_s$$ (input spendable-balance blinding, encoded as a single $$\mathbb{F}\_r$$ `Field`; see §10.4 *Post-merge witness availability* for the acknowledged $$2^{-127}$$-per-merge case affecting $$r\_s$$), $$r\_e$$.
 
-**Post-verification:** The contract verifies the proof, sets `spendable_balance` $$= C\_{\text{spend}}'$$ and deletes the delegation. Emits event with $$(R\_e, \sigma, \tilde{b}, \tilde{v}\_{\text{aud,s}}, \tilde{b}\_{\text{aud,s}})$$.
+**Post-verification:** The contract verifies the proof, sets `spendable_commitment` $$= C\_{\text{spend}}'$$ and deletes the delegation. Emits event with $$(R\_e, \sigma, \tilde{b}, \tilde{v}\_{\text{aud,s}}, \tilde{b}\_{\text{aud,s}})$$.
 
 ### 7.10 Owner Operations with Active Spenders
 

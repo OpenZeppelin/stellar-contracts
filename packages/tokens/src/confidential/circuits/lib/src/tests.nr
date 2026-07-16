@@ -193,8 +193,10 @@ fn encrypt_decrypt_round_trip() {
     let mask_esc = poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, sigma]);
     assert(dvk_escrowed - mask_esc == v);
 
+    // The auditor balance checkpoint pads with the sponge's second squeeze
+    // (the balance slot), not the single-squeeze funnel.
     let b_tilde_aud_s = encrypt_auditor_sender_balance(v, s, sigma);
-    let mask_aud_s = poseidon_with_domain(domain::AUDITOR_SENDER, [s, sigma]);
+    let mask_aud_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s, sigma)[1];
     assert(b_tilde_aud_s - mask_aud_s == v);
 }
 
@@ -432,14 +434,15 @@ fn fixtures_match_testdata() {
     assert(ss2_r[0] == SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_0);
     assert(ss2_r[1] == SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_1);
 
-    // encrypt_auditor_sender_balance is the canonical composition:
-    // v + Poseidon2(AUDITOR_SENDER, [s, sigma]). The mask matches the first
-    // squeeze of `sponge_squeeze_2` on the same absorb (single permutation,
-    // same state[0]) -- pin against the squeeze_2 vector so the helper and
-    // the raw funnel can't drift apart.
+    // encrypt_auditor_sender_balance pads with the sponge's *second*
+    // squeeze -- the balance slot, matching the two-ciphertext sender
+    // channels (Transfer T_a6). The first squeeze stays reserved for amount
+    // masks so the checkpoint pad can never collide with an amount pad even
+    // under (r_e, sigma) reuse. Pin against the squeeze_2 vector so the
+    // helper and the raw sponge can't drift apart.
     assert(
         encrypt_auditor_sender_balance(v, s_ecdh, sigma)
-            == v + SPONGE_SQUEEZE_2_AUDITOR_SENDER_0,
+            == v + SPONGE_SQUEEZE_2_AUDITOR_SENDER_1,
     );
     assert(
         poseidon_with_domain(domain::AUDITOR_SENDER, [s_ecdh, sigma])

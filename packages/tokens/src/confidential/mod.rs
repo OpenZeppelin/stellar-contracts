@@ -132,9 +132,7 @@ pub mod verifier;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{
-    contracterror, contractevent, contracttrait, Address, Bytes, BytesN, Env, IntoVal, Val,
-};
+use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Bytes, BytesN, Env};
 pub use storage::{
     ConfidentialAccount, ConfidentialTokenStorageKey, RegisterData, RegisterPayload,
     RevokeSpenderData, RevokeSpenderPayload, SetSpenderData, SetSpenderPayload, SpenderDelegation,
@@ -153,9 +151,8 @@ pub use storage::{
 /// observability, prefer subscribing to the token's events instead.
 ///
 /// For ops that carry a `data: Bytes` argument, the last parameter
-/// `payload` on the matching hook is the decoded operation payload as
-/// `Val` (e.g. [`TransferPayload`] for [`Self::on_transfer`]); the hook
-/// reconstructs the typed value via `T::from_val(e, &payload)`. The proof
+/// `payload` on the matching hook is a reference to the decoded operation
+/// payload (e.g. [`TransferPayload`] for [`Self::on_transfer`]). The proof
 /// is not forwarded. The proofless ops [`Self::on_deposit`] and
 /// [`Self::on_merge`] receive no `payload`.
 ///
@@ -164,12 +161,12 @@ pub use storage::{
 #[allow(unused_variables)]
 pub trait Hooks {
     /// Invoked after `register`'s auth and payload decode, before account
-    /// creation. `payload: Val` carries a [`RegisterPayload`]. `auditor_id`
-    /// is the caller-selected auditor key index — forwarded so the hook
-    /// can enforce an approved-auditor policy. The core checks only that
-    /// the id exists in the auditor registry; restricting which auditors
-    /// an account may bind to is the deployment's responsibility.
-    fn on_register(e: &Env, account: &Address, auditor_id: u32, payload: Val) {}
+    /// creation. `auditor_id` is the caller-selected auditor key index —
+    /// forwarded so the hook can enforce an approved-auditor policy. The
+    /// core checks only that the id exists in the auditor registry;
+    /// restricting which auditors an account may bind to is the
+    /// deployment's responsibility.
+    fn on_register(e: &Env, account: &Address, auditor_id: u32, payload: &RegisterPayload) {}
 
     /// Invoked after `deposit`'s auth, before SEP-41 transfer and balance
     /// update.
@@ -179,32 +176,40 @@ pub trait Hooks {
     fn on_merge(e: &Env, account: &Address) {}
 
     /// Invoked after `withdraw`'s auth and decode, before proof verification.
-    /// `payload: Val` carries a [`WithdrawPayload`].
-    fn on_withdraw(e: &Env, from: &Address, to: &Address, amount: i128, payload: Val) {}
-
-    /// Invoked after `confidential_transfer`'s auth and decode. `payload:
-    /// Val` carries a [`TransferPayload`].
-    fn on_transfer(e: &Env, from: &Address, to: &Address, payload: Val) {}
-
-    /// Invoked after `confidential_transfer_from`'s auth and decode.
-    /// `payload: Val` carries an [`SpenderTransferPayload`].
-    fn on_spender_transfer(e: &Env, spender: &Address, from: &Address, to: &Address, payload: Val) {
+    fn on_withdraw(e: &Env, from: &Address, to: &Address, amount: i128, payload: &WithdrawPayload) {
     }
 
-    /// Invoked after `set_spender`'s auth and decode. `payload: Val`
-    /// carries a [`SetSpenderPayload`].
+    /// Invoked after `confidential_transfer`'s auth and decode.
+    fn on_transfer(e: &Env, from: &Address, to: &Address, payload: &TransferPayload) {}
+
+    /// Invoked after `confidential_transfer_from`'s auth and decode.
+    fn on_spender_transfer(
+        e: &Env,
+        spender: &Address,
+        from: &Address,
+        to: &Address,
+        payload: &SpenderTransferPayload,
+    ) {
+    }
+
+    /// Invoked after `set_spender`'s auth and decode.
     fn on_set_spender(
         e: &Env,
         account: &Address,
         spender: &Address,
         live_until_ledger: u32,
-        payload: Val,
+        payload: &SetSpenderPayload,
     ) {
     }
 
-    /// Invoked after `revoke_spender`'s auth and decode. `payload: Val`
-    /// carries a [`RevokeSpenderPayload`].
-    fn on_revoke_spender(e: &Env, account: &Address, spender: &Address, payload: Val) {}
+    /// Invoked after `revoke_spender`'s auth and decode.
+    fn on_revoke_spender(
+        e: &Env,
+        account: &Address,
+        spender: &Address,
+        payload: &RevokeSpenderPayload,
+    ) {
+    }
 }
 
 /// Zero-cost [`Hooks`] implementation whose every callback is an empty
@@ -254,7 +259,7 @@ pub trait ConfidentialToken {
         account.require_auth();
 
         let decoded: RegisterData = storage::decode_data(e, &data);
-        Self::Hooks::on_register(e, &account, auditor_id, decoded.payload.clone().into_val(e));
+        Self::Hooks::on_register(e, &account, auditor_id, &decoded.payload);
         storage::register(e, &account, auditor_id, &decoded.payload, &decoded.proof);
     }
 
@@ -262,7 +267,7 @@ pub trait ConfidentialToken {
     /// into `to`'s confidential receiving balance.
     ///
     /// No proof is required. The deposit commitment is `a · G` with zero
-    /// blinding, added homomorphically to `to.receiving_balance`. The
+    /// blinding, added homomorphically to `to.receiving_commitment`. The
     /// depositor `from` does not need a registered confidential account;
     /// only `to` does.
     ///
@@ -288,7 +293,7 @@ pub trait ConfidentialToken {
         storage::deposit(e, &from, &to, amount);
     }
 
-    /// Folds `account.receiving_balance` into `account.spendable_balance`
+    /// Folds `account.receiving_commitment` into `account.spendable_commitment`
     /// and resets the receiving storage entry to the identity.
     ///
     /// No proof is required; correctness follows from the homomorphic
@@ -334,13 +339,13 @@ pub trait ConfidentialToken {
     /// # Events
     ///
     /// * topics - `["withdraw", from: Address, to: Address]`
-    /// * data - `[amount: i128, r_e: BytesN<64>, sigma: BytesN<32>, b_tilde:
-    ///   BytesN<32>, b_aud_s: BytesN<32>]`
+    /// * data - `[amount: i128, r_e_point: BytesN<64>, sigma: BytesN<32>,
+    ///   b_tilde: BytesN<32>, b_tilde_aud_s: BytesN<32>]`
     fn withdraw(e: &Env, from: Address, to: Address, amount: i128, data: Bytes) {
         from.require_auth();
 
         let decoded: WithdrawData = storage::decode_data(e, &data);
-        Self::Hooks::on_withdraw(e, &from, &to, amount, decoded.payload.clone().into_val(e));
+        Self::Hooks::on_withdraw(e, &from, &to, amount, &decoded.payload);
         storage::withdraw(e, &from, &to, amount, &decoded.payload, &decoded.proof);
     }
 
@@ -361,13 +366,13 @@ pub trait ConfidentialToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[r_e, v_tilde, sigma, b_tilde, v_aud_r, r_aud_r, v_aud_s,
-    ///   b_aud_s]`
+    /// * data - `[r_e_point, v_tilde, sigma, b_tilde, v_tilde_aud_r,
+    ///   r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s]`
     fn confidential_transfer(e: &Env, from: Address, to: Address, data: Bytes) {
         from.require_auth();
 
         let decoded: TransferData = storage::decode_data(e, &data);
-        Self::Hooks::on_transfer(e, &from, &to, decoded.payload.clone().into_val(e));
+        Self::Hooks::on_transfer(e, &from, &to, &decoded.payload);
         storage::confidential_transfer(e, &from, &to, &decoded.payload, &decoded.proof);
     }
 
@@ -393,7 +398,8 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["spender_transfer", spender: Address, from: Address, to:
     ///   Address]`
-    /// * data - `[r_e, v_tilde, sigma_a, v_aud_r, r_aud_r, v_aud_s, a_aud_s]`
+    /// * data - `[r_e_point, v_tilde, sigma_a, v_tilde_aud_r, r_tilde_aud_r,
+    ///   v_tilde_aud_s, a_tilde_aud_s]`
     fn confidential_transfer_from(
         e: &Env,
         spender: Address,
@@ -404,13 +410,7 @@ pub trait ConfidentialToken {
         spender.require_auth();
 
         let decoded: SpenderTransferData = storage::decode_data(e, &data);
-        Self::Hooks::on_spender_transfer(
-            e,
-            &spender,
-            &from,
-            &to,
-            decoded.payload.clone().into_val(e),
-        );
+        Self::Hooks::on_spender_transfer(e, &spender, &from, &to, &decoded.payload);
         storage::confidential_transfer_from(
             e,
             &spender,
@@ -445,8 +445,8 @@ pub trait ConfidentialToken {
     /// # Events
     ///
     /// * topics - `["set_spender", account: Address, spender: Address]`
-    /// * data - `[live_until_ledger: u32, r_e, sigma, b_tilde, v_aud_s,
-    ///   b_aud_s]`
+    /// * data - `[live_until_ledger: u32, r_e_point, sigma, b_tilde,
+    ///   v_tilde_aud_s, b_tilde_aud_s]`
     fn set_spender(
         e: &Env,
         account: Address,
@@ -457,13 +457,7 @@ pub trait ConfidentialToken {
         account.require_auth();
 
         let decoded: SetSpenderData = storage::decode_data(e, &data);
-        Self::Hooks::on_set_spender(
-            e,
-            &account,
-            &spender,
-            live_until_ledger,
-            decoded.payload.clone().into_val(e),
-        );
+        Self::Hooks::on_set_spender(e, &account, &spender, live_until_ledger, &decoded.payload);
         storage::set_spender(
             e,
             &account,
@@ -493,12 +487,12 @@ pub trait ConfidentialToken {
     /// # Events
     ///
     /// * topics - `["revoke_spender", account: Address, spender: Address]`
-    /// * data - `[r_e, sigma, b_tilde, v_aud_s, b_aud_s]`
+    /// * data - `[r_e_point, sigma, b_tilde, v_tilde_aud_s, b_tilde_aud_s]`
     fn revoke_spender(e: &Env, account: Address, spender: Address, data: Bytes) {
         account.require_auth();
 
         let decoded: RevokeSpenderData = storage::decode_data(e, &data);
-        Self::Hooks::on_revoke_spender(e, &account, &spender, decoded.payload.clone().into_val(e));
+        Self::Hooks::on_revoke_spender(e, &account, &spender, &decoded.payload);
         storage::revoke_spender(e, &account, &spender, &decoded.payload, &decoded.proof);
     }
 
@@ -663,10 +657,10 @@ pub struct Withdraw {
     #[topic]
     pub to: Address,
     pub amount: i128,
-    pub r_e: BytesN<64>,
+    pub r_e_point: BytesN<64>,
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
-    pub b_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `Withdraw` event.
@@ -676,19 +670,19 @@ pub fn emit_withdraw(
     from: &Address,
     to: &Address,
     amount: i128,
-    r_e: &BytesN<64>,
+    r_e_point: &BytesN<64>,
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
-    b_aud_s: &BytesN<32>,
+    b_tilde_aud_s: &BytesN<32>,
 ) {
     Withdraw {
         from: from.clone(),
         to: to.clone(),
         amount,
-        r_e: r_e.clone(),
+        r_e_point: r_e_point.clone(),
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),
-        b_aud_s: b_aud_s.clone(),
+        b_tilde_aud_s: b_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -701,14 +695,14 @@ pub struct Transfer {
     pub from: Address,
     #[topic]
     pub to: Address,
-    pub r_e: BytesN<64>,
+    pub r_e_point: BytesN<64>,
     pub v_tilde: BytesN<32>,
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
-    pub v_aud_r: BytesN<32>,
-    pub r_aud_r: BytesN<32>,
-    pub v_aud_s: BytesN<32>,
-    pub b_aud_s: BytesN<32>,
+    pub v_tilde_aud_r: BytesN<32>,
+    pub r_tilde_aud_r: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `Transfer` event.
@@ -717,26 +711,26 @@ pub fn emit_transfer(
     e: &Env,
     from: &Address,
     to: &Address,
-    r_e: &BytesN<64>,
+    r_e_point: &BytesN<64>,
     v_tilde: &BytesN<32>,
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
-    v_aud_r: &BytesN<32>,
-    r_aud_r: &BytesN<32>,
-    v_aud_s: &BytesN<32>,
-    b_aud_s: &BytesN<32>,
+    v_tilde_aud_r: &BytesN<32>,
+    r_tilde_aud_r: &BytesN<32>,
+    v_tilde_aud_s: &BytesN<32>,
+    b_tilde_aud_s: &BytesN<32>,
 ) {
     Transfer {
         from: from.clone(),
         to: to.clone(),
-        r_e: r_e.clone(),
+        r_e_point: r_e_point.clone(),
         v_tilde: v_tilde.clone(),
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),
-        v_aud_r: v_aud_r.clone(),
-        r_aud_r: r_aud_r.clone(),
-        v_aud_s: v_aud_s.clone(),
-        b_aud_s: b_aud_s.clone(),
+        v_tilde_aud_r: v_tilde_aud_r.clone(),
+        r_tilde_aud_r: r_tilde_aud_r.clone(),
+        v_tilde_aud_s: v_tilde_aud_s.clone(),
+        b_tilde_aud_s: b_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -751,13 +745,13 @@ pub struct SpenderTransfer {
     pub from: Address,
     #[topic]
     pub to: Address,
-    pub r_e: BytesN<64>,
+    pub r_e_point: BytesN<64>,
     pub v_tilde: BytesN<32>,
     pub sigma_a: BytesN<32>,
-    pub v_aud_r: BytesN<32>,
-    pub r_aud_r: BytesN<32>,
-    pub v_aud_s: BytesN<32>,
-    pub a_aud_s: BytesN<32>,
+    pub v_tilde_aud_r: BytesN<32>,
+    pub r_tilde_aud_r: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub a_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits an `SpenderTransfer` event.
@@ -767,25 +761,25 @@ pub fn emit_spender_transfer(
     spender: &Address,
     from: &Address,
     to: &Address,
-    r_e: &BytesN<64>,
+    r_e_point: &BytesN<64>,
     v_tilde: &BytesN<32>,
     sigma_a: &BytesN<32>,
-    v_aud_r: &BytesN<32>,
-    r_aud_r: &BytesN<32>,
-    v_aud_s: &BytesN<32>,
-    a_aud_s: &BytesN<32>,
+    v_tilde_aud_r: &BytesN<32>,
+    r_tilde_aud_r: &BytesN<32>,
+    v_tilde_aud_s: &BytesN<32>,
+    a_tilde_aud_s: &BytesN<32>,
 ) {
     SpenderTransfer {
         spender: spender.clone(),
         from: from.clone(),
         to: to.clone(),
-        r_e: r_e.clone(),
+        r_e_point: r_e_point.clone(),
         v_tilde: v_tilde.clone(),
         sigma_a: sigma_a.clone(),
-        v_aud_r: v_aud_r.clone(),
-        r_aud_r: r_aud_r.clone(),
-        v_aud_s: v_aud_s.clone(),
-        a_aud_s: a_aud_s.clone(),
+        v_tilde_aud_r: v_tilde_aud_r.clone(),
+        r_tilde_aud_r: r_tilde_aud_r.clone(),
+        v_tilde_aud_s: v_tilde_aud_s.clone(),
+        a_tilde_aud_s: a_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -799,11 +793,11 @@ pub struct SetSpender {
     #[topic]
     pub spender: Address,
     pub live_until_ledger: u32,
-    pub r_e: BytesN<64>,
+    pub r_e_point: BytesN<64>,
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
-    pub v_aud_s: BytesN<32>,
-    pub b_aud_s: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `SetSpender` event.
@@ -813,21 +807,21 @@ pub fn emit_set_spender(
     account: &Address,
     spender: &Address,
     live_until_ledger: u32,
-    r_e: &BytesN<64>,
+    r_e_point: &BytesN<64>,
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
-    v_aud_s: &BytesN<32>,
-    b_aud_s: &BytesN<32>,
+    v_tilde_aud_s: &BytesN<32>,
+    b_tilde_aud_s: &BytesN<32>,
 ) {
     SetSpender {
         account: account.clone(),
         spender: spender.clone(),
         live_until_ledger,
-        r_e: r_e.clone(),
+        r_e_point: r_e_point.clone(),
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),
-        v_aud_s: v_aud_s.clone(),
-        b_aud_s: b_aud_s.clone(),
+        v_tilde_aud_s: v_tilde_aud_s.clone(),
+        b_tilde_aud_s: b_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -840,11 +834,11 @@ pub struct RevokeSpender {
     pub account: Address,
     #[topic]
     pub spender: Address,
-    pub r_e: BytesN<64>,
+    pub r_e_point: BytesN<64>,
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
-    pub v_aud_s: BytesN<32>,
-    pub b_aud_s: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `RevokeSpender` event.
@@ -853,20 +847,20 @@ pub fn emit_revoke_spender(
     e: &Env,
     account: &Address,
     spender: &Address,
-    r_e: &BytesN<64>,
+    r_e_point: &BytesN<64>,
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
-    v_aud_s: &BytesN<32>,
-    b_aud_s: &BytesN<32>,
+    v_tilde_aud_s: &BytesN<32>,
+    b_tilde_aud_s: &BytesN<32>,
 ) {
     RevokeSpender {
         account: account.clone(),
         spender: spender.clone(),
-        r_e: r_e.clone(),
+        r_e_point: r_e_point.clone(),
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),
-        v_aud_s: v_aud_s.clone(),
-        b_aud_s: b_aud_s.clone(),
+        v_tilde_aud_s: v_tilde_aud_s.clone(),
+        b_tilde_aud_s: b_tilde_aud_s.clone(),
     }
     .publish(e);
 }

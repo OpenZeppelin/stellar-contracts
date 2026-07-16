@@ -58,7 +58,7 @@ global K_AUD_S_Y: Field =
 global R_E_X: Field = 0x114ed4fcf2c57014eb678c577aa02f30ef590b713d7a6a5e87702d1c7f71957f;
 global R_E_Y: Field = 0x07a70cf826350d4f438c7a3c5e8761b0ae6cb63de757f0c96815f4057b9205f4;
 global B_TILDE_AUD_S: Field =
-    0x0a607feb31e56e89ed94a3e1dc3811d3d23aaf10b2f27874ce670878b9f6f071;
+    0x0b586defafdf4583d0f338855fdf8391102adaac4634a3b80594aea6f788e103;
 
 #[test]
 fn print_fixtures() {
