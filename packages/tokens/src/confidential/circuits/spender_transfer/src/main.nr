@@ -141,7 +141,7 @@ mod tests;
 //   2    sigma_a              sigma_a           Loaded from the delegation
 //                                                 entry's allowance_salt.
 //   3    y_op_x               Y_op.x            Loaded from
-//   4    y_op_y               Y_op.y              `spender.spending_key`;
+//   4    y_op_y               Y_op.y              `spender.spending_public_key`;
 //                                                 matches the auth principal.
 //   5    pvk_recipient_x      PVK_recipient.x   Loaded from
 //   6    pvk_recipient_y      PVK_recipient.y     `to.viewing_public_key`.
@@ -156,7 +156,7 @@ mod tests;
 //   12   c_a_new_y            C_a'.y              the delegation entry's new
 //                                                 allowance_commitment.
 //   13   c_tx_x               C_tx.x            Prover-supplied; added to
-//   14   c_tx_y               C_tx.y              `to.receiving_balance`.
+//   14   c_tx_y               C_tx.y              `to.receiving_commitment`.
 //   15   r_e_x                R_e.x             Prover-supplied ephemeral key;
 //   16   r_e_y                R_e.y               emitted.
 //   17   v_tilde              v_tilde           Prover-supplied encrypted

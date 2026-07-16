@@ -25,10 +25,13 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractclient, contracterror, contractevent, contracttrait, Address, Env, Val};
+use soroban_sdk::{contractclient, contracterror, contractevent, contracttrait, Address, Env};
 pub use storage::{ComplianceConfig, ComplianceStorageKey};
 
-use crate::confidential::{ConfidentialToken, Hooks};
+use crate::confidential::{
+    ConfidentialToken, Hooks, RegisterPayload, RevokeSpenderPayload, SetSpenderPayload,
+    SpenderTransferPayload, TransferPayload, WithdrawPayload,
+};
 
 // ################## POLICY ##################
 
@@ -206,7 +209,7 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 pub struct ComplianceHooks;
 
 impl Hooks for ComplianceHooks {
-    fn on_register(e: &Env, account: &Address, _auditor_id: u32, _payload: Val) {
+    fn on_register(e: &Env, account: &Address, _auditor_id: u32, _payload: &RegisterPayload) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };
@@ -229,7 +232,13 @@ impl Hooks for ComplianceHooks {
         storage::gate_account(e, account, &config);
     }
 
-    fn on_withdraw(e: &Env, from: &Address, to: &Address, _amount: i128, _payload: Val) {
+    fn on_withdraw(
+        e: &Env,
+        from: &Address,
+        to: &Address,
+        _amount: i128,
+        _payload: &WithdrawPayload,
+    ) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };
@@ -237,7 +246,7 @@ impl Hooks for ComplianceHooks {
         storage::gate_account(e, to, &config);
     }
 
-    fn on_transfer(e: &Env, from: &Address, to: &Address, _payload: Val) {
+    fn on_transfer(e: &Env, from: &Address, to: &Address, _payload: &TransferPayload) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };
@@ -250,7 +259,7 @@ impl Hooks for ComplianceHooks {
         spender: &Address,
         from: &Address,
         to: &Address,
-        _payload: Val,
+        _payload: &SpenderTransferPayload,
     ) {
         let Some(config) = storage::compliance_config(e) else {
             return;
@@ -268,7 +277,7 @@ impl Hooks for ComplianceHooks {
         account: &Address,
         spender: &Address,
         _live_until_ledger: u32,
-        _payload: Val,
+        _payload: &SetSpenderPayload,
     ) {
         let Some(config) = storage::compliance_config(e) else {
             return;
@@ -277,7 +286,12 @@ impl Hooks for ComplianceHooks {
         storage::check_policy(e, spender, &config);
     }
 
-    fn on_revoke_spender(e: &Env, account: &Address, _spender: &Address, _payload: Val) {
+    fn on_revoke_spender(
+        e: &Env,
+        account: &Address,
+        _spender: &Address,
+        _payload: &RevokeSpenderPayload,
+    ) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };

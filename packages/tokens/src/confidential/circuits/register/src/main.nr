@@ -26,7 +26,7 @@ mod tests;
 //   Idx  Param  Symbol  Source / Note
 //   ---  -----  ------  -----------------------------------------------
 //   0    y_x    Y.x     Prover-supplied spending public key. Written
-//   1    y_y    Y.y       to `account.spending_key` on success.
+//   1    y_y    Y.y       to `account.spending_public_key` on success.
 //   2    pvk_x  PVK.x   Prover-supplied public viewing key. Written
 //   3    pvk_y  PVK.y     to `account.viewing_public_key` on success.
 //   4    addr_f   addr_f    `env.current_contract_address()` - binds the
