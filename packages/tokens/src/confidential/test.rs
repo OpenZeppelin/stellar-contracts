@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl,
+    contract, contractimpl, symbol_short,
     testutils::{Address as _, Events, Ledger},
     token::StellarAssetClient,
     xdr::ToXdr,
@@ -75,9 +75,16 @@ struct MockVerifier;
 
 #[contractimpl(contracttrait)]
 impl ConfidentialVerifier for MockVerifier {
-    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+    fn register_verification_key(
+        _e: &Env,
+        _ct: CircuitType,
+        _verification_key: Bytes,
+        _op: Address,
+    ) {
+    }
 
-    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _verification_key: Bytes, _op: Address) {
+    }
 
     fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
         true
@@ -89,12 +96,50 @@ struct AlwaysFailVerifier;
 
 #[contractimpl(contracttrait)]
 impl ConfidentialVerifier for AlwaysFailVerifier {
+    fn register_verification_key(
+        _e: &Env,
+        _ct: CircuitType,
+        _verification_key: Bytes,
+        _op: Address,
+    ) {
+    }
+
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _verification_key: Bytes, _op: Address) {
+    }
+
+    fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
+        false
+    }
+}
+
+/// Models the register verifier's proof-to-account binding for replay tests.
+///
+/// A real UltraHonk proof absorbs the `acct_f` public input into its
+/// transcript, so it only verifies against the account it was produced for.
+/// This mock stands in for that: the first proof it accepts fixes the bound
+/// `acct_f` (the trailing 32-byte limb of the register blob), and every
+/// later verification succeeds only when the contract-assembled `acct_f`
+/// matches. A proof published by one registration therefore cannot be
+/// replayed by a different registering address.
+#[contract]
+struct ReplayGuardVerifier;
+
+#[contractimpl(contracttrait)]
+impl ConfidentialVerifier for ReplayGuardVerifier {
     fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
 
     fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
 
-    fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
-        false
+    fn verify_proof(e: &Env, _ct: CircuitType, pi: Bytes, _proof: Bytes) -> bool {
+        let acct_f = pi.slice(pi.len() - 32..);
+        let key = symbol_short!("bound");
+        match e.storage().instance().get::<_, Bytes>(&key) {
+            None => {
+                e.storage().instance().set(&key, &acct_f);
+                true
+            }
+            Some(bound) => bound == acct_f,
+        }
     }
 }
 
@@ -269,6 +314,27 @@ fn register_stores_account_with_identity_balances() {
     // Initial balances are identity (all-zero encoding).
     assert_eq!(account.spendable_commitment.to_array(), [0u8; 64]);
     assert_eq!(account.receiving_commitment.to_array(), [0u8; 64]);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3506)")]
+fn register_replayed_proof_bound_to_other_account_is_rejected() {
+    let e = Env::default();
+    let verifier_addr = e.register(ReplayGuardVerifier, ());
+    let h = setup_with_verifier_addr(e, verifier_addr);
+
+    let alice = Address::generate(&h.e);
+    let mallory = Address::generate(&h.e);
+
+    // Alice registers legitimately; her payload + proof are now public and the
+    // verifier binds that proof to `address_to_field(alice)`.
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+
+    // Mallory replays Alice's published material under his own address. The fix
+    // makes the contract assemble the blob with `address_to_field(mallory)`, so
+    // the proof — bound to Alice's acct_f — fails verification (InvalidProof,
+    // #3506) instead of minting a duplicate-key account for Mallory.
+    h.token.register(&mallory, &1u32, &register_data(&h.e));
 }
 
 #[test]

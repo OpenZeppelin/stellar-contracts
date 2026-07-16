@@ -430,11 +430,16 @@ pub fn register(
     let _k_aud = auditor.get_key(&auditor_id);
     let addr_f = get_address_as_field_element(e);
 
-    // PI order (DESIGN §7.2): Y, PVK, addr_f.
+    // PI order (DESIGN §7.2): Y, PVK, addr_f, acct_f. Recomputing acct_f
+    // from `account` (never accepting it from caller bytes) is what binds
+    // the proof to the registering address: any other caller assembles a
+    // different blob, so published registration material cannot be
+    // replayed into duplicate-key accounts.
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &payload.y);
     append_point(&mut pi, &payload.pvk);
     append_field(&mut pi, &addr_f);
+    append_field(&mut pi, &address_to_field(e, account));
 
     verify(e, CircuitType::Register, &pi, proof);
 
@@ -1053,9 +1058,6 @@ pub fn revoke_spender(
 /// only be used:
 /// - During contract initialization/construction
 /// - In admin functions that implement their own authorization logic
-///
-/// Using this function in public-facing methods may create significant
-/// security risks as it could allow unauthorized modifications.
 pub fn set_underlying_asset(e: &Env, underlying_asset: &Address) {
     if e.storage().instance().has(&ConfidentialTokenStorageKey::UnderlyingAsset) {
         panic_with_error!(e, ConfidentialTokenError::UnderlyingAssetAlreadySet);
@@ -1164,9 +1166,6 @@ pub fn set_auditor(e: &Env, auditor: &Address) {
 /// only be used:
 /// - During contract initialization/construction
 /// - In admin functions that implement their own authorization logic
-///
-/// Using this function in public-facing methods may create significant
-/// security risks as it could allow unauthorized modifications.
 pub fn set_address_as_field_element(e: &Env) {
     if e.storage().instance().has(&ConfidentialTokenStorageKey::AddressAsField) {
         panic_with_error!(e, ConfidentialTokenError::AddressAsFieldAlreadySet);

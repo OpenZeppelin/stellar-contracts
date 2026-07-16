@@ -505,10 +505,15 @@ An account provides a Grumpkin spending key $$Y$$, a public viewing key $$\text{
 |:---|:---|
 | $$Y$$, $$\text{PVK}$$ | Prover-supplied; written to `account.spending_public_key` and `account.viewing_public_key` on success |
 | $$\text{addr\\\_f}$$ | Loaded from instance storage; set once at construction (§3.5) |
+| $$\text{acct\\\_f}$$ | Binds the proof to the registering address that is authenticated with `require_auth()`|
+
+$$\text{acct\\\_f}$$ is referenced by no circuit constraint; its membership in the public-input set is the binding. The verifier absorbs every public input into the proof transcript, so a proof produced for one account fails verification when the contract assembles the blob for any other address. Without this input, the register proof and its public keys — all published on-chain by a legitimate registration — could be replayed by any caller to create duplicate-key accounts under fresh addresses.
 
 **Private witnesses:** $$sk$$.
 
 **Post-verification state:** The contract validates that `auditor_id` exists in the auditor contract and points to a valid key, then stores `spending_public_key`, `viewing_public_key`, `auditor_id`, and initializes `spendable_commitment = receiving_commitment = ` $$\mathcal{O}$$.
+
+**Auditor selection.** The registering account owner chooses `auditor_id` freely: the register proof does not constrain it, and the core validates only that the id exists in the auditor registry. On a shared auditor registry, deployments that must restrict which auditors an account may bind to MUST enforce that restriction in their `Hooks::on_register` implementation — the default `ComplianceHooks::on_register` deliberately does not restrict it. See [COMPLIANCE.md](./COMPLIANCE.md) §4.3 for a worked example.
 
 ### 7.3 Deposit
 

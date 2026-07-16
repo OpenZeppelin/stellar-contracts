@@ -1,11 +1,11 @@
 use crate::{
     assert_on_curve_non_identity, commit, derive_allow_r, derive_spend_r, derive_tx_blind, domain,
     dvk_from_vk_op, ecdh, encrypt_allowance, encrypt_amount, encrypt_auditor_sender_balance,
-    encrypt_balance, encrypt_esc_dvk, G, H, poseidon_with_domain, pvk_from_vk, scalar_mul,
+    encrypt_balance, encrypt_esc_dvk, G, H, poseidon_with_domain, pvk_from_vk, scalar_mul, sponge,
     sponge_squeeze_2, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
-use std::hash::{derive_generators, pedersen_commitment};
+use std::hash::{derive_generators, pedersen_commitment, poseidon2_permutation};
 
 /// Provenance check: reproduces G and H from Barretenberg's `derive_generators`
 /// at run time. If this test fails, the hardcoded constants above have drifted
@@ -196,6 +196,16 @@ fn encrypt_decrypt_round_trip() {
     let b_tilde_aud_s = encrypt_auditor_sender_balance(v, s, sigma);
     let mask_aud_s = poseidon_with_domain(domain::AUDITOR_SENDER, [s, sigma]);
     assert(b_tilde_aud_s - mask_aud_s == v);
+}
+
+#[test]
+fn sponge_empty_input_applies_squeeze_permutation() {
+    // The on-chain sponge always applies the final squeeze permutation, even
+    // over an empty absorb (IV = 0 for length 0). The in-circuit sponge must
+    // agree at the boundary rather than return the initial rate cell (0).
+    let h = sponge::<0>([]);
+    assert(h == poseidon2_permutation([0, 0, 0, 0], 4)[0]);
+    assert(h != 0);
 }
 
 #[test]
