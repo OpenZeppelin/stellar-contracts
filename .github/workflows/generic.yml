@@ -51,7 +51,7 @@ jobs:
             # `code` is exposed as steps.changes.outputs.code below and is
             # true whenever any non-markdown file changed.
             code:
-              - '!**.md'
+              - '!**/*.md'
 
       - name: Run sccache
         if: steps.changes.outputs.code == 'true'
