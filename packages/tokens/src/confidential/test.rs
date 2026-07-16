@@ -75,9 +75,16 @@ struct MockVerifier;
 
 #[contractimpl(contracttrait)]
 impl ConfidentialVerifier for MockVerifier {
-    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+    fn register_verification_key(
+        _e: &Env,
+        _ct: CircuitType,
+        _verification_key: Bytes,
+        _op: Address,
+    ) {
+    }
 
-    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _verification_key: Bytes, _op: Address) {
+    }
 
     fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
         true
@@ -89,9 +96,16 @@ struct AlwaysFailVerifier;
 
 #[contractimpl(contracttrait)]
 impl ConfidentialVerifier for AlwaysFailVerifier {
-    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+    fn register_verification_key(
+        _e: &Env,
+        _ct: CircuitType,
+        _verification_key: Bytes,
+        _op: Address,
+    ) {
+    }
 
-    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _verification_key: Bytes, _op: Address) {
+    }
 
     fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
         false
