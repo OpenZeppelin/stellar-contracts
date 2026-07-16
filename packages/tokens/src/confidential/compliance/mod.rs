@@ -170,9 +170,10 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 /// 1. Reverts [`ComplianceError::AccountFrozen`] if the address is frozen.
 /// 2. When `config.policy = Some(p)`, calls `p.is_authorized` and reverts
 ///    [`ComplianceError::NotAuthorizedByPolicy`] on `false`.
-/// 3. When `config.sac_passthrough = true`, calls the underlying SEP-41 token's
-///    `authorized` view and reverts [`ComplianceError::NotAuthorizedBySac`] on
-///    `false`.
+/// 3. When `config.sac_passthrough = true`, calls the underlying SAC's
+///    `authorized` view (a Stellar Asset Contract interface, not SEP-41; see
+///    [`storage::check_sac`]) and reverts
+///    [`ComplianceError::NotAuthorizedBySac`] on `false`.
 ///
 /// Which parties pass which gates:
 ///

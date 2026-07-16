@@ -101,6 +101,28 @@
 //! Deploying this contract over any other token implementation is the
 //! deployer's responsibility — verify that `transfer` does not skim a fee
 //! or otherwise diverge from exact-transfer semantics before doing so.
+//!
+//! **Issuer control over a SAC underlying can lock or drain the pool.**
+//! All deposits sit in a single pooled balance held by the contract's own
+//! address, and every withdrawal pays out of it via `token.transfer`. If
+//! the underlying is a Stellar Asset Contract, its issuer holds two
+//! distinct powers over that pooled balance (DESIGN §3.4), and they behave
+//! very differently.
+//!
+//! *Freeze / deauthorization* is a reversible block that removes no value.
+//! One issuer action against the contract's address blocks every deposit
+//! and withdrawal, for all holders, for as long as it stands; confidential
+//! transfers between registered accounts keep working, but no value can
+//! enter or exit until the issuer restores authorization.
+//!
+//! *Clawback* instead extracts value from the pooled balance. It does not
+//! block anything but it leaves the pool holding less than the sum of all
+//! confidential balances, which directly harms the holders. A partial clawback
+//! socializes the shortfall across everyone: withdrawals become
+//! first-come-first-served and whoever exits last cannot fully redeem. A full
+//! clawback empties the pool, leaving all holders' confidential balances
+//! unbacked and unwithdrawable. Issuer-led SAC deployments must weigh both
+//! powers explicitly alongside the exact-transfer assumption.
 
 pub mod auditor;
 pub mod compliance;

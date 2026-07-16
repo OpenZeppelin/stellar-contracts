@@ -1055,9 +1055,6 @@ pub fn revoke_spender(
 /// only be used:
 /// - During contract initialization/construction
 /// - In admin functions that implement their own authorization logic
-///
-/// Using this function in public-facing methods may create significant
-/// security risks as it could allow unauthorized modifications.
 pub fn set_underlying_asset(e: &Env, underlying_asset: &Address) {
     if e.storage().instance().has(&ConfidentialTokenStorageKey::UnderlyingAsset) {
         panic_with_error!(e, ConfidentialTokenError::UnderlyingAssetAlreadySet);
@@ -1166,9 +1163,6 @@ pub fn set_auditor(e: &Env, auditor: &Address) {
 /// only be used:
 /// - During contract initialization/construction
 /// - In admin functions that implement their own authorization logic
-///
-/// Using this function in public-facing methods may create significant
-/// security risks as it could allow unauthorized modifications.
 pub fn set_address_as_field_element(e: &Env) {
     if e.storage().instance().has(&ConfidentialTokenStorageKey::AddressAsField) {
         panic_with_error!(e, ConfidentialTokenError::AddressAsFieldAlreadySet);
