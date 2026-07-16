@@ -52,13 +52,13 @@ const STRKEY_LIMB_LEN: usize = 28;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ConfidentialAccount {
     /// `Y = sk · H`, the Grumpkin spending public key.
-    pub spending_key: Point,
+    pub spending_public_key: Point,
     /// `PVK = vk · H`, the Grumpkin viewing public key.
     pub viewing_public_key: Point,
     /// Spendable balance commitment `C_spend`.
-    pub spendable_balance: Point,
+    pub spendable_commitment: Point,
     /// Receiving balance commitment `C_receive`.
-    pub receiving_balance: Point,
+    pub receiving_commitment: Point,
     /// Index of the auditor key in the auditor registry.
     pub auditor_id: u32,
 }
@@ -70,7 +70,7 @@ pub struct SpenderDelegation {
     /// Allowance commitment `C_a = Com(v_a, r_a)`.
     pub allowance_commitment: Point,
     /// Poseidon-encrypted allowance scalar `ã`.
-    pub encrypted_allowance: BytesN<32>,
+    pub a_tilde: BytesN<32>,
     /// ECDH escrow of `dvk_i` under the spender's spending key.
     pub escrowed_dvk: Point,
     /// Per-delegation salt `σ_a`.
@@ -112,9 +112,9 @@ pub struct RegisterData {
 pub struct WithdrawPayload {
     pub c_spend_new: Point,
     pub b_tilde: BytesN<32>,
-    pub r_e: Point,
+    pub r_e_point: Point,
     pub sigma: BytesN<32>,
-    pub b_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
@@ -133,14 +133,14 @@ pub struct WithdrawData {
 pub struct TransferPayload {
     pub c_spend_new: Point,
     pub c_tx: Point,
-    pub r_e: Point,
+    pub r_e_point: Point,
     pub v_tilde: BytesN<32>,
     pub b_tilde: BytesN<32>,
     pub sigma: BytesN<32>,
-    pub v_aud_r: BytesN<32>,
-    pub r_aud_r: BytesN<32>,
-    pub v_aud_s: BytesN<32>,
-    pub b_aud_s: BytesN<32>,
+    pub v_tilde_aud_r: BytesN<32>,
+    pub r_tilde_aud_r: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
@@ -159,14 +159,14 @@ pub struct TransferData {
 pub struct SpenderTransferPayload {
     pub c_a_new: Point,
     pub c_tx: Point,
-    pub r_e: Point,
+    pub r_e_point: Point,
     pub v_tilde: BytesN<32>,
     pub a_tilde_new: BytesN<32>,
     pub sigma_a_new: BytesN<32>,
-    pub v_aud_r: BytesN<32>,
-    pub r_aud_r: BytesN<32>,
-    pub v_aud_s: BytesN<32>,
-    pub a_aud_s: BytesN<32>,
+    pub v_tilde_aud_r: BytesN<32>,
+    pub r_tilde_aud_r: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub a_tilde_aud_s: BytesN<32>,
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
@@ -187,11 +187,11 @@ pub struct SetSpenderPayload {
     pub escrowed_dvk: Point,
     pub b_tilde: BytesN<32>,
     pub a_tilde: BytesN<32>,
-    pub r_e: Point,
+    pub r_e_point: Point,
     pub sigma: BytesN<32>,
     pub sigma_a: BytesN<32>,
-    pub v_aud_s: BytesN<32>,
-    pub b_aud_s: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
@@ -209,10 +209,10 @@ pub struct SetSpenderData {
 pub struct RevokeSpenderPayload {
     pub c_spend_new: Point,
     pub b_tilde: BytesN<32>,
-    pub r_e: Point,
+    pub r_e_point: Point,
     pub sigma: BytesN<32>,
-    pub v_aud_s: BytesN<32>,
-    pub b_aud_s: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
@@ -445,10 +445,10 @@ pub fn register(
     e.storage().persistent().set(
         &key,
         &ConfidentialAccount {
-            spending_key: payload.y.clone(),
+            spending_public_key: payload.y.clone(),
             viewing_public_key: payload.pvk.clone(),
-            spendable_balance: Grumpkin::identity(e),
-            receiving_balance: Grumpkin::identity(e),
+            spendable_commitment: Grumpkin::identity(e),
+            receiving_commitment: Grumpkin::identity(e),
             auditor_id,
         },
     );
@@ -459,7 +459,7 @@ pub fn register(
 /// `to`'s confidential receiving balance.
 ///
 /// No proof is required. The deposit commitment is `a · G` with zero
-/// blinding, added homomorphically to `to.receiving_balance`. The depositor
+/// blinding, added homomorphically to `to.receiving_commitment`. The depositor
 /// `from` does not need a registered confidential account; only `to` does.
 ///
 /// # Arguments
@@ -509,7 +509,7 @@ pub fn deposit(e: &Env, from: &Address, to: &Address, amount: i128) {
     emit_deposit(e, from, to, amount);
 }
 
-/// Folds `account.receiving_balance` into `account.spendable_balance` and
+/// Folds `account.receiving_commitment` into `account.spendable_commitment` and
 /// resets the receiving storage entry to the identity.
 ///
 /// # Arguments
@@ -533,8 +533,9 @@ pub fn deposit(e: &Env, from: &Address, to: &Address, amount: i128) {
 /// entry point is responsible for calling `account.require_auth()`.
 pub fn merge(e: &Env, account: &Address) {
     let mut data = get_account(e, account);
-    data.spendable_balance = Grumpkin::add(e, &data.spendable_balance, &data.receiving_balance);
-    data.receiving_balance = Grumpkin::identity(e);
+    data.spendable_commitment =
+        Grumpkin::add(e, &data.spendable_commitment, &data.receiving_commitment);
+    data.receiving_commitment = Grumpkin::identity(e);
     e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &data);
 
     emit_merge(e, account);
@@ -567,8 +568,8 @@ pub fn merge(e: &Env, account: &Address) {
 /// # Events
 ///
 /// * topics - `["withdraw", from: Address, to: Address]`
-/// * data - `[amount: i128, r_e: BytesN<64>, sigma: BytesN<32>, b_tilde:
-///   BytesN<32>, b_aud_s: BytesN<32>]`
+/// * data - `[amount: i128, r_e_point: BytesN<64>, sigma: BytesN<32>, b_tilde:
+///   BytesN<32>, b_tilde_aud_s: BytesN<32>]`
 ///
 /// # Notes
 ///
@@ -604,18 +605,18 @@ pub fn withdraw(
 
     // PI order (DESIGN §7.5):
     //   C_spend, Y, addr_f, K_aud_s, a,
-    //   C_spend', sigma, b_tilde, R_e, b_aud_s
+    //   C_spend', sigma, b_tilde, R_e, b_tilde_aud_s
     let mut pi = Bytes::new(e);
-    append_point(&mut pi, &account.spendable_balance);
-    append_point(&mut pi, &account.spending_key);
+    append_point(&mut pi, &account.spendable_commitment);
+    append_point(&mut pi, &account.spending_public_key);
     append_field(&mut pi, &addr_f);
     append_point(&mut pi, &k_aud_s);
     append_amount(&mut pi, e, amount);
     append_point(&mut pi, &payload.c_spend_new);
     append_field(&mut pi, &payload.sigma);
     append_field(&mut pi, &payload.b_tilde);
-    append_point(&mut pi, &payload.r_e);
-    append_field(&mut pi, &payload.b_aud_s);
+    append_point(&mut pi, &payload.r_e_point);
+    append_field(&mut pi, &payload.b_tilde_aud_s);
 
     verify(e, CircuitType::Withdraw, &pi, proof);
 
@@ -629,10 +630,10 @@ pub fn withdraw(
         from,
         to,
         amount,
-        &payload.r_e,
+        &payload.r_e_point,
         &payload.sigma,
         &payload.b_tilde,
-        &payload.b_aud_s,
+        &payload.b_tilde_aud_s,
     );
 }
 
@@ -660,8 +661,8 @@ pub fn withdraw(
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[r_e, v_tilde, sigma, b_tilde, v_aud_r, r_aud_r, v_aud_s,
-///   b_aud_s]`
+/// * data - `[r_e_point, v_tilde, sigma, b_tilde, v_tilde_aud_r, r_tilde_aud_r,
+///   v_tilde_aud_s, b_tilde_aud_s]`
 ///
 /// # Security Warning
 ///
@@ -684,24 +685,24 @@ pub fn confidential_transfer(
     // PI order (DESIGN §7.6):
     //   C_spend_A, Y_A, PVK_B, addr_f, K_aud_r, K_aud_s,
     //   C_spend', C_tx, R_e, v_tilde, b_tilde, sigma,
-    //   v_aud_r, r_aud_r, v_aud_s, b_aud_s
+    //   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s
     let mut pi = Bytes::new(e);
-    append_point(&mut pi, &sender.spendable_balance);
-    append_point(&mut pi, &sender.spending_key);
+    append_point(&mut pi, &sender.spendable_commitment);
+    append_point(&mut pi, &sender.spending_public_key);
     append_point(&mut pi, &recipient.viewing_public_key);
     append_field(&mut pi, &addr_f);
     append_point(&mut pi, &k_aud_r);
     append_point(&mut pi, &k_aud_s);
     append_point(&mut pi, &payload.c_spend_new);
     append_point(&mut pi, &payload.c_tx);
-    append_point(&mut pi, &payload.r_e);
+    append_point(&mut pi, &payload.r_e_point);
     append_field(&mut pi, &payload.v_tilde);
     append_field(&mut pi, &payload.b_tilde);
     append_field(&mut pi, &payload.sigma);
-    append_field(&mut pi, &payload.v_aud_r);
-    append_field(&mut pi, &payload.r_aud_r);
-    append_field(&mut pi, &payload.v_aud_s);
-    append_field(&mut pi, &payload.b_aud_s);
+    append_field(&mut pi, &payload.v_tilde_aud_r);
+    append_field(&mut pi, &payload.r_tilde_aud_r);
+    append_field(&mut pi, &payload.v_tilde_aud_s);
+    append_field(&mut pi, &payload.b_tilde_aud_s);
 
     verify(e, CircuitType::Transfer, &pi, proof);
 
@@ -712,14 +713,14 @@ pub fn confidential_transfer(
         e,
         from,
         to,
-        &payload.r_e,
+        &payload.r_e_point,
         &payload.v_tilde,
         &payload.sigma,
         &payload.b_tilde,
-        &payload.v_aud_r,
-        &payload.r_aud_r,
-        &payload.v_aud_s,
-        &payload.b_aud_s,
+        &payload.v_tilde_aud_r,
+        &payload.r_tilde_aud_r,
+        &payload.v_tilde_aud_s,
+        &payload.b_tilde_aud_s,
     );
 }
 
@@ -754,7 +755,8 @@ pub fn confidential_transfer(
 ///
 /// * topics - `["spender_transfer", spender: Address, from: Address, to:
 ///   Address]`
-/// * data - `[r_e, v_tilde, sigma_a, v_aud_r, r_aud_r, v_aud_s, a_aud_s]`
+/// * data - `[r_e_point, v_tilde, sigma_a, v_tilde_aud_r, r_tilde_aud_r,
+///   v_tilde_aud_s, a_tilde_aud_s]`
 ///
 /// # Security Warning
 ///
@@ -788,30 +790,30 @@ pub fn confidential_transfer_from(
     // PI order (DESIGN §7.8):
     //   C_a, sigma_a, Y_op, PVK_recipient, K_aud_r, K_aud_s,
     //   C_a', C_tx, R_e, v_tilde, a_tilde', sigma_a',
-    //   v_aud_r, r_aud_r, v_aud_s, a_aud_s
+    //   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &delegation.allowance_commitment);
     append_field(&mut pi, &delegation.allowance_salt);
-    append_point(&mut pi, &spender_account.spending_key);
+    append_point(&mut pi, &spender_account.spending_public_key);
     append_point(&mut pi, &recipient.viewing_public_key);
     append_point(&mut pi, &k_aud_r);
     append_point(&mut pi, &k_aud_s);
     append_point(&mut pi, &payload.c_a_new);
     append_point(&mut pi, &payload.c_tx);
-    append_point(&mut pi, &payload.r_e);
+    append_point(&mut pi, &payload.r_e_point);
     append_field(&mut pi, &payload.v_tilde);
     append_field(&mut pi, &payload.a_tilde_new);
     append_field(&mut pi, &payload.sigma_a_new);
-    append_field(&mut pi, &payload.v_aud_r);
-    append_field(&mut pi, &payload.r_aud_r);
-    append_field(&mut pi, &payload.v_aud_s);
-    append_field(&mut pi, &payload.a_aud_s);
+    append_field(&mut pi, &payload.v_tilde_aud_r);
+    append_field(&mut pi, &payload.r_tilde_aud_r);
+    append_field(&mut pi, &payload.v_tilde_aud_s);
+    append_field(&mut pi, &payload.a_tilde_aud_s);
 
     verify(e, CircuitType::SpenderTransfer, &pi, proof);
 
     // Update delegation.
     delegation.allowance_commitment = payload.c_a_new.clone();
-    delegation.encrypted_allowance = payload.a_tilde_new.clone();
+    delegation.a_tilde = payload.a_tilde_new.clone();
     delegation.allowance_salt = payload.sigma_a_new.clone();
     e.storage()
         .persistent()
@@ -824,13 +826,13 @@ pub fn confidential_transfer_from(
         spender,
         from,
         to,
-        &payload.r_e,
+        &payload.r_e_point,
         &payload.v_tilde,
         &sigma_a,
-        &payload.v_aud_r,
-        &payload.r_aud_r,
-        &payload.v_aud_s,
-        &payload.a_aud_s,
+        &payload.v_tilde_aud_r,
+        &payload.r_tilde_aud_r,
+        &payload.v_tilde_aud_s,
+        &payload.a_tilde_aud_s,
     );
 }
 
@@ -865,7 +867,8 @@ pub fn confidential_transfer_from(
 /// # Events
 ///
 /// * topics - `["set_spender", account: Address, spender: Address]`
-/// * data - `[live_until_ledger: u32, r_e, sigma, b_tilde, v_aud_s, b_aud_s]`
+/// * data - `[live_until_ledger: u32, r_e_point, sigma, b_tilde, v_tilde_aud_s,
+///   b_tilde_aud_s]`
 ///
 /// # Security Warning
 ///
@@ -884,17 +887,17 @@ pub fn set_spender(
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_s = auditor.get_key(&owner.auditor_id);
     let addr_f = get_address_as_field_element(e);
-    let op_i = address_to_field(e, spender);
+    let spender_id = address_to_field(e, spender);
 
     // PI order (DESIGN §7.7):
-    //   C_spend, Y, Y_op, op_i, addr_f, K_aud_s,
+    //   C_spend, Y, Y_op, spender_id (op_i), addr_f, K_aud_s,
     //   C_spend', C_a, escrowed_dvk, b_tilde, a_tilde,
-    //   sigma, sigma_a, R_e, v_aud_s, b_aud_s
+    //   sigma, sigma_a, R_e, v_tilde_aud_s, b_tilde_aud_s
     let mut pi = Bytes::new(e);
-    append_point(&mut pi, &owner.spendable_balance);
-    append_point(&mut pi, &owner.spending_key);
-    append_point(&mut pi, &spender_account.spending_key);
-    append_field(&mut pi, &op_i);
+    append_point(&mut pi, &owner.spendable_commitment);
+    append_point(&mut pi, &owner.spending_public_key);
+    append_point(&mut pi, &spender_account.spending_public_key);
+    append_field(&mut pi, &spender_id);
     append_field(&mut pi, &addr_f);
     append_point(&mut pi, &k_aud_s);
     append_point(&mut pi, &payload.c_spend_new);
@@ -904,9 +907,9 @@ pub fn set_spender(
     append_field(&mut pi, &payload.a_tilde);
     append_field(&mut pi, &payload.sigma);
     append_field(&mut pi, &payload.sigma_a);
-    append_point(&mut pi, &payload.r_e);
-    append_field(&mut pi, &payload.v_aud_s);
-    append_field(&mut pi, &payload.b_aud_s);
+    append_point(&mut pi, &payload.r_e_point);
+    append_field(&mut pi, &payload.v_tilde_aud_s);
+    append_field(&mut pi, &payload.b_tilde_aud_s);
 
     verify(e, CircuitType::SetSpender, &pi, proof);
 
@@ -917,7 +920,7 @@ pub fn set_spender(
         spender,
         &SpenderDelegation {
             allowance_commitment: payload.c_a.clone(),
-            encrypted_allowance: payload.a_tilde.clone(),
+            a_tilde: payload.a_tilde.clone(),
             escrowed_dvk: payload.escrowed_dvk.clone(),
             allowance_salt: payload.sigma_a.clone(),
             live_until_ledger,
@@ -929,11 +932,11 @@ pub fn set_spender(
         account,
         spender,
         live_until_ledger,
-        &payload.r_e,
+        &payload.r_e_point,
         &payload.sigma,
         &payload.b_tilde,
-        &payload.v_aud_s,
-        &payload.b_aud_s,
+        &payload.v_tilde_aud_s,
+        &payload.b_tilde_aud_s,
     );
 }
 
@@ -965,7 +968,7 @@ pub fn set_spender(
 /// # Events
 ///
 /// * topics - `["revoke_spender", account: Address, spender: Address]`
-/// * data - `[r_e, sigma, b_tilde, v_aud_s, b_aud_s]`
+/// * data - `[r_e_point, sigma, b_tilde, v_tilde_aud_s, b_tilde_aud_s]`
 ///
 /// # Security Warning
 ///
@@ -983,25 +986,25 @@ pub fn revoke_spender(
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_s = auditor.get_key(&owner.auditor_id);
     let addr_f = get_address_as_field_element(e);
-    let op_i = address_to_field(e, spender);
+    let spender_id = address_to_field(e, spender);
 
     // PI order (DESIGN §7.9):
-    //   C_spend, C_a, sigma_a, Y, op_i, addr_f, K_aud_s,
-    //   C_spend', b_tilde, sigma, R_e, v_aud_s, b_aud_s
+    //   C_spend, C_a, sigma_a, Y, spender_id (op_i), addr_f, K_aud_s,
+    //   C_spend', b_tilde, sigma, R_e, v_tilde_aud_s, b_tilde_aud_s
     let mut pi = Bytes::new(e);
-    append_point(&mut pi, &owner.spendable_balance);
+    append_point(&mut pi, &owner.spendable_commitment);
     append_point(&mut pi, &delegation.allowance_commitment);
     append_field(&mut pi, &delegation.allowance_salt);
-    append_point(&mut pi, &owner.spending_key);
-    append_field(&mut pi, &op_i);
+    append_point(&mut pi, &owner.spending_public_key);
+    append_field(&mut pi, &spender_id);
     append_field(&mut pi, &addr_f);
     append_point(&mut pi, &k_aud_s);
     append_point(&mut pi, &payload.c_spend_new);
     append_field(&mut pi, &payload.b_tilde);
     append_field(&mut pi, &payload.sigma);
-    append_point(&mut pi, &payload.r_e);
-    append_field(&mut pi, &payload.v_aud_s);
-    append_field(&mut pi, &payload.b_aud_s);
+    append_point(&mut pi, &payload.r_e_point);
+    append_field(&mut pi, &payload.v_tilde_aud_s);
+    append_field(&mut pi, &payload.b_tilde_aud_s);
 
     verify(e, CircuitType::RevokeSpender, &pi, proof);
 
@@ -1012,11 +1015,11 @@ pub fn revoke_spender(
         e,
         account,
         spender,
-        &payload.r_e,
+        &payload.r_e_point,
         &payload.sigma,
         &payload.b_tilde,
-        &payload.v_aud_s,
-        &payload.b_aud_s,
+        &payload.v_tilde_aud_s,
+        &payload.b_tilde_aud_s,
     );
 }
 
@@ -1175,7 +1178,7 @@ pub fn set_address_as_field_element(e: &Env) {
 
 // ################## LOW-LEVEL HELPERS ##################
 
-/// Overwrites `account.spendable_balance` with `c_spend_new`.
+/// Overwrites `account.spendable_commitment` with `c_spend_new`.
 ///
 /// # Arguments
 ///
@@ -1189,11 +1192,11 @@ pub fn set_address_as_field_element(e: &Env) {
 ///   registered.
 fn set_spendable(e: &Env, account: &Address, c_spend_new: &Point) {
     let mut data = get_account(e, account);
-    data.spendable_balance = c_spend_new.clone();
+    data.spendable_commitment = c_spend_new.clone();
     e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &data);
 }
 
-/// Adds `c_tx` to `account.receiving_balance` via Grumpkin homomorphic
+/// Adds `c_tx` to `account.receiving_commitment` via Grumpkin homomorphic
 /// addition. Used by deposits and incoming transfers.
 ///
 /// # Arguments
@@ -1208,7 +1211,7 @@ fn set_spendable(e: &Env, account: &Address, c_spend_new: &Point) {
 ///   registered.
 fn add_to_receiving(e: &Env, account: &Address, c_tx: &Point) {
     let mut data = get_account(e, account);
-    data.receiving_balance = Grumpkin::add(e, &data.receiving_balance, c_tx);
+    data.receiving_commitment = Grumpkin::add(e, &data.receiving_commitment, c_tx);
     e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &data);
 }
 

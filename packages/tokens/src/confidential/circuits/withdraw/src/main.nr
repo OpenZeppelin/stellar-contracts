@@ -63,9 +63,9 @@ mod tests;
 // --------------------------------------------------------
 //   Idx  Param          Symbol        Source / Note
 //   ---  -----          ------        -------------------------------------
-//   0    c_spend_x      C_spend.x     Loaded from `from.spendable_balance`.
+//   0    c_spend_x      C_spend.x     Loaded from `from.spendable_commitment`.
 //   1    c_spend_y      C_spend.y
-//   2    y_x            Y.x           Loaded from `from.spending_key`.
+//   2    y_x            Y.x           Loaded from `from.spending_public_key`.
 //   3    y_y            Y.y
 //   4    addr_f           addr_f          `env.current_contract_address()`.
 //   5    k_aud_s_x      K_aud_s.x     Fetched from the auditor contract by
@@ -75,7 +75,7 @@ mod tests;
 //                                     (Section 3.4), W4 then closes
 //                                     a < 2^127 in-circuit.
 //   8    c_spend_new_x  C_spend'.x    Prover-supplied; written to
-//   9    c_spend_new_y  C_spend'.y      `from.spendable_balance` on success.
+//   9    c_spend_new_y  C_spend'.y      `from.spendable_commitment` on success.
 //   10   sigma          sigma         Prover-supplied random salt; emitted.
 //   11   b_tilde        b_tilde       Prover-supplied encrypted balance
 //                                     scalar; emitted.

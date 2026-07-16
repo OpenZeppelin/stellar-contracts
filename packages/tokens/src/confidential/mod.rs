@@ -242,7 +242,7 @@ pub trait ConfidentialToken {
     /// into `to`'s confidential receiving balance.
     ///
     /// No proof is required. The deposit commitment is `a · G` with zero
-    /// blinding, added homomorphically to `to.receiving_balance`. The
+    /// blinding, added homomorphically to `to.receiving_commitment`. The
     /// depositor `from` does not need a registered confidential account;
     /// only `to` does.
     ///
@@ -268,7 +268,7 @@ pub trait ConfidentialToken {
         storage::deposit(e, &from, &to, amount);
     }
 
-    /// Folds `account.receiving_balance` into `account.spendable_balance`
+    /// Folds `account.receiving_commitment` into `account.spendable_commitment`
     /// and resets the receiving storage entry to the identity.
     ///
     /// No proof is required; correctness follows from the homomorphic
@@ -314,8 +314,8 @@ pub trait ConfidentialToken {
     /// # Events
     ///
     /// * topics - `["withdraw", from: Address, to: Address]`
-    /// * data - `[amount: i128, r_e: BytesN<64>, sigma: BytesN<32>, b_tilde:
-    ///   BytesN<32>, b_aud_s: BytesN<32>]`
+    /// * data - `[amount: i128, r_e_point: BytesN<64>, sigma: BytesN<32>,
+    ///   b_tilde: BytesN<32>, b_tilde_aud_s: BytesN<32>]`
     fn withdraw(e: &Env, from: Address, to: Address, amount: i128, data: Bytes) {
         from.require_auth();
 
@@ -341,8 +341,8 @@ pub trait ConfidentialToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[r_e, v_tilde, sigma, b_tilde, v_aud_r, r_aud_r, v_aud_s,
-    ///   b_aud_s]`
+    /// * data - `[r_e_point, v_tilde, sigma, b_tilde, v_tilde_aud_r,
+    ///   r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s]`
     fn confidential_transfer(e: &Env, from: Address, to: Address, data: Bytes) {
         from.require_auth();
 
@@ -373,7 +373,8 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["spender_transfer", spender: Address, from: Address, to:
     ///   Address]`
-    /// * data - `[r_e, v_tilde, sigma_a, v_aud_r, r_aud_r, v_aud_s, a_aud_s]`
+    /// * data - `[r_e_point, v_tilde, sigma_a, v_tilde_aud_r, r_tilde_aud_r,
+    ///   v_tilde_aud_s, a_tilde_aud_s]`
     fn confidential_transfer_from(
         e: &Env,
         spender: Address,
@@ -419,8 +420,8 @@ pub trait ConfidentialToken {
     /// # Events
     ///
     /// * topics - `["set_spender", account: Address, spender: Address]`
-    /// * data - `[live_until_ledger: u32, r_e, sigma, b_tilde, v_aud_s,
-    ///   b_aud_s]`
+    /// * data - `[live_until_ledger: u32, r_e_point, sigma, b_tilde,
+    ///   v_tilde_aud_s, b_tilde_aud_s]`
     fn set_spender(
         e: &Env,
         account: Address,
@@ -461,7 +462,7 @@ pub trait ConfidentialToken {
     /// # Events
     ///
     /// * topics - `["revoke_spender", account: Address, spender: Address]`
-    /// * data - `[r_e, sigma, b_tilde, v_aud_s, b_aud_s]`
+    /// * data - `[r_e_point, sigma, b_tilde, v_tilde_aud_s, b_tilde_aud_s]`
     fn revoke_spender(e: &Env, account: Address, spender: Address, data: Bytes) {
         account.require_auth();
 
@@ -631,10 +632,10 @@ pub struct Withdraw {
     #[topic]
     pub to: Address,
     pub amount: i128,
-    pub r_e: BytesN<64>,
+    pub r_e_point: BytesN<64>,
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
-    pub b_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `Withdraw` event.
@@ -644,19 +645,19 @@ pub fn emit_withdraw(
     from: &Address,
     to: &Address,
     amount: i128,
-    r_e: &BytesN<64>,
+    r_e_point: &BytesN<64>,
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
-    b_aud_s: &BytesN<32>,
+    b_tilde_aud_s: &BytesN<32>,
 ) {
     Withdraw {
         from: from.clone(),
         to: to.clone(),
         amount,
-        r_e: r_e.clone(),
+        r_e_point: r_e_point.clone(),
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),
-        b_aud_s: b_aud_s.clone(),
+        b_tilde_aud_s: b_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -669,14 +670,14 @@ pub struct Transfer {
     pub from: Address,
     #[topic]
     pub to: Address,
-    pub r_e: BytesN<64>,
+    pub r_e_point: BytesN<64>,
     pub v_tilde: BytesN<32>,
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
-    pub v_aud_r: BytesN<32>,
-    pub r_aud_r: BytesN<32>,
-    pub v_aud_s: BytesN<32>,
-    pub b_aud_s: BytesN<32>,
+    pub v_tilde_aud_r: BytesN<32>,
+    pub r_tilde_aud_r: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `Transfer` event.
@@ -685,26 +686,26 @@ pub fn emit_transfer(
     e: &Env,
     from: &Address,
     to: &Address,
-    r_e: &BytesN<64>,
+    r_e_point: &BytesN<64>,
     v_tilde: &BytesN<32>,
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
-    v_aud_r: &BytesN<32>,
-    r_aud_r: &BytesN<32>,
-    v_aud_s: &BytesN<32>,
-    b_aud_s: &BytesN<32>,
+    v_tilde_aud_r: &BytesN<32>,
+    r_tilde_aud_r: &BytesN<32>,
+    v_tilde_aud_s: &BytesN<32>,
+    b_tilde_aud_s: &BytesN<32>,
 ) {
     Transfer {
         from: from.clone(),
         to: to.clone(),
-        r_e: r_e.clone(),
+        r_e_point: r_e_point.clone(),
         v_tilde: v_tilde.clone(),
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),
-        v_aud_r: v_aud_r.clone(),
-        r_aud_r: r_aud_r.clone(),
-        v_aud_s: v_aud_s.clone(),
-        b_aud_s: b_aud_s.clone(),
+        v_tilde_aud_r: v_tilde_aud_r.clone(),
+        r_tilde_aud_r: r_tilde_aud_r.clone(),
+        v_tilde_aud_s: v_tilde_aud_s.clone(),
+        b_tilde_aud_s: b_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -719,13 +720,13 @@ pub struct SpenderTransfer {
     pub from: Address,
     #[topic]
     pub to: Address,
-    pub r_e: BytesN<64>,
+    pub r_e_point: BytesN<64>,
     pub v_tilde: BytesN<32>,
     pub sigma_a: BytesN<32>,
-    pub v_aud_r: BytesN<32>,
-    pub r_aud_r: BytesN<32>,
-    pub v_aud_s: BytesN<32>,
-    pub a_aud_s: BytesN<32>,
+    pub v_tilde_aud_r: BytesN<32>,
+    pub r_tilde_aud_r: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub a_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits an `SpenderTransfer` event.
@@ -735,25 +736,25 @@ pub fn emit_spender_transfer(
     spender: &Address,
     from: &Address,
     to: &Address,
-    r_e: &BytesN<64>,
+    r_e_point: &BytesN<64>,
     v_tilde: &BytesN<32>,
     sigma_a: &BytesN<32>,
-    v_aud_r: &BytesN<32>,
-    r_aud_r: &BytesN<32>,
-    v_aud_s: &BytesN<32>,
-    a_aud_s: &BytesN<32>,
+    v_tilde_aud_r: &BytesN<32>,
+    r_tilde_aud_r: &BytesN<32>,
+    v_tilde_aud_s: &BytesN<32>,
+    a_tilde_aud_s: &BytesN<32>,
 ) {
     SpenderTransfer {
         spender: spender.clone(),
         from: from.clone(),
         to: to.clone(),
-        r_e: r_e.clone(),
+        r_e_point: r_e_point.clone(),
         v_tilde: v_tilde.clone(),
         sigma_a: sigma_a.clone(),
-        v_aud_r: v_aud_r.clone(),
-        r_aud_r: r_aud_r.clone(),
-        v_aud_s: v_aud_s.clone(),
-        a_aud_s: a_aud_s.clone(),
+        v_tilde_aud_r: v_tilde_aud_r.clone(),
+        r_tilde_aud_r: r_tilde_aud_r.clone(),
+        v_tilde_aud_s: v_tilde_aud_s.clone(),
+        a_tilde_aud_s: a_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -767,11 +768,11 @@ pub struct SetSpender {
     #[topic]
     pub spender: Address,
     pub live_until_ledger: u32,
-    pub r_e: BytesN<64>,
+    pub r_e_point: BytesN<64>,
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
-    pub v_aud_s: BytesN<32>,
-    pub b_aud_s: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `SetSpender` event.
@@ -781,21 +782,21 @@ pub fn emit_set_spender(
     account: &Address,
     spender: &Address,
     live_until_ledger: u32,
-    r_e: &BytesN<64>,
+    r_e_point: &BytesN<64>,
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
-    v_aud_s: &BytesN<32>,
-    b_aud_s: &BytesN<32>,
+    v_tilde_aud_s: &BytesN<32>,
+    b_tilde_aud_s: &BytesN<32>,
 ) {
     SetSpender {
         account: account.clone(),
         spender: spender.clone(),
         live_until_ledger,
-        r_e: r_e.clone(),
+        r_e_point: r_e_point.clone(),
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),
-        v_aud_s: v_aud_s.clone(),
-        b_aud_s: b_aud_s.clone(),
+        v_tilde_aud_s: v_tilde_aud_s.clone(),
+        b_tilde_aud_s: b_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -808,11 +809,11 @@ pub struct RevokeSpender {
     pub account: Address,
     #[topic]
     pub spender: Address,
-    pub r_e: BytesN<64>,
+    pub r_e_point: BytesN<64>,
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
-    pub v_aud_s: BytesN<32>,
-    pub b_aud_s: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `RevokeSpender` event.
@@ -821,20 +822,20 @@ pub fn emit_revoke_spender(
     e: &Env,
     account: &Address,
     spender: &Address,
-    r_e: &BytesN<64>,
+    r_e_point: &BytesN<64>,
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
-    v_aud_s: &BytesN<32>,
-    b_aud_s: &BytesN<32>,
+    v_tilde_aud_s: &BytesN<32>,
+    b_tilde_aud_s: &BytesN<32>,
 ) {
     RevokeSpender {
         account: account.clone(),
         spender: spender.clone(),
-        r_e: r_e.clone(),
+        r_e_point: r_e_point.clone(),
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),
-        v_aud_s: v_aud_s.clone(),
-        b_aud_s: b_aud_s.clone(),
+        v_tilde_aud_s: v_tilde_aud_s.clone(),
+        b_tilde_aud_s: b_tilde_aud_s.clone(),
     }
     .publish(e);
 }

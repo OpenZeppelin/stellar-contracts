@@ -185,21 +185,27 @@ fn register_payload(e: &Env) -> RegisterPayload {
 }
 
 fn withdraw_payload(e: &Env) -> WithdrawPayload {
-    WithdrawPayload { c_spend_new: pt(e), b_tilde: fr(e), r_e: pt(e), sigma: fr(e), b_aud_s: fr(e) }
+    WithdrawPayload {
+        c_spend_new: pt(e),
+        b_tilde: fr(e),
+        r_e_point: pt(e),
+        sigma: fr(e),
+        b_tilde_aud_s: fr(e),
+    }
 }
 
 fn transfer_payload(e: &Env) -> TransferPayload {
     TransferPayload {
         c_spend_new: pt(e),
         c_tx: pt(e),
-        r_e: pt(e),
+        r_e_point: pt(e),
         v_tilde: fr(e),
         b_tilde: fr(e),
         sigma: fr(e),
-        v_aud_r: fr(e),
-        r_aud_r: fr(e),
-        v_aud_s: fr(e),
-        b_aud_s: fr(e),
+        v_tilde_aud_r: fr(e),
+        r_tilde_aud_r: fr(e),
+        v_tilde_aud_s: fr(e),
+        b_tilde_aud_s: fr(e),
     }
 }
 
@@ -207,14 +213,14 @@ fn spender_transfer_payload(e: &Env) -> SpenderTransferPayload {
     SpenderTransferPayload {
         c_a_new: pt(e),
         c_tx: pt(e),
-        r_e: pt(e),
+        r_e_point: pt(e),
         v_tilde: fr(e),
         a_tilde_new: fr(e),
         sigma_a_new: fr(e),
-        v_aud_r: fr(e),
-        r_aud_r: fr(e),
-        v_aud_s: fr(e),
-        a_aud_s: fr(e),
+        v_tilde_aud_r: fr(e),
+        r_tilde_aud_r: fr(e),
+        v_tilde_aud_s: fr(e),
+        a_tilde_aud_s: fr(e),
     }
 }
 
@@ -225,11 +231,11 @@ fn set_spender_payload(e: &Env) -> SetSpenderPayload {
         escrowed_dvk: pt(e),
         b_tilde: fr(e),
         a_tilde: fr(e),
-        r_e: pt(e),
+        r_e_point: pt(e),
         sigma: fr(e),
         sigma_a: fr(e),
-        v_aud_s: fr(e),
-        b_aud_s: fr(e),
+        v_tilde_aud_s: fr(e),
+        b_tilde_aud_s: fr(e),
     }
 }
 
@@ -237,10 +243,10 @@ fn revoke_spender_payload(e: &Env) -> RevokeSpenderPayload {
     RevokeSpenderPayload {
         c_spend_new: pt(e),
         b_tilde: fr(e),
-        r_e: pt(e),
+        r_e_point: pt(e),
         sigma: fr(e),
-        v_aud_s: fr(e),
-        b_aud_s: fr(e),
+        v_tilde_aud_s: fr(e),
+        b_tilde_aud_s: fr(e),
     }
 }
 
@@ -762,10 +768,10 @@ fn register_minimal_account(e: &Env, account: &Address) {
     use crate::confidential::{ConfidentialAccount, ConfidentialTokenStorageKey};
     let identity = Grumpkin::identity(e);
     let acc = ConfidentialAccount {
-        spending_key: identity.clone(),
+        spending_public_key: identity.clone(),
         viewing_public_key: identity.clone(),
-        spendable_balance: identity.clone(),
-        receiving_balance: identity,
+        spendable_commitment: identity.clone(),
+        receiving_commitment: identity,
         auditor_id: 0,
     };
     e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &acc);
