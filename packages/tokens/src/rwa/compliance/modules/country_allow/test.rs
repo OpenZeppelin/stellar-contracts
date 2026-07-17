@@ -291,3 +291,17 @@ fn on_transfer_forced_is_exempt_from_policy() {
         on_transfer(&e, &to, &TransferKind::Forced, &token);
     });
 }
+
+#[test]
+fn on_transfer_recovery_is_exempt_from_policy() {
+    let e = Env::default();
+    let module_id = e.register(TestCountryAllowContract, ());
+    let token = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // No IRS configured and no allowlist: a standard transfer would
+        // panic, but a recovery passes through untouched.
+        on_transfer(&e, &to, &TransferKind::Recovery, &token);
+    });
+}

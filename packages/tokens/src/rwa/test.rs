@@ -62,11 +62,14 @@ impl MockCompliance {
         _from: AccountSnapshot,
         _to: AccountSnapshot,
         _amount: i128,
-        _kind: TransferKind,
+        kind: TransferKind,
         _contract: Address,
     ) {
         let ok: bool = e.storage().persistent().get(&symbol_short!("tx_ok")).unwrap_or(true);
         assert!(ok, "compliance rejected transfer");
+        // Record the reported kind so tests can assert which one the token
+        // sent for a given operation.
+        e.storage().persistent().set(&symbol_short!("last_kind"), &kind);
     }
 
     pub fn created(e: Env, _to: AccountSnapshot, _amount: i128, _contract: Address) {
@@ -452,9 +455,57 @@ fn recover_balance() {
         // Verify tokens were transferred
         assert_eq!(RWA::balance(&e, &old_account), 0);
         assert_eq!(RWA::balance(&e, &new_account), 100);
-        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 Transfer (forced) + 1
-        // RecoverySuccess
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 Transfer (recovery) +
+        // 1 RecoverySuccess
         assert_eq!(e.events().all().events().len(), 5);
+    });
+}
+
+#[test]
+fn recover_balance_reports_recovery_kind() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let old_account = Address::generate(&e);
+    let new_account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let compliance = set_and_return_compliance(&e);
+
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("recovery"), &new_account);
+        });
+
+        RWA::mint(&e, &old_account, 100);
+        let success = RWA::recover_balance(&e, &old_account, &new_account);
+        assert!(success);
+
+        // The compliance hook saw the movement as a recovery, not a seizure.
+        let kind: TransferKind = e.as_contract(&compliance, || {
+            e.storage().persistent().get(&symbol_short!("last_kind")).unwrap()
+        });
+        assert_eq!(kind, TransferKind::Recovery);
+    });
+}
+
+#[test]
+fn forced_transfer_reports_forced_kind() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let _ = set_and_return_identity_verifier(&e);
+        let compliance = set_and_return_compliance(&e);
+
+        RWA::mint(&e, &from, 100);
+        RWA::forced_transfer(&e, &from, &to, 40);
+
+        let kind: TransferKind = e.as_contract(&compliance, || {
+            e.storage().persistent().get(&symbol_short!("last_kind")).unwrap()
+        });
+        assert_eq!(kind, TransferKind::Forced);
     });
 }
 
@@ -623,8 +674,8 @@ fn forced_transfer_succeeds_when_from_identity_unverified() {
 
         // Revoke `from`'s identity after the mint. forced_transfer must still
         // succeed because it only verifies `to`; this is what lets it pull
-        // tokens out of sanctioned/compromised wallets and underlies
-        // `recover_balance`.
+        // tokens out of sanctioned/compromised wallets. `recover_balance`
+        // shares the same mechanics.
         e.as_contract(&identity_verifier, || {
             e.storage().persistent().set(&symbol_short!("id_deny"), &from);
         });

@@ -6,7 +6,7 @@
 //! decrements on every burn hook. When a mint would push the running
 //! supply above the configured limit, the operation is blocked.
 //!
-//! Unlike the upstream Solidity reference (which reads the token's
+//! Unlike the Solidity reference (which reads the token's
 //! `totalSupply()` at validation time), this port keeps its own counter.
 //! That makes the supply check a single per-token storage read instead of
 //! a cross-contract call, but it requires the module to be registered on

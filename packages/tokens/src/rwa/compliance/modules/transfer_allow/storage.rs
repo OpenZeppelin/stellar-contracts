@@ -37,9 +37,9 @@ pub fn is_user_allowed(e: &Env, token: &Address, user: &Address) -> bool {
 /// Rejects a transfer where neither party, sender nor recipient, is on the
 /// allowlist, by panicking.
 ///
-/// The transfer amount has no effect on the decision. Forced
-/// (admin/recovery) transfers are exempt from the policy, and no
-/// bookkeeping exists in this module, so they pass through untouched.
+/// The transfer amount has no effect on the decision. Privileged (forced
+/// and recovery) transfers are exempt from the policy, and no bookkeeping
+/// exists in this module, so they pass through untouched.
 ///
 /// # Arguments
 ///
@@ -52,10 +52,11 @@ pub fn is_user_allowed(e: &Env, token: &Address, user: &Address) -> bool {
 /// # Errors
 ///
 /// * [`ComplianceModuleError::UserNotAllowed`] - When neither party is on the
-///   allowlist and the transfer is not forced.
+///   allowlist and the transfer is not privileged.
 pub fn on_transfer(e: &Env, from: &Address, to: &Address, kind: &TransferKind, token: &Address) {
-    if *kind == TransferKind::Forced {
-        return;
+    match kind {
+        TransferKind::Forced | TransferKind::Recovery => return,
+        TransferKind::Standard | TransferKind::Delegated(_) => {}
     }
     if !is_user_allowed(e, token, from) && !is_user_allowed(e, token, to) {
         panic_with_error!(e, ComplianceModuleError::UserNotAllowed);

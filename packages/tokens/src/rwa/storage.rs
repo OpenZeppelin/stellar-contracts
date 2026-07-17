@@ -186,9 +186,10 @@ impl RWA {
     /// The `to` address must pass identity verification. `from` is not required
     /// to be verified, so this privileged action remains usable to pull
     /// tokens out of accounts whose identity is no longer valid
-    /// (sanctioned, revoked, or compromised wallets). This is also what
-    /// makes `forced_transfer` suitable as the underlying primitive for
-    /// [`Self::recover_balance`].
+    /// (sanctioned, revoked, or compromised wallets). The same mechanics
+    /// back [`Self::recover_balance`], which reports
+    /// [`TransferKind::Recovery`] to the compliance contract instead of
+    /// [`TransferKind::Forced`].
     ///
     /// This function can unfreeze tokens if needed for regulatory compliance.
     /// It bypasses paused state and frozen address checks.
@@ -215,17 +216,34 @@ impl RWA {
     /// # Notes
     ///
     /// This function bypasses freezing restrictions and can unfreeze tokens
-    /// as needed. It's intended for regulatory compliance and recovery
-    /// scenarios.
+    /// as needed. It's intended for regulatory compliance scenarios such as
+    /// court-ordered seizures.
     ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: This function bypasses authorization and freezing checks.
     /// Should only be used by authorized compliance or admin functions.
     pub fn forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+        Self::privileged_transfer(e, from, to, amount, &TransferKind::Forced);
+    }
+
+    /// Shared mechanics behind [`Self::forced_transfer`] and
+    /// [`Self::recover_balance`]: moves `amount` from `from` to `to`,
+    /// bypassing paused state and freezing restrictions (unfreezing as
+    /// needed), and reports the movement to the compliance contract as
+    /// `kind`. The two public entry points differ only in the kind they
+    /// report, which is what lets compliance modules tell a seizure from a
+    /// wallet migration.
+    fn privileged_transfer(
+        e: &Env,
+        from: &Address,
+        to: &Address,
+        amount: i128,
+        kind: &TransferKind,
+    ) {
         // Snapshot before any unfreeze/balance mutation so the hook observes
-        // the pre-operation state. A forced transfer has no spender: it is an
-        // administrative pull, not a delegated move.
+        // the pre-operation state. A privileged transfer has no spender: it is
+        // an administrative pull, not a delegated move.
         let from_snapshot = Self::account_snapshot(e, from);
         let to_snapshot = Self::account_snapshot(e, to);
 
@@ -259,7 +277,7 @@ impl RWA {
             &from_snapshot,
             &to_snapshot,
             &amount,
-            &TransferKind::Forced,
+            kind,
             &e.current_contract_address(),
         );
 
@@ -414,7 +432,16 @@ impl RWA {
     /// the old account and applies it to the new account, maintaining
     /// regulatory compliance.
     ///
-    /// This functions does not concern itself with the Identity Management.
+    /// State owned by this contract (the frozen status) is migrated directly
+    /// by this function. State held by compliance modules is handled through
+    /// the transfer hook: the recovery is reported to the compliance contract
+    /// as a transfer of kind [`TransferKind::Recovery`], and each module
+    /// decides how to treat it. Policy modules exempt it like a forced
+    /// transfer, while bookkeeping modules migrate wallet-bound state
+    /// instead of consuming it (e.g. the initial lockup period module moves
+    /// the old account's lock entries to the new account).
+    ///
+    /// This function does not concern itself with the Identity Management.
     /// If the old account's identity should be removed, it should be done on
     /// the Identity Stack.
     ///
@@ -449,9 +476,17 @@ impl RWA {
         let frozen_tokens = Self::get_frozen_tokens(e, old_account);
         let is_address_frozen = Self::is_frozen(e, old_account);
 
-        // Use forced_transfer to transfer all tokens (this handles unfreezing as
-        // needed)
-        Self::forced_transfer(e, old_account, new_account, lost_balance);
+        // Move all tokens with the shared privileged mechanics (handles
+        // unfreezing as needed), reporting the movement as a recovery so
+        // compliance modules migrate wallet-bound state instead of
+        // consuming it.
+        Self::privileged_transfer(
+            e,
+            old_account,
+            new_account,
+            lost_balance,
+            &TransferKind::Recovery,
+        );
 
         // Preserve frozen tokens on the new account if there were any
         if frozen_tokens > 0 {

@@ -147,9 +147,13 @@ pub trait ComplianceModule {
     /// * `to` - Snapshot of the receiver, as of before the transfer.
     /// * `amount` - The amount of tokens transferred.
     /// * `kind` - Who initiated the transfer and under what authority; see
-    ///   [`TransferKind`]. Policy modules should generally exempt
-    ///   [`TransferKind::Forced`] from their checks, while still applying any
-    ///   bookkeeping.
+    ///   [`TransferKind`]. Policy modules should generally exempt the
+    ///   privileged kinds ([`TransferKind::Forced`],
+    ///   [`TransferKind::Recovery`]) from their checks, while still applying
+    ///   any bookkeeping. Bookkeeping modules must also decide what a recovery
+    ///   means for their state: wallet-bound records should migrate to the
+    ///   destination wallet, while identity-bound records are typically
+    ///   unaffected.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
     /// # Notes
