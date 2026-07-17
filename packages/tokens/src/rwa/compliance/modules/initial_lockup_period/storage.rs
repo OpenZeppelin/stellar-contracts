@@ -473,6 +473,9 @@ pub fn migrate_locks(
 
     let free = (balance - src.total_locked).max(0);
     if amount <= free {
+        // should be unreachable if called via `recovery_balance`, this is just a security belt
+        // for the case that the caller is not `recovery_balance` and does not check the free balance
+        // for example, maybe useful for partial recovery in the future
         return;
     }
 
