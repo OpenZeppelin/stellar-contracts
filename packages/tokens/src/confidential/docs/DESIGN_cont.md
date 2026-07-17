@@ -29,7 +29,7 @@ $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}}) \qquad \text{(DESIGN §2.4)}$$
 $$(m\_{v,s}, m\_{b,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$
 $$\tilde{v}\_{\text{aud,s}} = v\_{\text{tx}} + m\_{v,s}, \qquad \tilde{b}\_{\text{aud,s}} = (v\_A - v\_{\text{tx}}) + m\_{b,s}$$
 
-The transfer circuit (constraints T\_a1--T\_a8) enforces correct computation. The contract fetches both auditor keys from the auditor contract using the respective account `auditor_id` fields; neither the sender nor the recipient can substitute a different key.
+The transfer circuit (constraints T\_a1--T\_a8) enforces correct computation. At operation time, the contract fetches both auditor keys from the auditor contract using the *stored* `auditor_id` field of each account; neither the sender nor the recipient can substitute a different key for the operation being proven. This guarantee is scoped to operation time: *which* auditor an account is bound to is chosen by the account owner at registration (DESIGN §7.2), subject only to existence in the auditor registry unless the deployment gates the selection in its `Hooks::on_register` implementation ([COMPLIANCE.md](./COMPLIANCE.md) §4.3).
 
 Each auditor decrypts using their secret key $$k$$. For example, the sender's auditor:
 
@@ -39,7 +39,7 @@ $$v\_{\text{tx}} = \tilde{v}\_{\text{aud,s}} - m\_{v,s}, \qquad v\_{\text{new}} 
 
 where $$R\_e$$ and $$\sigma$$ are published in the Transfer event. The recipient's auditor follows the same pattern with $$\delta\_{\text{aud\\\_r}}$$ to recover the pair $$(v\_{\text{tx}}, r\_{\text{tx}})$$.
 
-**Recipient-auditor opening capability.** Because the recipient-auditor recovers $$r\_{\text{tx}}$$ for every inbound transfer, and because deposits add to `receiving_balance` with $$r = 0$$ (Section 7.3), the recipient-auditor can reconstruct the full Pedersen opening of $$C\_{\text{receive}}$$ between merges:
+**Recipient-auditor opening capability.** Because the recipient-auditor recovers $$r\_{\text{tx}}$$ for every inbound transfer, and because deposits add to `receiving_commitment` with $$r = 0$$ (Section 7.3), the recipient-auditor can reconstruct the full Pedersen opening of $$C\_{\text{receive}}$$ between merges:
 
 $$v\_r = \sum\_i v\_{\text{tx},i} + \sum\_j a\_j, \qquad r\_r = \sum\_i r\_{\text{tx},i}$$
 
@@ -60,28 +60,28 @@ The opening capability does not extend to $$C\_{\text{spend}}$$. The auditor kno
 
 The recipient's auditor does not see the sender's balance in any of these operations.
 
-**Per-transfer Pedersen randomness (recipient-auditor only).** Beyond the transfer amount, the recipient's auditor also decrypts the per-transfer Pedersen blinding $$r\_{\text{tx}}$$ from $$\tilde{r}\_{\text{aud,r}}$$ on every confidential transfer and spender-transfer (constraints T\_a4 and O\_a4). Combined with $$v\_{\text{tx}}$$ this is a full Pedersen opening of each $$C\_{\text{tx},i}$$ and, by homomorphism, of the recipient's `receiving_balance` $$C\_{\text{receive}}$$ between merges (Section 8.1). The sender's auditor does not see $$r\_{\text{tx}}$$.
+**Per-transfer Pedersen randomness (recipient-auditor only).** Beyond the transfer amount, the recipient's auditor also decrypts the per-transfer Pedersen blinding $$r\_{\text{tx}}$$ from $$\tilde{r}\_{\text{aud,r}}$$ on every confidential transfer and spender-transfer (constraints T\_a4 and O\_a4). Combined with $$v\_{\text{tx}}$$ this is a full Pedersen opening of each $$C\_{\text{tx},i}$$ and, by homomorphism, of the recipient's `receiving_commitment` $$C\_{\text{receive}}$$ between merges (Section 8.1). The sender's auditor does not see $$r\_{\text{tx}}$$.
 
 **Key rotation.** When the auditor contract sets a new key under the account's `auditor_id` (§8.3), the new key sees the balance checkpoint at the next owner-initiated operation, with no event replay or bootstrapping required. The balance checkpoint is self-contained: it depends only on the auditor's ECDH secret key and the published $$(R\_e, \sigma)$$. Note that `auditor_id` itself is immutable per account (§6.1); only the key under that `auditor_id` rotates.
 
-**No viewing-key escrow on the sender side.** The sender-auditor does not hold any account's viewing key, and compromise of a sender-auditor key exposes only per-operation amounts and balance checkpoints from operations that occurred while the compromised key was active. Historical balances under prior keys, and the recipient's `spendable_balance` (whose blinding derives from $$vk\_A$$, not from any auditor channel), remain opaque.
+**No viewing-key escrow on the sender side.** The sender-auditor does not hold any account's viewing key, and compromise of a sender-auditor key exposes only per-operation amounts and balance checkpoints from operations that occurred while the compromised key was active. Historical balances under prior keys, and the recipient's `spendable_commitment` (whose blinding derives from $$vk\_A$$, not from any auditor channel), remain opaque.
 
 **Recipient-side opening capability.** The recipient-auditor additionally learns the per-transfer Pedersen randomness $$r\_{\text{tx}}$$ for every inbound transfer and spender-transfer. This is capability-equivalent to holding the opening of every $$C\_{\text{tx},i}$$ and, by summation, of $$C\_{\text{receive}}$$. The capability is bounded in two ways:
 
 - **Forward-only.** Only events emitted while the auditor key was active are decryptable.
-- **Receiving-side only (opening).** The full $$(v\_r, r\_r)$$ opening covers `receiving_balance`. It does not extend to a full opening of `spendable_balance`, whose blinding $$r\_s = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk\_A, \sigma)$$ depends on $$vk\_A$$ and is not derivable from any auditor key. The auditor still knows the *value* $$v\_s$$ of `spendable_balance` at every spend boundary via $$\tilde{b}\_{\text{aud,s}}$$.
+- **Receiving-side only (opening).** The full $$(v\_r, r\_r)$$ opening covers `receiving_commitment`. It does not extend to a full opening of `spendable_commitment`, whose blinding $$r\_s = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk\_A, \sigma)$$ depends on $$vk\_A$$ and is not derivable from any auditor key. The auditor still knows the *value* $$v\_s$$ of `spendable_commitment` at every spend boundary via $$\tilde{b}\_{\text{aud,s}}$$.
 
 This is the trust position that supports the clawback flow in [COMPLIANCE.md](./COMPLIANCE.md) §5: the recipient-auditor is the seize-enabling party for inbound flows, while the sender-auditor remains the seize-enabling party for the spendable-balance side via $$\tilde{b}\_{\text{aud,s}}$$.
 
 ### 8.3 Auditor Key Management and Rotation
 
-The auditor contract stores Grumpkin public keys as full affine points $$(x, y)$$ indexed by `auditor_id`. The contract validates that every inserted key is canonical, on-curve ($$y^2 \equiv x^3 - 17 \pmod{r}$$), and non-identity at insertion time (Section 3.1, Section 10.8). Each `auditor_id` MAY maintain a sequence of versions, each carrying its activation ledger. Rotation appends a new entry rather than overwriting the previous one.
+The auditor contract stores Grumpkin public keys as full affine points $$(x, y)$$ indexed by `auditor_id`. The contract validates that every inserted key is canonical, on-curve ($$y^2 \equiv x^3 - 17 \pmod{r}$$), and non-identity at insertion time (Section 3.1, Section 10.8). Each `auditor_id` MAY maintain a sequence of versions, each carrying its activation ledger, in which case rotation appends a new entry rather than overwriting the previous one. The reference registry shipped in this repository takes the simpler form: it keeps a single current key per `auditor_id`, which `rotate_key` overwrites in place; a versioned, activation-ledger registry is an optional production target.
 
 When building public inputs for any operation that produces auditor ciphertexts (transfers, withdrawals, set/revoke spender), the contract fetches the relevant auditor keys for the recipient's and/or sender's `auditor_id`. The contract passes the full Grumpkin point as a public input; the circuit constrains the ECDH ciphertexts against that exact point. The contract and the circuit are version-agnostic: they verify against whichever key the auditor contract currently exposes.
 
 **In-flight proofs across rotation.** A proof constructed against version $$v$$ becomes unverifiable the instant the auditor contract activates version $$v+1$$. The $$K\_{\text{aud}}$$ public input the contract fetches at verification no longer matches the value the prover committed to, so UltraHonk verification fails and the invocation **reverts at the proof-verification boundary**. The caller (sender, owner, or spender) reconstructs the proof against the new $$K\_{\text{aud}}$$ and resubmits. The rejection is benign: the contract's spendable balance, receiving balance, and delegation state are unchanged by the reverted call, $$\sigma$$ is freshly sampled on retry (Section 9.6), and an observer cannot correlate the rejected attempt with the resubmission.
 
-**Auditor's off-chain obligation.** The auditor MUST retain the secret key for every historical version it has issued. To decrypt an event at ledger $$L$$, the auditor queries the auditor contract for the version of its `auditor_id` whose activation ledger is the largest value not exceeding $$L$$, then uses the corresponding off-chain secret key against the $$R\_e$$ and $$\sigma$$ (or $$\sigma\_a$$) emitted in the event.
+**Auditor's off-chain obligation.** The auditor MUST retain the secret key for every historical version it has issued. To decrypt an event at ledger $$L$$, the auditor resolves the version from its own rotation records (with a versioned activation-ledger registry, the auditor instead queries the auditor contract for the version of its `auditor_id` whose activation ledger is the largest value not exceeding $$L$$), then uses the corresponding off-chain secret key against the $$R\_e$$ and $$\sigma$$ (or $$\sigma\_a$$) emitted in the event.
 
 ### 8.4 Spender Transfer Auditing
 
@@ -172,7 +172,7 @@ A checkpoint is concretely an event of type `Withdraw`, `Transfer` (as sender), 
 
 The replay window is bounded by the owner's spending frequency. An account that spends or withdraws regularly produces frequent checkpoints, keeping the replay window short. In the worst case (funds received but never spent), the window extends back to registration.
 
-**Data-availability dependency.** Recovery from seed alone (i.e., after the wallet's local cache is destroyed) requires access to the full event history since the last checkpoint, which Stellar RPC does not guarantee. The protocol therefore requires a durable indexer; the data model, retention obligations, and recommended API are specified in the indexing document (INDEXER.md, to be added). Without such an indexer a user can still see that their funds exist on-chain (the commitment remains), but cannot reconstruct the opening required to spend.
+**Data-availability dependency.** Recovery from seed alone (i.e., after the wallet's local cache is destroyed) requires access to the full event history since the last checkpoint, which Stellar RPC does not guarantee. The protocol therefore requires a durable indexer; the data model, retention obligations, and recommended API are specified in [INDEXER.md](./INDEXER.md). Without such an indexer a user can still see that their funds exist on-chain (the commitment remains), but cannot reconstruct the opening required to spend.
 
 **Incoming-transfer spam.** A third party can spam an account with confidential transfers (including zero-value transfers, see Section 9.1 Corollary) without invalidating the recipient's spend proofs. The cost to the spammer is the Soroban transaction fee per transfer, which bounds the rate. The cost to the recipient is per-event indexer storage and wallet replay work. Both costs are linear in the number of incoming transfers and bounded by the replay window; neither breaks correctness.
 
@@ -270,7 +270,7 @@ fn commit(value: Field, randomness: Field) -> EmbeddedCurvePoint {
 /// s = Poseidon2(delta_ecdh, S.x, S.y). Absorbing both coordinates binds
 /// the full shared point, removing the (P, -P) negation invariance of an
 /// x-only extraction. All ECDH scalars in this protocol are F_r-sampled
-/// (sk, vk, r_e), so single-limb conversion is sound.
+/// (sk, vk, r_e_point), so single-limb conversion is sound.
 fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> Field {
     let s = multi_scalar_mul(
         [point],
@@ -458,7 +458,7 @@ Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
 
 ### 11.3 Read Methods
 
-**`confidential_balance(account) -> Bytes`.** Returns the XDR-serialized `ConfidentialAccount` struct for the given account (§6.1), i.e. the tuple `(spending_key, viewing_public_key, spendable_balance, receiving_balance, auditor_id)`. Reverts if `account` is not registered. Wallets bootstrap from this call (single round-trip to obtain both Pedersen commitments plus the keys needed to identify the account and its bound auditor); indexers use it to verify consistency between their replayed accumulators and on-chain state (§5.2 "Consistency check").
+**`confidential_balance(account) -> Bytes`.** Returns the XDR-serialized `ConfidentialAccount` struct for the given account (§6.1), i.e. the tuple `(spending_public_key, viewing_public_key, spendable_commitment, receiving_commitment, auditor_id)`. Reverts if `account` is not registered. Wallets bootstrap from this call (single round-trip to obtain both Pedersen commitments plus the keys needed to identify the account and its bound auditor); indexers use it to verify consistency between their replayed accumulators and on-chain state (§5.2 "Consistency check").
 
 **`is_spender(account, spender) -> bool`.** Returns `true` iff a delegation entry exists for `(account, spender)` **and** `ledger.sequence() <= live_until_ledger`. Returns `false` for:
 
@@ -468,13 +468,13 @@ Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
 
 The function returns the *spending-authority* state, not the *escrow-existence* state. Consumers that need to distinguish "no delegation" from "expired delegation" inspect `get_spender` (below) or replay `SetSpender` / `RevokeSpender` events.
 
-**`get_spender(account, spender) -> Bytes`.** Returns the XDR-serialized `SpenderDelegation` struct (§6.2) for the `(account, spender)` pair, i.e. `(allowance_commitment, encrypted_allowance, escrowed_dvk, allowance_salt, live_until_ledger)`. Reverts if no delegation entry exists for the pair. Unlike `is_spender`, this surfaces the raw on-chain delegation state without applying the expiry filter, so callers can distinguish "no delegation" (revert) from "active delegation" (`ledger.sequence() <= live_until_ledger`) from "expired-but-not-yet-revoked delegation" (`ledger.sequence() > live_until_ledger`, escrowed value still pending reclaim). Primary consumers:
+**`get_spender(account, spender) -> Bytes`.** Returns the XDR-serialized `SpenderDelegation` struct (§6.2) for the `(account, spender)` pair, i.e. `(allowance_commitment, a_tilde, escrowed_dvk, allowance_salt, live_until_ledger)`. Reverts if no delegation entry exists for the pair. Unlike `is_spender`, this surfaces the raw on-chain delegation state without applying the expiry filter, so callers can distinguish "no delegation" (revert) from "active delegation" (`ledger.sequence() <= live_until_ledger`) from "expired-but-not-yet-revoked delegation" (`ledger.sequence() > live_until_ledger`, escrowed value still pending reclaim). Primary consumers:
 
-- **Spender wallet:** fetches `allowance_commitment`, `encrypted_allowance`, `escrowed_dvk`, and `allowance_salt` to recover $$dvk\_i$$ via §7.11 decryption, then reads the current allowance via $$\tilde{a} = v\_a + \text{Poseidon}(\delta\_{\text{enc\\\_allow}}, dvk\_i, \sigma\_a)$$ to construct the next `confidential_transfer_from` witness.
+- **Spender wallet:** fetches `allowance_commitment`, `a_tilde`, `escrowed_dvk`, and `allowance_salt` to recover $$dvk\_i$$ via §7.11 decryption, then reads the current allowance via $$\tilde{a} = v\_a + \text{Poseidon}(\delta\_{\text{enc\\\_allow}}, dvk\_i, \sigma\_a)$$ to construct the next `confidential_transfer_from` witness.
 - **Owner wallet:** reads the same fields after losing local state, or before calling `revoke_spender`, to confirm the on-chain entry matches its records.
 - **Indexers:** verify their replayed delegation state against the live commitment, in the same way `confidential_balance` is used for account state (§5.2 "Consistency check").
 
-The auditor's allowance tracking does **not** use this method: per-event allowance ciphertexts (§8.5) are the auditor's data path; `encrypted_allowance` is keyed to $$dvk\_i$$ and is unreadable without it.
+The auditor's allowance tracking does **not** use this method: per-event allowance ciphertexts (§8.5) are the auditor's data path; `a_tilde` is keyed to $$dvk\_i$$ and is unreadable without it.
 
 ---
 

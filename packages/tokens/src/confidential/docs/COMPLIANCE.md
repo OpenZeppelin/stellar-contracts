@@ -38,6 +38,8 @@ The contract maintains a `frozen(account) -> bool` entry per account. Before app
 
 Full freeze (rather than outbound-only) keeps semantics clean: no further accumulation is possible after the freeze takes effect.
 
+The spender named by the delegation flows (`set_spender`, `confidential_transfer_from`) is not an account for the purposes of the freeze check: the freeze targets fund ownership, and the spender holds no funds — the value being moved stays the owner's, and freezing the owner halts the delegation. This mirrors the allowance models of the library's fungible and rwa tokens. The spender is instead gated by the policy contract (§3).
+
 ### 2.1 Core Interface Additions
 
 Three functions are added to the core contract interface:
@@ -60,6 +62,8 @@ $$\text{permitted}(a) = \neg \text{frozen}(a) \\;\land\\; \text{policy\\\_ok}(a)
 
 Off by default. Issuer-led deployments using a SAC underlying opt in at construction. The cost is one extra cross-contract invocation per named account per operation. This is the *transitive compliance* pattern: the issuer's own freeze/deauthorize, driven through the SAC's standardized admin interface (`set_authorized`, CAP-0046-06), takes effect at the confidential layer with no state mirrored by the token admin.
 
+Like the contract-level freeze (§2), the SAC check names only fund-holding parties: the spender of a delegated flow is exempt.
+
 ---
 
 ## 3. Policy Contract
@@ -81,6 +85,8 @@ This single hook covers the common deployment modes without baking them into the
 Membership management, list semantics, and identity proofs live entirely inside the policy contract. The token's only agreement with the policy is the boolean return value.
 
 Externalizing the policy also lets a single registry serve multiple tokens. An issuer running several confidential tokens (different denominations, jurisdictions, or product lines) can point every token at the same KYC or sanctions contract and maintain one source of truth, rather than mirroring lists into each token. The `token` argument to `is_authorized` lets the registry apply per-token rules when needed (e.g., a jurisdiction filter) without giving up the shared baseline.
+
+**Spender gating.** Unlike the freeze (§2) and SAC (§2.2) checks, the policy gate also names the spender of a delegated flow: `set_spender` checks the spender at grant time — a delegation to a policy-denied spender fails when it is established, not only when it is exercised — and `confidential_transfer_from` checks the spender at spend time, alongside `from` and `to`. `revoke_spender` deliberately does not gate the spender: revocation is the owner's escape hatch, and blocking it once the spender turns non-compliant would entrench the bad delegation (the owner is still gated on revocation, as on every other operation).
 
 The policy address is rotatable via `set_compliance_config` (§6) under admin auth (§1.1). Setting it to `None` disables the gate. The policy is part of the deployment's trust surface.
 
@@ -139,6 +145,30 @@ The depositor is required to be the recipient — no one can deposit on someone 
 
 These two examples are illustrative; the same surface accommodates per-deposit rate limits, allowlists keyed off the deposit amount, mirror writes to an audit log, or any other synchronous policy. The token's only agreement with the `Hooks` impl is that callbacks revert (via `panic_with_error!`) when the operation must be rejected.
 
+### 4.3 Restrict Auditor Selection
+
+At `register`, the account owner chooses which `auditor_id` the account binds to. The core validates only that the id exists in the auditor registry ([DESIGN.md](DESIGN.md) §7.2), and the default `ComplianceHooks::on_register` deliberately does not restrict the choice. On a shared auditor registry, a deployment with designated auditors gates the selection against its own approved set:
+
+```rust
+impl Hooks for ApprovedAuditorHooks {
+    fn on_register(e: &Env, account: &Address, auditor_id: u32, payload: Val) {
+        let approved: Vec<u32> = e
+            .storage()
+            .instance()
+            .get(&DataKey::ApprovedAuditors)
+            .unwrap_or_else(|| Vec::new(e));
+        if !approved.contains(auditor_id) {
+            panic_with_error!(e, DeploymentError::AuditorNotApproved);
+        }
+        ComplianceHooks::on_register(e, account, auditor_id, payload);
+    }
+
+    // …other callbacks delegate to ComplianceHooks defaults…
+}
+```
+
+`ApprovedAuditors` is a deployment-maintained instance-storage allowlist (populated at construction or through an admin entry point) and `AuditorNotApproved` a deployment-defined error. Because `auditor_id` is immutable once the account is registered ([DESIGN.md](DESIGN.md) §6.1), this gate is the single point where a deployment controls which auditors may ever observe an account's flows.
+
 ---
 
 ## 5. Clawback (Outline Only)
@@ -164,7 +194,7 @@ Three roles bear on this flow:
 - **Issuer (SAC admin)** — when the base asset is a Stellar Asset Contract, the holder of its standardized admin interface (`mint`, `clawback`, `set_authorized`; CAP-0046-06). Seized value settles to the issuer over the transparent SEP-41 path, and the issuer can freeze independently of the token admin via SAC passthrough (§2.2).
 - **Auditor** — holder of the off-chain auditor decryption key bound to the account at registration (`DESIGN_cont.md` §8). Governs visibility of confidential balances; cannot move funds or change contract state.
 
-The seize itself is carried out by the token admin and the auditor together. The admin authorizes the on-chain action per the role above; the auditor unlocks knowledge of the target's balance. Two halves of the target's confidential position are covered by the two auditor channels (see `DESIGN_cont.md` §8.1, §8.2). The **sender-auditor** decrypts the spendable-balance checkpoint $$\tilde{b}\_{\text{aud,s}}$$ from the target's most recent owner-initiated event, recovering $$v\_s$$. The **recipient-auditor** decrypts the per-transfer pairs $$(v\_{\text{tx},i}, r\_{\text{tx},i})$$ from every inbound transfer and spender-transfer since the last merge, recovering the full Pedersen opening $$(v\_r, r\_r)$$ of the target's `receiving_balance`. The auditor then produces a zero-knowledge proof bounding the clawback amount by $$v\_s + v\_r$$, without revealing either summand.
+The seize itself is carried out by the token admin and the auditor together. The admin authorizes the on-chain action per the role above; the auditor unlocks knowledge of the target's balance. Two halves of the target's confidential position are covered by the two auditor channels (see `DESIGN_cont.md` §8.1, §8.2). The **sender-auditor** decrypts the spendable-balance checkpoint $$\tilde{b}\_{\text{aud,s}}$$ from the target's most recent owner-initiated event, recovering $$v\_s$$. The **recipient-auditor** decrypts the per-transfer pairs $$(v\_{\text{tx},i}, r\_{\text{tx},i})$$ from every inbound transfer and spender-transfer since the last merge, recovering the full Pedersen opening $$(v\_r, r\_r)$$ of the target's `receiving_commitment`. The auditor then produces a zero-knowledge proof bounding the clawback amount by $$v\_s + v\_r$$, without revealing either summand.
 
 Neither party can act alone: the admin cannot produce the proof, and the auditor cannot freeze the account or move funds. This is the same trust separation present in the core protocol (admin governs state transitions, auditor governs visibility) extended to a write surface.
 
@@ -174,7 +204,7 @@ The admin role here is the same access-control surface introduced in §1.1; depl
 
 ### 5.3 New Circuit
 
-The clawback proof is a constant-size circuit deployed through the existing Verifier surface. It binds the seize amount $$\alpha$$ by the sum of the spendable and receiving balances of the target account, refreshes the spendable-balance checkpoint, and rewrites `receiving_balance` to a zero commitment so the seized inbound flow is consumed atomically.
+The clawback proof is a constant-size circuit deployed through the existing Verifier surface. It binds the seize amount $$\alpha$$ by the sum of the spendable and receiving balances of the target account, refreshes the spendable-balance checkpoint, and rewrites `receiving_commitment` to a zero commitment so the seized inbound flow is consumed atomically.
 
 **Public inputs.** $$C\_{\text{spend}}, C\_{\text{receive}}, K\_{\text{aud,s}}, \tilde{b}\_{\text{aud,s}}^{\text{old}}, R\_e^{\text{old}}, \sigma^{\text{old}}, \alpha, \tilde{b}\_{\text{aud,s}}^{\text{new}}, R\_e^{\text{new}}, \sigma^{\text{new}}, addr\_f$$.
 

@@ -25,10 +25,13 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractclient, contracterror, contractevent, contracttrait, Address, Env, Val};
+use soroban_sdk::{contractclient, contracterror, contractevent, contracttrait, Address, Env};
 pub use storage::{ComplianceConfig, ComplianceStorageKey};
 
-use crate::confidential::{ConfidentialToken, Hooks};
+use crate::confidential::{
+    ConfidentialToken, Hooks, RegisterPayload, RevokeSpenderPayload, SetSpenderPayload,
+    SpenderTransferPayload, TransferPayload, WithdrawPayload,
+};
 
 // ################## POLICY ##################
 
@@ -164,21 +167,40 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 /// the active [`ComplianceConfig`]. Wire as `type Hooks = ComplianceHooks;`
 /// on a contract that implements [`ConfidentialToken`].
 ///
-/// Each callback follows the same three-stage sequence when a configuration
+/// Each gated party is checked against up to three gates when a configuration
 /// is present:
 ///
-/// 1. Reverts [`ComplianceError::AccountFrozen`] if the address is frozen (with
-///    the exception for `spender`).
+/// 1. Reverts [`ComplianceError::AccountFrozen`] if the address is frozen.
 /// 2. When `config.policy = Some(p)`, calls `p.is_authorized` and reverts
 ///    [`ComplianceError::NotAuthorizedByPolicy`] on `false`.
-/// 3. When `config.sac_passthrough = true`, calls the underlying SEP-41 token's
-///    `authorized` view and reverts [`ComplianceError::NotAuthorizedBySac`] on
-///    `false`.
+/// 3. When `config.sac_passthrough = true`, calls the underlying SAC's
+///    `authorized` view (a Stellar Asset Contract interface, not SEP-41; see
+///    [`storage::check_sac`]) and reverts
+///    [`ComplianceError::NotAuthorizedBySac`] on `false`.
 ///
-/// Special cases:
+/// Which parties pass which gates:
 ///
-/// * [`on_register`](Hooks::on_register) skips the freeze branch but still
-///   applies policy and SAC.
+/// * [`on_deposit`](Hooks::on_deposit), [`on_withdraw`](Hooks::on_withdraw),
+///   [`on_transfer`](Hooks::on_transfer): `from` and `to` pass all three gates.
+///   [`on_merge`](Hooks::on_merge): `account` passes all three.
+/// * [`on_register`](Hooks::on_register): `account` skips the freeze gate
+///   (registration predates the account entry) but passes policy and SAC.
+/// * [`on_register`](Hooks::on_register) does not restrict the caller-selected
+///   `auditor_id`. Deployments that must limit which auditors an account may
+///   bind to override it with a custom gate (see [`docs/COMPLIANCE.md`] §4.3).
+/// * [`on_spender_transfer`](Hooks::on_spender_transfer): `from` and `to` pass
+///   all three gates; `spender` passes only the policy gate.
+/// * [`on_set_spender`](Hooks::on_set_spender): the delegating `account` passes
+///   all three gates; `spender` passes only the policy gate, so a delegation to
+///   a policy-denied spender fails at grant time rather than at spend time.
+/// * [`on_revoke_spender`](Hooks::on_revoke_spender): `account` passes all
+///   three gates; `spender` is not gated at all. Revocation is the owner's
+///   escape hatch — blocking it once the spender turns non-compliant would
+///   entrench the bad delegation.
+///
+/// The spender is exempt from the freeze and SAC gates everywhere: both
+/// target fund ownership, and the spender holds no funds in this model,
+/// mirroring the fungible and rwa allowance models.
 ///
 /// Deployments that need additional behaviour (audit mirroring, rate
 /// limiting, or alternative deposit semantics — see
@@ -187,7 +209,7 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 pub struct ComplianceHooks;
 
 impl Hooks for ComplianceHooks {
-    fn on_register(e: &Env, account: &Address, _auditor_id: u32, _payload: Val) {
+    fn on_register(e: &Env, account: &Address, _auditor_id: u32, _payload: &RegisterPayload) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };
@@ -210,7 +232,13 @@ impl Hooks for ComplianceHooks {
         storage::gate_account(e, account, &config);
     }
 
-    fn on_withdraw(e: &Env, from: &Address, to: &Address, _amount: i128, _payload: Val) {
+    fn on_withdraw(
+        e: &Env,
+        from: &Address,
+        to: &Address,
+        _amount: i128,
+        _payload: &WithdrawPayload,
+    ) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };
@@ -218,7 +246,7 @@ impl Hooks for ComplianceHooks {
         storage::gate_account(e, to, &config);
     }
 
-    fn on_transfer(e: &Env, from: &Address, to: &Address, _payload: Val) {
+    fn on_transfer(e: &Env, from: &Address, to: &Address, _payload: &TransferPayload) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };
@@ -228,34 +256,42 @@ impl Hooks for ComplianceHooks {
 
     fn on_spender_transfer(
         e: &Env,
-        _spender: &Address,
+        spender: &Address,
         from: &Address,
         to: &Address,
-        _payload: Val,
+        _payload: &SpenderTransferPayload,
     ) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };
-        // Gate `from` and `to` only, consistent with the fungible and rwa allowance
-        // models.
+        // `from` and `to` pass all three gates; the spender holds no funds, so
+        // it skips freeze and SAC (consistent with the fungible and rwa
+        // allowance models) but must still clear the external policy.
         storage::gate_account(e, from, &config);
         storage::gate_account(e, to, &config);
+        storage::check_policy(e, spender, &config);
     }
 
     fn on_set_spender(
         e: &Env,
         account: &Address,
-        _spender: &Address,
+        spender: &Address,
         _live_until_ledger: u32,
-        _payload: Val,
+        _payload: &SetSpenderPayload,
     ) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };
         storage::gate_account(e, account, &config);
+        storage::check_policy(e, spender, &config);
     }
 
-    fn on_revoke_spender(e: &Env, account: &Address, _spender: &Address, _payload: Val) {
+    fn on_revoke_spender(
+        e: &Env,
+        account: &Address,
+        _spender: &Address,
+        _payload: &RevokeSpenderPayload,
+    ) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };

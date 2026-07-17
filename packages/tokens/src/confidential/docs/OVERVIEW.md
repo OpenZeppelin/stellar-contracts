@@ -165,7 +165,7 @@ The wallet must:
 - **Generate and store keys** - derive the full key hierarchy (spending key, viewing key, public viewing key, delegation viewing keys) from a single master secret.
 - **Produce zero-knowledge proofs** - the heaviest client-side computation. Proof generation time depends on the circuit complexity but targets single-digit seconds on modern hardware. The Transfer circuit involves approximately 7 elliptic-curve scalar multiplications (including two auditor ECDH exchanges); the Register circuit is lighter.
 - **Track local state** - maintain running commitment openings (value and blinding factor pairs) for the spendable and receiving balances by processing on-chain events. This is comparable to wallet sync in UTXO-based privacy systems (Zcash, Monero).
-- **Handle recovery** - if local state is lost, reconstruct balances from on-chain data using the viewing key: fetch the encrypted balance scalar and salt from the most recent spend-boundary event, derive the deterministic blinding factor, and replay subsequent incoming transfer events. Recovery requires the master secret plus access to a durable event archive (Stellar RPC retains only 7 days of history); the indexer this archive must satisfy is specified in the companion Indexing and Off-Chain State Recovery document (`INDEXER.md`).
+- **Handle recovery** - if local state is lost, reconstruct balances from on-chain data using the viewing key: fetch the encrypted balance scalar and salt from the most recent spend-boundary event, derive the deterministic blinding factor, and replay subsequent incoming transfer events. Recovery requires the master secret plus access to a durable event archive (Stellar RPC retains only 7 days of history); the indexer this archive must satisfy is specified in the companion [Indexing and Off-Chain State Recovery](./INDEXER.md) document.
 
 ### For Developers (Integration)
 
@@ -202,7 +202,7 @@ If the wallet is lost or reinstalled on a new device:
 2. The wallet re-derives the full key hierarchy.
 3. The wallet fetches the latest spend-boundary event for the account, reads the encrypted balance scalar and salt from it, recovers the spendable balance opening using the viewing key, then replays subsequent incoming transfer events to reconstruct the receiving balance.
 
-The recovery process is fully deterministic given the master secret and access to the account's full event history since the last spend boundary. Because Stellar RPC retains only the last 7 days of events, recovery from seed alone depends on a durable indexer (`INDEXER.md`) that retains the per-account event log; without one, the on-chain commitments remain visible but their openings cannot be reconstructed.
+The recovery process is fully deterministic given the master secret and access to the account's full event history since the last spend boundary. Because Stellar RPC retains only the last 7 days of events, recovery from seed alone depends on a durable indexer ([INDEXER.md](./INDEXER.md)) that retains the per-account event log; without one, the on-chain commitments remain visible but their openings cannot be reconstructed.
 
 ### Edge Cases the Wallet Handles
 

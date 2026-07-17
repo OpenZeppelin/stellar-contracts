@@ -95,9 +95,9 @@ mod tests;
 // --------------------------------------------------------
 //   Idx  Param            Symbol          Source / Note
 //   ---  -----            ------          -----------------------------------
-//   0    c_spend_x        C_spend^A.x     Loaded from `from.spendable_balance`.
+//   0    c_spend_x        C_spend^A.x     Loaded from `from.spendable_commitment`.
 //   1    c_spend_y        C_spend^A.y
-//   2    y_x              Y_A.x           Loaded from `from.spending_key`.
+//   2    y_x              Y_A.x           Loaded from `from.spending_public_key`.
 //   3    y_y              Y_A.y
 //   4    pvk_b_x          PVK_B.x         Loaded from `to.viewing_public_key`.
 //   5    pvk_b_y          PVK_B.y           Recipient must be registered.
@@ -107,9 +107,9 @@ mod tests;
 //   9    k_aud_s_x        K_aud_s.x       Fetched from the auditor contract by
 //   10   k_aud_s_y        K_aud_s.y         `from.auditor_id`.
 //   11   c_spend_new_x    C_spend'.x      Prover-supplied; written to
-//   12   c_spend_new_y    C_spend'.y        `from.spendable_balance`.
+//   12   c_spend_new_y    C_spend'.y        `from.spendable_commitment`.
 //   13   c_tx_x           C_tx.x          Prover-supplied; added to
-//   14   c_tx_y           C_tx.y            `to.receiving_balance`.
+//   14   c_tx_y           C_tx.y            `to.receiving_commitment`.
 //   15   r_e_x            R_e.x           Prover-supplied ephemeral key;
 //   16   r_e_y            R_e.y             emitted.
 //   17   v_tilde          v_tilde         Prover-supplied encrypted amount;

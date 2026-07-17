@@ -26,11 +26,21 @@ mod tests;
 //   Idx  Param  Symbol  Source / Note
 //   ---  -----  ------  -----------------------------------------------
 //   0    y_x    Y.x     Prover-supplied spending public key. Written
-//   1    y_y    Y.y       to `account.spending_key` on success.
+//   1    y_y    Y.y       to `account.spending_public_key` on success.
 //   2    pvk_x  PVK.x   Prover-supplied public viewing key. Written
 //   3    pvk_y  PVK.y     to `account.viewing_public_key` on success.
 //   4    addr_f   addr_f    `env.current_contract_address()` - binds the
 //                         proof to a specific contract instance.
+//   5    acct_f   acct_f    `address_to_field(account)` - binds the proof
+//                         to the registering address.
+//
+// `acct_f` is referenced by no gate: its presence in the public-input set
+// is the binding. UltraHonk absorbs every public input into the proof
+// transcript, so a proof produced for one account fails verification when
+// the contract assembles the blob for any other address. Without it, the
+// proof and payload -- both published on-chain by a legitimate
+// registration -- could be replayed by any caller to mint duplicate-key
+// accounts.
 //
 // Private witness
 // ---------------
@@ -42,6 +52,7 @@ fn main(
     pvk_x: pub Field,
     pvk_y: pub Field,
     addr_f: pub Field,
+    _acct_f: pub Field,
 ) {
     // R4
     assert(sk != 0);

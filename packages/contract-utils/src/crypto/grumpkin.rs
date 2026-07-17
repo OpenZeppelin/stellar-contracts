@@ -8,9 +8,15 @@
 //! This module exposes:
 //!
 //! * [`Grumpkin::add`], [`Grumpkin::sub`], [`Grumpkin::neg`], [`Grumpkin::mul`]
-//!   — affine point arithmetic with full identity handling.
-//! * [`Grumpkin::is_on_curve`], [`Grumpkin::is_not_identity`] — validation
-//!   helpers for points that enter the system without a soundness proof.
+//!   — affine point arithmetic with full identity handling. Every point input
+//!   is validated at entry: the canonical identity encoding is accepted as `O`,
+//!   any other input must be a canonical on-curve point, and violations panic
+//!   with [`CryptoError::InvalidPoint`].
+//! * [`Grumpkin::is_on_curve`], [`Grumpkin::is_not_identity`],
+//!   [`Grumpkin::is_canonical_point`], [`Grumpkin::is_canonical_field`] —
+//!   non-panicking validation helpers for trust boundaries that need to accept
+//!   or reject foreign bytes with a domain-specific error (e.g. user-supplied
+//!   public keys) before they reach this API.
 //! * [`Grumpkin::identity`] — the encoded point at infinity, `(0, 0)` over 64
 //!   bytes.
 //! * [`Grumpkin::generator`] — the canonical Barretenberg generator `G` used by
@@ -23,8 +29,17 @@
 //! identity is the all-zero encoding `(0, 0)` and is handled as a special case
 //! in arithmetic. Real curve points cannot share this encoding because
 //! `0² ≠ 0³ - 17 (mod r)`.
+//!
+//! The Soroban host reduces non-canonical `Bn254Fr` encodings modulo `r`
+//! instead of rejecting them, so distinct byte strings can decode to the same
+//! coordinates (e.g. `be(r) || be(r)` decodes to `(0, 0)`). The arithmetic
+//! entry points therefore reject any non-canonical encoding before decoding;
+//! within that validated domain every logical point has exactly one byte
+//! encoding and byte comparison decides point equality.
 
-use soroban_sdk::{crypto::bn254::Bn254Fr, BytesN, Env, U256};
+use soroban_sdk::{crypto::bn254::Bn254Fr, panic_with_error, BytesN, Env, U256};
+
+use crate::crypto::error::CryptoError;
 
 /// Affine encoding of a Grumpkin point as a 64-byte value.
 ///
@@ -59,11 +74,18 @@ const GENERATOR_BYTES: [u8; 64] = [
 
 /// Grumpkin point arithmetic over `Bn254Fr`.
 ///
-/// The implementation performs no on-curve check on its inputs: callers must
-/// ensure inputs are valid curve points before calling [`Self::add`],
-/// [`Self::sub`], or [`Self::neg`]. Use [`Self::is_on_curve`] and
-/// [`Self::is_not_identity`] at trust boundaries (e.g. user-supplied points
-/// without an accompanying soundness proof).
+/// The arithmetic entry points ([`Self::add`], [`Self::sub`], [`Self::neg`],
+/// [`Self::mul`]) validate every point input once at entry: the canonical
+/// identity encoding is accepted as `O`, any other input must be a canonical
+/// on-curve point, and violations panic with [`CryptoError::InvalidPoint`].
+/// Intermediate results are on the curve by construction and are not
+/// re-validated.
+///
+/// [`Self::is_on_curve`], [`Self::is_canonical_point`],
+/// [`Self::is_canonical_field`] and [`Self::is_not_identity`] remain available
+/// as non-panicking checks for trust boundaries that need to accept or reject
+/// foreign bytes with a domain-specific error (e.g. user-supplied public keys
+/// without an accompanying soundness proof) before they reach this API.
 pub struct Grumpkin;
 
 impl Grumpkin {
@@ -92,7 +114,15 @@ impl Grumpkin {
         BytesN::from_array(e, &GENERATOR_BYTES)
     }
 
-    /// Returns `true` iff `p` is the identity (all-zero 64-byte encoding).
+    /// Returns `true` iff `p` is the canonical identity encoding (the
+    /// all-zero 64 bytes).
+    ///
+    /// The decision is made on raw bytes and is only meaningful for canonical
+    /// encodings: a non-canonical encoding whose coordinates reduce to `(0,
+    /// 0)` modulo `r` (e.g. `be(r) || be(r)`) returns `false`. The arithmetic
+    /// entry points reject such encodings with
+    /// [`CryptoError::InvalidPoint`] instead of treating them as the
+    /// identity.
     ///
     /// # Arguments
     ///
@@ -181,13 +211,14 @@ impl Grumpkin {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `p` - The point to negate.
+    ///
+    /// # Errors
+    ///
+    /// * [`CryptoError::InvalidPoint`] - When `p` is neither the canonical
+    ///   identity encoding nor a canonical on-curve point.
     pub fn neg(e: &Env, p: &Point) -> Point {
-        if Self::is_identity(p) {
-            return p.clone();
-        }
-        let (x, y) = Self::coordinates(e, p);
-        let neg_y = fr_zero(e) - y;
-        Self::from_xy(e, &x, &neg_y)
+        Self::require_valid_point(e, p);
+        Self::neg_unchecked(e, p)
     }
 
     /// Returns `p1 + p2` on Grumpkin.
@@ -208,7 +239,133 @@ impl Grumpkin {
     /// * `e` - Access to the Soroban environment.
     /// * `p1` - The first summand.
     /// * `p2` - The second summand.
+    ///
+    /// # Errors
+    ///
+    /// * [`CryptoError::InvalidPoint`] - When `p1` or `p2` is neither the
+    ///   canonical identity encoding nor a canonical on-curve point.
     pub fn add(e: &Env, p1: &Point, p2: &Point) -> Point {
+        Self::require_valid_point(e, p1);
+        Self::require_valid_point(e, p2);
+        Self::add_unchecked(e, p1, p2)
+    }
+
+    /// Returns `p1 - p2 = p1 + (-p2)`. Subtraction of a point from itself
+    /// returns `O` via the inverse case in [`Self::add`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `p1` - The minuend.
+    /// * `p2` - The subtrahend.
+    ///
+    /// # Errors
+    ///
+    /// * [`CryptoError::InvalidPoint`] - When `p1` or `p2` is neither the
+    ///   canonical identity encoding nor a canonical on-curve point.
+    pub fn sub(e: &Env, p1: &Point, p2: &Point) -> Point {
+        Self::require_valid_point(e, p1);
+        Self::require_valid_point(e, p2);
+        Self::add_unchecked(e, p1, &Self::neg_unchecked(e, p2))
+    }
+
+    /// Returns `scalar · p` on Grumpkin via double-and-add.
+    ///
+    /// Handles edges cleanly: `0 · p = O` for any `p`, and `scalar · O = O`
+    /// for any `scalar`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `p` - The base point.
+    /// * `scalar` - The scalar multiplier. Sized for the on-chain consumers'
+    ///   needs (token amounts and similar bounded quantities); off-chain
+    ///   provers typically use larger scalars and should pre-compute on the
+    ///   prover side rather than calling this function.
+    ///
+    /// # Errors
+    ///
+    /// * [`CryptoError::InvalidPoint`] - When `p` is neither the canonical
+    ///   identity encoding nor a canonical on-curve point.
+    pub fn mul(e: &Env, p: &Point, scalar: u128) -> Point {
+        Self::require_valid_point(e, p);
+        if scalar == 0 || Self::is_identity(p) {
+            return Self::identity(e);
+        }
+        let mut k = scalar;
+        let mut result = Self::identity(e);
+        let mut base = p.clone();
+        while k > 0 {
+            if k & 1 == 1 {
+                result = Self::add_unchecked(e, &result, &base);
+            }
+            k >>= 1;
+            if k > 0 {
+                base = Self::add_unchecked(e, &base, &base);
+            }
+        }
+        result
+    }
+
+    /// Encodes `(x, y)` as a 64-byte [`Point`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `x` - The x-coordinate as a `Bn254Fr` element.
+    /// * `y` - The y-coordinate as a `Bn254Fr` element.
+    pub fn from_xy(e: &Env, x: &Bn254Fr, y: &Bn254Fr) -> Point {
+        let mut bytes = [0u8; 64];
+        bytes[..32].copy_from_slice(&x.to_bytes().to_array());
+        bytes[32..].copy_from_slice(&y.to_bytes().to_array());
+        BytesN::from_array(e, &bytes)
+    }
+
+    /// Decodes `(x, y)` from a 64-byte [`Point`].
+    ///
+    /// Performs no validation: non-canonical coordinates are reduced modulo
+    /// `r` by the host deserialiser. See [`Self::is_canonical_field`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `p` - The encoded point to decode.
+    pub fn coordinates(e: &Env, p: &Point) -> (Bn254Fr, Bn254Fr) {
+        let bytes = p.to_array();
+        let mut x = [0u8; 32];
+        let mut y = [0u8; 32];
+        x.copy_from_slice(&bytes[..32]);
+        y.copy_from_slice(&bytes[32..]);
+        (
+            Bn254Fr::from_bytes(BytesN::from_array(e, &x)),
+            Bn254Fr::from_bytes(BytesN::from_array(e, &y)),
+        )
+    }
+
+    /// Panics with [`CryptoError::InvalidPoint`] unless `p` is the canonical
+    /// identity encoding or a canonical on-curve point.
+    fn require_valid_point(e: &Env, p: &Point) {
+        if !Self::is_identity(p) && !Self::is_on_curve(e, p) {
+            panic_with_error!(e, CryptoError::InvalidPoint);
+        }
+    }
+
+    /// [`Self::neg`] without input validation. `p` must be the canonical
+    /// identity encoding or a canonical on-curve point.
+    fn neg_unchecked(e: &Env, p: &Point) -> Point {
+        if Self::is_identity(p) {
+            return p.clone();
+        }
+        let (x, y) = Self::coordinates(e, p);
+        let neg_y = fr_zero(e) - y;
+        Self::from_xy(e, &x, &neg_y)
+    }
+
+    /// [`Self::add`] without input validation. Both inputs must be the
+    /// canonical identity encoding or canonical on-curve points. Keeps
+    /// chained operations on intermediate results — which are on the curve by
+    /// construction — free of redundant validation.
+    fn add_unchecked(e: &Env, p1: &Point, p2: &Point) -> Point {
         if Self::is_identity(p1) {
             return p2.clone();
         }
@@ -243,82 +400,6 @@ impl Grumpkin {
         let x3 = lambda.clone() * lambda.clone() - x1.clone() - x2;
         let y3 = lambda * (x1 - x3.clone()) - y1;
         Self::from_xy(e, &x3, &y3)
-    }
-
-    /// Returns `p1 - p2 = p1 + (-p2)`. Subtraction of a point from itself
-    /// returns `O` via the inverse case in [`Self::add`].
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `p1` - The minuend.
-    /// * `p2` - The subtrahend.
-    pub fn sub(e: &Env, p1: &Point, p2: &Point) -> Point {
-        Self::add(e, p1, &Self::neg(e, p2))
-    }
-
-    /// Returns `scalar · p` on Grumpkin via double-and-add.
-    ///
-    /// Handles edges cleanly: `0 · p = O` for any `p`, and `scalar · O = O`
-    /// for any `scalar`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `p` - The base point.
-    /// * `scalar` - The scalar multiplier. Sized for the on-chain consumers'
-    ///   needs (token amounts and similar bounded quantities); off-chain
-    ///   provers typically use larger scalars and should pre-compute on the
-    ///   prover side rather than calling this function.
-    pub fn mul(e: &Env, p: &Point, scalar: u128) -> Point {
-        if scalar == 0 || Self::is_identity(p) {
-            return Self::identity(e);
-        }
-        let mut k = scalar;
-        let mut result = Self::identity(e);
-        let mut base = p.clone();
-        while k > 0 {
-            if k & 1 == 1 {
-                result = Self::add(e, &result, &base);
-            }
-            k >>= 1;
-            if k > 0 {
-                base = Self::add(e, &base, &base);
-            }
-        }
-        result
-    }
-
-    /// Encodes `(x, y)` as a 64-byte [`Point`].
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `x` - The x-coordinate as a `Bn254Fr` element.
-    /// * `y` - The y-coordinate as a `Bn254Fr` element.
-    pub fn from_xy(e: &Env, x: &Bn254Fr, y: &Bn254Fr) -> Point {
-        let mut bytes = [0u8; 64];
-        bytes[..32].copy_from_slice(&x.to_bytes().to_array());
-        bytes[32..].copy_from_slice(&y.to_bytes().to_array());
-        BytesN::from_array(e, &bytes)
-    }
-
-    /// Decodes `(x, y)` from a 64-byte [`Point`].
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `p` - The encoded point to decode.
-    pub fn coordinates(e: &Env, p: &Point) -> (Bn254Fr, Bn254Fr) {
-        let bytes = p.to_array();
-        let mut x = [0u8; 32];
-        let mut y = [0u8; 32];
-        x.copy_from_slice(&bytes[..32]);
-        y.copy_from_slice(&bytes[32..]);
-        (
-            Bn254Fr::from_bytes(BytesN::from_array(e, &x)),
-            Bn254Fr::from_bytes(BytesN::from_array(e, &y)),
-        )
     }
 }
 

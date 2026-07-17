@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl,
+    contract, contractimpl, symbol_short,
     testutils::{Address as _, Events, Ledger},
     token::StellarAssetClient,
     xdr::ToXdr,
@@ -75,9 +75,16 @@ struct MockVerifier;
 
 #[contractimpl(contracttrait)]
 impl ConfidentialVerifier for MockVerifier {
-    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+    fn register_verification_key(
+        _e: &Env,
+        _ct: CircuitType,
+        _verification_key: Bytes,
+        _op: Address,
+    ) {
+    }
 
-    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _verification_key: Bytes, _op: Address) {
+    }
 
     fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
         true
@@ -89,12 +96,50 @@ struct AlwaysFailVerifier;
 
 #[contractimpl(contracttrait)]
 impl ConfidentialVerifier for AlwaysFailVerifier {
+    fn register_verification_key(
+        _e: &Env,
+        _ct: CircuitType,
+        _verification_key: Bytes,
+        _op: Address,
+    ) {
+    }
+
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _verification_key: Bytes, _op: Address) {
+    }
+
+    fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
+        false
+    }
+}
+
+/// Models the register verifier's proof-to-account binding for replay tests.
+///
+/// A real UltraHonk proof absorbs the `acct_f` public input into its
+/// transcript, so it only verifies against the account it was produced for.
+/// This mock stands in for that: the first proof it accepts fixes the bound
+/// `acct_f` (the trailing 32-byte limb of the register blob), and every
+/// later verification succeeds only when the contract-assembled `acct_f`
+/// matches. A proof published by one registration therefore cannot be
+/// replayed by a different registering address.
+#[contract]
+struct ReplayGuardVerifier;
+
+#[contractimpl(contracttrait)]
+impl ConfidentialVerifier for ReplayGuardVerifier {
     fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
 
     fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
 
-    fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
-        false
+    fn verify_proof(e: &Env, _ct: CircuitType, pi: Bytes, _proof: Bytes) -> bool {
+        let acct_f = pi.slice(pi.len() - 32..);
+        let key = symbol_short!("bound");
+        match e.storage().instance().get::<_, Bytes>(&key) {
+            None => {
+                e.storage().instance().set(&key, &acct_f);
+                true
+            }
+            Some(bound) => bound == acct_f,
+        }
     }
 }
 
@@ -171,9 +216,9 @@ fn withdraw_data(e: &Env) -> Bytes {
         payload: WithdrawPayload {
             c_spend_new: fixture_point(e),
             b_tilde: fixture_field(e, 0xaa),
-            r_e: fixture_point(e),
+            r_e_point: fixture_point(e),
             sigma: fixture_field(e, 0xbb),
-            b_aud_s: fixture_field(e, 0xcc),
+            b_tilde_aud_s: fixture_field(e, 0xcc),
         },
         proof: Bytes::new(e),
     }
@@ -185,14 +230,14 @@ fn transfer_data(e: &Env) -> Bytes {
         payload: TransferPayload {
             c_spend_new: fixture_point(e),
             c_tx: fixture_point(e),
-            r_e: fixture_point(e),
+            r_e_point: fixture_point(e),
             v_tilde: fixture_field(e, 0x11),
             b_tilde: fixture_field(e, 0x12),
             sigma: fixture_field(e, 0x13),
-            v_aud_r: fixture_field(e, 0x14),
-            r_aud_r: fixture_field(e, 0x15),
-            v_aud_s: fixture_field(e, 0x16),
-            b_aud_s: fixture_field(e, 0x17),
+            v_tilde_aud_r: fixture_field(e, 0x14),
+            r_tilde_aud_r: fixture_field(e, 0x15),
+            v_tilde_aud_s: fixture_field(e, 0x16),
+            b_tilde_aud_s: fixture_field(e, 0x17),
         },
         proof: Bytes::new(e),
     }
@@ -207,11 +252,11 @@ fn set_spender_data(e: &Env) -> Bytes {
             escrowed_dvk: fixture_point(e),
             b_tilde: fixture_field(e, 0x21),
             a_tilde: fixture_field(e, 0x22),
-            r_e: fixture_point(e),
+            r_e_point: fixture_point(e),
             sigma: fixture_field(e, 0x23),
             sigma_a: fixture_field(e, 0x24),
-            v_aud_s: fixture_field(e, 0x25),
-            b_aud_s: fixture_field(e, 0x26),
+            v_tilde_aud_s: fixture_field(e, 0x25),
+            b_tilde_aud_s: fixture_field(e, 0x26),
         },
         proof: Bytes::new(e),
     }
@@ -223,14 +268,14 @@ fn spender_transfer_data(e: &Env) -> Bytes {
         payload: SpenderTransferPayload {
             c_a_new: fixture_point(e),
             c_tx: fixture_point(e),
-            r_e: fixture_point(e),
+            r_e_point: fixture_point(e),
             v_tilde: fixture_field(e, 0x31),
             a_tilde_new: fixture_field(e, 0x32),
             sigma_a_new: fixture_field(e, 0x33),
-            v_aud_r: fixture_field(e, 0x34),
-            r_aud_r: fixture_field(e, 0x35),
-            v_aud_s: fixture_field(e, 0x36),
-            a_aud_s: fixture_field(e, 0x37),
+            v_tilde_aud_r: fixture_field(e, 0x34),
+            r_tilde_aud_r: fixture_field(e, 0x35),
+            v_tilde_aud_s: fixture_field(e, 0x36),
+            a_tilde_aud_s: fixture_field(e, 0x37),
         },
         proof: Bytes::new(e),
     }
@@ -242,10 +287,10 @@ fn revoke_spender_data(e: &Env) -> Bytes {
         payload: RevokeSpenderPayload {
             c_spend_new: fixture_point(e),
             b_tilde: fixture_field(e, 0x41),
-            r_e: fixture_point(e),
+            r_e_point: fixture_point(e),
             sigma: fixture_field(e, 0x42),
-            v_aud_s: fixture_field(e, 0x43),
-            b_aud_s: fixture_field(e, 0x44),
+            v_tilde_aud_s: fixture_field(e, 0x43),
+            b_tilde_aud_s: fixture_field(e, 0x44),
         },
         proof: Bytes::new(e),
     }
@@ -263,12 +308,33 @@ fn register_stores_account_with_identity_balances() {
     assert_eq!(h.e.events().all().events().len(), 1);
 
     let account: ConfidentialAccount = h.token.confidential_balance(&alice);
-    assert_eq!(account.spending_key, fixture_point(&h.e));
+    assert_eq!(account.spending_public_key, fixture_point(&h.e));
     assert_eq!(account.viewing_public_key, fixture_point(&h.e));
     assert_eq!(account.auditor_id, 1u32);
     // Initial balances are identity (all-zero encoding).
-    assert_eq!(account.spendable_balance.to_array(), [0u8; 64]);
-    assert_eq!(account.receiving_balance.to_array(), [0u8; 64]);
+    assert_eq!(account.spendable_commitment.to_array(), [0u8; 64]);
+    assert_eq!(account.receiving_commitment.to_array(), [0u8; 64]);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3506)")]
+fn register_replayed_proof_bound_to_other_account_is_rejected() {
+    let e = Env::default();
+    let verifier_addr = e.register(ReplayGuardVerifier, ());
+    let h = setup_with_verifier_addr(e, verifier_addr);
+
+    let alice = Address::generate(&h.e);
+    let mallory = Address::generate(&h.e);
+
+    // Alice registers legitimately; her payload + proof are now public and the
+    // verifier binds that proof to `address_to_field(alice)`.
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+
+    // Mallory replays Alice's published material under his own address. The fix
+    // makes the contract assemble the blob with `address_to_field(mallory)`, so
+    // the proof — bound to Alice's acct_f — fails verification (InvalidProof,
+    // #3506) instead of minting a duplicate-key account for Mallory.
+    h.token.register(&mallory, &1u32, &register_data(&h.e));
 }
 
 #[test]
@@ -315,9 +381,9 @@ fn withdraw_non_canonical_scalar_panics() {
         payload: WithdrawPayload {
             c_spend_new: fixture_point(&h.e),
             b_tilde: fixture_field(&h.e, 0x11),
-            r_e: fixture_point(&h.e),
+            r_e_point: fixture_point(&h.e),
             sigma: BytesN::from_array(&h.e, &[0xff; 32]),
-            b_aud_s: fixture_field(&h.e, 0x12),
+            b_tilde_aud_s: fixture_field(&h.e, 0x12),
         },
         proof: Bytes::new(&h.e),
     }
@@ -376,7 +442,7 @@ fn deposit_credits_receiving_balance() {
 
     // Receiving balance must move off identity.
     let account = h.token.confidential_balance(&alice);
-    assert_ne!(account.receiving_balance.to_array(), [0u8; 64]);
+    assert_ne!(account.receiving_commitment.to_array(), [0u8; 64]);
     // Contract now holds the deposit on the SEP-41 side.
     let token_client = soroban_sdk::token::TokenClient::new(&h.e, &h.sac_addr);
     assert_eq!(token_client.balance(&h.token_addr), 500);
@@ -419,7 +485,7 @@ fn deposit_zero_amount_is_ok() {
     h.token.deposit(&depositor, &alice, &0i128);
 
     let account = h.token.confidential_balance(&alice);
-    assert_eq!(account.receiving_balance.to_array(), [0u8; 64]);
+    assert_eq!(account.receiving_commitment.to_array(), [0u8; 64]);
 }
 
 // ################## MERGE ##################
@@ -442,8 +508,8 @@ fn merge_folds_receiving_into_spendable() {
 
     // Spendable now equals the prior receiving (since prior spendable was
     // identity).
-    assert_eq!(post.spendable_balance, pre.receiving_balance);
-    assert_eq!(post.receiving_balance.to_array(), [0u8; 64]);
+    assert_eq!(post.spendable_commitment, pre.receiving_commitment);
+    assert_eq!(post.receiving_commitment.to_array(), [0u8; 64]);
 }
 
 #[test]
@@ -478,7 +544,7 @@ fn withdraw_transfers_tokens_and_updates_spendable() {
 
     let account = h.token.confidential_balance(&alice);
     // Spendable was overwritten by payload.c_spend_new.
-    assert_eq!(account.spendable_balance, fixture_point(&h.e));
+    assert_eq!(account.spendable_commitment, fixture_point(&h.e));
 }
 
 #[test]
@@ -522,10 +588,10 @@ fn confidential_transfer_updates_both_sides() {
 
     // Sender's spendable balance was overwritten.
     let alice_acc = h.token.confidential_balance(&alice);
-    assert_eq!(alice_acc.spendable_balance, fixture_point(&h.e));
+    assert_eq!(alice_acc.spendable_commitment, fixture_point(&h.e));
     // Receiver's receiving balance accumulated.
     let bob_acc = h.token.confidential_balance(&bob);
-    assert_ne!(bob_acc.receiving_balance.to_array(), [0u8; 64]);
+    assert_ne!(bob_acc.receiving_commitment.to_array(), [0u8; 64]);
 }
 
 // ################## SET / REVOKE SPENDER ##################
@@ -617,7 +683,7 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
     assert_eq!(delegation.allowance_commitment, fixture_point(&h.e));
     // Bob's receiving balance accumulated.
     let bob_acc = h.token.confidential_balance(&bob);
-    assert_ne!(bob_acc.receiving_balance.to_array(), [0u8; 64]);
+    assert_ne!(bob_acc.receiving_commitment.to_array(), [0u8; 64]);
 }
 
 #[test]
@@ -762,7 +828,7 @@ fn delegation_type_export_compiles() {
     let e = Env::default();
     _used::<SpenderDelegation>(SpenderDelegation {
         allowance_commitment: fixture_point(&e),
-        encrypted_allowance: fixture_field(&e, 0),
+        a_tilde: fixture_field(&e, 0),
         escrowed_dvk: fixture_point(&e),
         allowance_salt: fixture_field(&e, 0),
         live_until_ledger: 0,
