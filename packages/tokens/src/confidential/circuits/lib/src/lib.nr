@@ -89,6 +89,7 @@ global POSEIDON2_IV_BASE: Field = 18446744073709551616; // 2^64
 /// | `delta_esc_dvk`   | 10    | `ESCROWED_DELEGATION_VIEWING_KEY` |
 /// | `delta_aud_s`     | 11    | `AUDITOR_SENDER`                  |
 /// | `delta_aud_r`     | 12    | `AUDITOR_RECIPIENT`               |
+/// | `delta_ecdh`      | 13    | `ECDH_SHARED_SECRET`              |
 pub mod domain {
     /// Soroban Address compression into a single `F_r` Field:
     /// `address_to_field(a) = Poseidon2(ADDRESS, lo(a), hi(a))`.
@@ -136,6 +137,10 @@ pub mod domain {
     /// 2 yields the per-transfer Pedersen randomness mask.
     /// Constraints T_a2 / O_a2 (`delta_aud_r`).
     pub global AUDITOR_RECIPIENT: Field = 12;
+    /// ECDH shared-secret scalar extraction:
+    /// `s = Poseidon2(ECDH_SHARED_SECRET, S.x, S.y)`.
+    /// Section 2.4 (`delta_ecdh`). See [`ecdh`].
+    pub global ECDH_SHARED_SECRET: Field = 13;
 }
 
 // ################## CORE PRIMITIVES ##################
@@ -154,14 +159,24 @@ pub fn scalar_mul(scalar: Field, point: EmbeddedCurvePoint) -> EmbeddedCurvePoin
     multi_scalar_mul([point], [EmbeddedCurveScalar::from_field(scalar)])
 }
 
-/// ECDH shared-secret extraction: returns `(s*P).x` per Section 2.4.
+/// ECDH shared-secret scalar extraction per Section 2.4: computes
+/// `S = scalar * P` and binds both coordinates into the output via the
+/// Poseidon funnel, `s = Poseidon2(ECDH_SHARED_SECRET, S.x, S.y)`.
+///
+/// Absorbing `S.y` removes the negation invariance of an x-only extraction:
+/// `P` and `-P = (P.x, -P.y)` share an x-coordinate, so `(scalar * P).x`
+/// alone maps a key and its negation (`-PVK = (-vk) * H`, itself a valid,
+/// canonical registration) to the same shared secret for every scalar.
+/// The absorb `[tag, S.x, S.y]` fills exactly one rate-3 block, so the
+/// binding costs a single Poseidon2 permutation.
 ///
 /// Use this whenever the *scalar* shared secret is what downstream Poseidon
 /// helpers expect (every `derive_tx_blind` / `encrypt_amount` /
 /// `encrypt_auditor_*` call). When the full shared-secret *point* is needed,
 /// reach for `scalar_mul` directly.
 pub fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> Field {
-    scalar_mul(scalar, point).x
+    let s = scalar_mul(scalar, point);
+    poseidon_with_domain(domain::ECDH_SHARED_SECRET, [s.x, s.y])
 }
 
 /// Asserts `p` is on Grumpkin AND not the identity. Use this for every
@@ -257,7 +272,8 @@ pub fn derive_allow_r(dvk: Field, sigma_a: Field) -> Field {
 }
 
 /// ECDH-derived blinding for the transfer commitment `C_tx`.
-/// Constraints T7 / O7. `s` is the recipient-ECDH shared secret x-coordinate.
+/// Constraints T7 / O7. `s` is the recipient-ECDH shared-secret scalar
+/// produced by [`ecdh`].
 pub fn derive_tx_blind(s: Field, sigma: Field) -> Field {
     poseidon_with_domain(domain::TX_BLINDING, [s, sigma])
 }
@@ -283,17 +299,18 @@ pub fn encrypt_allowance(v_a: Field, dvk: Field, sigma_a: Field) -> Field {
 }
 
 /// Delegation-key escrow mask for the spender handoff at `set_spender`. Section 7.11.
-/// `escrowed_dvk = dvk + Poseidon2(ESC_DVK, s, op_i)` where `s = (r_e * Y_op).x`.
+/// `escrowed_dvk = dvk + Poseidon2(ESC_DVK, s, op_i)` where `s = ecdh(r_e, Y_op)`.
 pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
     dvk + poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, op_i])
 }
 
 // ################## AUDITOR-CHANNEL SPONGE ##################
 
-/// Poseidon2 sponge with two squeezes. Absorbs `(d, s_x, sigma)` and returns
+/// Poseidon2 sponge with two squeezes. Absorbs `(d, s_x, sigma)` -- where
+/// `s_x` is the ECDH shared-secret scalar produced by [`ecdh`] -- and returns
 /// the first two rate-elements of the post-permutation state in order.
 ///
-/// Implements `SpongeSqueeze_2(delta, S.x, sigma)` from Section 2.5. The canonical
+/// Implements `SpongeSqueeze_2(delta, s, sigma)` from Section 2.5. The canonical
 /// squeeze order is: index 0 = amount mask, index 1 = balance / randomness
 /// mask, fixed by Sections 7 and 8. With rate = 3 the absorb fits one block
 /// and both outputs are served from the same permutation, so the constraint
@@ -310,7 +327,9 @@ pub fn sponge_squeeze_2(d: Field, s_x: Field, sigma: Field) -> [Field; 2] {
 /// Sender-auditor encrypted balance checkpoint for circuits whose auditor
 /// block emits a single ciphertext (Withdraw W_a3/W_a4).
 ///
-/// `b_tilde_aud_s = v_new + sponge_squeeze_2(AUDITOR_SENDER, s_a_s_x, sigma)[1]`.
+/// `b_tilde_aud_s = v_new + sponge_squeeze_2(AUDITOR_SENDER, s_a_s_x, sigma)[1]`,
+/// where `s_a_s_x` is the sender-auditor ECDH shared-secret scalar produced by
+/// [`ecdh`].
 /// The pad is the sponge's *second* squeeze -- the slot every two-ciphertext
 /// sender channel (Transfer T_a6-T_a8, SetSpender S_a3-S_a5, RevokeSpender
 /// V_a3-V_a5, SpenderTransfer O_a6-O_a8) uses for its balance/allowance mask.

@@ -68,7 +68,7 @@ fn commit_homomorphic() {
 
 #[test]
 fn ecdh_symmetric() {
-    // ECDH symmetry: (a) * (b*H) and (b) * (a*H) yield the same shared x.
+    // ECDH symmetry: (a) * (b*H) and (b) * (a*H) yield the same shared scalar.
     let a: Field = 12345;
     let b: Field = 67890;
     let a_pub = scalar_mul(a, H);
@@ -76,6 +76,19 @@ fn ecdh_symmetric() {
     let s_a_b = ecdh(a, b_pub);
     let s_b_a = ecdh(b, a_pub);
     assert(s_a_b == s_b_a);
+}
+
+#[test]
+fn ecdh_binds_negated_key() {
+    // A point and its negation share an x-coordinate, so an x-only extraction
+    // would satisfy ecdh(a, P) == ecdh(a, -P) for every scalar, collapsing
+    // each (vk, -vk) registration pair onto one shared secret. Absorbing S.y
+    // must keep the two apart.
+    let a: Field = 12345;
+    let p = scalar_mul(67890, H);
+    let neg_p = EmbeddedCurvePoint { x: p.x, y: 0 - p.y, is_infinite: false };
+    assert_on_curve_non_identity(neg_p);
+    assert(ecdh(a, p) != ecdh(a, neg_p));
 }
 
 #[test]
@@ -148,6 +161,7 @@ fn domain_separation_distinct() {
     let h_ed = poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [a, b]);
     let h_as = poseidon_with_domain(domain::AUDITOR_SENDER, [a, b]);
     let h_ar2 = poseidon_with_domain(domain::AUDITOR_RECIPIENT, [a, b]);
+    let h_es = poseidon_with_domain(domain::ECDH_SHARED_SECRET, [a, b]);
 
     // Distinct from VK.
     assert(h_vk != h_addr);
@@ -161,6 +175,7 @@ fn domain_separation_distinct() {
     assert(h_vk != h_ed);
     assert(h_vk != h_as);
     assert(h_vk != h_ar2);
+    assert(h_vk != h_es);
 
     // The two auditor channels must yield distinct masks under identical
     // inputs -- if they collide, the same shared-secret `S.x` would leak the
@@ -240,7 +255,7 @@ fn sponge_squeeze_2_outputs_distinct() {
 
 #[test]
 fn sponge_squeeze_channel_separation() {
-    // Same (S.x, sigma) under the two channel domains must produce different
+    // Same (s, sigma) under the two channel domains must produce different
     // mask pairs. This is the property that makes a leaked sender-channel
     // ciphertext useless for decrypting the recipient channel and vice versa.
     let s_x: Field = 0xcafe;
@@ -284,7 +299,7 @@ fn print_fixtures() {
     println(f"scalar_mul_Y.x = {yx}");
     println(f"scalar_mul_Y.y = {yy}");
 
-    // ecdh(r_e, H) -- shared secret x
+    // ecdh(r_e, H) -- shared-secret scalar
     let e = ecdh(r_e, H);
     println(f"ecdh = {e}");
 
@@ -382,7 +397,7 @@ fn fixtures_match_testdata() {
     assert(y_pt.y == 0x29116280600c10ead1fdbd9ab4b571896030679bf554d7f1ebf681e5147de21b);
 
     assert(
-        ecdh(r_e, H) == 0x114ed4fcf2c57014eb678c577aa02f30ef590b713d7a6a5e87702d1c7f71957f,
+        ecdh(r_e, H) == 0x105fa0a0e003bf2072dff4e53da5a288bee77e894392ada1ac6ae99bb2b8568b,
     );
 
     let vk = vk_from_sk(sk, addr_f);
