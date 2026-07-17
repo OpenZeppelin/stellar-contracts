@@ -14,6 +14,16 @@
 //! [`crate::rwa::compliance::ComplianceHook::Destroyed`] so the counter
 //! stays in sync with reality.
 //!
+//! For migration scenarios (registering this module on a token that
+//! already has circulating supply), the module exposes a preset phase. The
+//! operator seeds the counter with the token's current supply via
+//! [`storage::preset_supply_count`], then finalizes the phase with
+//! [`storage::mark_preset_completed`]. Subsequent preset calls panic with
+//! [`crate::rwa::compliance::modules::ComplianceModuleError::PresetAlreadyCompleted`].
+//! Without the preset, a counter starting at zero would let the total
+//! supply exceed the cap by the pre-existing amount, and would block burns
+//! of pre-existing tokens on underflow.
+//!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/SupplyLimitModule.sol
 
 pub mod storage;
@@ -42,6 +52,12 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// (Created/Destroyed): the mint hook both enforces the cap (by panicking)
 /// and increments the counter. Missing a hook causes the counter to drift
 /// away from the actual on-chain supply.
+///
+/// For migration scenarios, the trait exposes preset functions
+/// ([`SupplyLimit::preset_supply_count`],
+/// [`SupplyLimit::mark_preset_completed`]) so the operator can seed the
+/// counter with the existing on-chain supply before binding the module to
+/// the token.
 ///
 /// This trait is designed to be used in conjunction with the
 /// [`ComplianceModule`] trait.
@@ -74,6 +90,62 @@ pub trait SupplyLimit: ComplianceModule {
     /// the implementation.
     fn set_supply_limit(e: &Env, token: Address, limit: i128, operator: Address);
 
+    /// Pre-seeds the running supply counter for `token`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `token` - The token whose counter is being seeded.
+    /// * `supply` - The current circulating supply to record.
+    /// * `operator` - The address authorized to perform this operation.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::rwa::compliance::modules::ComplianceModuleError::InvalidAmount`] -
+    ///   When `supply` is negative.
+    /// * [`crate::rwa::compliance::modules::ComplianceModuleError::PresetAlreadyCompleted`] -
+    ///   When the preset phase has already been finalized.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["supply_count_updated", token: Address]`
+    /// * data - `[supply: i128]`
+    ///
+    /// # Notes
+    ///
+    /// * Intended for registering this module on a token that already has
+    ///   circulating supply; only callable before
+    ///   [`SupplyLimit::mark_preset_completed`]. `supply` may exceed the
+    ///   configured limit, in which case mints stay blocked until burns bring
+    ///   the tracked supply back under the limit.
+    /// * No default implementation is provided because this is a privileged
+    ///   operation that requires custom access control. Access control should
+    ///   be enforced on `operator` before calling
+    ///   [`storage::preset_supply_count`] for the implementation.
+    fn preset_supply_count(e: &Env, token: Address, supply: i128, operator: Address);
+
+    /// Finalizes the preset phase for `token`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `token` - The token whose preset phase is being finalized.
+    /// * `operator` - The address authorized to perform this operation.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["preset_completed", token: Address]`
+    /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// * After this call, any further preset attempts panic.
+    /// * No default implementation is provided because this is a privileged
+    ///   operation that requires custom access control. Access control should
+    ///   be enforced on `operator` before calling
+    ///   [`storage::mark_preset_completed`] for the implementation.
+    fn mark_preset_completed(e: &Env, token: Address, operator: Address);
+
     /// Returns the configured supply cap for `token`.
     ///
     /// # Arguments
@@ -92,6 +164,16 @@ pub trait SupplyLimit: ComplianceModule {
     /// * `token` - The token address.
     fn get_supply_count(e: &Env, token: Address) -> i128 {
         storage::get_supply_count(e, &token)
+    }
+
+    /// Returns `true` when the preset phase for `token` has been finalized.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `token` - The token address.
+    fn is_preset_completed(e: &Env, token: Address) -> bool {
+        storage::is_preset_completed(e, &token)
     }
 }
 
@@ -135,4 +217,22 @@ pub struct SupplyCountUpdated {
 /// * `supply` - The new tracked supply.
 pub fn emit_supply_count_updated(e: &Env, token: &Address, supply: i128) {
     SupplyCountUpdated { token: token.clone(), supply }.publish(e);
+}
+
+/// Emitted when the preset phase for a token is finalized.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PresetCompleted {
+    #[topic]
+    pub token: Address,
+}
+
+/// Emits a [`PresetCompleted`] event.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose preset phase was finalized.
+pub fn emit_preset_completed(e: &Env, token: &Address) {
+    PresetCompleted { token: token.clone() }.publish(e);
 }
