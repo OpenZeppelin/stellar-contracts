@@ -3,16 +3,16 @@ extern crate std;
 use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short,
     testutils::{Address as _, Events},
-    Address, Env, String,
+    Address, Env, Event, String,
 };
 use stellar_contract_utils::pausable;
 
 use crate::{
-    fungible::ContractOverrides,
+    fungible::{ContractOverrides, Transfer},
     rwa::{
         compliance::{AccountSnapshot, TransferKind},
         storage::RWAStorageKey,
-        IdentityVerifier, RWAError, RWA,
+        IdentityVerifier, RWAError, RecoverySuccess, RWA,
     },
 };
 
@@ -455,9 +455,21 @@ fn recover_balance() {
         // Verify tokens were transferred
         assert_eq!(RWA::balance(&e, &old_account), 0);
         assert_eq!(RWA::balance(&e, &new_account), 100);
-        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 Transfer (recovery) +
-        // 1 RecoverySuccess
-        assert_eq!(e.events().all().events().len(), 5);
+
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 Transfer
+        // (recovery) + 1 RecoverySuccess
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 5);
+        assert_eq!(
+            events.events().get(3).unwrap(),
+            &Transfer { from: old_account.clone(), to: new_account.clone(), amount: 100 }
+                .to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(4).unwrap(),
+            &RecoverySuccess { old_account: old_account.clone(), new_account: new_account.clone() }
+                .to_xdr(&e, &address)
+        );
     });
 }
 

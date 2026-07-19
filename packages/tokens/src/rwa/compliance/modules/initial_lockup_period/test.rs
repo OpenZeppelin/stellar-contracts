@@ -241,8 +241,8 @@ fn on_transfer_forced_consumes_active_locks() {
         set_lockup_period(&e, &token, 100);
         on_created(&e, &from, 80, &token);
 
-        // Everything is still locked, but a forced transfer (recovery,
-        // seizure) is not rejected: the moved tokens' locks are consumed.
+        // Everything is still locked, but a forced transfer (seizure) is not
+        // rejected: the moved tokens' locks are consumed.
         on_transfer(&e, &from, &to, 80, 80, &TransferKind::Forced, &token);
 
         let details = get_locked_details(&e, &token, &from);
@@ -500,6 +500,34 @@ fn on_transfer_recovery_partial_amount_splits_lock() {
         let destination = get_locked_details(&e, &token, &to);
         assert_eq!(destination.total_locked, 20);
         assert_eq!(destination.locks, vec![&e, LockedTokens { amount: 20, release_ledger: 1_000 }]);
+    });
+}
+
+#[test]
+fn on_transfer_recovery_within_free_portion_leaves_locks_untouched() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // 100 of the wallet's 150 stay locked until t=1000. A partial
+        // recovery covered entirely by the free portion dips into no lock:
+        // nothing migrates and both schedules stay untouched.
+        preset_locks(
+            &e,
+            &token,
+            &from,
+            &vec![&e, LockedTokens { amount: 100, release_ledger: 1_000 }],
+        );
+
+        on_transfer(&e, &from, &to, 150, 50, &TransferKind::Recovery, &token);
+
+        let source = get_locked_details(&e, &token, &from);
+        assert_eq!(source.total_locked, 100);
+        assert_eq!(source.locks, vec![&e, LockedTokens { amount: 100, release_ledger: 1_000 }]);
+        assert_eq!(get_locked_details(&e, &token, &to).locks.len(), 0);
     });
 }
 

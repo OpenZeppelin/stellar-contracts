@@ -51,8 +51,8 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// [`crate::rwa::compliance::ComplianceHook::Destroyed`]: each hook both
 /// enforces the cap (by panicking) and updates the aggregate balances.
 /// Missing a hook causes the tracked balances to drift from reality.
-/// Forced (admin/recovery) transfers are exempt from the cap but still
-/// update the books.
+/// Privileged (forced and recovery) transfers are exempt from the cap but
+/// still update the books.
 ///
 /// For migration scenarios, the trait exposes preset functions
 /// ([`MaxBalance::preset_id_balance`],
