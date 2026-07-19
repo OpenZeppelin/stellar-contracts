@@ -36,6 +36,6 @@ That test (in `lib/src/tests.nr`) feeds a fixed input set through every primitiv
 | `v_tx` | `100` (`0x64`) | transfer amount |
 | `v_a` | `500` (`0x1f4`) | allowance amount |
 | `r_e` | `0xfeedface` | ephemeral ECDH scalar |
-| `s` | `0x12345` | ECDH shared-secret `x` (treated as opaque scalar input) |
+| `s` | `0x12345` | ECDH shared-secret scalar (treated as opaque input) |
 
 All field values are BN254 scalar field elements written as zero-padded hex.

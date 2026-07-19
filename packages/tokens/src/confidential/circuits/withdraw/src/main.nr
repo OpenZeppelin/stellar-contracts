@@ -39,10 +39,10 @@ mod tests;
 // Auditor block (sender-auditor visibility, Section 8.1)
 //   W_a1 R_e         = r_e * H                         Ephemeral key for
 //                                                      auditor ECDH.
-//   W_a2 S_{a,s}     = r_e * K_{aud,s}                 Sender-auditor ECDH
-//                                                      shared secret.
+//   W_a2 s_{a,s}     = ecdh(r_e, K_{aud,s})            Sender-auditor ECDH
+//                                                      shared scalar (2.4).
 //   W_a3 m_b         = SpongeSqueeze_2(delta_aud_s,
-//                                     S_{a,s}.x,
+//                                     s_{a,s},
 //                                     sigma)[1]         Sender-channel sponge,
 //                                                      second squeeze (the
 //                                                      balance slot; the
@@ -165,7 +165,7 @@ fn main(
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_s);
 
-    // W_a2 (shared secret x-coordinate)
+    // W_a2 (shared-secret scalar)
     let s_a_s_x = ecdh(r_e, k_aud_s);
 
     // W_a3 + W_a4

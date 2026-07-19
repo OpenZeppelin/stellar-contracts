@@ -53,11 +53,11 @@ mod tests;
 // Auditor block (owner-auditor visibility, Section 8.1 / 8.5)
 //   V_a1 R_e       = r_e * H                             Ephemeral key for
 //                                                        auditor ECDH.
-//   V_a2 S_{a,s}   = r_e * K_{aud,s}                     Owner-auditor ECDH
-//                                                        shared secret.
+//   V_a2 s_{a,s}   = ecdh(r_e, K_{aud,s})                Owner-auditor ECDH
+//                                                        shared scalar (2.4).
 //   V_a3 (m_v, m_b)
 //                  = SpongeSqueeze_2(delta_aud_s,
-//                                    S_{a,s}.x, sigma)   Owner-channel sponge,
+//                                    s_{a,s}, sigma)     Owner-channel sponge,
 //                                                        two squeezes.
 //   V_a4 v_tilde_aud_s = v_a + m_v                       Owner-auditor
 //                                                        encrypted reclaimed
@@ -208,7 +208,7 @@ fn main(
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_s);
 
-    // V_a2 (shared secret x-coordinate)
+    // V_a2 (shared-secret scalar)
     let s_a_s_x = ecdh(r_e, k_aud_s);
 
     // V_a3 (owner-channel masks: reclaimed amount, then balance checkpoint)

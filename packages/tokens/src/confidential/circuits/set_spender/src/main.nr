@@ -53,8 +53,8 @@ mod tests;
 //                                                        auditor block
 //                                                        (S_a1), forced
 //                                                        equal here.
-//         (b) s_esc        = (r_e * Y_op).x              Spender-handoff
-//                                                        ECDH shared secret.
+//         (b) s_esc        = ecdh(r_e, Y_op)             Spender-handoff ECDH
+//                                                        shared scalar (2.4).
 //         (c) dvk_cipher   = dvk_i
 //                              + Poseidon2(delta_esc_dvk, s_esc, op_i)
 //                                                        Masked dvk_i for the
@@ -71,10 +71,10 @@ mod tests;
 //                                                        auditor ECDH (also
 //                                                        the escrow ephemeral
 //                                                        key; see S12(a)).
-//   S_a2 S_{a,s}    = r_e * K_aud_s                      Owner-auditor ECDH
-//                                                        shared secret.
+//   S_a2 s_{a,s}    = ecdh(r_e, K_aud_s)                 Owner-auditor ECDH
+//                                                        shared scalar.
 //   S_a3 (m_v, m_b) = SpongeSqueeze_2(delta_aud_s,
-//                                    S_{a,s}.x, sigma)   Owner-channel
+//                                    s_{a,s}, sigma)     Owner-channel
 //                                                        sponge: two masks.
 //   S_a4 v_tilde_aud_s = v_a + m_v                       Owner-auditor
 //                                                        encrypted escrow
@@ -260,7 +260,7 @@ fn main(
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_s);
 
-    // S_a2 (owner-auditor shared secret x-coordinate)
+    // S_a2 (owner-auditor shared-secret scalar)
     let s_a_s_x = ecdh(r_e, k_aud_s);
 
     // S_a3 (owner-channel masks: amount, then balance)
