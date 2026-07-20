@@ -2,7 +2,11 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, MuxedAddress, St
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{
-    fungible::{emit_transfer, Base, ContractOverrides},
+    fungible::{
+        emit_transfer,
+        total_supply::{decrease_total_supply, increase_total_supply, TotalSupplyOverrides},
+        Base, ContractOverrides,
+    },
     rwa::{
         compliance::{AccountSnapshot, ComplianceClient, TransferKind},
         emit_address_frozen, emit_burn, emit_compliance_set, emit_identity_verifier_set, emit_mint,
@@ -40,6 +44,10 @@ impl ContractOverrides for RWA {
         RWA::transfer_from(e, spender, from, to, amount);
     }
 }
+
+// T-REX (ERC-3643) tokens expose the total supply, so the RWA contract type
+// is inherently supply-aware.
+impl TotalSupplyOverrides for RWA {}
 
 impl RWA {
     // ################## QUERY STATE ##################
@@ -319,6 +327,7 @@ impl RWA {
         // Snapshot before the mint so the hook observes the pre-mint balance.
         let to_snapshot = Self::account_snapshot(e, to);
 
+        increase_total_supply(e, amount);
         Base::update(e, None, Some(to), amount);
 
         let compliance_addr = Self::compliance(e);
@@ -374,6 +383,7 @@ impl RWA {
         }
 
         Base::update(e, Some(user_address), None, amount);
+        decrease_total_supply(e, amount);
 
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);

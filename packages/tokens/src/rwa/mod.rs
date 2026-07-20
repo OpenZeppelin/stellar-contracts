@@ -128,6 +128,11 @@ use crate::fungible::FungibleToken;
 /// - Freezing mechanisms for regulatory enforcement
 /// - Recovery system for lost/old account scenarios
 /// - Administrative controls for token management
+///
+/// The `RWA` contract type tracks the total supply (as mandated by T-REX
+/// through the ERC-20 interface), and RWA contracts are expected to also
+/// implement [`crate::fungible::total_supply::FungibleTotalSupply`] to
+/// expose it.
 #[contracttrait]
 pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     // ################## CORE TOKEN FUNCTIONS ##################

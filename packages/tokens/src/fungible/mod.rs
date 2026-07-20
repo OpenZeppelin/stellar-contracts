@@ -3,7 +3,7 @@
 //! Implements utilities for handling fungible tokens in a Soroban contract.
 //!
 //! This module provides essential storage functionalities required for managing
-//! balances, allowances, and total supply of fungible tokens.
+//! balances and allowances of fungible tokens.
 //!
 //! ## Design Overview
 //!
@@ -27,16 +27,16 @@
 //!
 //! The base module includes:
 //!
-//! - Total supply management
 //! - Transfers and allowances
 //!
 //! The following optional extensions are available:
 //!
 //! - Metadata: Provides additional information about the token, such as name,
 //!   symbol, and decimals.
-//! - Burnable: Enables token holders to destroy their tokens, reducing the
-//!   total supply.
-//! - Capped: Enables the contract to set a maximum limit on the total supply.
+//! - Burnable: Enables token holders to destroy their tokens.
+//! - TotalSupply: Tracks and exposes the total amount of tokens in circulation.
+//! - Capped: Enables the contract to set a maximum limit on the total supply
+//!   (requires the TotalSupply extension).
 //!
 //! ## Compatibility and Compliance
 //!
@@ -74,7 +74,10 @@ mod utils;
 #[cfg(test)]
 mod test;
 
-pub use extensions::{allowlist, blocklist, burnable, capped, votes};
+pub use extensions::{
+    allowlist, blocklist, burnable, capped, combinations, combinations::Compose, total_supply,
+    votes,
+};
 pub use overrides::{Base, ContractOverrides};
 use soroban_sdk::{
     contracterror, contractevent, contracttrait, Address, Env, MuxedAddress, String,
@@ -87,8 +90,10 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// The `FungibleToken` trait defines the core functionality for fungible
 /// tokens, adhering to SEP-41. It provides a standard interface for managing
 /// balances, allowances, and metadata associated with fungible tokens.
-/// Additionally, this trait includes the `total_supply()` function, which is
-/// not part of SEP-41 but is commonly used in token contracts.
+///
+/// Tracking the total supply is not part of SEP-41 and is not provided by
+/// this trait; it is available as the opt-in
+/// [`crate::fungible::total_supply::FungibleTotalSupply`] extension.
 ///
 /// To fully comply with the SEP-41 specification one has to implement the
 /// `FungibleBurnable` trait in addition to this one. SEP-41 mandates support
@@ -113,13 +118,27 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 ///   incompatible with [`crate::fungible::allowlist::AllowList`] trait and
 ///   [`crate::rwa::RWA`] trait.
 /// * [`crate::rwa::RWA`] (enabling the compatibility and overrides for
-///   [`crate::rwa::RWAToken`]) trait, incompatible with
-///   [`crate::fungible::allowlist::AllowList`] trait and
+///   [`crate::rwa::RWAToken`] and
+///   [`crate::fungible::total_supply::FungibleTotalSupply`]) traits,
+///   incompatible with [`crate::fungible::allowlist::AllowList`] trait and
 ///   [`crate::fungible::blocklist::BlockList`] trait.
+/// * [`crate::fungible::total_supply::TotalSupply`] (additionally tracking the
+///   total supply, enabling the compatibility and overrides for
+///   [`crate::fungible::total_supply::FungibleTotalSupply`]) trait.
+/// * [`crate::vault::Vault`] (enabling the compatibility and overrides for
+///   [`crate::vault::FungibleVault`] and
+///   [`crate::fungible::total_supply::FungibleTotalSupply`]) traits.
+/// * [`crate::fungible::votes::FungibleVotes`] (enabling the compatibility and
+///   overrides for [`stellar_governance::votes::Votes`] and
+///   [`crate::fungible::total_supply::FungibleTotalSupply`]) traits.
 ///
-/// The default implementations of this trait for `Base`, `Allowlist`,
-/// `Blocklist` and `RWA` can be found by navigating to:
-/// `ContractType::{method_name}`.
+/// Contract types that can work together (e.g. `AllowList` with
+/// `TotalSupply`) are combined by listing them in
+/// [`crate::fungible::combinations::Compose`]; invalid combinations are
+/// rejected at compile time.
+///
+/// The default implementations of this trait for each contract type can be
+/// found by navigating to: `ContractType::{method_name}`.
 ///
 /// For example, the implementation of [`FungibleToken::transfer`] for the
 /// `Allowlist` contract type can be found at
@@ -128,20 +147,14 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 pub trait FungibleToken {
     /// Helper type that allows some of the functionality of the base trait to
     /// be overridden based on the extensions implemented.
-    /// [`crate::fungible::Base`] should be used as the type when
-    /// not using
-    /// [`crate::fungible::allowlist::AllowList`] or
-    /// [`crate::fungible::blocklist::BlockList`] extensions.
+    /// The contract type is selected with
+    /// [`crate::fungible::combinations::Compose`], by listing the contract
+    /// types that override the `Base` behavior: `Compose<(Base,)>` for the
+    /// vanilla case, `Compose<(AllowList, TotalSupply)>` for a combination,
+    /// and so on. Extensions that add functionality without overriding
+    /// behavior (e.g. [`crate::fungible::burnable::FungibleBurnable`]) have
+    /// no contract type and do not appear in the list.
     type ContractType: ContractOverrides;
-
-    /// Returns the total amount of tokens in circulation.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    fn total_supply(e: &Env) -> i128 {
-        Self::ContractType::total_supply(e)
-    }
 
     /// Returns the amount of tokens held by `account`.
     ///
@@ -290,7 +303,7 @@ pub enum FungibleTokenError {
     InvalidLiveUntilLedger = 102,
     /// Indicates an error when an input that must be >= 0
     LessThanZero = 103,
-    /// Indicates overflow when adding two values
+    /// Indicates an overflow or underflow in an arithmetic operation
     MathOverflow = 104,
     /// Indicates access to uninitialized metadata
     UnsetMetadata = 105,
@@ -322,6 +335,8 @@ pub const BALANCE_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const BALANCE_TTL_THRESHOLD: u32 = BALANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 pub const ALLOW_BLOCK_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const ALLOW_BLOCK_TTL_THRESHOLD: u32 = ALLOW_BLOCK_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+pub const TOTAL_SUPPLY_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const TOTAL_SUPPLY_TTL_THRESHOLD: u32 = TOTAL_SUPPLY_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 pub const INSTANCE_EXTEND_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
 pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 

@@ -32,23 +32,12 @@ pub struct Metadata {
 #[contracttype]
 pub enum FungibleStorageKey {
     Meta,
-    TotalSupply,
     Balance(Address),
     Allowance(AllowanceKey),
 }
 
 impl Base {
     // ################## QUERY STATE ##################
-
-    /// Returns the total amount of tokens in circulation. If no supply is
-    /// recorded, it defaults to `0`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    pub fn total_supply(e: &Env) -> i128 {
-        e.storage().instance().get(&FungibleStorageKey::TotalSupply).unwrap_or(0)
-    }
 
     /// Returns the amount of tokens held by `account`. Defaults to `0` if no
     /// balance is stored.
@@ -383,8 +372,7 @@ impl Base {
     }
 
     /// Transfers `amount` of tokens from `from` to `to` or alternatively
-    /// mints (or burns) tokens if `from` (or `to`) is `None`. Updates the total
-    /// supply accordingly.
+    /// mints (or burns) tokens if `from` (or `to`) is `None`.
     ///
     /// # Arguments
     ///
@@ -398,12 +386,17 @@ impl Base {
     /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to
     ///   transfer more tokens than `from` current balance.
     /// * [`FungibleTokenError::LessThanZero`] - When `amount < 0`.
-    /// * [`FungibleTokenError::MathOverflow`] - When `total_supply` overflows.
+    /// * [`FungibleTokenError::MathOverflow`] - When the `to` balance
+    ///   overflows.
     ///
     /// # Notes
     ///
     /// This function does not enforce authorization. Ensure that authorization
     /// is handled at a higher level.
+    ///
+    /// This function does not account for the total supply; supply-aware
+    /// flows (e.g. [`crate::fungible::total_supply::mint`], the RWA and Vault
+    /// contract types) layer the supply bookkeeping on top of it.
     pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i128) {
         if amount < 0 {
             panic_with_error!(e, FungibleTokenError::LessThanZero);
@@ -418,33 +411,19 @@ impl Base {
             e.storage()
                 .persistent()
                 .set(&FungibleStorageKey::Balance(account.clone()), &from_balance);
-        } else {
-            // `from` is None, so we're minting tokens.
-            let total_supply = Base::total_supply(e);
-            let Some(new_total_supply) = total_supply.checked_add(amount) else {
-                panic_with_error!(e, FungibleTokenError::MathOverflow);
-            };
-            e.storage().instance().set(&FungibleStorageKey::TotalSupply, &new_total_supply);
         }
 
         if let Some(account) = to {
-            // NOTE: can't overflow because balance + amount is at most total_supply.
-            let to_balance = Base::balance(e, account) + amount;
+            let Some(to_balance) = Base::balance(e, account).checked_add(amount) else {
+                panic_with_error!(e, FungibleTokenError::MathOverflow);
+            };
             e.storage()
                 .persistent()
                 .set(&FungibleStorageKey::Balance(account.clone()), &to_balance);
-        } else {
-            // `to` is None, so we're burning tokens.
-
-            // NOTE: can't overflow because amount <= total_supply or amount <= from_balance
-            // <= total_supply.
-            let total_supply = Base::total_supply(e) - amount;
-            e.storage().instance().set(&FungibleStorageKey::TotalSupply, &total_supply);
         }
     }
 
-    /// Creates `amount` of tokens and assigns them to `to`. Updates
-    /// the total supply accordingly.
+    /// Creates `amount` of tokens and assigns them to `to`.
     ///
     /// # Arguments
     ///
@@ -460,6 +439,13 @@ impl Base {
     ///
     /// * topics - `["mint", to: Address]`
     /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// This function does not account for the total supply. For tokens that
+    /// track it (i.e. implementers of
+    /// [`crate::fungible::total_supply::FungibleTotalSupply`]),
+    /// [`crate::fungible::total_supply::mint`] should be used instead.
     ///
     /// # Security Warning
     ///

@@ -8,7 +8,7 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
 use stellar_tokens::non_fungible::{
     burnable::NonFungibleBurnable,
     enumerable::{Enumerable, NonFungibleEnumerable},
-    Base, NonFungibleToken,
+    Base, Compose, NonFungibleToken,
 };
 
 #[contracttype]
@@ -36,7 +36,7 @@ impl ExampleContract {
 
 #[contractimpl(contracttrait)]
 impl NonFungibleToken for ExampleContract {
-    type ContractType = Enumerable;
+    type ContractType = Compose<(Enumerable,)>;
 }
 
 #[contractimpl(contracttrait)]

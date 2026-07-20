@@ -1,5 +1,7 @@
 use soroban_sdk::{Address, Env, MuxedAddress, String};
 
+use crate::fungible::extensions::total_supply::total_supply;
+
 /// Internal override hook for [`crate::fungible::FungibleToken`].
 ///
 /// # Note
@@ -25,14 +27,10 @@ use soroban_sdk::{Address, Env, MuxedAddress, String};
 /// ```rust
 /// #[contractimpl(contracttrait)]
 /// impl FungibleToken for ExampleContract {
-///     type ContractType = Base;
+///     type ContractType = Compose<(Base,)>;
 /// }
 /// ```
 pub trait ContractOverrides {
-    fn total_supply(e: &Env) -> i128 {
-        Base::total_supply(e)
-    }
-
     fn balance(e: &Env, account: &Address) -> i128 {
         Base::balance(e, account)
     }
@@ -94,3 +92,27 @@ pub trait BurnableOverrides {
 }
 
 impl BurnableOverrides for Base {}
+
+/// Internal override hook for
+/// [`crate::fungible::total_supply::FungibleTotalSupply`].
+///
+/// # Note
+///
+/// Like [`ContractOverrides`], this trait is internal plumbing of the
+/// library. There is no need to implement or import it: implementing
+/// [`crate::fungible::total_supply::FungibleTotalSupply`] with an empty body
+/// is enough, and the right behavior is picked based on the contract's
+/// `ContractType`. The library ships implementations for its supply-aware
+/// contract types ([`crate::fungible::total_supply::TotalSupply`], the
+/// combined contract types resolved by
+/// [`crate::fungible::combinations::Compose`], `RWA`, `Vault`,
+/// `FungibleVotes`).
+///
+/// Unlike `BurnableOverrides`, there is deliberately no implementation for
+/// [`Base`]: exposing the total supply requires a supply-tracking contract
+/// type.
+pub trait TotalSupplyOverrides {
+    fn total_supply(e: &Env) -> i128 {
+        total_supply(e)
+    }
+}

@@ -4,6 +4,10 @@
 //! SEP-41-compliant fungible token. It includes essential features such as
 //! controlled token transfers by an admin who can allow or disallow specific
 //! accounts.
+//!
+//! It also demonstrates composing the contract type: `Compose<(AllowList,
+//! TotalSupply)>` pairs the allowlist transfer policy with total supply
+//! tracking.
 
 use soroban_sdk::{
     contract, contractimpl, symbol_short, Address, Env, MuxedAddress, String, Symbol, Vec,
@@ -13,6 +17,8 @@ use stellar_macros::only_role;
 use stellar_tokens::fungible::{
     allowlist::{AllowList, FungibleAllowList},
     burnable::FungibleBurnable,
+    combinations::Compose,
+    total_supply::{self, FungibleTotalSupply, TotalSupply},
     Base, FungibleToken,
 };
 
@@ -40,14 +46,17 @@ impl ExampleContract {
         AllowList::allow_user(e, &admin);
 
         // Mint initial supply to the admin
-        Base::mint(e, &admin, initial_supply);
+        total_supply::mint(e, &admin, initial_supply);
     }
 }
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
-    type ContractType = AllowList;
+    type ContractType = Compose<(AllowList, TotalSupply)>;
 }
+
+#[contractimpl(contracttrait)]
+impl FungibleTotalSupply for ExampleContract {}
 
 #[contractimpl(contracttrait)]
 impl FungibleAllowList for ExampleContract {
