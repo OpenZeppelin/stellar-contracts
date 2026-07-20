@@ -122,7 +122,7 @@
 /// - **Cannot recover to an already-recovered account**: An account that was
 ///   previously used as a recovery target cannot be used again.
 /// - **Proper sequencing enforced**: The system enforces the correct recovery
-///   sequence: `recover_identity` must be called before `recovery_balance` to
+///   sequence: `recover_identity` must be called before `recover_balance` to
 ///   ensure identity verification precedes asset transfer.
 use soroban_sdk::{
     contracttype, panic_with_error, Address, Env, IntoVal, Map, String, Symbol, TryFromVal, Val,

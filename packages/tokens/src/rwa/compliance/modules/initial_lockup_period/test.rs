@@ -216,6 +216,31 @@ fn on_transfer_panics_when_tokens_still_locked() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #399)")]
+fn on_transfer_delegated_cannot_spend_locked_tokens() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // The wallet's entire balance stays locked until t=1000.
+        preset_locks(
+            &e,
+            &token,
+            &from,
+            &vec![&e, LockedTokens { amount: 80, release_ledger: 1_000 }],
+        );
+
+        // A delegated transfer (approved spender) is not privileged: dipping
+        // into the locked region is rejected exactly like a standard one.
+        on_transfer(&e, &from, &to, 80, 1, &TransferKind::Delegated(spender), &token);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #399)")]
 fn on_transfer_panics_when_balance_insufficient() {
     let e = Env::default();
     let module_id = e.register(TestInitialLockupPeriodContract, ());
@@ -622,6 +647,35 @@ fn migrated_locks_still_enforced_on_destination() {
         // The migrated schedule keeps restricting the recovered balance:
         // spending from the new wallet before release is rejected.
         on_transfer(&e, &to, &from, 80, 1, &TransferKind::Standard, &token);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #391)")]
+fn migrate_locks_panics_when_destination_aggregate_overflows() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // The destination's lock aggregate already sits at the i128 ceiling,
+        // so crediting the migrated entry overflows.
+        preset_locks(
+            &e,
+            &token,
+            &to,
+            &vec![&e, LockedTokens { amount: i128::MAX, release_ledger: 1_000 }],
+        );
+        preset_locks(
+            &e,
+            &token,
+            &from,
+            &vec![&e, LockedTokens { amount: 100, release_ledger: 1_000 }],
+        );
+
+        on_transfer(&e, &from, &to, 100, 100, &TransferKind::Recovery, &token);
     });
 }
 
