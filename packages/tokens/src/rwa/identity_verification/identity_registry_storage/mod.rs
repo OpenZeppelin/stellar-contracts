@@ -309,8 +309,8 @@ use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, Int
 pub use storage::{
     add_country_data_entries, add_identity, delete_country_data, get_country_data,
     get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
-    modify_identity, recover_identity, remove_identity, stored_identity, validate_country_data,
-    CountryData, CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
+    recover_identity, remove_identity, stored_identity, validate_country_data, CountryData,
+    CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
     OrganizationCountryRelation,
 };
 
@@ -376,30 +376,12 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling [`remove_identity`] for the
     /// implementation.
+    ///
+    /// The library-provided [`remove_identity`] rejects removal while
+    /// `account` holds a non-zero balance in any linked token, so that
+    /// identity-keyed compliance state is never orphaned; refer to its
+    /// documentation.
     fn remove_identity(e: &Env, account: Address, operator: Address);
-
-    /// Modifies an existing identity.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The Soroban environment.
-    /// * `account` - The account address whose identity is being modified.
-    /// * `new_identity` - The new identity address.
-    /// * `operator` - The address authorizing the invocation.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["identity_modified", old_identity: Address, new_identity:
-    ///   Address]`
-    /// * data - `[]`
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Access control should be
-    /// enforced on `operator` before calling [`modify_identity`] for the
-    /// implementation.
-    fn modify_identity(e: &Env, account: Address, identity: Address, operator: Address);
 
     /// Recovers an identity by transferring it from an old account to a new
     /// account.
@@ -586,6 +568,8 @@ pub enum IRSError {
     MetadataTooManyEntries = 326,
     /// Metadata string value is too long (exceeds MAX_METADATA_STRING_LEN).
     MetadataStringTooLong = 327,
+    /// The account still holds a balance in a linked token.
+    AccountHasBalance = 328,
 }
 
 // ################## CONSTANTS ##################
@@ -652,28 +636,6 @@ pub struct IdentityUnstored {
 /// * `identity` - The identity address that was removed.
 pub fn emit_identity_unstored(e: &Env, account: &Address, identity: &Address) {
     IdentityUnstored { account: account.clone(), identity: identity.clone() }.publish(e);
-}
-
-/// Event emitted when an identity is modified for an account.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IdentityModified {
-    #[topic]
-    pub old_identity: Address,
-    #[topic]
-    pub new_identity: Address,
-}
-
-/// Emits an event when an identity is modified for an account.
-///
-/// # Arguments
-///
-/// * `e` - The Soroban environment.
-/// * `old_identity` - The previous identity address.
-/// * `new_identity` - The new identity address.
-pub fn emit_identity_modified(e: &Env, old_identity: &Address, new_identity: &Address) {
-    IdentityModified { old_identity: old_identity.clone(), new_identity: new_identity.clone() }
-        .publish(e);
 }
 
 /// Event emitted when an identity is recovered for a new account.

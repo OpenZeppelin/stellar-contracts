@@ -64,11 +64,6 @@ impl IdentityRegistryStorage for IdentityRegistryContract {
     }
 
     #[only_role(operator, "manager")]
-    fn modify_identity(e: &Env, account: Address, new_identity: Address, operator: Address) {
-        identity_storage::modify_identity(e, &account, &new_identity);
-    }
-
-    #[only_role(operator, "manager")]
     fn remove_identity(e: &Env, account: Address, operator: Address) {
         identity_storage::remove_identity(e, &account);
     }
