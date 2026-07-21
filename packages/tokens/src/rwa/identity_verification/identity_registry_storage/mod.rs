@@ -14,6 +14,42 @@
 //! Instead of simple country codes, it uses a sophisticated model that pairs
 //! relationship types with country codes.
 //!
+//! ## What Is Stored, and For Whom
+//!
+//! Three families of entries are kept, all keyed by the wallet (account)
+//! address:
+//!
+//! - `Identity(wallet) -> Address`: the pointer to the wallet's identity
+//!   contract, an external contract implementing
+//!   [`crate::rwa::identity_verification::identity_claims::IdentityClaims`]
+//!   that holds the investor's claims. Several wallets may point to the same
+//!   identity: the identity represents the investor, the wallets are its keys.
+//! - `IdentityProfile(wallet)`: registry-side metadata, an [`IdentityType`]
+//!   plus the country data entries. This is kept per wallet, not per identity,
+//!   so two wallets of the same investor each carry their own copy.
+//! - `RecoveredTo(old_wallet) -> new_wallet`: a permanent tombstone written by
+//!   account recovery; recovered wallets can never be registered again.
+//!
+//! ## Lifecycle Operations
+//!
+//! - `add_identity` registers a wallet under an identity contract.
+//! - `modify_identity` swaps which identity contract a wallet points to. Only
+//!   the pointer is rewritten: neither identity contract is touched, and claims
+//!   do not carry over, since issuer attestations bind to the identity address.
+//!   It exists for replacing a compromised or obsolete identity contract, or
+//!   fixing a mis-registration; the new identity needs its own attestations.
+//! - `remove_identity` deletes a wallet's registration and profile.
+//! - `recover_identity` handles wallet loss: the same identity moves to a new
+//!   wallet, and the old wallet is tombstoned. This is the mirror image of
+//!   `modify_identity` (same identity, new wallet, instead of same wallet, new
+//!   identity).
+//!
+//! The identity address does double duty downstream: compliance modules key
+//! their per-investor accounting (aggregate balances, transfer counters) by
+//! the resolved identity. Repointing or removing the identity of a wallet
+//! that still holds tokens re-keys that accounting, so these are privileged
+//! operations that must be sequenced with care.
+//!
 //! ## Flexible Country Relations
 //!
 //! The system supports flexible mixing of country relationship types to

@@ -19,6 +19,11 @@
 //! The trait is intentionally minimal and unopinionated, allowing maximum
 //! flexibility in implementation.
 //!
+//! Claims are re-validated through this entry point on every identity
+//! verification, so validity is a live answer rather than a stored fact.
+//! Revoking a claim therefore requires no change on the identity contract:
+//! the issuer simply stops validating it.
+//!
 //! ## Verification Schemes
 //!
 //! A claim issuer contract can support one or multiple verification schemes,

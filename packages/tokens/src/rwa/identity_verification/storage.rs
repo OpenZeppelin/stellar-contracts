@@ -57,6 +57,11 @@ pub fn identity_registry_storage(e: &Env) -> Address {
 /// Verifies that the identity of an user address has the required valid
 /// claims.
 ///
+/// The account is resolved to its identity contract through the configured
+/// identity registry storage; for every required claim topic, the identity
+/// contract must hold a claim from one of the topic's trusted issuers, and
+/// that issuer is queried live for the claim's validity.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.

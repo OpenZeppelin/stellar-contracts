@@ -7,6 +7,12 @@ use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, Map
 
 /// Trait for managing claim topics and trusted issuers for RWA tokens.
 ///
+/// This contract is the requirement side of identity verification: it states
+/// which claim topics a holder's identity must carry (for example KYC, AML),
+/// and which claim issuers are trusted to attest each topic. Verification
+/// checks these requirements against the claims found on the holder's
+/// identity contract.
+///
 /// [`ClaimTopicsAndIssuers`] trait is not expected to be an extension to a RWA
 /// smart contract, but it is a separate contract on its own. This design allows
 /// it to be shared across many RWA tokens. Note that, there is no `RWA` bound
