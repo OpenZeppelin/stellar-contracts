@@ -151,6 +151,83 @@ fn on_created_and_on_destroyed_track_supply() {
 }
 
 #[test]
+fn preset_flow_seeds_counter_and_finalizes() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let compliance = Address::generate(&e);
+    let token = Address::generate(&e);
+    let holder = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+
+    client.set_compliance_address(&token, &compliance, &admin);
+    client.set_supply_limit(&token, &1_000_i128, &manager);
+
+    // The token migrates in with 600 already circulating.
+    client.preset_supply_count(&token, &600_i128, &manager);
+    assert_eq!(client.get_supply_count(&token), 600);
+    assert!(!client.is_preset_completed(&token));
+
+    client.mark_preset_completed(&token, &manager);
+    assert!(client.is_preset_completed(&token));
+
+    // Pre-existing tokens can be burned, and the cap holds against the
+    // real total supply.
+    client.on_destroyed(&snap(&holder), &100_i128, &token);
+    client.on_created(&snap(&holder), &500_i128, &token);
+    assert_eq!(client.get_supply_count(&token), 1_000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #395)")]
+fn preset_supply_count_panics_after_finalize() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let token = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+
+    client.mark_preset_completed(&token, &manager);
+    client.preset_supply_count(&token, &1_i128, &manager);
+}
+
+#[test]
+fn preset_supply_count_requires_manager_auth() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let token = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+
+    client.preset_supply_count(&token, &500_i128, &manager);
+
+    let auths = e.auths();
+    assert_eq!(auths.len(), 1);
+    let (addr, _) = &auths[0];
+    assert_eq!(addr, &manager);
+}
+
+#[test]
+fn mark_preset_completed_requires_manager_auth() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let token = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+
+    client.mark_preset_completed(&token, &manager);
+
+    let auths = e.auths();
+    assert_eq!(auths.len(), 1);
+    let (addr, _) = &auths[0];
+    assert_eq!(addr, &manager);
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #394)")]
 fn on_created_panics_when_exceeding_limit() {
     let e = Env::default();
