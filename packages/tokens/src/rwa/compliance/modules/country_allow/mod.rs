@@ -48,11 +48,14 @@ use crate::rwa::compliance::modules::ComplianceModule;
 ///   non-allowlisted jurisdiction still passes, since a single allowed tie is
 ///   sufficient. This module cannot express "every country on the identity must
 ///   be allowed".
-/// - **Relation type is not distinguished.** Every
-///   [`crate::rwa::identity_registry_storage::CountryRelation`] variant —
-///   residence, citizenship, source of funds, tax residency, and custom — is
-///   flattened to a bare country code, so a weak secondary tie (e.g. source of
-///   funds) counts the same as country of residence.
+/// - **Relation type is not distinguished.** The lookup uses only the numeric
+///   code, so every [`crate::rwa::identity_registry_storage::CountryRelation`]
+///   variant is treated identically — both the individual relations (residence,
+///   citizenship, source of funds, tax residency, custom) and the organization
+///   relations (incorporation, operating jurisdiction, tax jurisdiction, source
+///   of funds, custom). A country attached only as, say, source of funds is
+///   therefore accepted exactly as if it were the country of residence or
+///   incorporation.
 /// - **Entry validity metadata is not honored.** The per-entry
 ///   [`crate::rwa::identity_registry_storage::CountryData::metadata`],
 ///   documented as carrying a validity period such as a visa, is never
