@@ -225,11 +225,14 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 
 /// Records a transfer between two wallets: debits the sender's identity and
 /// credits the recipient's identity. Panics if crediting the recipient would
-/// exceed the per-identity cap, unless the transfer is forced: a privileged
-/// operation (forced transfer, recovery) is exempt from the cap, but the
-/// aggregate balances are still updated so the books stay true. Transfers
-/// where `from` and `to` resolve to the same identity are no-ops: no debit,
-/// no credit, no cap check.
+/// exceed the per-identity cap, unless the transfer is privileged: a forced
+/// transfer or a recovery is exempt from the cap, but the aggregate
+/// balances are still updated so the books stay true. Transfers where
+/// `from` and `to` resolve to the same identity are no-ops: no debit, no
+/// credit, no cap check. The aggregates are keyed by identity, so a genuine
+/// recovery (same investor, new wallet) lands on the same-identity no-op
+/// path and the books are untouched; the cap exemption matters only when a
+/// privileged movement crosses identities.
 ///
 /// When `from`'s live identity entry has already been removed by account
 /// recovery, the sender is resolved through the IRS recovery record rather than
@@ -251,7 +254,7 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
 /// * [`ComplianceModuleError::MaxBalanceExceeded`] - When the recipient's new
 ///   aggregate balance would exceed the configured maximum and the transfer is
-///   not forced.
+///   not privileged.
 /// * [`ComplianceModuleError::MathOverflow`] - When the recipient's credit
 ///   addition overflows.
 /// * [`ComplianceModuleError::MathUnderflow`] - When the sender's debit
@@ -296,10 +299,13 @@ pub fn on_transfer(
     }
 
     debit_identity(e, token, &id_from, amount);
-    if *kind == TransferKind::Forced {
-        credit_identity_unchecked(e, token, &id_to, amount);
-    } else {
-        credit_identity(e, token, &id_to, amount);
+    match kind {
+        TransferKind::Forced | TransferKind::Recovery => {
+            credit_identity_unchecked(e, token, &id_to, amount)
+        }
+        TransferKind::Standard | TransferKind::Delegated(_) => {
+            credit_identity(e, token, &id_to, amount)
+        }
     }
 }
 

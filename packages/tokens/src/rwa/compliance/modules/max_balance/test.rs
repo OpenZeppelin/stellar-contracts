@@ -369,13 +369,47 @@ fn on_transfer_forced_bypasses_cap_but_updates_books() {
     });
 }
 
-// Regression: after `recover_identity` removes the old wallet's identity, the
-// RWA recovery flow moves the balance via a forced transfer to the recovery
-// target. The hook must not revert on the now-missing source identity; it
-// resolves `from` through the recovery record, finds the same identity on both
-// sides, and leaves the per-identity book untouched (a same-identity no-op).
 #[test]
-fn forced_transfer_after_recovery_is_noop_and_does_not_revert() {
+fn on_transfer_recovery_bypasses_cap_but_updates_books() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let from_wallet = Address::generate(&e);
+    let to_wallet = Address::generate(&e);
+    let from_id = Address::generate(&e);
+    let to_id = Address::generate(&e);
+
+    irs.set_identity(&from_wallet, &from_id);
+    irs.set_identity(&to_wallet, &to_id);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_max_balance(&e, &token, 50);
+
+        preset_id_balance(&e, &token, &from_id, 50);
+        preset_id_balance(&e, &token, &to_id, 30);
+
+        // A genuine recovery resolves both sides to the same identity and
+        // never reaches the cap. This exercises the defensive cross-identity
+        // case: like a forced transfer, a recovery is exempt from the cap
+        // while the aggregates stay true.
+        on_transfer(&e, &from_wallet, &to_wallet, 25, &TransferKind::Recovery, &token);
+
+        assert_eq!(get_id_balance(&e, &token, &from_id), 25);
+        assert_eq!(get_id_balance(&e, &token, &to_id), 55);
+    });
+}
+
+// Regression: after `recover_identity` removes the old wallet's identity, the
+// RWA recovery flow moves the balance to the recovery target as a transfer of
+// kind `Recovery`. The hook must not revert on the now-missing source
+// identity; it resolves `from` through the recovery record, finds the same
+// identity on both sides, and leaves the per-identity book untouched (a
+// same-identity no-op).
+#[test]
+fn recovery_transfer_after_identity_recovery_is_noop_and_does_not_revert() {
     let e = Env::default();
     let module_id = e.register(TestMaxBalanceContract, ());
     let irs_id = e.register(MockIRSContract, ());
@@ -398,9 +432,10 @@ fn forced_transfer_after_recovery_is_noop_and_does_not_revert() {
     irs.recover(&old_wallet, &new_wallet);
 
     e.as_contract(&module_id, || {
-        // The documented recovery move: forced transfer of the whole balance
-        // from the (now identity-less) old wallet to the recovery target.
-        on_transfer(&e, &old_wallet, &new_wallet, 80, &TransferKind::Forced, &token);
+        // The documented recovery move: the whole balance leaves the (now
+        // identity-less) old wallet for the recovery target, reported as
+        // `TransferKind::Recovery` by `recover_balance`.
+        on_transfer(&e, &old_wallet, &new_wallet, 80, &TransferKind::Recovery, &token);
 
         // Same identity on both sides => the aggregate is unchanged and correct.
         assert_eq!(get_id_balance(&e, &token, &identity), 80);

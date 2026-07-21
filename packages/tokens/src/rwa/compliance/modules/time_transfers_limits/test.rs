@@ -339,6 +339,31 @@ fn on_transfer_forced_skips_check_and_counters() {
 }
 
 #[test]
+fn on_transfer_recovery_skips_check_and_counters() {
+    let e = Env::default();
+    let module_id = e.register(TestTimeTransfersLimitsContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_time_transfer_limit(
+            &e,
+            &token,
+            &TransferLimit { limit_duration: 100, limit_value: 50 },
+        );
+
+        // A wallet migration is not investor trading activity: no
+        // rejection, and the identity's window allowance stays intact.
+        on_transfer(&e, &from, &to, 9_999, &TransferKind::Recovery, &token);
+
+        assert_eq!(get_transfer_counter(&e, &token, &from, 100).value, 0);
+    });
+}
+
+#[test]
 fn on_transfer_increments_counters_for_each_window() {
     let e = Env::default();
     let module_id = e.register(TestTimeTransfersLimitsContract, ());

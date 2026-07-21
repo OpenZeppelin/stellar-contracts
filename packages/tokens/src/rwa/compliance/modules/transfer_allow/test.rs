@@ -95,6 +95,21 @@ fn on_transfer_forced_is_exempt_from_policy() {
 }
 
 #[test]
+fn on_transfer_recovery_is_exempt_from_policy() {
+    let e = Env::default();
+    let module_id = e.register(TestTransferAllowContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // Neither party is allowlisted: a standard transfer would panic,
+        // but a recovery passes through untouched.
+        on_transfer(&e, &from, &to, &TransferKind::Recovery, &token);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #406)")]
 fn allowlist_is_tracked_per_token() {
     let e = Env::default();
