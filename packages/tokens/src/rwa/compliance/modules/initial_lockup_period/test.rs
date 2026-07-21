@@ -84,6 +84,61 @@ fn on_created_zero_amount_creates_no_lock() {
 }
 
 #[test]
+fn on_created_prunes_expired_locks() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_lockup_period(&e, &token, 100);
+        on_created(&e, &wallet, 50, &token); // releases at t=100
+
+        // The first lock has expired by the second mint: instead of letting
+        // the entry grow, the mint drops it while appending the new lock.
+        e.ledger().with_mut(|li| li.sequence_number = 100);
+        on_created(&e, &wallet, 30, &token); // releases at t=200
+
+        let details = get_locked_details(&e, &token, &wallet);
+        assert_eq!(details.total_locked, 30);
+        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 30, release_ledger: 200 }]);
+        assert_eq!(get_locked_amount(&e, &token, &wallet), 30);
+    });
+}
+
+#[test]
+fn on_created_pruning_keeps_active_locks() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_lockup_period(&e, &token, 100);
+        on_created(&e, &wallet, 50, &token); // releases at t=100
+        e.ledger().with_mut(|li| li.sequence_number = 50);
+        on_created(&e, &wallet, 40, &token); // releases at t=150
+
+        // Only the first lock has expired: the mint prunes it and carries
+        // the still-active one over untouched.
+        e.ledger().with_mut(|li| li.sequence_number = 120);
+        on_created(&e, &wallet, 30, &token); // releases at t=220
+
+        let details = get_locked_details(&e, &token, &wallet);
+        assert_eq!(details.total_locked, 70);
+        assert_eq!(
+            details.locks,
+            vec![
+                &e,
+                LockedTokens { amount: 40, release_ledger: 150 },
+                LockedTokens { amount: 30, release_ledger: 220 },
+            ]
+        );
+        assert_eq!(get_locked_amount(&e, &token, &wallet), 70);
+    });
+}
+
+#[test]
 fn on_transfer_allows_free_portion_only() {
     let e = Env::default();
     let module_id = e.register(TestInitialLockupPeriodContract, ());

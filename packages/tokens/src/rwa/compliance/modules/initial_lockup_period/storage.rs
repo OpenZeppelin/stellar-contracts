@@ -23,8 +23,8 @@ pub struct LockedTokens {
 /// The lock entries tracked for one `(token, wallet)` pair, together with
 /// their running aggregate. `total_locked` always equals the sum of the
 /// `locks` amounts, including entries whose release time has already
-/// passed: expired entries are consumed lazily by transfers and burns, not
-/// by the passage of time.
+/// passed: expired entries are consumed lazily by transfers and burns and
+/// pruned by subsequent mints, not by the passage of time.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LockedDetails {
@@ -275,8 +275,11 @@ pub fn on_transfer(
 }
 
 /// Records a mint to `to`: when a lockup period is configured, appends a lock
-/// entry releasing after that period. The wallet's balance is owned by the
-/// token, so nothing else is tracked.
+/// entry releasing after that period. Expired entries are pruned in the same
+/// write, so the stored vector tracks the wallet's active locks rather than
+/// its lifetime mint count and cannot grow past the ledger-entry size limit
+/// under repeated issuance. The wallet's balance is owned by the token, so
+/// nothing else is tracked.
 ///
 /// # Arguments
 ///
@@ -300,6 +303,7 @@ pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
     let period = get_lockup_period(e, token);
     if period > 0 && amount > 0 {
         let mut details = get_locked_details(e, token, to);
+        prune_expired_locks(e, &mut details);
         details.locks.push_back(LockedTokens {
             amount,
             release_ledger: e.ledger().sequence().saturating_add(period),
@@ -508,6 +512,30 @@ fn expired_amount(e: &Env, locks: &Vec<LockedTokens>) -> i128 {
         }
     }
     expired
+}
+
+/// Drops the entries in `details` whose release time has passed, reducing
+/// `total_locked` by the dropped amounts. Expired entries are already
+/// spendable ([`get_locked_amount`] subtracts them), so dropping them
+/// changes nothing about what the wallet can move; it only keeps the
+/// stored vector bounded by the number of active locks.
+fn prune_expired_locks(e: &Env, details: &mut LockedDetails) {
+    let now = e.ledger().sequence();
+    let mut pruned = 0;
+    let mut remaining = Vec::new(e);
+
+    for lock in details.locks.iter() {
+        if lock.release_ledger <= now {
+            pruned = add_i128_or_panic(e, pruned, lock.amount);
+        } else {
+            remaining.push_back(lock);
+        }
+    }
+
+    if pruned > 0 {
+        details.total_locked = sub_i128_or_panic(e, details.total_locked, pruned);
+        details.locks = remaining;
+    }
 }
 
 /// Consumes `amount` from the expired entries in `details`, oldest-first:

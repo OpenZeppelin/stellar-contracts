@@ -40,8 +40,11 @@ use crate::rwa::compliance::modules::ComplianceModule;
 ///
 /// Locks are consumed lazily: expired entries stay on the books until a
 /// transfer or burn dips into the locked region, at which point they are
-/// consumed oldest-first and removed. Mints themselves are never blocked by
-/// this module: they are the operation that creates locks.
+/// consumed oldest-first and removed. Each mint also prunes whatever has
+/// expired by then while appending its new lock, so a wallet's stored lock
+/// entries stay bounded by its active locks no matter how many mints it
+/// receives. Mints themselves are never blocked by this module: they are
+/// the operation that creates locks.
 ///
 /// The module **maintains its own state**: per-wallet lock entries that
 /// record how much of a wallet's balance is still locked. Correct accounting
