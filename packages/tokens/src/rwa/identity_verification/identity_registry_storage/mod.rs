@@ -37,7 +37,8 @@
 //!   the pointer is rewritten: neither identity contract is touched, and claims
 //!   do not carry over, since issuer attestations bind to the identity address.
 //!   It exists for replacing a compromised or obsolete identity contract, or
-//!   fixing a mis-registration; the new identity needs its own attestations.
+//!   fixing an erroneous registration; the new identity needs its own
+//!   attestations.
 //! - `remove_identity` deletes a wallet's registration and profile.
 //! - `recover_identity` handles wallet loss: the same identity moves to a new
 //!   wallet, and the old wallet is tombstoned. This is the mirror image of
