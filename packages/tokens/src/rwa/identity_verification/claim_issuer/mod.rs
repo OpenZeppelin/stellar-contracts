@@ -175,11 +175,10 @@ pub trait ClaimIssuer {
     /// is entirely application-specific — each claim issuer defines its own
     /// supported verification schemes, key management strategy, and
     /// validation pipeline. There is no single storage function to call;
-    /// instead, compose the optional helpers from the [`storage`] module
-    /// (e.g., [`storage::is_key_allowed_for_topic`],
-    /// [`storage::is_claim_expired`], [`storage::is_claim_revoked`]) and a
-    /// [`SignatureVerifier`] implementation. See the [module-level
-    /// documentation](self) for a full example.
+    /// instead, compose the optional helpers exported from this module
+    /// (e.g., [`is_key_allowed_for_topic`], [`is_claim_expired`],
+    /// [`is_claim_revoked`]) and a [`SignatureVerifier`] implementation. See
+    /// the [module-level documentation](self) for a full example.
     fn is_claim_valid(
         e: &Env,
         identity: Address,
@@ -216,8 +215,8 @@ pub trait SignatureVerifier {
     ///
     /// No default implementation is provided because each signature scheme
     /// has a unique data layout. See [`Ed25519Verifier`],
-    /// [`Secp256k1Verifier`], and [`Secp256r1Verifier`] in the [`storage`]
-    /// module for reference implementations.
+    /// [`Secp256k1Verifier`], and [`Secp256r1Verifier`] for reference
+    /// implementations.
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData;
 
     /// Builds the message to verify for claim signature validation.
@@ -235,8 +234,9 @@ pub trait SignatureVerifier {
     /// # Notes
     ///
     /// No default implementation is provided because the message format may
-    /// vary between signature schemes. See the built-in
-    /// verifiers in the [`storage`] module for reference implementations.
+    /// vary between signature schemes. See the built-in verifiers
+    /// ([`Ed25519Verifier`], [`Secp256k1Verifier`], [`Secp256r1Verifier`])
+    /// for reference implementations.
     fn build_message(e: &Env, identity: &Address, claim_topic: u32, claim_data: &Bytes) -> Bytes;
 
     /// Validates a claim signature using the parsed signature data and panics
@@ -251,8 +251,9 @@ pub trait SignatureVerifier {
     /// # Notes
     ///
     /// No default implementation is provided because cryptographic
-    /// verification is scheme-specific. See the built-in
-    /// verifiers in the [`storage`] module for reference implementations.
+    /// verification is scheme-specific. See the built-in verifiers
+    /// ([`Ed25519Verifier`], [`Secp256k1Verifier`], [`Secp256r1Verifier`])
+    /// for reference implementations.
     fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData);
 
     /// Returns the expected signature data length for this scheme.
