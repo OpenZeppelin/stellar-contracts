@@ -3,7 +3,7 @@
 //! Deployer-configurable controls layered on top of the
 //! [`ConfidentialToken`]: per-account freezing,
 //! SAC `authorized()` passthrough, and a pluggable external
-//! authorization policy. See `docs/COMPLIANCE.md` for the
+//! authorization policy. See [`docs/COMPLIANCE.md`] for the
 //! specification.
 //!
 //! ## Surface
@@ -55,9 +55,7 @@ pub trait Policy {
 ///
 /// ## Why the write methods have no default body
 ///
-/// The write methods ([`ConfidentialCompliance::freeze`],
-/// [`ConfidentialCompliance::unfreeze`],
-/// [`ConfidentialCompliance::set_compliance_config`])
+/// The write methods ([`freeze`], [`unfreeze`], [`set_compliance_config`])
 /// accept an `operator: Address` and intentionally ship without a default
 /// implementation. Because the choice of access-control module is the contract
 /// author's, the trait forces an explicit override. The override typically:
@@ -189,7 +187,7 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 ///   (registration predates the account entry) but passes policy and SAC.
 /// * [`on_register`](Hooks::on_register) does not restrict the caller-selected
 ///   `auditor_id`. Deployments that must limit which auditors an account may
-///   bind to override it with a custom gate (see `docs/COMPLIANCE.md` §4.3).
+///   bind to override it with a custom gate (see [`docs/COMPLIANCE.md`] §4.3).
 /// * [`on_spender_transfer`](Hooks::on_spender_transfer): `from` and `to` pass
 ///   all three gates; `spender` passes only the policy gate.
 /// * [`on_set_spender`](Hooks::on_set_spender): the delegating `account` passes
@@ -206,7 +204,7 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 ///
 /// Deployments that need additional behaviour (audit mirroring, rate
 /// limiting, or alternative deposit semantics — see
-/// `docs/COMPLIANCE.md` §4) can write a custom `Hooks` impl that
+/// [`docs/COMPLIANCE.md`] §4) can write a custom `Hooks` impl that
 /// calls the same primitives.
 pub struct ComplianceHooks;
 

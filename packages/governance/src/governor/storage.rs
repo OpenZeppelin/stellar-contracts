@@ -214,8 +214,7 @@ pub fn get_proposal_core(e: &Env, proposal_id: &BytesN<32>) -> ProposalCore {
 /// * `e` - Access to the Soroban environment.
 /// * `proposal_id` - The unique identifier of the proposal.
 /// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
+///   `vote_snapshot` ledger via [`Governor::quorum`].
 ///
 /// # Errors
 ///
@@ -561,8 +560,7 @@ pub fn propose(
 /// * `queue_enabled` - Whether queueing is enabled (i.e., whether the proposal
 ///   must be in the `Queued` state to execute).
 /// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
+///   `vote_snapshot` ledger via [`Governor::quorum`].
 ///
 /// # Errors
 ///
@@ -647,8 +645,7 @@ pub fn execute(
 /// * `eta` - The estimated ledger sequence for execution. Emitted in the event
 ///   only; not stored or enforced by the governor.
 /// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
+///   `vote_snapshot` ledger via [`Governor::quorum`].
 ///
 /// # Errors
 ///
@@ -796,8 +793,7 @@ pub fn hash_proposal(
 /// * `e` - Access to the Soroban environment.
 /// * `proposal_id` - The unique identifier of the proposal.
 /// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
+///   `vote_snapshot` ledger via [`Governor::quorum`].
 ///
 /// # Errors
 ///
@@ -854,8 +850,7 @@ pub fn check_proposal_state(e: &Env, proposal_id: &BytesN<32>, quorum: u128) -> 
 /// * `proposal_id` - The unique identifier of the proposal.
 /// * `core` - The proposal's stored core data.
 /// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
+///   `vote_snapshot` ledger via [`Governor::quorum`].
 ///
 /// # Errors
 ///
@@ -1012,8 +1007,7 @@ fn get_quorum_checkpoint(e: &Env, index: u32) -> QuorumCheckpoint {
 /// * `e` - Access to the Soroban environment.
 /// * `proposal_id` - The unique identifier of the proposal.
 /// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
+///   `vote_snapshot` ledger via [`Governor::quorum`].
 ///
 /// # Errors
 ///
@@ -1206,8 +1200,7 @@ pub fn count_vote(
 /// * `reason` - An optional explanation for the vote.
 /// * `voter` - The address casting the vote.
 /// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
+///   `vote_snapshot` ledger via [`Governor::quorum`].
 ///
 /// # Errors
 ///

@@ -58,8 +58,8 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced on `operator` before calling [`BlockList::block_user`] for
-    /// the implementation.
+    /// enforced on `operator` before calling [`storage::block_user`] for the
+    /// implementation.
     fn block_user(e: &Env, user: Address, operator: Address);
 
     /// Unblocks a user, allowing them to receive and transfer tokens.
@@ -79,8 +79,8 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced on `operator` before calling [`BlockList::unblock_user`] for
-    /// the implementation.
+    /// enforced on `operator` before calling [`storage::unblock_user`] for the
+    /// implementation.
     fn unblock_user(e: &Env, user: Address, operator: Address);
 }
 

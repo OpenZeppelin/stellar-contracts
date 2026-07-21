@@ -60,7 +60,7 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
-    /// [`Base::set_default_royalty`] for the implementation.
+    /// [`storage::set_default_royalty`] for the implementation.
     fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32, operator: Address);
 
     /// Sets the royalty information for a specific token.
@@ -91,7 +91,7 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
-    /// [`Base::set_token_royalty`] for the implementation.
+    /// [`storage::set_token_royalty`] for the implementation.
     fn set_token_royalty(
         e: &Env,
         token_id: u32,
@@ -124,7 +124,7 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
-    /// [`Base::remove_token_royalty`] for the implementation.
+    /// [`storage::remove_token_royalty`] for the implementation.
     fn remove_token_royalty(e: &Env, token_id: u32, operator: Address);
 
     /// Returns `(Address, i128)` - A tuple containing the receiver address and

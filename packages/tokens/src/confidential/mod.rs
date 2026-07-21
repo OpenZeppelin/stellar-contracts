@@ -6,7 +6,7 @@
 //! accompanied by an UltraHonk proof that the contract verifies via a separate
 //! verifier contract. Auditor keys are read from a separate registry contract
 //! and dual auditor ciphertexts are emitted in each transfer event. See
-//! `docs/DESIGN.md` (§1–§7) and `docs/DESIGN_cont.md` (§8–§13) for the
+//! [`docs/DESIGN.md`] (§1–§7) and [`docs/DESIGN_cont.md`] (§8–§13) for the
 //! full specification.
 //!
 //! # ⚠️ Not Production Ready
@@ -52,9 +52,7 @@
 //!
 //! The contract closes this gap at the verifier boundary. The append
 //! helpers in [`storage`] (`append_field`, `append_point`) call
-//! [`Grumpkin::is_canonical_field`](stellar_contract_utils::crypto::grumpkin::Grumpkin::is_canonical_field)
-//! / [`Grumpkin::is_canonical_point`](stellar_contract_utils::crypto::grumpkin::Grumpkin::is_canonical_point).
-//! By the
+//! [`Grumpkin::is_canonical_field`] / [`Grumpkin::is_canonical_point`]. By the
 //! time `verify_proof` is invoked, every caller-supplied scalar and Grumpkin
 //! coordinate is guaranteed to be the unique canonical big-endian
 //! representative of its field element, and values the contract subsequently

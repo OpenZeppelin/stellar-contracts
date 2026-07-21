@@ -90,8 +90,7 @@ pub fn is_key_hash_revoked(e: &Env, public_key_hash: &BytesN<32>) -> bool {
 ///
 /// # Events
 ///
-/// Emits [`KeyHashRegistered`](crate::dkim_registry::KeyHashRegistered) with
-/// the domain and public key hashes.
+/// Emits [`KeyHashRegistered`] with the domain and public key hashes.
 ///
 /// # Security Warning
 ///
@@ -157,8 +156,7 @@ pub fn set_dkim_public_key_hashes(
 ///
 /// # Events
 ///
-/// Emits [`KeyHashRevoked`](crate::dkim_registry::KeyHashRevoked) with the
-/// public key hash.
+/// Emits [`KeyHashRevoked`] with the public key hash.
 ///
 /// # Security Warning
 ///
