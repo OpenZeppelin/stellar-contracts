@@ -983,6 +983,36 @@ fn test_checked_exp_underflow_returns_zero() {
 }
 
 #[test]
+fn test_checked_exp_underflow_band_returns_zero() {
+    // Regression: inputs in (-42.139..., -41.935...] drive the final scaling
+    // shift to exactly 256, which the EVM defines as 0 but soroban's
+    // `U256::shr` rejects. They must take the `EXP_INPUT_MIN` early return
+    // instead of trapping.
+    let e = Env::default();
+    for raw in [
+        -42_139_678_854_452_767_550, // just above Solmate's cutoff
+        -42_000_000_000_000_000_000,
+        -41_935_404_423_876_691_220, // EXP_INPUT_MIN: largest input with k = -61
+    ] {
+        assert_eq!(Wad::from_raw(raw).checked_exp(&e), Some(Wad::from_raw(0)));
+    }
+    // Just above EXP_INPUT_MIN: runs the full algorithm (k = -60, shift 255)
+    // and still truncates to 0.
+    assert_eq!(Wad::from_raw(-41_935_404_423_876_691_219).checked_exp(&e), Some(Wad::from_raw(0)));
+}
+
+#[test]
+fn test_powf_underflow_band_returns_zero() {
+    // 0.5^60.7: the intermediate y * ln(x) ≈ -42.07 lands in the band that
+    // used to trap (see test_checked_exp_underflow_band_returns_zero).
+    let e = Env::default();
+    let half = Wad::from_raw(500_000_000_000_000_000);
+    let exponent = Wad::from_raw(60_700_000_000_000_000_000);
+    assert_eq!(half.checked_powf(&e, exponent), Some(Wad::from_raw(0)));
+    assert_eq!(half.powf(&e, exponent), Wad::from_raw(0));
+}
+
+#[test]
 fn test_exp_ln_roundtrip() {
     let e = Env::default();
     // exp(ln(x)) ≈ x for various positive x. Tolerance is per-magnitude
