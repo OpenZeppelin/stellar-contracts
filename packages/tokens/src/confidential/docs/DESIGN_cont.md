@@ -19,13 +19,13 @@ Each confidential transfer produces ciphertexts under two auditor keys via ECDH,
 
 **Recipient's auditor** ($$K\_{\text{aud,r}}$$, from the recipient's `auditor_id`) receives the transfer amount and the per-transfer Pedersen randomness:
 
-$$S\_{a,r} = r\_e \cdot K\_{\text{aud,r}}, \qquad s\_{a,r} = S\_{a,r}.x$$
+$$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}}) \qquad \text{(DESIGN §2.4)}$$
 $$(m\_{v,r}, m\_{r,r}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_r}}, s\_{a,r}, \sigma)$$
 $$\tilde{v}\_{\text{aud,r}} = v\_{\text{tx}} + m\_{v,r}, \qquad \tilde{r}\_{\text{aud,r}} = r\_{\text{tx}} + m\_{r,r}$$
 
 **Sender's auditor** ($$K\_{\text{aud,s}}$$, from the sender's `auditor_id`) receives the transfer amount and the sender's post-transfer balance:
 
-$$S\_{a,s} = r\_e \cdot K\_{\text{aud,s}}, \qquad s\_{a,s} = S\_{a,s}.x$$
+$$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}}) \qquad \text{(DESIGN §2.4)}$$
 $$(m\_{v,s}, m\_{b,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$
 $$\tilde{v}\_{\text{aud,s}} = v\_{\text{tx}} + m\_{v,s}, \qquad \tilde{b}\_{\text{aud,s}} = (v\_A - v\_{\text{tx}}) + m\_{b,s}$$
 
@@ -33,7 +33,7 @@ The transfer circuit (constraints T\_a1--T\_a8) enforces correct computation. At
 
 Each auditor decrypts using their secret key $$k$$. For example, the sender's auditor:
 
-$$S\_{a,s} = k \cdot R\_e, \qquad s\_{a,s} = S\_{a,s}.x$$
+$$S\_{a,s} = k \cdot R\_e, \qquad s\_{a,s} = \text{Poseidon}(\delta\_{\text{ecdh}}, S\_{a,s}.x, S\_{a,s}.y)$$
 $$(m\_{v,s}, m\_{b,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$
 $$v\_{\text{tx}} = \tilde{v}\_{\text{aud,s}} - m\_{v,s}, \qquad v\_{\text{new}} = \tilde{b}\_{\text{aud,s}} - m\_{b,s}$$
 
@@ -266,13 +266,17 @@ fn commit(value: Field, randomness: Field) -> EmbeddedCurvePoint {
     )
 }
 
-/// ECDH: scalar * point. All ECDH scalars in this protocol are F_r-sampled
+/// ECDH shared-secret scalar (Section 2.4): S = scalar * point, then
+/// s = Poseidon2(delta_ecdh, S.x, S.y). Absorbing both coordinates binds
+/// the full shared point, removing the (P, -P) negation invariance of an
+/// x-only extraction. All ECDH scalars in this protocol are F_r-sampled
 /// (sk, vk, r_e_point), so single-limb conversion is sound.
-fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> EmbeddedCurvePoint {
-    multi_scalar_mul(
+fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> Field {
+    let s = multi_scalar_mul(
         [point],
         [EmbeddedCurveScalar::from_field(scalar)]
-    )
+    );
+    poseidon_with_domain(ECDH_SHARED_SECRET, [s.x, s.y])
 }
 ```
 
@@ -507,7 +511,8 @@ Each $$\delta$$ is a small positive integer in $$\mathbb{F}\_r$$, fixed for the 
 | $$\delta\_{\text{esc\\\_dvk}}$$ | 10 | Delegation key escrow (spender ECDH) (§7.11) |
 | $$\delta\_{\text{aud\\\_s}}$$ | 11 | Sender / owner-auditor channel sponge (§2.5, §8.1) |
 | $$\delta\_{\text{aud\\\_r}}$$ | 12 | Recipient-auditor channel sponge (§2.5, §8.1) |
+| $$\delta\_{\text{ecdh}}$$ | 13 | ECDH shared-secret scalar extraction (§2.4) |
 
-**Provenance.** Sequential small integers are the simplest assignment that satisfies the requirement of *distinctness* across all Poseidon2 invocations in this protocol -- Poseidon2 is collision-resistant under the assumption of §3.2, so any two distinct leading inputs (independent of size) produce independent outputs. The values themselves carry no semantic meaning; the binding is purely positional and the table is the only authoritative source. Implementations MUST hardcode these exact numeric values; deviations break cross-implementation derivation of $$vk$$, $$dvk\_i$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\tilde{a}$$, $$r\_{\text{tx}}$$, $$r\_a$$, and all auditor masks.
+**Provenance.** Sequential small integers are the simplest assignment that satisfies the requirement of *distinctness* across all Poseidon2 invocations in this protocol -- Poseidon2 is collision-resistant under the assumption of §3.2, so any two distinct leading inputs (independent of size) produce independent outputs. The values themselves carry no semantic meaning; the binding is purely positional and the table is the only authoritative source. Implementations MUST hardcode these exact numeric values; deviations break cross-implementation derivation of $$vk$$, $$dvk\_i$$, the ECDH shared scalar $$s$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\tilde{a}$$, $$r\_{\text{tx}}$$, $$r\_a$$, and all auditor masks.
 
 **Cross-protocol collision.** Future protocols that share Grumpkin / BN254 / Poseidon2 with this protocol -- e.g. an unrelated payments protocol that uses small-integer Poseidon2 domains -- could in principle pick the same numeric values for unrelated purposes. The protocol assumes that the surrounding inputs to Poseidon2 (key material, structural witnesses) sufficiently disambiguate even in such a case; no Poseidon2 invocation in this protocol is keyed solely on a $$\delta$$ value. If stronger isolation is desired, implementers may instead use the alternate scheme $$\delta\_X = \text{Poseidon2}(0, \text{ASCII}(\text{"openzeppelin/confidential-token/v1:X"}))$$, but this is a deployment-time choice that must be applied uniformly and disclosed in the deployment's circuit-binding documentation.
