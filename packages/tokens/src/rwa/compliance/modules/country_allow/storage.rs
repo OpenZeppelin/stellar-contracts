@@ -38,6 +38,15 @@ pub fn is_country_allowed(e: &Env, token: &Address, country: u32) -> bool {
 /// Returns `true` if `account` has at least one allowed country in the IRS for
 /// `token`.
 ///
+/// The check returns on the first country code that appears in the allowlist
+/// and matches on the bare numeric code alone: it does not require every tie
+/// to be allowed, does not distinguish the relation type (residence,
+/// citizenship, source of funds, ...), and does not honor per-entry validity
+/// [`metadata`](crate::rwa::identity_registry_storage::CountryData::metadata).
+/// See the
+/// [`CountryAllow`](crate::rwa::compliance::modules::country_allow::CountryAllow)
+/// trait docs for the full limitations.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
