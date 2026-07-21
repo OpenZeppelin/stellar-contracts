@@ -57,20 +57,20 @@ global C_SPEND_NEW_X: Field =
     0x11aca8a40b3357f0b9f87a5c4a9ca1b6599f9a70cc9d29b7f49fe2fc2bd16477;
 global C_SPEND_NEW_Y: Field =
     0x0e4f3b326ff5b603ea400a3b0e31a95472db13ef487524952ecd7387719fcde4;
-global C_TX_X: Field = 0x1679ef51dbb01793592348ed9dcc453f82aba5d4777d786ea09979e06b965dfc;
-global C_TX_Y: Field = 0x1ec2eb1cc4b0cfd172637f34166074f3e15e6620d814cc22bae87eeb2a40270d;
+global C_TX_X: Field = 0x26677e8f24cbbc929b8be4a8d470d4a0e54a3c8a351ceef295e6b99b2898ed1d;
+global C_TX_Y: Field = 0x089153eeedb04e49b206f7121341fdcb842a6ca19fb0f938167834dd10d42a97;
 global R_E_X: Field = 0x114ed4fcf2c57014eb678c577aa02f30ef590b713d7a6a5e87702d1c7f71957f;
 global R_E_Y: Field = 0x07a70cf826350d4f438c7a3c5e8761b0ae6cb63de757f0c96815f4057b9205f4;
-global V_TILDE: Field = 0x2861fc81fda926afd33517cb5509df867f324abf81c82ab9d7eca9a94a16f07b;
+global V_TILDE: Field = 0x0b3b7be1cd27249ec6b32b4ecb840079e0354b8675e94aade6519e5428473ffa;
 global B_TILDE: Field = 0x04d1659db899a50a94dcfc54a18b8adaf6e9e8e3046bd11893fbd4a86a7c5738;
 global V_TILDE_AUD_R: Field =
-    0x2d80e4f8a46472bb837956b13028b7d95979a8f5e0f657c50a7d6721f9a19f66;
+    0x1150b1568e3047a5d263b9c24b00f49ca3971880e2fd09e9e6448207136bbb41;
 global R_TILDE_AUD_R: Field =
-    0x0b9fb0b33e05f9c93da3802075248e25b59f1b2416c997ffbedd6cd71e1c1385;
+    0x16cb31d142cf3005f8bd95ab3f59c3bda0da0de7e1d2ac16b4d038548a02b364;
 global V_TILDE_AUD_S: Field =
-    0x0a607feb31e56e89ed94a3e1dc3811d3d23aaf10b2f27874ce670878b9f6ee19;
+    0x0d0a3aa77960977737f4355093d4672ea9f95556fabf63bda0913ebef52c42cf;
 global B_TILDE_AUD_S: Field =
-    0x0b586defafdf4583d0f338855fdf8391102adaac4634a3b80594aea6f788e1cb;
+    0x288ff48898f218dbba2a5c9546d0986af3257a4a539e23e4f35c404d6720c144;
 
 #[test]
 fn print_fixtures() {
@@ -694,7 +694,7 @@ fn rejects_poisoned_c_tx() {
     // Anti-poisoning (Section 5.4): a sender that commits C_tx with arbitrary
     // blinding -- here r_tx' = canonical r_tx + 1 -- desynchronizes the
     // recipient's accumulated blinding. T7 + T8 together close this attack:
-    // r_tx is uniquely determined by Poseidon2(delta_tx_blind, S.x, sigma),
+    // r_tx is uniquely determined by Poseidon2(delta_tx_blind, s, sigma),
     // so any C_tx not built from that exact r_tx fails T8.
     let pvk_b = EmbeddedCurvePoint { x: PVK_B_X, y: PVK_B_Y, is_infinite: false };
     let s_x = ecdh(R_E, pvk_b);

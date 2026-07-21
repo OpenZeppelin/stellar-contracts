@@ -80,11 +80,11 @@ global C_A_Y: Field = 0x1f9f86c84bed1f091c282300a063e4ff38082a63aeec17aef054d5ec
 global A_TILDE: Field =
     0x0c4647bbcd2819afdcd6facf2037861da37e68008f3a40ec2f8db6487e1355c1;
 global ESCROWED_DVK_CIPHER: Field =
-    0x0d9a3beebbda646b71859a11420a74f8b3fe645d9f235f862733554e1d928405;
+    0x1ef89e3bd93ec1afed649d150e9d0ff5df72002759e260cb66b06604a4d7ebe0;
 global V_TILDE_AUD_S: Field =
-    0x0a607feb31e56e89ed94a3e1dc3811d3d23aaf10b2f27874ce670878b9f6eee1;
+    0x0d0a3aa77960977737f4355093d4672ea9f95556fabf63bda0913ebef52c4397;
 global B_TILDE_AUD_S: Field =
-    0x0b586defafdf4583d0f338855fdf8391102adaac4634a3b80594aea6f788e103;
+    0x288ff48898f218dbba2a5c9546d0986af3257a4a539e23e4f35c404d6720c07c;
 
 #[test]
 fn print_fixtures() {
