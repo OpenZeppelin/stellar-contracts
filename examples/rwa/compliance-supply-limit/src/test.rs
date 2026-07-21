@@ -211,6 +211,23 @@ fn preset_supply_count_requires_manager_auth() {
 }
 
 #[test]
+fn mark_preset_completed_requires_manager_auth() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let token = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+
+    client.mark_preset_completed(&token, &manager);
+
+    let auths = e.auths();
+    assert_eq!(auths.len(), 1);
+    let (addr, _) = &auths[0];
+    assert_eq!(addr, &manager);
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #394)")]
 fn on_created_panics_when_exceeding_limit() {
     let e = Env::default();

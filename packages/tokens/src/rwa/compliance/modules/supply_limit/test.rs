@@ -3,12 +3,15 @@ extern crate std;
 use soroban_sdk::{
     contract,
     testutils::{Address as _, Events},
-    Address, Env,
+    Address, Env, Event,
 };
 
-use crate::rwa::compliance::modules::supply_limit::storage::{
-    get_supply_count, get_supply_limit, is_preset_completed, mark_preset_completed, on_created,
-    on_destroyed, preset_supply_count, set_supply_limit,
+use crate::rwa::compliance::modules::supply_limit::{
+    storage::{
+        get_supply_count, get_supply_limit, is_preset_completed, mark_preset_completed, on_created,
+        on_destroyed, preset_supply_count, set_supply_limit,
+    },
+    PresetCompleted,
 };
 
 #[contract]
@@ -201,7 +204,12 @@ fn mark_preset_completed_blocks_further_presets() {
         let after_mark = e.events().all().events().len();
         // Repeated marking is a write but emits another event; no panic.
         mark_preset_completed(&e, &token);
-        assert_eq!(e.events().all().events().len(), after_mark + 1);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), after_mark + 1);
+        assert_eq!(
+            events.events().get(after_mark).unwrap(),
+            &PresetCompleted { token: token.clone() }.to_xdr(&e, &module_id)
+        );
         assert!(is_preset_completed(&e, &token));
     });
 }
@@ -228,5 +236,22 @@ fn preset_supply_count_panics_on_negative_supply() {
 
     e.as_contract(&module_id, || {
         preset_supply_count(&e, &token, -1);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #391)")]
+fn on_created_panics_on_supply_count_overflow() {
+    let e = Env::default();
+    let module_id = e.register(TestSupplyLimitContract, ());
+    let token = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // The preset can seed the counter at the numeric ceiling, so the
+        // addition in `on_created` must trip before the cap check does.
+        set_supply_limit(&e, &token, i128::MAX);
+        preset_supply_count(&e, &token, i128::MAX);
+        on_created(&e, &to, 1, &token);
     });
 }
