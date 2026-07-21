@@ -33,6 +33,14 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// not raise the effective cap. Each counter starts with the first
 /// transfer after its window elapsed and resets once the window passes.
 ///
+/// Counters follow the identity, not the wallet. A wallet re-registered
+/// under a different identity (remove and re-add in the registry, allowed
+/// only at zero balance) accrues subsequent transfers against the new
+/// identity's windows, while consumed allowances stay with the old
+/// identity. An identity replacement for the same investor should
+/// therefore wait out open transfer windows, since counters are not
+/// migrated.
+///
 /// Only outgoing transfers are counted and checked. Mints and burns are
 /// exempt, as are forced (admin/recovery) transfers: those are not investor
 /// activity, so they neither consume the window allowance nor get rejected

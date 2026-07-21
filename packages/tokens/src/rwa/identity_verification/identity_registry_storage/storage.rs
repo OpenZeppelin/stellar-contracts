@@ -420,10 +420,18 @@ pub fn add_identity(
 ///
 /// # Notes
 ///
-/// One cross-contract `balance` call is made per linked token. The zero
-/// balance check is only as complete as the token binder registry: a token
-/// that resolves identities through this contract without being bound to it
-/// is not checked.
+/// One cross-contract `balance` call is made per linked token; the token
+/// binder's `MAX_TOKENS` cap is sized so this sweep fits within a single
+/// transaction. The zero balance check is only as complete as the token
+/// binder registry: a token that resolves identities through this contract
+/// without being bound to it is not checked.
+///
+/// The check covers balance-backed module state. Time-windowed transfer
+/// counters are flow-based and stay keyed to the old identity: a wallet
+/// re-registered under a new identity starts fresh windows. That is correct
+/// when the wallet genuinely changes investors; an identity replacement for
+/// the same investor should wait out open transfer windows, since counters
+/// are not migrated.
 ///
 /// # Security Warning
 ///

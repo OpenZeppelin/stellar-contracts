@@ -77,11 +77,11 @@ fn bind_tokens_splits_across_two_buckets() {
 
     e.as_contract(&address, || {
         // Pre-fill current bucket to BUCKET_SIZE - 5
-        for _ in 0..95u32 {
+        for _ in 0..(BUCKET_SIZE - 5) {
             let t = Address::generate(&e);
             bind_token(&e, &t);
         }
-        assert_eq!(linked_token_count(&e), 95);
+        assert_eq!(linked_token_count(&e), BUCKET_SIZE - 5);
 
         // Now bind a batch of 10 which should split: 5 in current, 5 in next
         let mut batch: Vec<Address> = Vec::new(&e);
@@ -92,19 +92,19 @@ fn bind_tokens_splits_across_two_buckets() {
         bind_tokens(&e, &batch);
 
         // Validate counts
-        assert_eq!(linked_token_count(&e), 105);
+        assert_eq!(linked_token_count(&e), BUCKET_SIZE + 5);
 
-        // First 5 go at indices 95..99 (current bucket), next 5 at 100..104 (next
-        // bucket)
+        // First 5 go at the end of the current bucket, next 5 at the start of
+        // the next bucket
         for i in 0..10u32 {
-            assert_eq!(get_token_by_index(&e, 95 + i), batch.get(i).unwrap());
+            assert_eq!(get_token_by_index(&e, BUCKET_SIZE - 5 + i), batch.get(i).unwrap());
         }
 
         // Spot-check full list end ordering
         let all = linked_tokens(&e);
-        assert_eq!(all.len(), 105);
+        assert_eq!(all.len(), BUCKET_SIZE + 5);
         for i in 0..10u32 {
-            assert_eq!(all.get(95 + i).unwrap(), batch.get(i).unwrap());
+            assert_eq!(all.get(BUCKET_SIZE - 5 + i).unwrap(), batch.get(i).unwrap());
         }
     });
 }
@@ -418,33 +418,38 @@ fn bind_tokens_spill_across_three_buckets() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        // Pre-fill 50 tokens in current bucket
-        for _ in 0..50u32 {
+        // Pre-fill half of the current bucket
+        let half = BUCKET_SIZE / 2;
+        for _ in 0..half {
             bind_token(&e, &Address::generate(&e));
         }
-        assert_eq!(linked_token_count(&e), 50);
+        assert_eq!(linked_token_count(&e), half);
 
-        // Batch of 200 should fill: 50 in current, 100 in next, 50 in third
+        // A batch of BUCKET_SIZE * 2 should fill: half in current, a full
+        // bucket in the next, and the remaining half in a third
         let mut batch: Vec<Address> = Vec::new(&e);
-        for _ in 0..200u32 {
+        for _ in 0..(BUCKET_SIZE * 2) {
             batch.push_back(Address::generate(&e));
         }
 
         bind_tokens(&e, &batch);
 
-        assert_eq!(linked_token_count(&e), 250);
+        assert_eq!(linked_token_count(&e), half + BUCKET_SIZE * 2);
 
-        // First 50 of batch at indices 50..99
-        for i in 0..50u32 {
-            assert_eq!(get_token_by_index(&e, 50 + i), batch.get(i).unwrap());
+        // First half of batch fills the current bucket
+        for i in 0..half {
+            assert_eq!(get_token_by_index(&e, half + i), batch.get(i).unwrap());
         }
-        // Next 100 of batch at indices 100..199
-        for i in 0..100u32 {
-            assert_eq!(get_token_by_index(&e, 100 + i), batch.get(50 + i).unwrap());
+        // Next full bucket of batch lands in the second bucket
+        for i in 0..BUCKET_SIZE {
+            assert_eq!(get_token_by_index(&e, BUCKET_SIZE + i), batch.get(half + i).unwrap());
         }
-        // Last 50 of batch at indices 200..249
-        for i in 0..50u32 {
-            assert_eq!(get_token_by_index(&e, 200 + i), batch.get(150 + i).unwrap());
+        // Remaining half of batch lands in the third bucket
+        for i in 0..half {
+            assert_eq!(
+                get_token_by_index(&e, BUCKET_SIZE * 2 + i),
+                batch.get(BUCKET_SIZE + half + i).unwrap()
+            );
         }
     });
 }

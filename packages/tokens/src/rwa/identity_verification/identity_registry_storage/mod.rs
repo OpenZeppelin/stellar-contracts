@@ -33,23 +33,35 @@
 //! ## Lifecycle Operations
 //!
 //! - `add_identity` registers a wallet under an identity contract.
-//! - `modify_identity` swaps which identity contract a wallet points to. Only
-//!   the pointer is rewritten: neither identity contract is touched, and claims
-//!   do not carry over, since issuer attestations bind to the identity address.
-//!   It exists for replacing a compromised or obsolete identity contract, or
-//!   fixing an erroneous registration; the new identity needs its own
-//!   attestations.
-//! - `remove_identity` deletes a wallet's registration and profile.
+//! - `remove_identity` deletes a wallet's registration and profile. It is
+//!   rejected while the wallet still holds a balance in any linked token.
 //! - `recover_identity` handles wallet loss: the same identity moves to a new
-//!   wallet, and the old wallet is tombstoned. This is the mirror image of
-//!   `modify_identity` (same identity, new wallet, instead of same wallet, new
-//!   identity).
+//!   wallet, and the old wallet is tombstoned.
 //!
-//! The identity address does double duty downstream: compliance modules key
-//! their per-investor accounting (aggregate balances, transfer counters) by
-//! the resolved identity. Repointing or removing the identity of a wallet
-//! that still holds tokens re-keys that accounting, so these are privileged
-//! operations that must be sequenced with care.
+//! ## Replacing an Identity
+//!
+//! There is deliberately no in-place pointer swap: ERC-3643's
+//! `updateIdentity` has no equivalent here. The identity address does double
+//! duty downstream: besides locating the claims, it is the key under which
+//! compliance modules aggregate per-investor accounting (aggregate balances,
+//! transfer counters). Swapping the pointer under a funded wallet would
+//! silently re-key that accounting, and would amount to changing the tokens'
+//! beneficial owner without a transfer, bypassing every compliance check. An
+//! in-place swap also would not save anything real: issuer attestations bind
+//! to the identity address, so claims never carry over to a replacement
+//! contract, and re-attestation is required regardless.
+//!
+//! Replacing a wallet's identity contract (compromise, provider migration,
+//! erroneous registration) is therefore a two-step operation on an emptied
+//! wallet: the balance leaves first through regular or forced transfers, so
+//! every token movement passes through the compliance hooks, then
+//! `remove_identity` followed by `add_identity` with the new identity.
+//!
+//! One caveat remains: time-windowed transfer counters are keyed by identity
+//! and are not balance-backed, so re-registration starts fresh windows. That
+//! is correct when the wallet genuinely changes investors; a replacement for
+//! the same investor should wait out open transfer windows, since counters
+//! are not migrated.
 //!
 //! ## Flexible Country Relations
 //!

@@ -31,14 +31,15 @@ pub use storage::{
 /// contracts can decide how to expose batch semantics in their own interfaces.
 ///
 /// Implementation notes:
-/// - Token addresses are stored in buckets of 100 addresses each (`BUCKET_SIZE
-///   = 100`).
-/// - Up to 100 buckets are supported (`MAX_BUCKETS = 100`), allowing at most
-///   10,000 tokens bound to a single contract.
-/// - With Protocol 23, reading live Soroban state is inexpensive and read-entry
-///   limits per transaction have been removed. Lookups are therefore cheap, and
-///   storage remains simple with no reverse mapping; functions like
-///   `get_token_index()` linearly scan buckets.
+/// - Token addresses are stored in buckets of 20 addresses each (`BUCKET_SIZE =
+///   20`).
+/// - Up to 5 buckets are supported (`MAX_BUCKETS = 5`), allowing at most 100
+///   tokens bound to a single contract. The cap is deliberately small enough
+///   that a sweep making one cross-contract call per bound token fits in a
+///   single transaction; refer to [`MAX_TOKENS`] for the sizing rationale.
+/// - With Protocol 23, reading live Soroban state is inexpensive. Lookups are
+///   therefore cheap, and storage remains simple with no reverse mapping;
+///   functions like `get_token_index()` linearly scan buckets.
 #[contracttrait]
 pub trait TokenBinder {
     /// Returns all currently bound token addresses.
@@ -109,11 +110,21 @@ pub const TOKEN_BINDER_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const TOKEN_BINDER_TTL_THRESHOLD: u32 = TOKEN_BINDER_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 /// Number of Token addresses in bucket
-pub const BUCKET_SIZE: u32 = 100;
+pub const BUCKET_SIZE: u32 = 20;
 /// Max. number of buckets
-pub const MAX_BUCKETS: u32 = 100;
-/// Max. number of Token addresses
-pub const MAX_TOKENS: u32 = BUCKET_SIZE * MAX_BUCKETS; // 10_000
+pub const MAX_BUCKETS: u32 = 5;
+/// Max. number of Token addresses.
+///
+/// The cap is sized so that operations sweeping every bound token with one
+/// cross-contract call each (such as the identity registry's zero-balance
+/// check on `remove_identity`) fit within a single transaction. The binding
+/// constraint on current Mainnet is the 400 footprint entries allowed per
+/// transaction: each swept token touches up to three distinct entries
+/// (contract instance, contract code, one data entry), so 100 tokens consume
+/// at most ~300 entries and leave room for the caller's own footprint. CPU
+/// stays well within budget at this size. Current limits are listed at
+/// <https://lab.stellar.org/network-limits>.
+pub const MAX_TOKENS: u32 = BUCKET_SIZE * MAX_BUCKETS; // 100
 
 // ################## EVENTS ##################
 
