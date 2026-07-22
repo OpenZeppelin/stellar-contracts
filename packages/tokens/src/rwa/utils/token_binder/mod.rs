@@ -5,8 +5,7 @@ mod test;
 
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, Vec};
 pub use storage::{
-    bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound,
-    linked_token_count, linked_tokens, unbind_token,
+    bind_token, bind_tokens, is_token_bound, linked_token_count, linked_tokens, unbind_token,
 };
 
 /// Trait for managing token bindings to periphery contracts.
@@ -22,9 +21,9 @@ pub use storage::{
 ///
 /// # Storage Pattern
 ///
-/// The underlying storage uses an enumerable pattern for efficiency:
-/// - Tokens are indexed sequentially (0, 1, 2, ...)
-/// - Swap-remove pattern maintains compact storage when unbinding
+/// - All bound token addresses live in a single `Vec<Address>` ledger entry
+/// - Swap-remove pattern keeps the list compact when unbinding, so the list
+///   order is not stable across unbinds
 ///
 /// Note that the storage module also exposes a batch binding helper
 /// `bind_tokens(e, tokens)` which is not part of this trait, so that client
@@ -39,7 +38,7 @@ pub use storage::{
 ///   for the sizing rationale.
 /// - With Protocol 23, reading live Soroban state is inexpensive. Lookups are
 ///   therefore cheap, and storage remains simple with no reverse mapping;
-///   functions like `get_token_index()` linearly scan the list.
+///   membership checks (`is_token_bound()`) linearly scan the list.
 #[contracttrait]
 pub trait TokenBinder {
     /// Returns all currently bound token addresses.

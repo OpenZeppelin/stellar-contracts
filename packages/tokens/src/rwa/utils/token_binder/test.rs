@@ -3,13 +3,13 @@ extern crate std;
 use soroban_sdk::{
     contract,
     testutils::{Address as _, Events},
-    Address, Env, Vec,
+    vec, Address, Env, Vec,
 };
 
 use crate::rwa::utils::token_binder::{
     storage::{
-        bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound,
-        linked_token_count, linked_tokens, unbind_token, TokenBinderStorageKey,
+        bind_token, bind_tokens, is_token_bound, linked_token_count, linked_tokens, unbind_token,
+        TokenBinderStorageKey,
     },
     MAX_TOKENS,
 };
@@ -61,10 +61,7 @@ fn bind_tokens_appends_in_order() {
         bind_tokens(&e, &batch);
 
         // verify
-        assert_eq!(linked_token_count(&e), 10);
-        for i in 0..10u32 {
-            assert_eq!(get_token_by_index(&e, i), batch.get(i).unwrap());
-        }
+        assert_eq!(linked_tokens(&e), batch);
         // one TokenBound per token
         assert_eq!(e.events().all().events().len(), 10);
 
@@ -90,8 +87,7 @@ fn bind_tokens_full_capacity_in_one_call() {
         bind_tokens(&e, &batch);
 
         assert_eq!(linked_token_count(&e), MAX_TOKENS);
-        assert_eq!(get_token_by_index(&e, 0), batch.get(0).unwrap());
-        assert_eq!(get_token_by_index(&e, MAX_TOKENS - 1), batch.get(MAX_TOKENS - 1).unwrap());
+        assert_eq!(linked_tokens(&e), batch);
         assert!(is_token_bound(&e, &batch.get(MAX_TOKENS / 2).unwrap()));
     });
 }
@@ -125,8 +121,7 @@ fn bind_single_token() {
 
         assert_eq!(linked_token_count(&e), 1);
         assert!(is_token_bound(&e, &token));
-        assert_eq!(get_token_by_index(&e, 0), token);
-        assert_eq!(get_token_index(&e, &token), 0);
+        assert_eq!(linked_tokens(&e), vec![&e, token.clone()]);
         assert_eq!(e.events().all().events().len(), 1);
     });
 }
@@ -149,13 +144,7 @@ fn bind_multiple_tokens() {
         assert!(is_token_bound(&e, &token2));
         assert!(is_token_bound(&e, &token3));
 
-        assert_eq!(get_token_by_index(&e, 0), token1);
-        assert_eq!(get_token_by_index(&e, 1), token2);
-        assert_eq!(get_token_by_index(&e, 2), token3);
-
-        assert_eq!(get_token_index(&e, &token1), 0);
-        assert_eq!(get_token_index(&e, &token2), 1);
-        assert_eq!(get_token_index(&e, &token3), 2);
+        assert_eq!(linked_tokens(&e), vec![&e, token1.clone(), token2.clone(), token3.clone()]);
     });
 }
 
@@ -210,11 +199,8 @@ fn unbind_middle_token_swap_remove() {
         assert!(!is_token_bound(&e, &token2));
         assert!(is_token_bound(&e, &token3));
 
-        assert_eq!(get_token_by_index(&e, 0), token1);
-        assert_eq!(get_token_by_index(&e, 1), token3);
-
-        assert_eq!(get_token_index(&e, &token1), 0);
-        assert_eq!(get_token_index(&e, &token3), 1);
+        // The last token (token3) filled the removed slot
+        assert_eq!(linked_tokens(&e), vec![&e, token1.clone(), token3.clone()]);
     });
 }
 
@@ -238,8 +224,7 @@ fn unbind_last_token() {
         assert!(is_token_bound(&e, &token2));
         assert!(!is_token_bound(&e, &token3));
 
-        assert_eq!(get_token_by_index(&e, 0), token1);
-        assert_eq!(get_token_by_index(&e, 1), token2);
+        assert_eq!(linked_tokens(&e), vec![&e, token1.clone(), token2.clone()]);
     });
 }
 
@@ -252,29 +237,6 @@ fn unbind_nonexistent_token() {
 
     e.as_contract(&address, || {
         unbind_token(&e, &token);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #330)")]
-fn get_token_by_invalid_index() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        get_token_by_index(&e, 0);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #330)")]
-fn get_token_index_nonexistent() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-    let token = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        get_token_index(&e, &token);
     });
 }
 
@@ -337,18 +299,14 @@ fn complex_bind_unbind_sequence() {
         assert_eq!(linked_token_count(&e), 3);
 
         unbind_token(&e, &token2);
-        assert_eq!(linked_token_count(&e), 2);
-        assert_eq!(get_token_by_index(&e, 0), token1);
-        assert_eq!(get_token_by_index(&e, 1), token3);
+        assert_eq!(linked_tokens(&e), vec![&e, token1.clone(), token3.clone()]);
 
         bind_token(&e, &token4);
-        assert_eq!(linked_token_count(&e), 3);
-        assert_eq!(get_token_by_index(&e, 2), token4);
+        assert_eq!(linked_tokens(&e), vec![&e, token1.clone(), token3.clone(), token4.clone()]);
 
         unbind_token(&e, &token1);
-        assert_eq!(linked_token_count(&e), 2);
-        assert_eq!(get_token_by_index(&e, 0), token4);
-        assert_eq!(get_token_by_index(&e, 1), token3);
+        // The last token (token4) filled the removed slot
+        assert_eq!(linked_tokens(&e), vec![&e, token4.clone(), token3.clone()]);
     });
 }
 
@@ -386,15 +344,13 @@ fn rebind_after_unbind() {
     e.as_contract(&address, || {
         bind_token(&e, &token);
         assert!(is_token_bound(&e, &token));
-        assert_eq!(get_token_index(&e, &token), 0);
 
         unbind_token(&e, &token);
         assert!(!is_token_bound(&e, &token));
 
         bind_token(&e, &token);
         assert!(is_token_bound(&e, &token));
-        assert_eq!(get_token_index(&e, &token), 0);
-        assert_eq!(linked_token_count(&e), 1);
+        assert_eq!(linked_tokens(&e), vec![&e, token.clone()]);
     });
 }
 
@@ -456,9 +412,8 @@ fn bind_tokens_appends_after_existing() {
         }
         bind_tokens(&e, &batch);
 
-        assert_eq!(linked_token_count(&e), 15);
-        for i in 0..10u32 {
-            assert_eq!(get_token_by_index(&e, 5 + i), batch.get(i).unwrap());
-        }
+        let all = linked_tokens(&e);
+        assert_eq!(all.len(), 15);
+        assert_eq!(all.slice(5..), batch);
     });
 }

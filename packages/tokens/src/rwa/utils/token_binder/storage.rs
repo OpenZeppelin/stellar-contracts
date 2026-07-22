@@ -38,42 +38,6 @@ pub fn linked_token_count(e: &Env) -> u32 {
     linked_tokens(e).len()
 }
 
-/// Returns a token address by its index.
-///
-/// # Arguments
-///
-/// * `e` - The Soroban environment.
-/// * `index` - The index of the token to retrieve.
-///
-/// # Errors
-///
-/// * [`TokenBinderError::TokenNotFound`] - If `index` is out of bounds.
-pub fn get_token_by_index(e: &Env, index: u32) -> Address {
-    linked_tokens(e)
-        .get(index)
-        .unwrap_or_else(|| panic_with_error!(e, TokenBinderError::TokenNotFound))
-}
-
-/// Returns the index of a bound token address.
-///
-/// # Arguments
-///
-/// * `e` - The Soroban environment.
-/// * `token` - The token address to look up.
-///
-/// # Errors
-///
-/// * [`TokenBinderError::TokenNotFound`] - If the token is not currently bound.
-///
-/// # Notes
-///
-/// Performs a linear scan of the token list.
-pub fn get_token_index(e: &Env, token: &Address) -> u32 {
-    linked_tokens(e)
-        .first_index_of(token)
-        .unwrap_or_else(|| panic_with_error!(e, TokenBinderError::TokenNotFound))
-}
-
 /// Checks whether a token address is currently bound.
 ///
 /// # Arguments
