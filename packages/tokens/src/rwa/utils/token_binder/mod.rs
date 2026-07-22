@@ -5,8 +5,8 @@ mod test;
 
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, Vec};
 pub use storage::{
-    bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound, linked_tokens,
-    unbind_token,
+    bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound,
+    linked_token_count, linked_tokens, unbind_token,
 };
 
 /// Trait for managing token bindings to periphery contracts.
@@ -31,15 +31,15 @@ pub use storage::{
 /// contracts can decide how to expose batch semantics in their own interfaces.
 ///
 /// Implementation notes:
-/// - Token addresses are stored in buckets of 20 addresses each (`BUCKET_SIZE =
-///   20`).
-/// - Up to 5 buckets are supported (`MAX_BUCKETS = 5`), allowing at most 100
-///   tokens bound to a single contract. The cap is deliberately small enough
-///   that a sweep making one cross-contract call per bound token fits in a
-///   single transaction; refer to [`MAX_TOKENS`] for the sizing rationale.
+/// - All token addresses live in a single `Vec<Address>` ledger entry. At most
+///   [`MAX_TOKENS`] = 100 tokens can be bound to a single contract: the cap is
+///   deliberately small enough that a sweep making one cross-contract call per
+///   bound token fits in a single transaction, and it keeps the whole list a
+///   few kilobytes, far below the per-entry size limit. Refer to [`MAX_TOKENS`]
+///   for the sizing rationale.
 /// - With Protocol 23, reading live Soroban state is inexpensive. Lookups are
 ///   therefore cheap, and storage remains simple with no reverse mapping;
-///   functions like `get_token_index()` linearly scan buckets.
+///   functions like `get_token_index()` linearly scan the list.
 #[contracttrait]
 pub trait TokenBinder {
     /// Returns all currently bound token addresses.
@@ -97,8 +97,6 @@ pub enum TokenBinderError {
     TokenAlreadyBound = 331,
     /// Total token capacity (MAX_TOKENS) has been reached.
     MaxTokensReached = 332,
-    /// Batch bind size exceeded.
-    BindBatchTooLarge = 333,
     /// The batch contains duplicates.
     BindBatchDuplicates = 334,
 }
@@ -109,10 +107,6 @@ const DAY_IN_LEDGERS: u32 = 17280;
 pub const TOKEN_BINDER_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const TOKEN_BINDER_TTL_THRESHOLD: u32 = TOKEN_BINDER_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
-/// Number of Token addresses in bucket
-pub const BUCKET_SIZE: u32 = 20;
-/// Max. number of buckets
-pub const MAX_BUCKETS: u32 = 5;
 /// Max. number of Token addresses.
 ///
 /// The cap is sized so that operations sweeping every bound token with one
@@ -124,7 +118,10 @@ pub const MAX_BUCKETS: u32 = 5;
 /// at most ~300 entries and leave room for the caller's own footprint. CPU
 /// stays well within budget at this size. Current limits are listed at
 /// <https://lab.stellar.org/network-limits>.
-pub const MAX_TOKENS: u32 = BUCKET_SIZE * MAX_BUCKETS; // 100
+///
+/// The cap also keeps the whole token list viable as a single ledger entry:
+/// 100 addresses take a few kilobytes, far below the 64 KB per-entry limit.
+pub const MAX_TOKENS: u32 = 100;
 
 // ################## EVENTS ##################
 

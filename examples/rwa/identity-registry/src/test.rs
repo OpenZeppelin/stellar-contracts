@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{testutils::Address as _, vec, Address, Env};
-use stellar_tokens::rwa::utils::token_binder::BUCKET_SIZE;
+use stellar_tokens::rwa::utils::token_binder::MAX_TOKENS;
 
 use crate::contract::{IdentityRegistryContract, IdentityRegistryContractClient};
 
@@ -24,8 +24,8 @@ fn bind_max() {
     let client = create_client(&e, &admin, &manager);
     e.mock_all_auths();
 
-    // The largest batch a single `bind_tokens` call accepts.
-    let max_batch = BUCKET_SIZE * 2;
+    // The full capacity can be bound in a single call.
+    let max_batch = MAX_TOKENS;
     let mut tokens = vec![&e];
     for _ in 0..max_batch {
         let token = Address::generate(&e);

@@ -11,7 +11,7 @@ use crate::rwa::utils::token_binder::{
         bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound,
         linked_token_count, linked_tokens, unbind_token, TokenBinderStorageKey,
     },
-    BUCKET_SIZE, MAX_TOKENS,
+    MAX_TOKENS,
 };
 
 #[contract]
@@ -35,7 +35,12 @@ fn bind_token_max_tokens_reached() {
     e.cost_estimate().disable_resource_limits();
     let address = e.register(MockContract, ());
     e.as_contract(&address, || {
-        e.storage().persistent().set(&TokenBinderStorageKey::TotalCount, &MAX_TOKENS);
+        let mut tokens: Vec<Address> = Vec::new(&e);
+        for _ in 0..MAX_TOKENS {
+            tokens.push_back(Address::generate(&e));
+        }
+        e.storage().persistent().set(&TokenBinderStorageKey::Tokens, &tokens);
+
         // Next bind should panic with MaxTokensReached
         let extra = Address::generate(&e);
         bind_token(&e, &extra);
@@ -43,12 +48,11 @@ fn bind_token_max_tokens_reached() {
 }
 
 #[test]
-fn bind_tokens_fits_current_bucket() {
+fn bind_tokens_appends_in_order() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     let tokens = e.as_contract(&address, || {
-        // batch smaller than BUCKET_SIZE * 2
         let mut batch: Vec<Address> = Vec::new(&e);
         for _ in 0..10u32 {
             batch.push_back(Address::generate(&e));
@@ -71,41 +75,24 @@ fn bind_tokens_fits_current_bucket() {
 }
 
 #[test]
-fn bind_tokens_splits_across_two_buckets() {
+fn bind_tokens_full_capacity_in_one_call() {
     let e = Env::default();
+    e.cost_estimate().disable_resource_limits();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        // Pre-fill current bucket to BUCKET_SIZE - 5
-        for _ in 0..(BUCKET_SIZE - 5) {
-            let t = Address::generate(&e);
-            bind_token(&e, &t);
-        }
-        assert_eq!(linked_token_count(&e), BUCKET_SIZE - 5);
-
-        // Now bind a batch of 10 which should split: 5 in current, 5 in next
+        // A single batch can bind up to the full capacity.
         let mut batch: Vec<Address> = Vec::new(&e);
-        for _ in 0..10u32 {
+        for _ in 0..MAX_TOKENS {
             batch.push_back(Address::generate(&e));
         }
 
         bind_tokens(&e, &batch);
 
-        // Validate counts
-        assert_eq!(linked_token_count(&e), BUCKET_SIZE + 5);
-
-        // First 5 go at the end of the current bucket, next 5 at the start of
-        // the next bucket
-        for i in 0..10u32 {
-            assert_eq!(get_token_by_index(&e, BUCKET_SIZE - 5 + i), batch.get(i).unwrap());
-        }
-
-        // Spot-check full list end ordering
-        let all = linked_tokens(&e);
-        assert_eq!(all.len(), BUCKET_SIZE + 5);
-        for i in 0..10u32 {
-            assert_eq!(all.get(BUCKET_SIZE - 5 + i).unwrap(), batch.get(i).unwrap());
-        }
+        assert_eq!(linked_token_count(&e), MAX_TOKENS);
+        assert_eq!(get_token_by_index(&e, 0), batch.get(0).unwrap());
+        assert_eq!(get_token_by_index(&e, MAX_TOKENS - 1), batch.get(MAX_TOKENS - 1).unwrap());
+        assert!(is_token_bound(&e, &batch.get(MAX_TOKENS / 2).unwrap()));
     });
 }
 
@@ -412,56 +399,14 @@ fn rebind_after_unbind() {
 }
 
 #[test]
-fn bind_tokens_spill_across_three_buckets() {
+#[should_panic(expected = "Error(Contract, #332)")]
+fn bind_tokens_exceeding_capacity_panics() {
     let e = Env::default();
     e.cost_estimate().disable_resource_limits();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        // Pre-fill half of the current bucket
-        let half = BUCKET_SIZE / 2;
-        for _ in 0..half {
-            bind_token(&e, &Address::generate(&e));
-        }
-        assert_eq!(linked_token_count(&e), half);
-
-        // A batch of BUCKET_SIZE * 2 should fill: half in current, a full
-        // bucket in the next, and the remaining half in a third
-        let mut batch: Vec<Address> = Vec::new(&e);
-        for _ in 0..(BUCKET_SIZE * 2) {
-            batch.push_back(Address::generate(&e));
-        }
-
-        bind_tokens(&e, &batch);
-
-        assert_eq!(linked_token_count(&e), half + BUCKET_SIZE * 2);
-
-        // First half of batch fills the current bucket
-        for i in 0..half {
-            assert_eq!(get_token_by_index(&e, half + i), batch.get(i).unwrap());
-        }
-        // Next full bucket of batch lands in the second bucket
-        for i in 0..BUCKET_SIZE {
-            assert_eq!(get_token_by_index(&e, BUCKET_SIZE + i), batch.get(half + i).unwrap());
-        }
-        // Remaining half of batch lands in the third bucket
-        for i in 0..half {
-            assert_eq!(
-                get_token_by_index(&e, BUCKET_SIZE * 2 + i),
-                batch.get(BUCKET_SIZE + half + i).unwrap()
-            );
-        }
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #333)")]
-fn bind_tokens_batch_too_large_should_panic() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let target_len = BUCKET_SIZE * 2 + 1; // strictly greater than allowed
+        let target_len = MAX_TOKENS + 1; // strictly greater than capacity
         let mut batch: Vec<Address> = Vec::new(&e);
         for _ in 0..target_len {
             batch.push_back(Address::generate(&e));
@@ -493,86 +438,27 @@ fn bind_tokens_already_bound_in_storage_should_panic() {
 }
 
 #[test]
-fn unbind_makes_last_bucket_empty() {
+fn bind_tokens_appends_after_existing() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        // Create exactly BUCKET_SIZE + 1 tokens => second bucket has 1 item
-        let mut tokens: Vec<Address> = Vec::new(&e);
-        for _ in 0..(BUCKET_SIZE + 1) {
-            let t = Address::generate(&e);
-            bind_token(&e, &t);
-            tokens.push_back(t);
-        }
-        assert_eq!(linked_token_count(&e), BUCKET_SIZE + 1);
-
-        // Unbind the first token; the single last token moves into index 0,
-        // making the last bucket empty afterwards.
-        let first = tokens.get(0).unwrap();
-        let last_before = tokens.get(BUCKET_SIZE).unwrap();
-        unbind_token(&e, &first);
-
-        assert_eq!(linked_token_count(&e), BUCKET_SIZE);
-        // Index 0 now holds the previous last token
-        assert_eq!(get_token_by_index(&e, 0), last_before);
-
-        // Sanity: full list has exactly BUCKET_SIZE elements now
-        let all = linked_tokens(&e);
-        assert_eq!(all.len(), BUCKET_SIZE);
-    });
-}
-
-#[test]
-fn is_token_bound_across_buckets() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    let (t0, t_boundary, t_next) = e.as_contract(&address, || {
-        // Fill first bucket fully and add a few into next
-        let mut first: Option<Address> = None;
-        for i in 0..(BUCKET_SIZE + 5) {
-            let t = Address::generate(&e);
-            bind_token(&e, &t);
-            if i == 0 {
-                first = Some(t.clone());
-            }
-        }
-        let first_token = first.unwrap();
-        let boundary_token = get_token_by_index(&e, BUCKET_SIZE - 1);
-        let next_bucket_token = get_token_by_index(&e, BUCKET_SIZE);
-        (first_token, boundary_token, next_bucket_token)
-    });
-
-    e.as_contract(&address, || {
-        assert!(is_token_bound(&e, &t0));
-        assert!(is_token_bound(&e, &t_boundary));
-        assert!(is_token_bound(&e, &t_next));
-    });
-}
-
-#[test]
-fn bind_tokens_exact_bucket_boundary_start() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        // Pre-fill exactly one bucket
-        for _ in 0..BUCKET_SIZE {
+        // Pre-bind a handful of single tokens
+        for _ in 0..5u32 {
             bind_token(&e, &Address::generate(&e));
         }
-        assert_eq!(linked_token_count(&e), BUCKET_SIZE);
+        assert_eq!(linked_token_count(&e), 5);
 
-        // Now bind a batch that fits entirely in the next bucket
+        // A batch appends after the existing entries, in order
         let mut batch: Vec<Address> = Vec::new(&e);
         for _ in 0..10u32 {
             batch.push_back(Address::generate(&e));
         }
         bind_tokens(&e, &batch);
 
-        assert_eq!(linked_token_count(&e), BUCKET_SIZE + 10);
+        assert_eq!(linked_token_count(&e), 15);
         for i in 0..10u32 {
-            assert_eq!(get_token_by_index(&e, BUCKET_SIZE + i), batch.get(i).unwrap());
+            assert_eq!(get_token_by_index(&e, 5 + i), batch.get(i).unwrap());
         }
     });
 }
