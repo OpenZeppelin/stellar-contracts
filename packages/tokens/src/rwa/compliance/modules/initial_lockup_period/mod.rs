@@ -53,9 +53,12 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// lockup (by panicking when the spend exceeds the unlocked holdings) and
 /// consume expired locks as the wallet spends, keeping the recorded total
 /// in step with what the wallet actually holds. Missing a hook leaves stale
-/// locks on the books. Forced (admin/recovery) transfers are not rejected:
-/// they consume locks oldest-first, expired or not, so a wallet with active
-/// locks can still be recovered.
+/// locks on the books. Privileged transfers are not rejected: a forced
+/// transfer (seizure) consumes locks oldest-first, expired or not, so the
+/// schedule shrinks with the seized tokens, while a recovery migrates the
+/// consumed entries to the destination wallet with their release times
+/// preserved, so the investor's remaining lockup follows the balance onto
+/// the new wallet.
 ///
 /// The wallet's balance is never mirrored: the token passes it into each
 /// hook via [`crate::rwa::compliance::AccountSnapshot`], and the module

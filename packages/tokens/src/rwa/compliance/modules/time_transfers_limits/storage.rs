@@ -251,9 +251,11 @@ pub fn batch_remove_time_transfer_limit(e: &Env, token: &Address, limit_duration
 /// are incremented. Panics when an increment would push a counter past its
 /// window's cap.
 ///
-/// Forced (admin/recovery) transfers are skipped entirely: they are not
-/// investor activity, so they neither consume the identity's window
-/// allowance nor get rejected by it.
+/// Privileged transfers (forced and recovery) are skipped entirely:
+/// neither a seizure nor a wallet migration is investor trading activity,
+/// so they neither consume the identity's window allowance nor get
+/// rejected by it. The counters are keyed by identity, so a recovered
+/// investor's running allowance carries over to the new wallet on its own.
 ///
 /// # Arguments
 ///
@@ -271,7 +273,7 @@ pub fn batch_remove_time_transfer_limit(e: &Env, token: &Address, limit_duration
 ///   overflows.
 /// * [`ComplianceModuleError::TransferLimitExceeded`] - When the new counter
 ///   value would exceed a configured window's cap and the transfer is not
-///   forced.
+///   privileged.
 /// * refer to [`get_irs_client`] errors.
 ///
 /// # Security Warning
@@ -287,8 +289,9 @@ pub fn on_transfer(
 ) {
     require_non_negative_amount(e, amount);
 
-    if *kind == TransferKind::Forced {
-        return;
+    match kind {
+        TransferKind::Forced | TransferKind::Recovery => return,
+        TransferKind::Standard | TransferKind::Delegated(_) => {}
     }
 
     let limits = get_time_transfer_limits(e, token);

@@ -60,9 +60,9 @@ pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
 /// Rejects a transfer whose recipient has no allowed country, by panicking.
 ///
 /// Country allowlist checks are recipient-based, so the sender and amount
-/// are intentionally ignored. Forced (admin/recovery) transfers are exempt
-/// from the policy, and no bookkeeping exists in this module, so they pass
-/// through untouched.
+/// are intentionally ignored. Privileged (forced and recovery) transfers
+/// are exempt from the policy, and no bookkeeping exists in this module,
+/// so they pass through untouched.
 ///
 /// # Arguments
 ///
@@ -74,11 +74,12 @@ pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
 /// # Errors
 ///
 /// * [`ComplianceModuleError::CountryNotAllowed`] - When the recipient has no
-///   allowed country and the transfer is not forced.
+///   allowed country and the transfer is not privileged.
 /// * refer to [`can_receive`] errors.
 pub fn on_transfer(e: &Env, to: &Address, kind: &TransferKind, token: &Address) {
-    if *kind == TransferKind::Forced {
-        return;
+    match kind {
+        TransferKind::Forced | TransferKind::Recovery => return,
+        TransferKind::Standard | TransferKind::Delegated(_) => {}
     }
     if !can_receive(e, to, token) {
         panic_with_error!(e, ComplianceModuleError::CountryNotAllowed);
