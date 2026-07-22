@@ -952,10 +952,25 @@ fn test_exp_underflow_returns_zero() {
 }
 
 #[test]
-fn test_exp_at_lower_bound_returns_zero() {
+fn test_exp_at_solmate_cutoff_returns_zero() {
     let e = Env::default();
-    let bound = Wad::from_raw(-42_139_678_854_452_767_551);
-    assert_eq!(bound.exp(&e), Wad::from_raw(0));
+    // Solmate's original underflow cutoff, floor(ln(0.5e-18) * 1e18). It sits
+    // well below EXP_INPUT_MIN nowadays, but stays pinned to keep the port
+    // aligned with the reference implementation.
+    let cutoff = Wad::from_raw(-42_139_678_854_452_767_551);
+    assert_eq!(cutoff.exp(&e), Wad::from_raw(0));
+}
+
+#[test]
+fn test_exp_near_underflow_crossing_is_nonzero() {
+    // Guards EXP_INPUT_MIN against being raised too far: results only
+    // truncate to 0 below ≈ -41.446 (where e^x * 1e18 drops under 1), so
+    // inputs just above that must keep producing nonzero values.
+    let e = Env::default();
+    // e^-41 * 1e18 ≈ 1.56
+    assert_eq!(Wad::from_integer(&e, -41).exp(&e), Wad::from_raw(1));
+    // e^-40 * 1e18 ≈ 4.25
+    assert_eq!(Wad::from_integer(&e, -40).exp(&e), Wad::from_raw(4));
 }
 
 #[test]
