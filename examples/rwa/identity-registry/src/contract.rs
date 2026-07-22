@@ -25,10 +25,6 @@ impl IdentityRegistryContract {
     pub fn bind_tokens(e: &Env, tokens: Vec<Address>, operator: Address) {
         binder::bind_tokens(e, &tokens);
     }
-
-    pub fn get_token_index(e: &Env, token: Address) -> u32 {
-        binder::get_token_index(e, &token)
-    }
 }
 
 #[contractimpl(contracttrait)]
@@ -61,11 +57,6 @@ impl IdentityRegistryStorage for IdentityRegistryContract {
             IdentityType::Individual,
             &Vec::from_iter(e, initial_profiles.iter().map(|p| CountryData::from_val(e, &p))),
         );
-    }
-
-    #[only_role(operator, "manager")]
-    fn modify_identity(e: &Env, account: Address, new_identity: Address, operator: Address) {
-        identity_storage::modify_identity(e, &account, &new_identity);
     }
 
     #[only_role(operator, "manager")]

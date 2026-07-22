@@ -13,6 +13,51 @@
 //! It also provides the `IdentityVerifier` trait for the contract that ties
 //! the full stack together for token checks.
 //!
+//! ## Contract Topology
+//!
+//! In the default claim-based setup, five contracts cooperate, and the
+//! identity data is spread across three of them:
+//!
+//! ```text
+//! RWA Token ──> IdentityVerifier ──> ClaimTopicsAndIssuers    (what is required)
+//!                     │
+//!                     ├──> Identity Registry Storage (IRS)    (who is this wallet)
+//!                     │        wallet ──> identity address
+//!                     │        wallet ──> IdentityProfile
+//!                     │
+//!                     └──> Identity contract (per investor)   (what has been attested)
+//!                              claims, validated against ──> ClaimIssuer contracts
+//! ```
+//!
+//! - **Identity Registry Storage** links each wallet to its identity contract
+//!   and carries registry-side jurisdiction data. One registry is typically
+//!   shared across all tokens of an issuer.
+//! - The **identity contract** (the [`identity_claims`] module) is the
+//!   investor's on-chain persona: one instance per investor, holding the claims
+//!   issued about them. Several wallets may point to the same identity.
+//! - **ClaimTopicsAndIssuers** holds the requirement configuration: the claim
+//!   topics a holder's identity must carry, and the issuers trusted to attest
+//!   each topic.
+//! - **ClaimIssuer** contracts answer `is_claim_valid` live on every check;
+//!   revocation needs no on-chain claim removal, the issuer simply stops
+//!   answering positively.
+//!
+//! ## How a Verification Walks the Graph
+//!
+//! [`storage::verify_identity`] performs the claim-based check invoked on
+//! every token operation:
+//!
+//! 1. The wallet is resolved to its identity contract through the registry.
+//! 2. The required topics and their trusted issuers are read from the claim
+//!    topics and issuers contract.
+//! 3. For each required topic, the identity contract must hold a claim from one
+//!    of the topic's trusted issuers, and that issuer is asked live whether the
+//!    claim is still valid.
+//!
+//! A wallet with no registered identity fails at step 1, so unregistered
+//! wallets can neither send nor receive. Country data is not part of this
+//! baseline check; it is consumed by the compliance country modules instead.
+//!
 //! ## Architecture & Implementation Approaches
 //!
 //! Identity verification systems can be implemented in various ways depending

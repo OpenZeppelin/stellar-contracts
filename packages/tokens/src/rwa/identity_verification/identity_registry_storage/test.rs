@@ -1,24 +1,40 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract,
+    contract, contractimpl,
     testutils::{Address as _, Events},
     vec, Address, Env, FromVal, IntoVal, Map, String, Symbol, Val, Vec,
 };
 
-use crate::rwa::identity_verification::identity_registry_storage::{
-    storage::{
-        add_country_data_entries, add_identity, delete_country_data, get_country_data,
-        get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
-        modify_identity, recover_identity, remove_identity, stored_identity, validate_country_data,
-        CountryData, CountryRelation, IdentityType, IndividualCountryRelation,
-        OrganizationCountryRelation,
+use crate::rwa::{
+    identity_verification::identity_registry_storage::{
+        storage::{
+            add_country_data_entries, add_identity, delete_country_data, get_country_data,
+            get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
+            recover_identity, remove_identity, stored_identity, validate_country_data, CountryData,
+            CountryRelation, IdentityType, IndividualCountryRelation, OrganizationCountryRelation,
+        },
+        MAX_COUNTRY_ENTRIES, MAX_METADATA_ENTRIES, MAX_METADATA_STRING_LEN,
     },
-    MAX_COUNTRY_ENTRIES, MAX_METADATA_ENTRIES, MAX_METADATA_STRING_LEN,
+    utils::token_binder::bind_token,
 };
 
 #[contract]
 struct MockContract;
+
+#[contract]
+struct MockToken;
+
+#[contractimpl]
+impl MockToken {
+    pub fn balance(e: &Env, id: Address) -> i128 {
+        e.storage().instance().get(&id).unwrap_or(0)
+    }
+
+    pub fn set_balance(e: &Env, id: Address, amount: i128) {
+        e.storage().instance().set(&id, &amount);
+    }
+}
 
 #[test]
 fn add_identity_success() {
@@ -81,49 +97,6 @@ fn add_identity_already_exists() {
             IdentityType::Individual,
             &vec![&e, country_data.clone()],
         );
-    });
-}
-
-#[test]
-fn modify_identity_success() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        let old_identity = Address::generate(&e);
-        let new_identity = Address::generate(&e);
-        let country_data = CountryData {
-            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)), // USA
-            metadata: None,
-        };
-
-        add_identity(
-            &e,
-            &account,
-            &old_identity,
-            IdentityType::Individual,
-            &vec![&e, country_data.clone()],
-        );
-        modify_identity(&e, &account, &new_identity);
-
-        assert_eq!(stored_identity(&e, &account), new_identity);
-        // 1 IdentityStored + 1 CountryDataAdded + 1 IdentityModified
-        assert_eq!(e.events().all().events().len(), 3);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #321)")] // IdentityNotFound
-fn modify_identity_not_found() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        let new_identity = Address::generate(&e);
-
-        modify_identity(&e, &account, &new_identity);
     });
 }
 
@@ -206,6 +179,103 @@ fn remove_identity_not_found() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         remove_identity(&e, &account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #328)")] // AccountHasBalance
+fn remove_identity_with_linked_token_balance_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token = e.register(MockToken, ());
+
+    let account = Address::generate(&e);
+    let identity = Address::generate(&e);
+    MockTokenClient::new(&e, &token).set_balance(&account, &100);
+
+    e.as_contract(&contract_id, || {
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)), // USA
+            metadata: None,
+        };
+
+        bind_token(&e, &token);
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+
+        remove_identity(&e, &account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #328)")] // AccountHasBalance
+fn remove_identity_checks_every_linked_token() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token1 = e.register(MockToken, ());
+    let token2 = e.register(MockToken, ());
+
+    let account = Address::generate(&e);
+    let identity = Address::generate(&e);
+    // Only the second linked token holds a balance for the account.
+    MockTokenClient::new(&e, &token2).set_balance(&account, &1);
+
+    e.as_contract(&contract_id, || {
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)), // USA
+            metadata: None,
+        };
+
+        bind_token(&e, &token1);
+        bind_token(&e, &token2);
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+
+        remove_identity(&e, &account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #321)")] // IdentityNotFound
+fn remove_identity_with_zero_linked_token_balance_succeeds() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token = e.register(MockToken, ());
+
+    let account = Address::generate(&e);
+    let identity = Address::generate(&e);
+
+    e.as_contract(&contract_id, || {
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)), // USA
+            metadata: None,
+        };
+
+        bind_token(&e, &token);
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+
+        // The account holds no balance in the linked token, so the removal
+        // goes through.
+        remove_identity(&e, &account);
+
+        // The identity is gone (should panic with IdentityNotFound).
+        stored_identity(&e, &account);
     });
 }
 

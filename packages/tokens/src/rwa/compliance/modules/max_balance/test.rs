@@ -64,10 +64,6 @@ impl IdentityRegistryStorage for MockIRSContract {
         unreachable!("remove_identity is not used in these tests");
     }
 
-    fn modify_identity(_e: &Env, _account: Address, _identity: Address, _operator: Address) {
-        unreachable!("modify_identity is not used in these tests");
-    }
-
     fn recover_identity(
         _e: &Env,
         _old_account: Address,

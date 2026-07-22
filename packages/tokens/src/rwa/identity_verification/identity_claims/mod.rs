@@ -1,3 +1,27 @@
+//! # Identity Claims Module
+//!
+//! An identity contract is an investor's on-chain persona: one instance,
+//! implementing the [`IdentityClaims`] trait, is deployed per investor, and
+//! the address stored in the identity registry for each of the investor's
+//! wallets points to it. What it stores is claims: attestations signed by
+//! trusted issuers about the identity, such as "KYC passed" or "accredited
+//! investor". Each claim is keyed by `claim_id = hash(issuer, topic)`, so an
+//! issuer holds at most one claim per topic on a given identity.
+//!
+//! Two properties are easy to miss:
+//!
+//! - Claims are bound to the identity contract's address. An issuer validates a
+//!   claim with the identity address as part of the attested payload (see
+//!   [`crate::rwa::identity_verification::storage::validate_claim`]), so claims
+//!   cannot be carried over to another identity contract. Replacing an
+//!   investor's identity contract means re-attestation by every issuer.
+//! - A stored claim proves nothing by itself. Claims are re-validated against
+//!   their issuer on every verification, which is how revocation works without
+//!   touching the identity contract.
+//!
+//! Claim management (`add_claim` / `remove_claim`) carries no default access
+//! control; who may write claims (the identity owner, issuers, a manager) is
+//! deployment-specific.
 mod storage;
 #[cfg(test)]
 mod test;
