@@ -2,14 +2,17 @@ extern crate std;
 
 use soroban_sdk::{
     contract,
-    testutils::{Address as _, Events as _},
+    testutils::{storage::Persistent as _, Address as _, Events as _, Ledger as _},
     vec, Address, Env,
 };
 
 use crate::rwa::compliance::{
-    modules::transfer_allow::storage::{
-        allow_user, batch_allow_users, batch_disallow_users, disallow_user, is_user_allowed,
-        on_transfer, remove_user_allowed, set_user_allowed,
+    modules::{
+        transfer_allow::storage::{
+            allow_user, batch_allow_users, batch_disallow_users, disallow_user, is_user_allowed,
+            on_transfer, remove_user_allowed, set_user_allowed, TransferAllowStorageKey,
+        },
+        MODULE_EXTEND_AMOUNT,
     },
     TransferKind,
 };
@@ -62,6 +65,34 @@ fn on_transfer_allows_allowlisted_recipient() {
         allow_user(&e, &token, &to);
 
         on_transfer(&e, &from, &to, &TransferKind::Standard, &token);
+    });
+}
+
+#[test]
+fn on_transfer_refreshes_recipient_ttl_when_sender_allowlisted() {
+    let e = Env::default();
+    let module_id = e.register(TestTransferAllowContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        allow_user(&e, &token, &from);
+        allow_user(&e, &token, &to);
+
+        // Age the recipient entry to the brink of expiry.
+        let to_key = TransferAllowStorageKey::AllowedUser(token.clone(), to.clone());
+        let ttl = e.storage().persistent().get_ttl(&to_key);
+        e.ledger().with_mut(|l| {
+            l.sequence_number += ttl;
+        });
+
+        // The sender is allowlisted, so the check no longer short-circuits
+        // before touching the recipient: the read-time extension must still
+        // refresh the recipient entry.
+        on_transfer(&e, &from, &to, &TransferKind::Standard, &token);
+
+        assert_eq!(e.storage().persistent().get_ttl(&to_key), MODULE_EXTEND_AMOUNT);
     });
 }
 
