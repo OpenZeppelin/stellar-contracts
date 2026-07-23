@@ -10,12 +10,15 @@ pub enum SACAdminGenericDataKey {
     Sac,
 }
 
-/// Index of `amount` in `fn mint(e: Env, to: Address, amount: i128)`
-pub const MINT_AMOUNT_INDEX: u32 = 2;
-/// Index of `amount` in `fn clawback(e: Env, from: Address, amount: i128)`
-pub const CLAWBACK_AMOUNT_INDEX: u32 = 2;
-/// Index of `authorized` in `fn set_authorized(e: Env, authorized: bool,
-/// account: Address)`
+// `ContractContext.args` holds only the invocation arguments the SAC function
+// was called with — the `Env` is never part of them — so these indices count
+// from the first real parameter (index 0).
+/// Index of `amount` in the SAC's `fn mint(to: Address, amount: i128)`.
+pub const MINT_AMOUNT_INDEX: u32 = 1;
+/// Index of `amount` in the SAC's `fn clawback(from: Address, amount: i128)`.
+pub const CLAWBACK_AMOUNT_INDEX: u32 = 1;
+/// Index of `authorize` in the SAC's `fn set_authorized(addr: Address,
+/// authorize: bool)`.
 pub const SET_AUTHORIZED_BOOL_INDEX: u32 = 1;
 
 /// Container mapping the extracted values from a SAC `ContractContext`

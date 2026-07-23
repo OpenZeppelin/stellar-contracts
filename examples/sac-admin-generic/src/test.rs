@@ -11,10 +11,13 @@ use soroban_sdk::{
 use crate::contract::{SACAdminGenericError, SacAdminExampleContract, Signature};
 
 fn create_auth_context(e: &Env, contract: &Address, fn_name: Symbol, amount: i128) -> Context {
+    // Mirror the real SAC `mint(to, amount)` argument layout: `ContractContext`
+    // carries only the invocation arguments, so `to` is at index 0 and `amount`
+    // at index 1 (no `Env` slot).
     Context::Contract(ContractContext {
         contract: contract.clone(),
         fn_name,
-        args: ((), (), amount).into_val(e),
+        args: (Address::generate(e), amount).into_val(e),
     })
 }
 
