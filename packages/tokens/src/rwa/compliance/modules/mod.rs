@@ -298,6 +298,9 @@ pub enum ComplianceModuleError {
     CountryRestricted = 405,
     /// Neither transfer party is on the allowlist.
     UserNotAllowed = 406,
+    /// A mint or preset would push a wallet's lock entries above the
+    /// per-wallet bound.
+    LockBoundExceeded = 407,
 }
 
 // ################## CONSTANTS ##################

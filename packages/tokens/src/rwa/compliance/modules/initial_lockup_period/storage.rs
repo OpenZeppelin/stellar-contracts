@@ -3,7 +3,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 use crate::rwa::compliance::{
     modules::{
         initial_lockup_period::{
-            emit_lockup_period_set, emit_lockup_state_preset, emit_preset_completed,
+            emit_lockup_period_set, emit_lockup_state_preset, emit_preset_completed, MAX_LOCKS,
         },
         storage::{add_i128_or_panic, require_non_negative_amount, sub_i128_or_panic},
         ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
@@ -170,6 +170,8 @@ pub fn set_lockup_period(e: &Env, token: &Address, period: u32) {
 ///   negative.
 /// * [`ComplianceModuleError::PresetAlreadyCompleted`] - When the preset phase
 ///   has already been finalized.
+/// * [`ComplianceModuleError::LockBoundExceeded`] - When `locks` holds more
+///   than [`MAX_LOCKS`] entries.
 /// * [`ComplianceModuleError::MathOverflow`] - When summing the lock amounts
 ///   overflows.
 ///
@@ -184,6 +186,9 @@ pub fn set_lockup_period(e: &Env, token: &Address, period: u32) {
 pub fn preset_locks(e: &Env, token: &Address, wallet: &Address, locks: &Vec<LockedTokens>) {
     if is_preset_completed(e, token) {
         panic_with_error!(e, ComplianceModuleError::PresetAlreadyCompleted);
+    }
+    if locks.len() > MAX_LOCKS {
+        panic_with_error!(e, ComplianceModuleError::LockBoundExceeded);
     }
 
     let mut total_locked = 0;
@@ -276,10 +281,9 @@ pub fn on_transfer(
 
 /// Records a mint to `to`: when a lockup period is configured, appends a lock
 /// entry releasing after that period. Expired entries are pruned in the same
-/// write, so the stored vector tracks the wallet's active locks rather than
-/// its lifetime mint count and cannot grow past the ledger-entry size limit
-/// under repeated issuance. The wallet's balance is owned by the token, so
-/// nothing else is tracked.
+/// write, keeping the stored vector bounded by the wallet's concurrently
+/// active locks rather than its lifetime mint count. The wallet's balance is
+/// owned by the token, so nothing else is tracked.
 ///
 /// # Arguments
 ///
@@ -291,6 +295,8 @@ pub fn on_transfer(
 /// # Errors
 ///
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
+/// * [`ComplianceModuleError::LockBoundExceeded`] - When the wallet already
+///   holds [`MAX_LOCKS`] unexpired lock entries.
 /// * [`ComplianceModuleError::MathOverflow`] - When the lock aggregate
 ///   overflows.
 ///
@@ -304,6 +310,9 @@ pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
     if period > 0 && amount > 0 {
         let mut details = get_locked_details(e, token, to);
         prune_expired_locks(e, &mut details);
+        if details.locks.len() >= MAX_LOCKS {
+            panic_with_error!(e, ComplianceModuleError::LockBoundExceeded);
+        }
         details.locks.push_back(LockedTokens {
             amount,
             release_ledger: e.ledger().sequence().saturating_add(period),
