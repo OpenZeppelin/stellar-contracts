@@ -3,7 +3,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 use crate::rwa::compliance::{
     modules::{
         initial_lockup_period::{
-            emit_lockup_period_set, emit_lockup_state_preset, emit_preset_completed,
+            emit_lockup_period_set, emit_lockup_state_preset, emit_preset_completed, MAX_LOCKS,
         },
         storage::{add_i128_or_panic, require_non_negative_amount, sub_i128_or_panic},
         ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
@@ -23,8 +23,8 @@ pub struct LockedTokens {
 /// The lock entries tracked for one `(token, wallet)` pair, together with
 /// their running aggregate. `total_locked` always equals the sum of the
 /// `locks` amounts, including entries whose release time has already
-/// passed: expired entries are consumed lazily by transfers and burns, not
-/// by the passage of time.
+/// passed: expired entries are consumed lazily by transfers and burns and
+/// pruned by subsequent mints, not by the passage of time.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LockedDetails {
@@ -170,6 +170,8 @@ pub fn set_lockup_period(e: &Env, token: &Address, period: u32) {
 ///   negative.
 /// * [`ComplianceModuleError::PresetAlreadyCompleted`] - When the preset phase
 ///   has already been finalized.
+/// * [`ComplianceModuleError::LockBoundExceeded`] - When `locks` holds more
+///   than [`MAX_LOCKS`] entries.
 /// * [`ComplianceModuleError::MathOverflow`] - When summing the lock amounts
 ///   overflows.
 ///
@@ -184,6 +186,9 @@ pub fn set_lockup_period(e: &Env, token: &Address, period: u32) {
 pub fn preset_locks(e: &Env, token: &Address, wallet: &Address, locks: &Vec<LockedTokens>) {
     if is_preset_completed(e, token) {
         panic_with_error!(e, ComplianceModuleError::PresetAlreadyCompleted);
+    }
+    if locks.len() > MAX_LOCKS {
+        panic_with_error!(e, ComplianceModuleError::LockBoundExceeded);
     }
 
     let mut total_locked = 0;
@@ -275,8 +280,10 @@ pub fn on_transfer(
 }
 
 /// Records a mint to `to`: when a lockup period is configured, appends a lock
-/// entry releasing after that period. The wallet's balance is owned by the
-/// token, so nothing else is tracked.
+/// entry releasing after that period. Expired entries are pruned in the same
+/// write, keeping the stored vector bounded by the wallet's concurrently
+/// active locks rather than its lifetime mint count. The wallet's balance is
+/// owned by the token, so nothing else is tracked.
 ///
 /// # Arguments
 ///
@@ -288,6 +295,8 @@ pub fn on_transfer(
 /// # Errors
 ///
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
+/// * [`ComplianceModuleError::LockBoundExceeded`] - When the wallet already
+///   holds [`MAX_LOCKS`] unexpired lock entries.
 /// * [`ComplianceModuleError::MathOverflow`] - When the lock aggregate
 ///   overflows.
 ///
@@ -300,6 +309,10 @@ pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
     let period = get_lockup_period(e, token);
     if period > 0 && amount > 0 {
         let mut details = get_locked_details(e, token, to);
+        prune_expired_locks(e, &mut details);
+        if details.locks.len() >= MAX_LOCKS {
+            panic_with_error!(e, ComplianceModuleError::LockBoundExceeded);
+        }
         details.locks.push_back(LockedTokens {
             amount,
             release_ledger: e.ledger().sequence().saturating_add(period),
@@ -508,6 +521,28 @@ fn expired_amount(e: &Env, locks: &Vec<LockedTokens>) -> i128 {
         }
     }
     expired
+}
+
+/// Drops the entries in `details` whose release time has passed, reducing
+/// `total_locked` by the dropped amounts. Expired entries are already
+/// spendable ([`get_locked_amount`] subtracts them), so dropping them
+/// changes nothing about what the wallet can move; it only keeps the
+/// stored vector bounded by the number of active locks.
+fn prune_expired_locks(e: &Env, details: &mut LockedDetails) {
+    let now = e.ledger().sequence();
+    let mut pruned = 0;
+    let mut remaining = Vec::new(e);
+
+    for lock in details.locks.iter() {
+        if lock.release_ledger <= now {
+            pruned = add_i128_or_panic(e, pruned, lock.amount);
+        } else {
+            remaining.push_back(lock);
+        }
+    }
+
+    details.total_locked = sub_i128_or_panic(e, details.total_locked, pruned);
+    details.locks = remaining;
 }
 
 /// Consumes `amount` from the expired entries in `details`, oldest-first:

@@ -17,6 +17,30 @@
 //! (unlocked) amount is then `balance - locked`, computed afresh on every
 //! hook. No balance is mirrored.
 //!
+//! # Capacity planning
+//!
+//! A wallet's lock entries live in a single contract-data entry, and their
+//! count is capped at [`MAX_LOCKS`]. Expired entries are pruned as mints and
+//! spends rewrite the entry, so the count that matters is the number of
+//! *concurrently active* locks: the mints a wallet receives within one
+//! lockup window, i.e. mint frequency times lockup period. A mint that
+//! would push a wallet past the cap is rejected with
+//! [`crate::rwa::compliance::modules::ComplianceModuleError::LockBoundExceeded`].
+//!
+//! Some schedules against the cap:
+//!
+//! * Monthly dividends, 2-year lockup: at most 24 active locks per wallet. Well
+//!   within the cap.
+//! * Daily rewards, 1-year lockup: at most ~366 active locks. Also within the
+//!   cap.
+//! * Daily rewards, 2-year lockup: ~730 active locks. Over the cap: mints to a
+//!   steadily rewarded wallet start failing about 17 months in.
+//!
+//! The cap is a hard deployment requirement: a token expecting any single
+//! wallet to receive more than [`MAX_LOCKS`] mints within one lockup window
+//! must not use this module as-is; such schedules call for fewer, batched
+//! distributions or a shorter lockup period.
+//!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/develop/contracts/compliance/modular/modules/InitialLockupPeriodModule.sol
 
 pub mod storage;
@@ -40,8 +64,13 @@ use crate::rwa::compliance::modules::ComplianceModule;
 ///
 /// Locks are consumed lazily: expired entries stay on the books until a
 /// transfer or burn dips into the locked region, at which point they are
-/// consumed oldest-first and removed. Mints themselves are never blocked by
-/// this module: they are the operation that creates locks.
+/// consumed oldest-first and removed. Each mint also prunes whatever has
+/// expired by then while appending its new lock, so a wallet's stored lock
+/// entries stay bounded by its active locks no matter how many mints it
+/// receives. Mints are blocked by this module only at that bound: a mint
+/// that would push a wallet past [`MAX_LOCKS`] active entries panics
+/// rather than record an oversized schedule (see the module docs for
+/// sizing guidance).
 ///
 /// The module **maintains its own state**: per-wallet lock entries that
 /// record how much of a wallet's balance is still locked. Correct accounting
@@ -122,6 +151,8 @@ pub trait InitialLockupPeriod: ComplianceModule {
     ///   When any lock amount is negative.
     /// * [`crate::rwa::compliance::modules::ComplianceModuleError::PresetAlreadyCompleted`] -
     ///   When the preset phase has already been finalized.
+    /// * [`crate::rwa::compliance::modules::ComplianceModuleError::LockBoundExceeded`] -
+    ///   When `locks` holds more than [`MAX_LOCKS`] entries.
     /// * [`crate::rwa::compliance::modules::ComplianceModuleError::MathOverflow`] -
     ///   When summing the lock amounts overflows.
     ///
@@ -222,6 +253,18 @@ pub trait InitialLockupPeriod: ComplianceModule {
         storage::is_preset_completed(e, &token)
     }
 }
+
+// ################## CONSTANTS ##################
+
+/// Upper bound on the lock entries stored per `(token, wallet)` pair.
+///
+/// Each entry serializes to roughly 80 bytes of XDR and the ledger caps a
+/// single contract-data entry at 64 KiB (`contract_data_entry_size_bytes`),
+/// which fits about 800 entries. 512 keeps the entry comfortably below
+/// that ceiling while accommodating dense issuance schedules: daily mints
+/// under a one-year lockup peak at ~366 active entries. See the module
+/// docs for capacity planning.
+pub const MAX_LOCKS: u32 = 512;
 
 // ################## EVENTS ##################
 
