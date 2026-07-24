@@ -12,7 +12,7 @@ use crate::{
     rwa::{
         compliance::{AccountSnapshot, TransferKind},
         storage::RWAStorageKey,
-        IdentityVerifier, RWAError, RecoverySuccess, RWA,
+        IdentityVerifier, RWAError, RecoverySuccess, TokensUnfrozen, RWA,
     },
 };
 
@@ -343,6 +343,15 @@ fn burn_with_token_unfreezing() {
         // Verify frozen tokens were reduced by 30 (60 - 30 = 30)
         assert_eq!(RWA::get_frozen_tokens(&e, &account), 30);
         assert_eq!(RWA::get_free_tokens(&e, &account), 0);
+
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen
+        // + 1 TokensUnfrozen + 1 Burned
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 6);
+        assert_eq!(
+            events.events().get(4).unwrap(),
+            &TokensUnfrozen { user_address: account.clone(), amount: 30 }.to_xdr(&e, &address)
+        );
     });
 }
 
@@ -756,6 +765,15 @@ fn forced_transfer_with_token_unfreezing() {
         assert_eq!(RWA::get_frozen_tokens(&e, &from), 30);
         assert_eq!(RWA::get_free_tokens(&e, &from), 0); // 30 balance - 30
                                                         // frozen = 0 free
+
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen
+        // + 1 TokensUnfrozen + 1 Transfer
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 6);
+        assert_eq!(
+            events.events().get(4).unwrap(),
+            &TokensUnfrozen { user_address: from.clone(), amount: 30 }.to_xdr(&e, &address)
+        );
     });
 }
 
