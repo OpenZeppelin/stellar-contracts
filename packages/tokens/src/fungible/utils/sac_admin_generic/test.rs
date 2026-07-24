@@ -119,7 +119,7 @@ fn test_extract_context_unknown_fn(e: Env, sac: Address) {
 }
 
 #[soroban_test_helpers::test]
-#[should_panic(expected = "Error(Contract, #110)")] // SACMissingFnParam
+#[should_panic(expected = "Error(Contract, #110)")] // SACAddressMismatch
 fn test_extract_context_address_mismatch(e: Env, sac: Address, other: Address) {
     let new_admin = e.register(MockContract, ());
 

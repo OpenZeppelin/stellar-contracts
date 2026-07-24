@@ -111,7 +111,10 @@ fn test_sac_generic_e2e_mint_and_clawback() {
     // clawbackable.
     let initial_admin = Address::generate(&e);
     let sac = e.register_stellar_asset_contract_v2(initial_admin);
+    // `ClawbackEnabledFlag` makes minted balances clawbackable; `RevocableFlag`
+    // lets the admin deauthorize a balance via `set_authorized(_, false)`.
     sac.issuer().set_flag(IssuerFlags::ClawbackEnabledFlag);
+    sac.issuer().set_flag(IssuerFlags::RevocableFlag);
     let sac_client = StellarAssetClient::new(&e, &sac.address());
 
     // Deploy the generic SAC-admin contract (operator doubles as chief here).
@@ -184,7 +187,24 @@ fn test_sac_generic_e2e_mint_and_clawback() {
     assert_eq!(sac_client.balance(&recipient), 1000);
 
     // clawback(recipient, 400) through the real SAC, authorized by `__check_auth`.
-    e.set_auths(&[build_auth("clawback", std::vec![recipient_arg, sc(400i128.into_val(&e))], 2)]);
+    e.set_auths(&[build_auth(
+        "clawback",
+        std::vec![recipient_arg.clone(), sc(400i128.into_val(&e))],
+        2,
+    )]);
     sac_client.clawback(&recipient, &400);
     assert_eq!(sac_client.balance(&recipient), 600);
+
+    // set_authorized(recipient, false) through the real SAC, authorized by
+    // `__check_auth`. This is the only arm that exercises
+    // `SET_AUTHORIZED_BOOL_INDEX` against the real host, mirroring `mint`/
+    // `clawback` above.
+    assert!(sac_client.authorized(&recipient));
+    e.set_auths(&[build_auth(
+        "set_authorized",
+        std::vec![recipient_arg, sc(false.into_val(&e))],
+        3,
+    )]);
+    sac_client.set_authorized(&recipient, &false);
+    assert!(!sac_client.authorized(&recipient));
 }
