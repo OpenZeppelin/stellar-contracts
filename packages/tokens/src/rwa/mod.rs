@@ -219,7 +219,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Errors
     ///
-    /// * [`RWAError::AddressFrozen`] - When the address is frozen.
+    /// * [`RWAError::InsufficientBalance`] - When the amount to burn exceeds
+    ///   the balance.
+    /// * [`RWAError::LessThanZero`] - When the amount is negative.
     ///
     /// # Events
     ///
