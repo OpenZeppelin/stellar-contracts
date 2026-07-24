@@ -40,7 +40,7 @@ fn test_extract_context_mint(e: Env, sac: Address, to: Address) {
     let context = ContractContext {
         contract: sac.clone(),
         fn_name: Symbol::new(&e, "mint"),
-        args: ((), to, 1000i128).into_val(&e),
+        args: (to, 1000i128).into_val(&e),
     };
 
     e.as_contract(&new_admin, || {
@@ -57,7 +57,7 @@ fn test_extract_context_clawback(e: Env, sac: Address, from: Address) {
     let context = ContractContext {
         contract: sac.clone(),
         fn_name: Symbol::new(&e, "clawback"),
-        args: ((), from, 2000i128).into_val(&e),
+        args: (from, 2000i128).into_val(&e),
     };
 
     e.as_contract(&new_admin, || {
@@ -74,7 +74,7 @@ fn test_extract_context_set_authorized(e: Env, sac: Address, user: Address) {
     let context = ContractContext {
         contract: sac.clone(),
         fn_name: Symbol::new(&e, "set_authorized"),
-        args: ((), true, user).into_val(&e),
+        args: (user, true).into_val(&e),
     };
 
     e.as_contract(&new_admin, || {
@@ -119,7 +119,7 @@ fn test_extract_context_unknown_fn(e: Env, sac: Address) {
 }
 
 #[soroban_test_helpers::test]
-#[should_panic(expected = "Error(Contract, #110)")] // SACMissingFnParam
+#[should_panic(expected = "Error(Contract, #110)")] // SACAddressMismatch
 fn test_extract_context_address_mismatch(e: Env, sac: Address, other: Address) {
     let new_admin = e.register(MockContract, ());
 
@@ -160,7 +160,7 @@ fn test_extract_context_invalid_param_type(e: Env, sac: Address, to: Address) {
     let context = ContractContext {
         contract: sac.clone(),
         fn_name: Symbol::new(&e, "mint"),
-        args: ((), to, Symbol::new(&e, "not_a_number")).into_val(&e),
+        args: (to, Symbol::new(&e, "not_a_number")).into_val(&e),
     };
 
     e.as_contract(&new_admin, || {
