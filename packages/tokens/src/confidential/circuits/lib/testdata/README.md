@@ -33,7 +33,7 @@ That test (in `lib/src/tests.nr`) feeds a fixed input set through every primitiv
 | `op_i` | `0xabcd` | spender address (as `Field`) |
 | `v` | `1000` (`0x3e8`) | balance value |
 | `r` | `42` (`0x2a`) | balance randomness |
-| `v_tx` | `100` (`0x64`) | transfer amount |
+| `v_transfer` | `100` (`0x64`) | transfer amount |
 | `v_a` | `500` (`0x1f4`) | allowance amount |
 | `r_e` | `0xfeedface` | ephemeral ECDH scalar |
 | `s` | `0x12345` | ECDH shared-secret scalar (treated as opaque input) |

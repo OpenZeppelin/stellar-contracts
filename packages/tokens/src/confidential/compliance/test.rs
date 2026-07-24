@@ -197,7 +197,7 @@ fn withdraw_payload(e: &Env) -> WithdrawPayload {
 fn transfer_payload(e: &Env) -> TransferPayload {
     TransferPayload {
         c_spend_new: pt(e),
-        c_tx: pt(e),
+        c_transfer: pt(e),
         r_e_point: pt(e),
         v_tilde: fr(e),
         b_tilde: fr(e),
@@ -212,7 +212,7 @@ fn transfer_payload(e: &Env) -> TransferPayload {
 fn spender_transfer_payload(e: &Env) -> SpenderTransferPayload {
     SpenderTransferPayload {
         c_a_new: pt(e),
-        c_tx: pt(e),
+        c_transfer: pt(e),
         r_e_point: pt(e),
         v_tilde: fr(e),
         a_tilde_new: fr(e),
