@@ -212,7 +212,7 @@ The system comprises three contracts deployed on Soroban:
 
 **Token contract.** Holds SEP-41 token balances, manages encrypted account state, and delegates proof verification via cross-contract calls. Performs Grumpkin point arithmetic through $$\mathbb{F}\_r$$ host operations for homomorphic balance updates.
 
-**Verifier contract.** A modified [UltraHonk verifier](https://github.com/indextree/ultrahonk_soroban_contract) storing one verification key per circuit type. Accepts a circuit identifier, serialized public inputs, and a proof blob; returns success or failure.
+**Verifier contract.** An UltraHonk verifier storing one verification key per circuit type. Accepts a circuit identifier, serialized public inputs, and a proof blob; returns success or failure. Builds on top of [NethermindEth/rs-soroban-ultrahonk](https://github.com/NethermindEth/rs-soroban-ultrahonk).
 
 **Auditor contract.** Manages auditor encryption keys independently of the contract. One auditor contract serves multiple token contracts. Stores Grumpkin public keys as full affine points $$(x, y)$$ indexed by `auditor_id`. The contract validates that stored keys are non-identity curve points; a zero or identity key would make ECDH-derived ciphertexts trivially decryptable (since $$\sigma$$ is public). The contract fetches the active auditor key at operation time and passes it as a public input to the relevant circuit.
 
@@ -247,7 +247,7 @@ i.e., the total committed value across all confidential accounts never exceeds t
 
 ### 3.5 Governance and Upgradeability
 
-The constructor binds the contract to fixed `admin`, `token`, `verifier`, and `auditor` addresses. It additionally computes and stores $$\text{addr\\\_f} = \text{address\\\_to\\\_field}(\text{env.current\\\_contract\\\_address}())$$ (§2.7) in **instance storage** as a single canonical $$\mathbb{F}\_r$$ Field; this is the value every owner-initiated proof references via constraints R2 / W2 / T2 / S2 / V2. The compressed `addr_f` Field is computed once at construction (not recomputed per call) to ensure all proofs across the contract's lifetime bind to the same Field representative of the contract's address. Beyond that, this specification does not prescribe a governance policy for upgrading these components or for rotating per-circuit verification keys. Concrete deployments differ widely in spender structure, regulatory posture, and emergency-response requirements, so these decisions are deliberately left to implementers.
+The constructor binds the contract to fixed `admin`, `token`, `verifier`, and `auditor` addresses. It additionally computes and stores `addr_f = address_to_field(env.current_contract_address())` (§2.7) in **instance storage** as a single canonical $$\mathbb{F}\_r$$ Field; this is the value every owner-initiated proof references via constraints R2 / W2 / T2 / S2 / V2. The compressed `addr_f` Field is computed once at construction (not recomputed per call) to ensure all proofs across the contract's lifetime bind to the same Field representative of the contract's address. Beyond that, this specification does not prescribe a governance policy for upgrading these components or for rotating per-circuit verification keys. Concrete deployments differ widely in spender structure, regulatory posture, and emergency-response requirements, so these decisions are deliberately left to implementers.
 
 Questions an implementer must answer:
 
@@ -414,11 +414,11 @@ Each registered account stores a `ConfidentialAccount` in persistent storage, ke
 
 ```rust
 ConfidentialAccount {
-    spending_public_key:         BytesN<64>,   // Y = sk · H
-    viewing_public_key:   BytesN<64>,   // PVK = vk · H
-    spendable_commitment:    BytesN<64>,   // C_spend: single Pedersen commitment
-    receiving_commitment:    BytesN<64>,   // C_receive: single Pedersen commitment
-    auditor_id:           u32,
+    spending_public_key:    BytesN<64>,   // Y = sk · H
+    viewing_public_key:     BytesN<64>,   // PVK = vk · H
+    spendable_commitment:   BytesN<64>,   // C_spend: single Pedersen commitment
+    receiving_commitment:   BytesN<64>,   // C_receive: single Pedersen commitment
+    auditor_id:             u32,
 }
 ```
 
@@ -449,11 +449,11 @@ Spender delegations are stored in persistent storage, keyed by `(owner, spender)
 
 ```rust
 SpenderDelegation {
-    allowance_commitment: BytesN<64>,   // Single Pedersen commitment
-    a_tilde:  BytesN<32>,   // Poseidon-encrypted allowance scalar
-    escrowed_dvk:         BytesN<64>,   // ECDH escrow of dvk_i under spender key
-    allowance_salt:       BytesN<32>,
-    live_until_ledger:    u32,
+    allowance_commitment:   BytesN<64>,   // Single Pedersen commitment
+    a_tilde:                BytesN<32>,   // Poseidon-encrypted allowance scalar
+    escrowed_dvk:           BytesN<64>,   // ECDH escrow of dvk_i under spender key
+    allowance_salt:         BytesN<32>,
+    live_until_ledger:      u32,
 }
 ```
 

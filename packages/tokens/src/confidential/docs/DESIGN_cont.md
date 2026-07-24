@@ -478,21 +478,6 @@ The auditor's allowance tracking does **not** use this method: per-event allowan
 
 ---
 
-## 12. Dependencies
-
-| Dependency | Status | Impact |
-|:---|:---|:---|
-| **Protocol 25** (BN254 G1 + pairing) | Available | `bn254_g1_{add, mul}`, `bn254_multi_pairing_check` |
-| **Protocol 26 / CAP-80** (BN254 Fr + MSM) | Available | `bn254_g1_msm`, `bn254_g1_is_on_curve`, `bn254_fr_{add, sub, mul, inv, pow}` -- required for UltraHonk verification and on-chain Grumpkin point arithmetic |
-| **Modified UltraHonk verifier** | To be built | Multi-VK support (one per circuit type) |
-| **Noir circuits** | To be built | 6 circuits using `std::embedded_curve_ops` for Grumpkin |
-| **Grumpkin point arithmetic library** | To be built | On-chain point add/sub using BN254 Fr ops, identity handling |
-| **Auditor contract** | To be built | Independent key management contract |
-| **Nargo / Barretenberg** | Available (`nargo 1.0.0-beta.11`, `bb v0.87.0`) | Off-chain proof generation |
-| **Client library** | To be built | ECDH key agreement, Poseidon-based amount encryption/decryption, event processing, off-chain balance tracking |
-
----
-
 ## 13. Domain Separation Constants
 
 Each $$\delta$$ is a small positive integer in $$\mathbb{F}\_r$$, fixed for the protocol version and used as a Poseidon2 leading-input domain tag. Numeric values are assigned sequentially from 1; the protocol version is implicit in the deployment, and any change to a circuit's constraint that uses these tags requires a new deployment with a fresh verification key (§3.5, §10.6).
