@@ -12,7 +12,7 @@ use crate::{
     rwa::{
         compliance::{AccountSnapshot, TransferKind},
         storage::RWAStorageKey,
-        IdentityVerifier, RWAError, RecoverySuccess, RWA,
+        IdentityVerifier, RWAError, RecoverySuccess, TokensUnfrozen, RWA,
     },
 };
 
@@ -314,6 +314,44 @@ fn burn_tokens() {
         assert_eq!(RWA::total_supply(&e), 70);
         // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 Burned
         assert_eq!(e.events().all().events().len(), 4);
+    });
+}
+
+#[test]
+fn burn_with_token_unfreezing() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        RWA::mint(&e, &account, 100);
+
+        // Freeze 60 tokens, leaving 40 free
+        RWA::freeze_partial_tokens(&e, &account, 60);
+        assert_eq!(RWA::get_frozen_tokens(&e, &account), 60);
+        assert_eq!(RWA::get_free_tokens(&e, &account), 40);
+
+        // Burn 70 tokens (more than free tokens)
+        // This should automatically unfreeze 30 tokens (70 - 40)
+        RWA::burn(&e, &account, 70);
+
+        assert_eq!(RWA::balance(&e, &account), 30);
+        assert_eq!(RWA::total_supply(&e), 30);
+
+        // Verify frozen tokens were reduced by 30 (60 - 30 = 30)
+        assert_eq!(RWA::get_frozen_tokens(&e, &account), 30);
+        assert_eq!(RWA::get_free_tokens(&e, &account), 0);
+
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen
+        // + 1 TokensUnfrozen + 1 Burned
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 6);
+        assert_eq!(
+            events.events().get(4).unwrap(),
+            &TokensUnfrozen { user_address: account.clone(), amount: 30 }.to_xdr(&e, &address)
+        );
     });
 }
 
@@ -727,6 +765,15 @@ fn forced_transfer_with_token_unfreezing() {
         assert_eq!(RWA::get_frozen_tokens(&e, &from), 30);
         assert_eq!(RWA::get_free_tokens(&e, &from), 0); // 30 balance - 30
                                                         // frozen = 0 free
+
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen
+        // + 1 TokensUnfrozen + 1 Transfer
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 6);
+        assert_eq!(
+            events.events().get(4).unwrap(),
+            &TokensUnfrozen { user_address: from.clone(), amount: 30 }.to_xdr(&e, &address)
+        );
     });
 }
 

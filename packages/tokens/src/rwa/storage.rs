@@ -224,6 +224,13 @@ impl RWA {
     /// **IMPORTANT**: This function bypasses authorization and freezing checks.
     /// Should only be used by authorized compliance or admin functions.
     pub fn forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+        // Verify identity for the `to` address only; `from` is intentionally
+        // skipped so this privileged action can still move tokens out of
+        // accounts whose identity is no longer valid.
+        let identity_verifier_addr = Self::identity_verifier(e);
+        let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
+        identity_verifier_client.verify_identity(to);
+
         Self::privileged_transfer(e, from, to, amount, &TransferKind::Forced);
     }
 
@@ -234,6 +241,9 @@ impl RWA {
     /// `kind`. The two public entry points differ only in the kind they
     /// report, which is what lets compliance modules tell a seizure from a
     /// wallet migration.
+    ///
+    /// Performs no identity verification; each caller verifies the recipient
+    /// before delegating here, so the check runs exactly once per invocation.
     fn privileged_transfer(
         e: &Env,
         from: &Address,
@@ -251,19 +261,13 @@ impl RWA {
             panic_with_error!(e, RWAError::InsufficientBalance);
         }
 
-        // Verify identity for the `to` address only; `from` is intentionally
-        // skipped so this privileged action can still move tokens out of
-        // accounts whose identity is no longer valid.
-        let identity_verifier_addr = Self::identity_verifier(e);
-        let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
-        identity_verifier_client.verify_identity(to);
-
-        // Check if we need to unfreeze tokens to complete the transfer
-        let free_tokens = Self::get_free_tokens(e, from);
+        // Check if we need to unfreeze tokens to complete the transfer. The
+        // snapshot is still current: nothing has mutated the balance or
+        // frozen amount since it was captured.
+        let free_tokens = from_snapshot.balance - from_snapshot.frozen;
         if free_tokens < amount {
             let tokens_to_unfreeze = amount - free_tokens;
-            let current_frozen = Self::get_frozen_tokens(e, from);
-            let new_frozen = current_frozen - tokens_to_unfreeze;
+            let new_frozen = from_snapshot.frozen - tokens_to_unfreeze;
 
             e.storage().persistent().set(&RWAStorageKey::FrozenTokens(from.clone()), &new_frozen);
             emit_tokens_unfrozen(e, from, tokens_to_unfreeze);
@@ -378,12 +382,13 @@ impl RWA {
             panic_with_error!(e, RWAError::InsufficientBalance);
         }
 
-        // Check if we need to unfreeze tokens to complete the burn
-        let free_tokens = Self::get_free_tokens(e, user_address);
+        // Check if we need to unfreeze tokens to complete the burn. The
+        // snapshot is still current: nothing has mutated the balance or
+        // frozen amount since it was captured.
+        let free_tokens = from_snapshot.balance - from_snapshot.frozen;
         if free_tokens < amount {
             let tokens_to_unfreeze = amount - free_tokens;
-            let current_frozen = Self::get_frozen_tokens(e, user_address);
-            let new_frozen = current_frozen - tokens_to_unfreeze;
+            let new_frozen = from_snapshot.frozen - tokens_to_unfreeze;
 
             e.storage()
                 .persistent()
@@ -451,7 +456,7 @@ impl RWA {
     /// checks. Should only be used by authorized recovery or admin
     /// functions.
     pub fn recover_balance(e: &Env, old_account: &Address, new_account: &Address) -> bool {
-        // Verify identity for the new account
+        // Verify identity for the new account.
         let identity_verifier_addr = Self::identity_verifier(e);
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
         identity_verifier_client.verify_identity(new_account);
