@@ -21,13 +21,13 @@ Each confidential transfer produces ciphertexts under two auditor keys via ECDH,
 
 $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}}) \qquad \text{(DESIGN §2.4)}$$
 $$(m\_{v,r}, m\_{r,r}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_r}}, s\_{a,r}, \sigma)$$
-$$\tilde{v}\_{\text{aud,r}} = v\_{\text{tx}} + m\_{v,r}, \qquad \tilde{r}\_{\text{aud,r}} = r\_{\text{tx}} + m\_{r,r}$$
+$$\tilde{v}\_{\text{aud,r}} = v\_{\text{transfer}} + m\_{v,r}, \qquad \tilde{r}\_{\text{aud,r}} = r\_{\text{transfer}} + m\_{r,r}$$
 
 **Sender's auditor** ($$K\_{\text{aud,s}}$$, from the sender's `auditor_id`) receives the transfer amount and the sender's post-transfer balance:
 
 $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}}) \qquad \text{(DESIGN §2.4)}$$
 $$(m\_{v,s}, m\_{b,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$
-$$\tilde{v}\_{\text{aud,s}} = v\_{\text{tx}} + m\_{v,s}, \qquad \tilde{b}\_{\text{aud,s}} = (v\_A - v\_{\text{tx}}) + m\_{b,s}$$
+$$\tilde{v}\_{\text{aud,s}} = v\_{\text{transfer}} + m\_{v,s}, \qquad \tilde{b}\_{\text{aud,s}} = (v\_A - v\_{\text{transfer}}) + m\_{b,s}$$
 
 The transfer circuit (constraints T\_a1--T\_a8) enforces correct computation. At operation time, the contract fetches both auditor keys from the auditor contract using the *stored* `auditor_id` field of each account; neither the sender nor the recipient can substitute a different key for the operation being proven. This guarantee is scoped to operation time: *which* auditor an account is bound to is chosen by the account owner at registration (DESIGN §7.2), subject only to existence in the auditor registry unless the deployment gates the selection in its `Hooks::on_register` implementation ([COMPLIANCE.md](./COMPLIANCE.md) §4.3).
 
@@ -35,13 +35,13 @@ Each auditor decrypts using their secret key $$k$$. For example, the sender's au
 
 $$S\_{a,s} = k \cdot R\_e, \qquad s\_{a,s} = \text{Poseidon}(\delta\_{\text{ecdh}}, S\_{a,s}.x, S\_{a,s}.y)$$
 $$(m\_{v,s}, m\_{b,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$
-$$v\_{\text{tx}} = \tilde{v}\_{\text{aud,s}} - m\_{v,s}, \qquad v\_{\text{new}} = \tilde{b}\_{\text{aud,s}} - m\_{b,s}$$
+$$v\_{\text{transfer}} = \tilde{v}\_{\text{aud,s}} - m\_{v,s}, \qquad v\_{\text{new}} = \tilde{b}\_{\text{aud,s}} - m\_{b,s}$$
 
-where $$R\_e$$ and $$\sigma$$ are published in the Transfer event. The recipient's auditor follows the same pattern with $$\delta\_{\text{aud\\\_r}}$$ to recover the pair $$(v\_{\text{tx}}, r\_{\text{tx}})$$.
+where $$R\_e$$ and $$\sigma$$ are published in the Transfer event. The recipient's auditor follows the same pattern with $$\delta\_{\text{aud\\\_r}}$$ to recover the pair $$(v\_{\text{transfer}}, r\_{\text{transfer}})$$.
 
-**Recipient-auditor opening capability.** Because the recipient-auditor recovers $$r\_{\text{tx}}$$ for every inbound transfer, and because deposits add to `receiving_commitment` with $$r = 0$$ (Section 7.3), the recipient-auditor can reconstruct the full Pedersen opening of $$C\_{\text{receive}}$$ between merges:
+**Recipient-auditor opening capability.** Because the recipient-auditor recovers $$r\_{\text{transfer}}$$ for every inbound transfer, and because deposits add to `receiving_commitment` with $$r = 0$$ (Section 7.3), the recipient-auditor can reconstruct the full Pedersen opening of $$C\_{\text{receive}}$$ between merges:
 
-$$v\_r = \sum\_i v\_{\text{tx},i} + \sum\_j a\_j, \qquad r\_r = \sum\_i r\_{\text{tx},i}$$
+$$v\_r = \sum\_i v\_{\text{transfer},i} + \sum\_j a\_j, \qquad r\_r = \sum\_i r\_{\text{transfer},i}$$
 
 where $$i$$ ranges over inbound transfers and spender-transfers since the last merge and $$j$$ ranges over deposits. This is a full Pedersen *opening* of $$C\_{\text{receive}}$$: both the value and the blinding are reconstructed by the auditor.
 
@@ -49,24 +49,24 @@ The opening capability does not extend to $$C\_{\text{spend}}$$. The auditor kno
 
 ### 8.2 Auditor Visibility Properties
 
-**Transfer amounts.** Both auditors see the transfer amount in real time. The recipient's auditor decrypts $$v\_{\text{tx}}$$ from $$\tilde{v}\_{\text{aud,r}}$$; the sender's auditor decrypts it from $$\tilde{v}\_{\text{aud,s}}$$.
+**Transfer amounts.** Both auditors see the transfer amount in real time. The recipient's auditor decrypts $$v\_{\text{transfer}}$$ from $$\tilde{v}\_{\text{aud,r}}$$; the sender's auditor decrypts it from $$\tilde{v}\_{\text{aud,s}}$$.
 
 **Balance checkpoints.** The sender's auditor receives an encrypted balance checkpoint at every owner-initiated operation that produces a proof:
 
-- **Outgoing transfer**: auditor decrypts post-transfer balance $$(v\_A - v\_{\text{tx}})$$ from $$\tilde{b}\_{\text{aud,s}}$$ (constraints T\_a5--T\_a8).
+- **Outgoing transfer**: auditor decrypts post-transfer balance $$(v\_A - v\_{\text{transfer}})$$ from $$\tilde{b}\_{\text{aud,s}}$$ (constraints T\_a5--T\_a8).
 - **Withdrawal**: auditor decrypts post-withdrawal balance $$(v - a)$$ from $$\tilde{b}\_{\text{aud,s}}$$ (constraints W\_a1--W\_a4). The withdrawal amount $$a$$ is also visible as a public input.
 - **Set spender**: auditor decrypts escrowed amount $$v\_a$$ from $$\tilde{v}\_{\text{aud,s}}$$ and post-escrow balance $$(v - v\_a)$$ from $$\tilde{b}\_{\text{aud,s}}$$ (constraints S\_a1--S\_a5).
 - **Revoke spender**: auditor decrypts reclaimed amount $$v\_a$$ from $$\tilde{v}\_{\text{aud,s}}$$ and post-reclaim balance $$(v\_s + v\_a)$$ from $$\tilde{b}\_{\text{aud,s}}$$ (constraints V\_a1--V\_a5).
 
 The recipient's auditor does not see the sender's balance in any of these operations.
 
-**Per-transfer Pedersen randomness (recipient-auditor only).** Beyond the transfer amount, the recipient's auditor also decrypts the per-transfer Pedersen blinding $$r\_{\text{tx}}$$ from $$\tilde{r}\_{\text{aud,r}}$$ on every confidential transfer and spender-transfer (constraints T\_a4 and O\_a4). Combined with $$v\_{\text{tx}}$$ this is a full Pedersen opening of each $$C\_{\text{tx},i}$$ and, by homomorphism, of the recipient's `receiving_commitment` $$C\_{\text{receive}}$$ between merges (Section 8.1). The sender's auditor does not see $$r\_{\text{tx}}$$.
+**Per-transfer Pedersen randomness (recipient-auditor only).** Beyond the transfer amount, the recipient's auditor also decrypts the per-transfer Pedersen blinding $$r\_{\text{transfer}}$$ from $$\tilde{r}\_{\text{aud,r}}$$ on every confidential transfer and spender-transfer (constraints T\_a4 and O\_a4). Combined with $$v\_{\text{transfer}}$$ this is a full Pedersen opening of each $$C\_{\text{transfer},i}$$ and, by homomorphism, of the recipient's `receiving_commitment` $$C\_{\text{receive}}$$ between merges (Section 8.1). The sender's auditor does not see $$r\_{\text{transfer}}$$.
 
 **Key rotation.** When the auditor contract sets a new key under the account's `auditor_id` (§8.3), the new key sees the balance checkpoint at the next owner-initiated operation, with no event replay or bootstrapping required. The balance checkpoint is self-contained: it depends only on the auditor's ECDH secret key and the published $$(R\_e, \sigma)$$. Note that `auditor_id` itself is immutable per account (§6.1); only the key under that `auditor_id` rotates.
 
 **No viewing-key escrow on the sender side.** The sender-auditor does not hold any account's viewing key, and compromise of a sender-auditor key exposes only per-operation amounts and balance checkpoints from operations that occurred while the compromised key was active. Historical balances under prior keys, and the recipient's `spendable_commitment` (whose blinding derives from $$vk\_A$$, not from any auditor channel), remain opaque.
 
-**Recipient-side opening capability.** The recipient-auditor additionally learns the per-transfer Pedersen randomness $$r\_{\text{tx}}$$ for every inbound transfer and spender-transfer. This is capability-equivalent to holding the opening of every $$C\_{\text{tx},i}$$ and, by summation, of $$C\_{\text{receive}}$$. The capability is bounded in two ways:
+**Recipient-side opening capability.** The recipient-auditor additionally learns the per-transfer Pedersen randomness $$r\_{\text{transfer}}$$ for every inbound transfer and spender-transfer. This is capability-equivalent to holding the opening of every $$C\_{\text{transfer},i}$$ and, by summation, of $$C\_{\text{receive}}$$. The capability is bounded in two ways:
 
 - **Forward-only.** Only events emitted while the auditor key was active are decryptable.
 - **Receiving-side only (opening).** The full $$(v\_r, r\_r)$$ opening covers `receiving_commitment`. It does not extend to a full opening of `spendable_commitment`, whose blinding $$r\_s = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk\_A, \sigma)$$ depends on $$vk\_A$$ and is not derivable from any auditor key. The auditor still knows the *value* $$v\_s$$ of `spendable_commitment` at every spend boundary via $$\tilde{b}\_{\text{aud,s}}$$.
@@ -88,14 +88,14 @@ When building public inputs for any operation that produces auditor ciphertexts 
 Each spender transfer produces auditor ciphertexts under two keys (constraints O\_a1--O\_a8), following the same dual-auditor sponge model as owner transfers. The recipient's auditor decrypts the transfer amount and the per-transfer Pedersen randomness:
 
 $$(m\_{v,r}, m\_{r,r}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_r}}, s\_{a,r}, \sigma\_a)$$
-$$v\_{\text{tx}} = \tilde{v}\_{\text{aud,r}} - m\_{v,r}, \qquad r\_{\text{tx}} = \tilde{r}\_{\text{aud,r}} - m\_{r,r}$$
+$$v\_{\text{transfer}} = \tilde{v}\_{\text{aud,r}} - m\_{v,r}, \qquad r\_{\text{transfer}} = \tilde{r}\_{\text{aud,r}} - m\_{r,r}$$
 
 The owner's auditor decrypts the transfer amount and post-transfer allowance:
 
 $$(m\_{v,s}, m\_{a,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma\_a)$$
-$$v\_{\text{tx}} = \tilde{v}\_{\text{aud,s}} - m\_{v,s}, \qquad v\_a' = \tilde{a}\_{\text{aud,s}} - m\_{a,s}$$
+$$v\_{\text{transfer}} = \tilde{v}\_{\text{aud,s}} - m\_{v,s}, \qquad v\_a' = \tilde{a}\_{\text{aud,s}} - m\_{a,s}$$
 
-where $$s\_{a,r}$$, $$s\_{a,s}$$, and $$\sigma\_a$$ are recovered from the event as in Section 8.1. The recipient-auditor opening capability stated in Section 8.1 extends to spender-transfer inbound flows: $$r\_{\text{tx}}$$ from spender-transfers contributes to $$r\_r$$ in $$C\_{\text{receive}}$$ identically to owner-transfer inbound flows.
+where $$s\_{a,r}$$, $$s\_{a,s}$$, and $$\sigma\_a$$ are recovered from the event as in Section 8.1. The recipient-auditor opening capability stated in Section 8.1 extends to spender-transfer inbound flows: $$r\_{\text{transfer}}$$ from spender-transfers contributes to $$r\_r$$ in $$C\_{\text{receive}}$$ identically to owner-transfer inbound flows.
 
 ### 8.5 Spender Allowance Auditing
 
@@ -138,15 +138,15 @@ where $$d\_j$$ are deposits, $$w\_k$$ are withdrawals, and the right-hand side s
 This invariant is maintained by:
 - **Deposits** increase $$v\_{\text{receive}}$$ by $$d\_j$$ (Section 7.3).
 - **Withdrawals** decrease $$v\_{\text{spend}}$$ by $$w\_k$$, enforced by circuit constraint W4.
-- **Transfers** decrease sender's $$v\_{\text{spend}}$$ and increase recipient's $$v\_{\text{receive}}$$ by the same $$v\_{\text{tx}}$$, enforced by circuit constraints T3–T8.
+- **Transfers** decrease sender's $$v\_{\text{spend}}$$ and increase recipient's $$v\_{\text{receive}}$$ by the same $$v\_{\text{transfer}}$$, enforced by circuit constraints T3–T8.
 - **Merge** moves value from $$v\_{\text{receive}}$$ to $$v\_{\text{spend}}$$ (Proposition 1); the sum is unchanged.
 - **Set spender** moves value from $$v\_{\text{spend}}$$ to $$v\_{\text{allowance}\_i}$$; enforced by S3–S7.
-- **Spender transfer** decreases $$v\_{\text{allowance}\_i}$$ and increases recipient's $$v\_{\text{receive}}$$ by $$v\_{\text{tx}}$$; enforced by O2–O8.
+- **Spender transfer** decreases $$v\_{\text{allowance}\_i}$$ and increases recipient's $$v\_{\text{receive}}$$ by $$v\_{\text{transfer}}$$; enforced by O2–O8.
 - **Revoke** moves remaining $$v\_{\text{allowance}\_i}$$ back to $$v\_{\text{spend}}$$; enforced by V4–V7.
 
 ### 9.4 Privacy Properties
 
-**Amount confidentiality.** Transfer amounts are hidden inside Pedersen commitments (computationally hiding under DL). The encrypted amount $$\tilde{v}$$ is masked by $$\text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s, \sigma)$$, which is pseudorandom to anyone who does not know $$s$$ (the ECDH shared secret).
+**Amount confidentiality.** Transfer amounts are hidden inside Pedersen commitments (computationally hiding under DL). The encrypted amount $$\tilde{v}$$ is masked by $$\text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s, \sigma)$$, which is pseudorandom to anyone who does not know $$s$$ (the ECDH shared secret).
 
 **Balance confidentiality.** The spendable balance commitment hides both value and blinding. The encrypted balance scalar $$\tilde{b}$$ emitted in spend-boundary events is masked by $$\text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk, \sigma)$$, pseudorandom without $$vk$$.
 
@@ -154,7 +154,7 @@ This invariant is maintained by:
 
 **Viewing key compromise.** Since $$vk$$ is contract-specific (Section 4.2), compromise of one contract's viewing key does not affect the owner's accounts in other deployments. Within the compromised contract, the attacker can: read all spendable balance snapshots (via $$\tilde{b}$$ emitted in spend-boundary events), decrypt all incoming transfer amounts (via ECDH with $$R\_e$$ from events), and derive all $$dvk\_i$$ to read spender allowances. The attacker **cannot** authorize any spending operation (requires $$sk$$, and $$vk$$ cannot recover $$sk$$ by Poseidon preimage resistance).
 
-**Auditor key compromise.** If a sender's auditor key is compromised, the attacker can decrypt amounts and balance checkpoints ($$\tilde{b}\_{\text{aud,s}}$$) for all operations (transfers, withdrawals, set/revoke spender) from accounts that used the compromised key, but cannot construct openings of any commitment. If a recipient's auditor key is compromised, the attacker recovers both the transfer amount and the per-transfer Pedersen randomness ($$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$) for every incoming transfer to accounts that used the compromised key. This is capability-equivalent to holding the opening of every $$C\_{\text{tx},i}$$ and, by summation, of the receiving-balance commitment $$C\_{\text{receive}}$$; see Section 8.2 for the bounded scope (forward-only, receiving-side only). Merge folds $$r\_r$$ into the spendable-balance randomness ($$r\_{\text{spend}}' = r\_s + r\_r$$, Section 7.4) and emits no checkpoint, so the recipient-auditor's $$r\_r$$ knowledge does not extend to a post-merge opening of $$C\_{\text{spend}}$$: $$r\_s$$ depends on $$vk\_A$$ and is not derivable from any auditor key. In neither case can the attacker recover viewing keys, post-merge spendable-balance openings, historical data from before the key was active, or authorize any spending. After key rotation, new operations are protected by the new key.
+**Auditor key compromise.** If a sender's auditor key is compromised, the attacker can decrypt amounts and balance checkpoints ($$\tilde{b}\_{\text{aud,s}}$$) for all operations (transfers, withdrawals, set/revoke spender) from accounts that used the compromised key, but cannot construct openings of any commitment. If a recipient's auditor key is compromised, the attacker recovers both the transfer amount and the per-transfer Pedersen randomness ($$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$) for every incoming transfer to accounts that used the compromised key. This is capability-equivalent to holding the opening of every $$C\_{\text{transfer},i}$$ and, by summation, of the receiving-balance commitment $$C\_{\text{receive}}$$; see Section 8.2 for the bounded scope (forward-only, receiving-side only). Merge folds $$r\_r$$ into the spendable-balance randomness ($$r\_{\text{spend}}' = r\_s + r\_r$$, Section 7.4) and emits no checkpoint, so the recipient-auditor's $$r\_r$$ knowledge does not extend to a post-merge opening of $$C\_{\text{spend}}$$: $$r\_s$$ depends on $$vk\_A$$ and is not derivable from any auditor key. In neither case can the attacker recover viewing keys, post-merge spendable-balance openings, historical data from before the key was active, or authorize any spending. After key rotation, new operations are protected by the new key.
 
 ### 9.5 State Recovery
 
@@ -352,7 +352,7 @@ Requires `bn254_fr_{add, sub, mul, inv}` host calls (CAP-80, Section 10.7).
 
 **Point validation.** Grumpkin points enter the system through three boundaries; on-curve and non-identity checks live at the boundary that owns each one. The contract itself performs no per-call on-curve check.
 
-1. **Proof-constrained points (the dominant case).** Every public input that the corresponding circuit also derives via `multi_scalar_mul` is on-curve by construction -- Noir's embedded-curve operations cannot produce an off-curve Grumpkin point. This covers $$Y$$ (R1), $$\text{PVK}$$ (R3), $$R\_e$$ (T6, O6, W_a1, S_a1, V_a1), $$C\_{\text{tx}}$$ (T8, O8), $$C\_{\text{spend}}'$$ (T11, W6, S10, V7), $$C\_a$$ / $$C\_a'$$ (S7, O11), and the ECDH shared secrets. Non-identity is enforced *in-circuit* by explicit nonzero-scalar constraints: $$sk \neq 0$$ and $$vk \neq 0$$ at registration (R4, R5), and $$r\_e \neq 0$$ in every circuit that produces an ephemeral key (W8, T13, S13, O13, V10). Without these constraints an adversary could publish $$Y = \mathcal{O}$$, $$\text{PVK} = \mathcal{O}$$, or $$R\_e = \mathcal{O}$$ and collapse ECDH (every shared secret becomes $$\mathcal{O}$$, every Poseidon mask becomes a constant function of $$\sigma$$, every ciphertext becomes trivially decryptable).
+1. **Proof-constrained points (the dominant case).** Every public input that the corresponding circuit also derives via `multi_scalar_mul` is on-curve by construction -- Noir's embedded-curve operations cannot produce an off-curve Grumpkin point. This covers $$Y$$ (R1), $$\text{PVK}$$ (R3), $$R\_e$$ (T6, O6, W_a1, S_a1, V_a1), $$C\_{\text{transfer}}$$ (T8, O8), $$C\_{\text{spend}}'$$ (T11, W6, S10, V7), $$C\_a$$ / $$C\_a'$$ (S7, O11), and the ECDH shared secrets. Non-identity is enforced *in-circuit* by explicit nonzero-scalar constraints: $$sk \neq 0$$ and $$vk \neq 0$$ at registration (R4, R5), and $$r\_e \neq 0$$ in every circuit that produces an ephemeral key (W8, T13, S13, O13, V10). Without these constraints an adversary could publish $$Y = \mathcal{O}$$, $$\text{PVK} = \mathcal{O}$$, or $$R\_e = \mathcal{O}$$ and collapse ECDH (every shared secret becomes $$\mathcal{O}$$, every Poseidon mask becomes a constant function of $$\sigma$$, every ciphertext becomes trivially decryptable).
 2. **Points read from prior on-chain state.** $$C\_{\text{spend}}$$, $$C\_{\text{receive}}$$, stored $$Y$$ / $$\text{PVK}$$, and allowance commitments were validated through path (1) when first written. The contract trusts them on subsequent reads.
 3. **Auditor keys (the only proof-less entry point).** $$K\_{\text{aud}}$$ is registered in the auditor contract by the auditor itself, with no accompanying proof. The auditor contract performs canonical encoding, on-curve ($$y^2 \equiv x^3 - 17 \pmod{r}$$), and non-identity checks at insertion (Section 3.1); the contract trusts the fetched value.
 
@@ -404,8 +404,8 @@ This table is authoritative: every entry is exactly the set of prover-supplied p
 |:---|:---|
 | `register` | $$Y$$, $$\text{PVK}$$, `proof` |
 | `withdraw` | $$C\_{\text{spend}}'$$, $$\tilde{b}$$, $$R\_e$$, $$\sigma$$, $$\tilde{b}\_{\text{aud,s}}$$, `proof` |
-| `confidential_transfer` | $$C\_{\text{spend}}'$$, $$C\_{\text{tx}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\sigma$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, `proof` |
-| `confidential_transfer_from` | $$C\_a'$$, $$C\_{\text{tx}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{a}'$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$, `proof` |
+| `confidential_transfer` | $$C\_{\text{spend}}'$$, $$C\_{\text{transfer}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\sigma$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, `proof` |
+| `confidential_transfer_from` | $$C\_a'$$, $$C\_{\text{transfer}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{a}'$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$, `proof` |
 | `set_spender` | $$C\_{\text{spend}}'$$, $$C\_a$$, $$\text{escrowed\\\_dvk}$$, $$\tilde{b}$$, $$\tilde{a}$$, $$R\_e$$, $$\sigma$$, $$\sigma\_a$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, `proof` |
 | `revoke_spender` | $$C\_{\text{spend}}'$$, $$\tilde{b}$$, $$R\_e$$, $$\sigma$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, `proof` |
 
@@ -452,7 +452,7 @@ Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
 
 **Usage by consumers:**
 
-- **Recipient wallet**: processes `Transfer` and `SpenderTransfer` events using $$(R\_e, \tilde{v}, \sigma)$$ to derive $$v\_{\text{tx}}$$ and $$r\_{\text{tx}}$$ (Section 5.3).
+- **Recipient wallet**: processes `Transfer` and `SpenderTransfer` events using $$(R\_e, \tilde{v}, \sigma)$$ to derive $$v\_{\text{transfer}}$$ and $$r\_{\text{transfer}}$$ (Section 5.3).
 - **Owner wallet**: processes all events for recovery (Section 5.2). The $$(\tilde{b}, \sigma)$$ pair from the most recent owner-initiated event forms a checkpoint.
 - **Auditor**: processes events containing $$R\_e$$ to compute ECDH shared secrets and decrypt amounts and balance checkpoints (Section 8.1, 8.2).
 
@@ -503,8 +503,8 @@ Each $$\delta$$ is a small positive integer in $$\mathbb{F}\_r$$, fixed for the 
 | $$\delta\_{\text{vk}}$$ | 2 | Viewing key derivation from spending key and contract address (§4.2) |
 | $$\delta\_{\text{dvk}}$$ | 3 | Delegation viewing key derivation (§4.4) |
 | $$\delta\_{\text{spend\\\_r}}$$ | 4 | Deterministic randomness for spendable balance commitments (§5.2 *Update rules*) |
-| $$\delta\_{\text{tx\\\_blind}}$$ | 5 | ECDH-derived transfer blinding factor (§5.3 Definition 1) |
-| $$\delta\_{\text{tx\\\_amount}}$$ | 6 | ECDH-derived transfer amount encryption (§5.3 Definition 1) |
+| $$\delta\_{\text{transfer\\\_blind}}$$ | 5 | ECDH-derived transfer blinding factor (§5.3 Definition 1) |
+| $$\delta\_{\text{transfer\\\_amount}}$$ | 6 | ECDH-derived transfer amount encryption (§5.3 Definition 1) |
 | $$\delta\_{\text{enc\\\_bal}}$$ | 7 | Encrypted balance scalar masking (§5.5) |
 | $$\delta\_{\text{enc\\\_allow}}$$ | 8 | Encrypted allowance scalar masking (§6.2 *encrypted\_allowance*) |
 | $$\delta\_{\text{allow\\\_r}}$$ | 9 | Deterministic randomness for spender allowance commitments (§6.2 *allowance\_commitment*) |
@@ -513,6 +513,6 @@ Each $$\delta$$ is a small positive integer in $$\mathbb{F}\_r$$, fixed for the 
 | $$\delta\_{\text{aud\\\_r}}$$ | 12 | Recipient-auditor channel sponge (§2.5, §8.1) |
 | $$\delta\_{\text{ecdh}}$$ | 13 | ECDH shared-secret scalar extraction (§2.4) |
 
-**Provenance.** Sequential small integers are the simplest assignment that satisfies the requirement of *distinctness* across all Poseidon2 invocations in this protocol -- Poseidon2 is collision-resistant under the assumption of §3.2, so any two distinct leading inputs (independent of size) produce independent outputs. The values themselves carry no semantic meaning; the binding is purely positional and the table is the only authoritative source. Implementations MUST hardcode these exact numeric values; deviations break cross-implementation derivation of $$vk$$, $$dvk\_i$$, the ECDH shared scalar $$s$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\tilde{a}$$, $$r\_{\text{tx}}$$, $$r\_a$$, and all auditor masks.
+**Provenance.** Sequential small integers are the simplest assignment that satisfies the requirement of *distinctness* across all Poseidon2 invocations in this protocol -- Poseidon2 is collision-resistant under the assumption of §3.2, so any two distinct leading inputs (independent of size) produce independent outputs. The values themselves carry no semantic meaning; the binding is purely positional and the table is the only authoritative source. Implementations MUST hardcode these exact numeric values; deviations break cross-implementation derivation of $$vk$$, $$dvk\_i$$, the ECDH shared scalar $$s$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\tilde{a}$$, $$r\_{\text{transfer}}$$, $$r\_a$$, and all auditor masks.
 
 **Cross-protocol collision.** Future protocols that share Grumpkin / BN254 / Poseidon2 with this protocol -- e.g. an unrelated payments protocol that uses small-integer Poseidon2 domains -- could in principle pick the same numeric values for unrelated purposes. The protocol assumes that the surrounding inputs to Poseidon2 (key material, structural witnesses) sufficiently disambiguate even in such a case; no Poseidon2 invocation in this protocol is keyed solely on a $$\delta$$ value. If stronger isolation is desired, implementers may instead use the alternate scheme $$\delta\_X = \text{Poseidon2}(0, \text{ASCII}(\text{"openzeppelin/confidential-token/v1:X"}))$$, but this is a deployment-time choice that must be applied uniformly and disclosed in the deployment's circuit-binding documentation.

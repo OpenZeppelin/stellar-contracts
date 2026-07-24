@@ -109,17 +109,17 @@ The disclosure layer inherits the protocol's threat model (DESIGN.md §3.2) and 
 
 ## 4. Disclosure Ciphertext to Recipient
 
-All variants below share a common output stage that encrypts the disclosed value $$v\_{\text{tx}}$$ under the recipient's key $$P\_R$$.
+All variants below share a common output stage that encrypts the disclosed value $$v\_{\text{transfer}}$$ under the recipient's key $$P\_R$$.
 
 The prover samples an ephemeral scalar $$r\_{\text{disc}} \in \mathbb{F}\_r$$ and computes:
 
 $$R\_{\text{disc}} = r\_{\text{disc}} \cdot H$$
 $$S\_{\text{disc}} = r\_{\text{disc}} \cdot P\_R, \qquad s\_{\text{disc}} = S\_{\text{disc}}.x$$
-$$\tilde{v}\_{\text{disc}} = v\_{\text{tx}} + \text{Poseidon}(\delta\_{\text{disc}}, s\_{\text{disc}}, \nu)$$
+$$\tilde{v}\_{\text{disc}} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{disc}}, s\_{\text{disc}}, \nu)$$
 
 The recipient decrypts:
 
-$$S\_{\text{disc}} = r\_R \cdot R\_{\text{disc}}, \qquad v\_{\text{tx}} = \tilde{v}\_{\text{disc}} - \text{Poseidon}(\delta\_{\text{disc}}, S\_{\text{disc}}.x, \nu)$$
+$$S\_{\text{disc}} = r\_R \cdot R\_{\text{disc}}, \qquad v\_{\text{transfer}} = \tilde{v}\_{\text{disc}} - \text{Poseidon}(\delta\_{\text{disc}}, S\_{\text{disc}}.x, \nu)$$
 
 The pair $$(R\_{\text{disc}}, \tilde{v}\_{\text{disc}})$$ is part of the proof's public inputs. The disclosed amount is therefore confidential to any party other than the recipient even if the proof itself is archived in the clear.
 
@@ -129,7 +129,7 @@ This block is constraints **U1–U3**:
 |:--|:---|
 | U1 | $$R\_{\text{disc}} = r\_{\text{disc}} \cdot H$$ |
 | U2 | $$S\_{\text{disc}} = r\_{\text{disc}} \cdot P\_R$$ |
-| U3 | $$\tilde{v}\_{\text{disc}} = v\_{\text{tx}} + \text{Poseidon}(\delta\_{\text{disc}}, S\_{\text{disc}}.x, \nu)$$ |
+| U3 | $$\tilde{v}\_{\text{disc}} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{disc}}, S\_{\text{disc}}.x, \nu)$$ |
 
 Subsequent variants reference this block by name.
 
@@ -174,7 +174,7 @@ The bundle does **not** include the event's payload, the disclosing account's ad
 
 ### 5.3 Verifier Protocol
 
-Given a bundle for $$(P\_R, \nu)$$ that this verifier previously issued, the recipient MUST perform every step below in order. Each step's failure is a hard reject; the recipient MUST NOT learn $$v\_{\text{tx}}$$ from a bundle that fails any step.
+Given a bundle for $$(P\_R, \nu)$$ that this verifier previously issued, the recipient MUST perform every step below in order. Each step's failure is a hard reject; the recipient MUST NOT learn $$v\_{\text{transfer}}$$ from a bundle that fails any step.
 
 1. **Resolve the event.** Look up $$\text{ref}\_E$$ via the indexer or via direct RPC of the transaction. The lookup MUST return exactly one event whose contract address equals the deployed confidential-token contract. Extract the event's payload fields verbatim:
    - For `Transfer`: `from`, `to`, $$R\_e$$, $$\sigma$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ (DESIGN_cont.md §11.2).
@@ -194,7 +194,7 @@ Given a bundle for $$(P\_R, \nu)$$ that this verifier previously issued, the rec
 
 5. **Verify the proof.** Run UltraHonk verification with the verification key for `circuit_id` against the constructed public inputs and $$\pi$$. Reject on failure.
 
-6. **Decrypt.** Compute $$S\_{\text{disc}} = r\_R \cdot R\_{\text{disc}}$$ and $$v\_{\text{tx}} = \tilde{v}\_{\text{disc}} - \text{Poseidon}(\delta\_{\text{disc}}, S\_{\text{disc}}.x, \nu)$$ as in §4.
+6. **Decrypt.** Compute $$S\_{\text{disc}} = r\_R \cdot R\_{\text{disc}}$$ and $$v\_{\text{transfer}} = \tilde{v}\_{\text{disc}} - \text{Poseidon}(\delta\_{\text{disc}}, S\_{\text{disc}}.x, \nu)$$ as in §4.
 
 ### 5.4 On-Chain Verification
 
@@ -214,7 +214,7 @@ Either way the request and the proof are public, which is the deliberate privacy
 
 ## 6. Circuit D-recipient: Holder Discloses an Inbound Transfer
 
-The account holder is the recipient of an on-chain confidential transfer (either a `Transfer` to them or a `SpenderTransfer` whose `to` is them) and proves to a third party that the transfer was for amount $$v\_{\text{tx}}$$. The same circuit covers both event families because the recipient-side ECDH constraint has identical shape in either case; only the value of the event nonce $$\sigma\_E$$ differs ($$\sigma$$ for `Transfer`, $$\sigma\_a$$ for `SpenderTransfer`; see DESIGN.md §7.6 T9, §7.8 O9).
+The account holder is the recipient of an on-chain confidential transfer (either a `Transfer` to them or a `SpenderTransfer` whose `to` is them) and proves to a third party that the transfer was for amount $$v\_{\text{transfer}}$$. The same circuit covers both event families because the recipient-side ECDH constraint has identical shape in either case; only the value of the event nonce $$\sigma\_E$$ differs ($$\sigma$$ for `Transfer`, $$\sigma\_a$$ for `SpenderTransfer`; see DESIGN.md §7.6 T9, §7.8 O9).
 
 **Public inputs**
 
@@ -227,7 +227,7 @@ The account holder is the recipient of an on-chain confidential transfer (either
 | $$\nu$$ | recipient-supplied nonce (§2.1) |
 | $$R\_{\text{disc}}, \tilde{v}\_{\text{disc}}$$ | disclosure ciphertext to recipient (§4) |
 
-**Private witnesses:** $$sk\_A$$, $$vk\_A$$, $$v\_{\text{tx}}$$, $$r\_{\text{disc}}$$.
+**Private witnesses:** $$sk\_A$$, $$vk\_A$$, $$v\_{\text{transfer}}$$, $$r\_{\text{disc}}$$.
 
 **Circuit constraints (D-recipient):**
 
@@ -236,19 +236,19 @@ The account holder is the recipient of an on-chain confidential transfer (either
 | D1 | $$vk\_A = \text{Poseidon}(\delta\_{\text{vk}}, sk\_A, \text{addr\\\_f})$$ (viewing key correctly derived, binds proof to contract; mirrors DESIGN.md R2/T2/W2/S2/V2) |
 | D2 | $$\text{PVK}\_A = vk\_A \cdot H$$ (binds proof to on-chain account) |
 | D3 | $$s = \text{ECDH}(vk\_A, R\_e)$$ (recipient-side ECDH shared scalar, DESIGN.md §2.4) |
-| D4 | $$v\_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s, \sigma\_E)$$ (correct decryption of event amount; matches DESIGN.md T9 for `Transfer` and O9 for `SpenderTransfer`) |
-| D5 | $$v\_{\text{tx}} \in [0, 2^{127})$$ (range, DESIGN.md §2.6) |
+| D4 | $$v\_{\text{transfer}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s, \sigma\_E)$$ (correct decryption of event amount; matches DESIGN.md T9 for `Transfer` and O9 for `SpenderTransfer`) |
+| D5 | $$v\_{\text{transfer}} \in [0, 2^{127})$$ (range, DESIGN.md §2.6) |
 | U1–U3 | Disclosure ciphertext to recipient (§4) |
 
-D1 and D2 anchor the proof to the disclosing account's on-chain record without revealing $$sk\_A$$ or $$vk\_A$$. D3 and D4 recompute the standard recipient-side decryption that the holder would normally perform offline to learn the incoming amount. The result $$v\_{\text{tx}}$$ then feeds the U-block, which encrypts it to the disclosure recipient.
+D1 and D2 anchor the proof to the disclosing account's on-chain record without revealing $$sk\_A$$ or $$vk\_A$$. D3 and D4 recompute the standard recipient-side decryption that the holder would normally perform offline to learn the incoming amount. The result $$v\_{\text{transfer}}$$ then feeds the U-block, which encrypts it to the disclosure recipient.
 
-**Verifier flow.** Follow §5.3 with `circuit_id = D-recipient`. Step 2 resolves $$\text{PVK}\_A$$ at $$E.\text{to}$$ (the only account record this variant consults). On success, the recipient now knows that the named on-chain event paid the named account exactly $$v\_{\text{tx}}$$ tokens, and learns nothing else.
+**Verifier flow.** Follow §5.3 with `circuit_id = D-recipient`. Step 2 resolves $$\text{PVK}\_A$$ at $$E.\text{to}$$ (the only account record this variant consults). On success, the recipient now knows that the named on-chain event paid the named account exactly $$v\_{\text{transfer}}$$ tokens, and learns nothing else.
 
 ---
 
 ## 7. Circuit D-sender: Sender Discloses an Outbound Transfer
 
-The party that **originated** an on-chain confidential transfer proves to a third party that they paid $$v\_{\text{tx}}$$ to the on-chain recipient address recorded in the event. "Sender" here covers both:
+The party that **originated** an on-chain confidential transfer proves to a third party that they paid $$v\_{\text{transfer}}$$ to the on-chain recipient address recorded in the event. "Sender" here covers both:
 
 - **`Transfer` events:** the originator is the account holder $$A$$ at `from`. The disclosing key material is the holder's own $$(sk\_A, vk\_A)$$ and the ephemeral scalar $$r\_e$$ used at transfer time.
 - **`SpenderTransfer` events:** the originator is the spender at `spender`, **not** the owner at `from`. The disclosing key material is the spender's own $$(sk\_{\text{op}}, vk\_{\text{op}})$$ and the ephemeral scalar $$r\_e$$ used at transfer time.
@@ -261,7 +261,7 @@ $$r\_e = \text{Poseidon2}(\delta\_{\text{eph}}, vk, \sigma\_E)$$
 
 where $$\delta\_{\text{eph}}$$ is a dedicated domain separator (the `EPHEMERAL_KEY` tag, §2.2), $$vk$$ is the originator's viewing key ($$vk\_A$$ for `Transfer`, $$vk\_{\text{op}}$$ for `SpenderTransfer`), and $$\sigma\_E$$ is the event nonce ($$\sigma$$ or $$\sigma\_a$$). This is the same construction the protocol already uses for the normalized spend randomness $$r' = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk, \sigma)$$ and the encrypted-balance mask $$\text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk, \sigma)$$ (DESIGN.md §5.2, §5.5): $$r\_e$$ joins the family of per-operation secrets recoverable from $$(vk, \sigma\_E)$$ alone. Because $$vk$$ is secret, $$r\_e$$ stays secret to everyone but the originator's wallet; because $$\sigma\_E$$ is published in the event, the wallet recomputes $$r\_e$$ at disclosure time having stored nothing.
 
-Once $$r\_e$$ is recovered the disclosed amount follows, $$v\_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, \text{ECDH}(r\_e, \text{PVK}\_B), \sigma\_E)$$ (DESIGN.md §2.4) with $$\text{PVK}\_B$$ read from the event's `to` address, so D-sender needs **no** per-transfer wallet state — only the wallet's $$vk$$ and an on-chain read of the event, matching the storage-free posture of D-recipient (§6). This is a wallet-side convention applied when *constructing* outgoing transfers; the contract and the six circuits are untouched (T5/T6 hold for any $$r\_e$$), and it is forward-looking — a transfer whose $$r\_e$$ was sampled randomly and not retained remains undiscloseable.
+Once $$r\_e$$ is recovered the disclosed amount follows, $$v\_{\text{transfer}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, \text{ECDH}(r\_e, \text{PVK}\_B), \sigma\_E)$$ (DESIGN.md §2.4) with $$\text{PVK}\_B$$ read from the event's `to` address, so D-sender needs **no** per-transfer wallet state — only the wallet's $$vk$$ and an on-chain read of the event, matching the storage-free posture of D-recipient (§6). This is a wallet-side convention applied when *constructing* outgoing transfers; the contract and the six circuits are untouched (T5/T6 hold for any $$r\_e$$), and it is forward-looking — a transfer whose $$r\_e$$ was sampled randomly and not retained remains undiscloseable.
 
 **Security note.** Deriving $$r\_e$$ from $$\sigma\_E$$ makes $$\sigma\_E$$ the sole freshness input for the whole transfer, including the recipient and auditor channels that otherwise draw independent freshness from a separately sampled $$r\_e$$. This is safe under the protocol's existing requirement that $$\sigma$$ be unique per operation: the balance channel $$\tilde{b} = v + \text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk, \sigma)$$ and the normalized $$r'$$ already depend on $$\sigma$$ alone, so a $$\sigma$$ collision is already disallowed and is negligible under the rejection sampling of DESIGN.md §2.2. The cost is the loss of $$r\_e$$ as an independent second freshness source; a deployment that wants defense-in-depth against $$\sigma$$ misuse on the recipient and auditor channels should keep sampling $$r\_e$$ and storing it instead.
 
@@ -278,7 +278,7 @@ In the symbols below, $$A$$ denotes the **originating** address — the holder's
 | $$P\_R, \nu$$ | disclosure recipient pubkey and nonce |
 | $$R\_{\text{disc}}, \tilde{v}\_{\text{disc}}$$ | disclosure ciphertext |
 
-**Private witnesses:** $$sk\_A$$, $$vk\_A$$, $$r\_e$$, $$v\_{\text{tx}}$$, $$r\_{\text{disc}}$$.
+**Private witnesses:** $$sk\_A$$, $$vk\_A$$, $$r\_e$$, $$v\_{\text{transfer}}$$, $$r\_{\text{disc}}$$.
 
 **Circuit constraints (D-sender):**
 
@@ -288,8 +288,8 @@ In the symbols below, $$A$$ denotes the **originating** address — the holder's
 | D2 | $$\text{PVK}\_A = vk\_A \cdot H$$ |
 | DS3 | $$R\_e = r\_e \cdot H$$ (prover knows the ephemeral scalar used at transfer time; same shape as DESIGN.md T6 for `Transfer` and O6 for `SpenderTransfer`) |
 | DS4 | $$s\_B = \text{ECDH}(r\_e, \text{PVK}\_B)$$ (sender-side ECDH shared scalar to recipient, DESIGN.md §2.4) |
-| DS5 | $$v\_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s\_B, \sigma\_E)$$ |
-| D5 | $$v\_{\text{tx}} \in [0, 2^{127})$$ |
+| DS5 | $$v\_{\text{transfer}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s\_B, \sigma\_E)$$ |
+| D5 | $$v\_{\text{transfer}} \in [0, 2^{127})$$ |
 | U1–U3 | Disclosure ciphertext to recipient (§4) |
 
 DS3 anchors $$R\_e$$ to the originator by forcing them to know $$r\_e$$. Combined with D1/D2, this proves the prover is the same party that produced the transfer's ephemeral key — the holder for `Transfer`, the spender for `SpenderTransfer`. DS4 and DS5 reconstruct the recipient-side decryption from the originator's perspective.
@@ -307,9 +307,9 @@ A D-sender proof for a `SpenderTransfer` proves that the spender (not the owner)
 
 ## 8. Circuit D-auditor: Auditor Discloses a Transfer
 
-The auditor proves to a third party that an on-chain event corresponds to a transfer of amount $$v\_{\text{tx}}$$ for one of the accounts under the auditor's scope. Used when the holder is uncooperative or when the disclosure recipient requires a guarantee that the auditor (not just the holder) has attested.
+The auditor proves to a third party that an on-chain event corresponds to a transfer of amount $$v\_{\text{transfer}}$$ for one of the accounts under the auditor's scope. Used when the holder is uncooperative or when the disclosure recipient requires a guarantee that the auditor (not just the holder) has attested.
 
-**Which auditor.** Every transfer carries ciphertexts under *two* auditor keys (DESIGN_cont.md §8.1): the recipient-side key $$K\_{\text{aud,r}}$$ (channel $$\delta\_{\text{aud\\\_r}}$$, two squeezes yielding masks for $$v\_{\text{tx}}$$ and $$r\_{\text{tx}}$$) and the sender-side key $$K\_{\text{aud,s}}$$ (channel $$\delta\_{\text{aud\\\_s}}$$, two squeezes yielding masks for $$v\_{\text{tx}}$$ and the sender's post-transfer balance). Whichever auditor is disclosing reuses the same shared-secret derivation they perform to read events natively; the circuit additionally encrypts the result to the disclosure recipient.
+**Which auditor.** Every transfer carries ciphertexts under *two* auditor keys (DESIGN_cont.md §8.1): the recipient-side key $$K\_{\text{aud,r}}$$ (channel $$\delta\_{\text{aud\\\_r}}$$, two squeezes yielding masks for $$v\_{\text{transfer}}$$ and $$r\_{\text{transfer}}$$) and the sender-side key $$K\_{\text{aud,s}}$$ (channel $$\delta\_{\text{aud\\\_s}}$$, two squeezes yielding masks for $$v\_{\text{transfer}}$$ and the sender's post-transfer balance). Whichever auditor is disclosing reuses the same shared-secret derivation they perform to read events natively; the circuit additionally encrypts the result to the disclosure recipient.
 
 The constraints below parameterize the channel as $$\delta\_{\text{aud}} \in \\{\delta\_{\text{aud\\\_r}}, \delta\_{\text{aud\\\_s}}\\}$$ and the corresponding event ciphertext as $$\tilde{v}\_{\text{aud}} \in \\{\tilde{v}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}\\}$$. In each case the amount mask is the *first* squeeze of the channel's two-squeeze sponge; the second squeeze ($$m\_{r,r}$$ or $$m\_{b,s}$$) is computed and discarded for an amount disclosure, or used in place of the first for the balance/randomness variants noted below.
 
@@ -322,7 +322,7 @@ The constraints below parameterize the channel as $$\delta\_{\text{aud}} \in \\{
 | $$P\_R, \nu$$ | disclosure recipient pubkey and nonce |
 | $$R\_{\text{disc}}, \tilde{v}\_{\text{disc}}$$ | disclosure ciphertext |
 
-**Private witnesses:** $$aud\_{sk}$$, $$v\_{\text{tx}}$$, $$r\_{\text{disc}}$$.
+**Private witnesses:** $$aud\_{sk}$$, $$v\_{\text{transfer}}$$, $$r\_{\text{disc}}$$.
 
 **Circuit constraints (D-auditor):**
 
@@ -331,15 +331,15 @@ The constraints below parameterize the channel as $$\delta\_{\text{aud}} \in \\{
 | A1 | $$K\_{\text{aud}} = aud\_{sk} \cdot H$$ (auditor key ownership) |
 | A2 | $$s\_{\text{aud}} = \text{ECDH}(aud\_{sk}, R\_e)$$ (auditor-side ECDH shared scalar; mirrors the prover-side $$\text{ECDH}(r\_e, K\_{\text{aud}})$$ from DESIGN.md T_a1 / T_a5) |
 | A3 | $$(m\_v, m\_2) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud}}, s\_{\text{aud}}, \sigma\_E)$$ (auditor channel sponge; same construction as DESIGN.md §2.5, §8.1) |
-| A4 | $$v\_{\text{tx}} = \tilde{v}\_{\text{aud}} - m\_v$$ (correct decryption of the channel's amount slot, the first squeeze) |
-| D5 | $$v\_{\text{tx}} \in [0, 2^{127})$$ |
+| A4 | $$v\_{\text{transfer}} = \tilde{v}\_{\text{aud}} - m\_v$$ (correct decryption of the channel's amount slot, the first squeeze) |
+| D5 | $$v\_{\text{transfer}} \in [0, 2^{127})$$ |
 | U1–U3 | Disclosure ciphertext to recipient (§4) |
 
 D-auditor does not bind to an account record; the auditor key already binds the proof. The disclosure recipient confirms which account the event concerns by reading the event's sender and recipient addresses directly.
 
 **Verifier flow.** Follow §5.3 with `circuit_id = D-auditor` (or the chosen balance / randomness variant). Step 2 is skipped — no $$\text{PVK}\_A$$ lookup is needed. Step 3 resolves $$K\_{\text{aud}}$$ at the event's ledger: $$K\_{\text{aud,r}}$$ from the `auditor_id` on the event's `to` account when disclosing the recipient-side channel, or $$K\_{\text{aud,s}}$$ from the `auditor_id` on the `from` account when disclosing the sender-side channel. `from` is the funds' owner in both `Transfer` and `SpenderTransfer`, since the sender-auditor channel always tracks the owner (DESIGN.md §7.8).
 
-**Balance / randomness variants.** The second squeeze of each channel carries a distinct datum: $$m\_{b,s}$$ (sender's post-transfer balance checkpoint, channel $$\delta\_{\text{aud\\\_s}}$$, recovered from $$\tilde{b}\_{\text{aud,s}}$$) or $$m\_{r,r}$$ (per-transfer Pedersen randomness, channel $$\delta\_{\text{aud\\\_r}}$$, recovered from $$\tilde{r}\_{\text{aud,r}}$$). A circuit that discloses either of these substitutes the corresponding event ciphertext for $$\tilde{v}\_{\text{aud}}$$ in A4 and reads $$m\_2$$ rather than $$m\_v$$ from the sponge output. Range constraint D5 applies unchanged to a balance disclosure; for a randomness disclosure D5 is dropped since $$r\_{\text{tx}} \in \mathbb{F}\_r$$ is not range-bounded. These variants are not separately tabulated.
+**Balance / randomness variants.** The second squeeze of each channel carries a distinct datum: $$m\_{b,s}$$ (sender's post-transfer balance checkpoint, channel $$\delta\_{\text{aud\\\_s}}$$, recovered from $$\tilde{b}\_{\text{aud,s}}$$) or $$m\_{r,r}$$ (per-transfer Pedersen randomness, channel $$\delta\_{\text{aud\\\_r}}$$, recovered from $$\tilde{r}\_{\text{aud,r}}$$). A circuit that discloses either of these substitutes the corresponding event ciphertext for $$\tilde{v}\_{\text{aud}}$$ in A4 and reads $$m\_2$$ rather than $$m\_v$$ from the sponge output. Range constraint D5 applies unchanged to a balance disclosure; for a randomness disclosure D5 is dropped since $$r\_{\text{transfer}} \in \mathbb{F}\_r$$ is not range-bounded. These variants are not separately tabulated.
 
 ---
 
@@ -406,7 +406,7 @@ For statements of the form "this account received at least $$X$$ from counterpar
 | List: $$(R\_{e,i}, \sigma\_{E,i}, \tilde{v}\_i)$$ for $$i \in [1, n]$$ | from $$n$$ on-chain transfer-family events; $$\sigma\_{E,i} = \sigma$$ if event $$i$$ is a `Transfer`, $$\sigma\_a$$ if `SpenderTransfer`. Each event MUST be identified by a $$\text{ref}\_{E,i}$$ in the proof bundle and resolved per §5.3. |
 | Optional: $$V\_{\text{threshold}}$$ | aggregate threshold |
 
-**Private witnesses:** $$sk\_A$$, $$vk\_A$$, $$\\{v\_{\text{tx},i}\\}\_{i=1}^n$$, $$r\_{\text{disc}}$$.
+**Private witnesses:** $$sk\_A$$, $$vk\_A$$, $$\\{v\_{\text{transfer},i}\\}\_{i=1}^n$$, $$r\_{\text{disc}}$$.
 
 **Circuit constraints (D-aggregate, n events):**
 
@@ -414,11 +414,11 @@ For statements of the form "this account received at least $$X$$ from counterpar
 |:--|:---|
 | D1, D2 | As in §6 |
 | For each $$i$$: D3$$\_i$$ | $$s\_i = \text{ECDH}(vk\_A, R\_{e,i})$$ |
-| For each $$i$$: D4$$\_i$$ | $$v\_{\text{tx},i} = \tilde{v}\_i - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s\_i, \sigma\_{E,i})$$ |
-| For each $$i$$: D5$$\_i$$ | $$v\_{\text{tx},i} \in [0, 2^{127})$$ |
-| AGG | $$V\_{\text{total}} = \sum\_{i=1}^n v\_{\text{tx},i}$$ |
+| For each $$i$$: D4$$\_i$$ | $$v\_{\text{transfer},i} = \tilde{v}\_i - \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s\_i, \sigma\_{E,i})$$ |
+| For each $$i$$: D5$$\_i$$ | $$v\_{\text{transfer},i} \in [0, 2^{127})$$ |
+| AGG | $$V\_{\text{total}} = \sum\_{i=1}^n v\_{\text{transfer},i}$$ |
 | THRESH (optional) | $$V\_{\text{total}} \geq V\_{\text{threshold}}$$ |
-| U1–U3 | Encrypt $$V\_{\text{total}}$$ (not the individual $$v\_{\text{tx},i}$$) to the recipient, with $$\delta\_{\text{disc\\\_bind}}$$ replacing $$\delta\_{\text{disc}}$$ to separate domain |
+| U1–U3 | Encrypt $$V\_{\text{total}}$$ (not the individual $$v\_{\text{transfer},i}$$) to the recipient, with $$\delta\_{\text{disc\\\_bind}}$$ replacing $$\delta\_{\text{disc}}$$ to separate domain |
 
 The recipient filters the $$n$$ events off-chain by the criteria they care about (sender address, block timestamp) before constructing the verifier's public inputs. They learn the aggregate $$V\_{\text{total}}$$ but not the individual amounts. If THRESH is included and the recipient does not need the aggregate value itself, U1–U3 can be omitted; the proof's mere validity asserts the threshold.
 
@@ -468,7 +468,7 @@ The diagram below shows the D-recipient case. D-sender and D-auditor follow the 
    (8) §5.3 step 4: build public-input vector
    (9) §5.3 step 5: verify π
    (10) §5.3 step 6: decrypt ṽ_disc with r_R, ν
-        → learns v_tx
+        → learns v_transfer
 ```
 
 The recipient MAY agree on ref_E in step (1) ahead of time (e.g., "disclose the transfer at tx 0xabc, log #3") or leave it to the holder, in which case the bundle in step (4) is the first time ref_E is communicated; either way the verifier resolves it independently in step (5). There is no on-chain transaction for the disclosure itself. Steps (1) and (4) flow over any authenticated channel the parties already use (TLS, signed email, dedicated compliance API).
@@ -482,7 +482,7 @@ The recipient MAY agree on ref_E in step (1) ahead of time (e.g., "disclose the 
 For the D-recipient circuit, soundness reduces to two facts:
 
 1. D1, D2 force the prover to know an $$sk\_A$$ whose derived $$vk\_A$$ matches the on-chain $$\text{PVK}\_A$$. By DESIGN.md §4.2 this party is the account owner.
-2. D3, D4 force $$v\_{\text{tx}}$$ to equal the decryption of $$\tilde{v}$$ under that owner's $$vk\_A$$. By DESIGN.md §5.3 this is the same value the on-chain transfer commitment $$C\_{\text{tx}}$$ commits to, since the transfer circuit enforced consistent ECDH derivation at transfer time.
+2. D3, D4 force $$v\_{\text{transfer}}$$ to equal the decryption of $$\tilde{v}$$ under that owner's $$vk\_A$$. By DESIGN.md §5.3 this is the same value the on-chain transfer commitment $$C\_{\text{transfer}}$$ commits to, since the transfer circuit enforced consistent ECDH derivation at transfer time.
 
 Therefore, a soundness break would require either a key-derivation collision (Poseidon2 preimage break, DESIGN.md §2.5, §3.2) or a discrete-log break on Grumpkin. Both are out of scope.
 
@@ -496,7 +496,7 @@ D-balance soundness reduces to Pedersen binding (DESIGN.md §2.3): given the on-
 
 ### 13.2 Recipient Binding
 
-The disclosed value $$v\_{\text{tx}}$$ is delivered only through $$\tilde{v}\_{\text{disc}} = v\_{\text{tx}} + \text{Poseidon}(\delta\_{\text{disc}}, s\_{\text{disc}}, \nu)$$, where $$s\_{\text{disc}} = r\_{\text{disc}} \cdot P\_R$$ is recoverable only by the holder of $$r\_R$$.
+The disclosed value $$v\_{\text{transfer}}$$ is delivered only through $$\tilde{v}\_{\text{disc}} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{disc}}, s\_{\text{disc}}, \nu)$$, where $$s\_{\text{disc}} = r\_{\text{disc}} \cdot P\_R$$ is recoverable only by the holder of $$r\_R$$.
 
 A party other than the intended recipient who obtains $$(\pi, R\_{\text{disc}}, \tilde{v}\_{\text{disc}})$$ can verify $$\pi$$ but cannot decrypt $$\tilde{v}\_{\text{disc}}$$. They learn that *some* value was disclosed but not the value itself.
 
@@ -506,7 +506,7 @@ Nonce $$\nu$$ is bound into the Poseidon argument. A holder cannot reuse $$(\pi,
 
 **Holder cherry-picking.** A holder may disclose three inbound transfers from counterparty $$Y$$ while withholding a fourth. The verifier cannot detect this from the proof alone. Mitigation: completeness routes through the auditor (D-auditor variants), who sees every event under their scope. Recipients that require completeness must request from the auditor, not the holder.
 
-**Disclosure recipient leakage.** Once decrypted, $$v\_{\text{tx}}$$ is plaintext in the recipient's possession. The recipient may store, share, or leak it. This is a non-cryptographic concern handled by the recipient's own data-protection obligations, not by the protocol.
+**Disclosure recipient leakage.** Once decrypted, $$v\_{\text{transfer}}$$ is plaintext in the recipient's possession. The recipient may store, share, or leak it. This is a non-cryptographic concern handled by the recipient's own data-protection obligations, not by the protocol.
 
 **Recipient compelling disclosure.** A recipient cannot force a holder to produce a proof. Compelled disclosure is a legal mechanism, not a cryptographic one; this layer enables disclosure when the holder is willing, and the auditor variants serve as the cryptographic backstop when the holder is not.
 
@@ -522,7 +522,7 @@ The following extensions are deliberately not part of this document. They are me
 
 **Merkle-accumulated event history with non-membership proofs.** Would enable cryptographic completeness ("the disclosed set is exhaustive") without trusting the auditor. Requires substantial on-chain storage changes and a new accumulator-maintenance circuit.
 
-**Public disclosure proofs (no recipient binding).** Replacing the U-block with a public-input $$v\_{\text{tx}}$$ produces a portable proof anyone can verify. Useful for fire-and-forget compliance archives but loses recipient binding. Not included as a primary variant; can be added by trivially dropping U1–U3 and exposing $$v\_{\text{tx}}$$ as a public input. This is also the proof shape an on-chain verifier would consume (§5.4).
+**Public disclosure proofs (no recipient binding).** Replacing the U-block with a public-input $$v\_{\text{transfer}}$$ produces a portable proof anyone can verify. Useful for fire-and-forget compliance archives but loses recipient binding. Not included as a primary variant; can be added by trivially dropping U1–U3 and exposing $$v\_{\text{transfer}}$$ as a public input. This is also the proof shape an on-chain verifier would consume (§5.4).
 
 ---
 
@@ -547,7 +547,7 @@ These circuits do *not* register with the on-chain verifier set (DESIGN_cont.md 
 
 A wallet that supports holder-side disclosures must:
 
-1. Derive the transfer ephemeral scalar deterministically as $$r\_e = \text{Poseidon2}(\delta\_{\text{eph}}, vk, \sigma\_E)$$ when constructing each outgoing transfer (§7). D-sender then requires **no** per-transfer storage — both $$r\_e$$ and $$v\_{\text{tx}}$$ are recomputed at disclosure time from the wallet's $$vk$$ and the on-chain event. A wallet that instead samples $$r\_e$$ from fresh randomness must retain $$(r\_e, v\_{\text{tx}})$$ per outbound transfer (tens of bytes each) to keep those transfers disclosable.
+1. Derive the transfer ephemeral scalar deterministically as $$r\_e = \text{Poseidon2}(\delta\_{\text{eph}}, vk, \sigma\_E)$$ when constructing each outgoing transfer (§7). D-sender then requires **no** per-transfer storage — both $$r\_e$$ and $$v\_{\text{transfer}}$$ are recomputed at disclosure time from the wallet's $$vk$$ and the on-chain event. A wallet that instead samples $$r\_e$$ from fresh randomness must retain $$(r\_e, v\_{\text{transfer}})$$ per outbound transfer (tens of bytes each) to keep those transfers disclosable.
 2. Retain the latest opening $$(v\_s, r\_s)$$ of $$C\_{\text{spend}}$$ to support D-balance. This is part of the wallet's normal spend state.
 3. Index event references (transaction hash, log index) per account event to enable selecting events by user-facing criteria (date, counterparty).
 4. Expose a UI flow that takes a disclosure request $$(P\_R, \nu)$$ and a target event (or set), produces the disclosure proof, and delivers the result over the requested channel.
@@ -560,4 +560,4 @@ A standalone verifier library (independent of the wallet) consumes:
 - Disclosure recipient's $$(r\_R, P\_R)$$ keypair.
 - Proof bundle $$(\pi, R\_{\text{disc}}, \tilde{v}\_{\text{disc}})$$ and event reference.
 
-It returns the decrypted $$v\_{\text{tx}}$$ on successful verification, or a typed error indicating which check failed (proof verification, on-chain state mismatch, decryption failure).
+It returns the decrypted $$v\_{\text{transfer}}$$ on successful verification, or a typed error indicating which check failed (proof verification, on-chain state mismatch, decryption failure).

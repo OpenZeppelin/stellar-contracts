@@ -130,7 +130,7 @@ The system uses **Poseidon2**, the algebraic hash function native to Noir's stan
 
 - Key derivation: $$vk = \text{Poseidon2}(\delta\_{\text{vk}}, sk, \text{addr\\\_f})$$
 - Randomness derivation: $$r = \text{Poseidon2}(\delta\_{\text{spend\\\_r}}, vk, \sigma)$$
-- Symmetric encryption: $$\tilde{v} = v + \text{Poseidon2}(\delta\_{\text{tx\\\_amount}}, s, \sigma)$$
+- Symmetric encryption: $$\tilde{v} = v + \text{Poseidon2}(\delta\_{\text{transfer\\\_amount}}, s, \sigma)$$
 - Domain separation: each invocation includes a leading constant $$\delta$$ to prevent cross-context collisions
 
 **Sponge mode for auditor channels.** The per-transfer auditor ciphertexts (Section 8) use Poseidon2 in sponge mode. A single absorb of $$(\delta\_{\text{channel}}, s, \sigma)$$ -- where $$s$$ is the ECDH shared scalar of Section 2.4 -- is followed by $$n$$ sequential squeezes producing $$(m\_1, \ldots, m\_n) \in \mathbb{F}\_r^n$$, denoted $$\text{SpongeSqueeze}\_n(\delta\_{\text{channel}}, s, \sigma)$$. Two channel tags are used: $$\delta\_{\text{aud\\\_s}}$$ for the sender-auditor channel keyed by $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$, and $$\delta\_{\text{aud\\\_r}}$$ for the recipient-auditor channel keyed by $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$.
@@ -143,7 +143,7 @@ All references to "Poseidon" in this document denote this Poseidon2 instantiatio
 
 ### 2.6 Integer Embedding and Range Proofs
 
-**The problem.** Noir circuits operate over $$\mathbb{F}\_r$$, where every element is a non-negative integer modulo $$r \approx 2^{254}$$. The statement $$v \geq 0$$ is vacuously true for all $$v \in \mathbb{F}\_r$$, and $$v\_A \geq v\_{\text{tx}}$$ is undefined without specifying how integers are embedded in the field. Without explicit range constraints, a prover can claim a balance of 1 and transfer 1,000,000: the "new balance" $$1 - 1{,}000{,}000 \equiv r - 999{,}999 \pmod{r}$$ is a valid field element, and the commitment equation holds. The attacker has minted 999,999 tokens.
+**The problem.** Noir circuits operate over $$\mathbb{F}\_r$$, where every element is a non-negative integer modulo $$r \approx 2^{254}$$. The statement $$v \geq 0$$ is vacuously true for all $$v \in \mathbb{F}\_r$$, and $$v\_A \geq v\_{\text{transfer}}$$ is undefined without specifying how integers are embedded in the field. Without explicit range constraints, a prover can claim a balance of 1 and transfer 1,000,000: the "new balance" $$1 - 1{,}000{,}000 \equiv r - 999{,}999 \pmod{r}$$ is a valid field element, and the commitment equation holds. The attacker has minted 999,999 tokens.
 
 **Integer embedding.** We define a canonical embedding $$\iota: [0, 2^{127}) \to \mathbb{F}\_r$$ mapping non-negative integers to their natural field representatives. A field element $$x \in \mathbb{F}\_r$$ represents a valid balance or transfer amount if and only if $$x < 2^{127}$$.
 
@@ -158,13 +158,13 @@ Each $$b\_i$$ is constrained to be Boolean ($$b\_i \cdot (b\_i - 1) = 0$$) and t
 value.assert_max_bit_size::<127>();
 ```
 
-**Sufficiency argument.** If the prover supplies $$v\_A$$ and $$v\_{\text{tx}}$$ such that the circuit verifies:
+**Sufficiency argument.** If the prover supplies $$v\_A$$ and $$v\_{\text{transfer}}$$ such that the circuit verifies:
 
 1. $$v\_A \in [0, 2^{127})$$ (the opening of $$C\_{\text{spend}}$$)
-2. $$v\_{\text{tx}} \in [0, 2^{127})$$ (the transfer amount)
-3. $$v\_A - v\_{\text{tx}} \in [0, 2^{127})$$ (the new balance)
+2. $$v\_{\text{transfer}} \in [0, 2^{127})$$ (the transfer amount)
+3. $$v\_A - v\_{\text{transfer}} \in [0, 2^{127})$$ (the new balance)
 
-then $$v\_A - v\_{\text{tx}}$$ is a non-negative integer less than $$2^{127}$$, which is only possible if the integer subtraction did not underflow. This is because $$v\_A < 2^{127}$$ and $$v\_{\text{tx}} < 2^{127}$$, so if $$v\_A < v\_{\text{tx}}$$ as integers, then $$v\_A - v\_{\text{tx}} \pmod{r}$$ would be $$r - (v\_{\text{tx}} - v\_A)$$, which is at least $$r - 2^{127} \gg 2^{127}$$, failing constraint (3).
+then $$v\_A - v\_{\text{transfer}}$$ is a non-negative integer less than $$2^{127}$$, which is only possible if the integer subtraction did not underflow. This is because $$v\_A < 2^{127}$$ and $$v\_{\text{transfer}} < 2^{127}$$, so if $$v\_A < v\_{\text{transfer}}$$ as integers, then $$v\_A - v\_{\text{transfer}} \pmod{r}$$ would be $$r - (v\_{\text{transfer}} - v\_A)$$, which is at least $$r - 2^{127} \gg 2^{127}$$, failing constraint (3).
 
 **Value capacity.** Both balances and transfer amounts are constrained to $$[0, 2^{127})$$. These bounds are enforced in every circuit that manipulates values. The bound is exactly the SEP-41 non-negative `i128` range, so the contract's value domain matches the underlying token's domain by construction. The gap between $$2^{127}$$ and $$|\mathbb{F}\_r| \approx 2^{254}$$ ensures that modular wrap-around is detectable by the range check.
 
@@ -173,7 +173,7 @@ then $$v\_A - v\_{\text{tx}}$$ is a non-negative integer less than $$2^{127}$$, 
 This is safe because $$v\_r$$ is *indirectly* bounded:
 
 1. Each deposit adds a public `i128` amount validated by the contract ($$\ge 0$$, hence $$< 2^{127}$$).
-2. Each incoming transfer adds a commitment whose sender circuit proved $$v\_{\text{tx}} \in [0, 2^{127})$$ (constraint T4 / O4).
+2. Each incoming transfer adds a commitment whose sender circuit proved $$v\_{\text{transfer}} \in [0, 2^{127})$$ (constraint T4 / O4).
 3. All tokens in the contract entered through deposits, so the sum of all committed values is bounded by the underlying token's total supply ($$< 2^{127}$$). No single account can receive more than the total supply.
 4. For the field-arithmetic concern (could $$v\_r$$ reach $$r$$ and wrap around), that would require $$r / 2^{127} > 2^{127}$$ incoming transfers, which is computationally infeasible.
 
@@ -303,18 +303,18 @@ The following symbols are used throughout this section:
 |:---|:---|
 | $$C\_{\text{spend}}$$ | On-chain spendable balance commitment (Pedersen point) |
 | $$C\_{\text{receive}}$$ | On-chain receiving balance commitment (Pedersen point) |
-| $$C\_{\text{tx}}$$ | Transfer commitment added to recipient's $$C\_{\text{receive}}$$ |
+| $$C\_{\text{transfer}}$$ | Transfer commitment added to recipient's $$C\_{\text{receive}}$$ |
 | $$\text{Com}(v, r)$$ | Pedersen commitment $$v \cdot G + r \cdot H$$ |
 | $$v\_s, r\_s$$ | Value and blinding factor of $$C\_{\text{spend}}$$ (off-chain wallet state) |
 | $$v\_r, r\_r$$ | Value and blinding factor of $$C\_{\text{receive}}$$ (off-chain wallet state) |
-| $$v\_{\text{tx}}$$ | Transfer amount (private) |
-| $$r\_{\text{tx}}$$ | ECDH-derived blinding factor for $$C\_{\text{tx}}$$ |
+| $$v\_{\text{transfer}}$$ | Transfer amount (private) |
+| $$r\_{\text{transfer}}$$ | ECDH-derived blinding factor for $$C\_{\text{transfer}}$$ |
 | $$W\_{\text{spend}}, W\_{\text{receive}}$$ | Wallet-side accumulators: $$(v, r)$$ pairs tracking commitment openings |
 | $$r\_e$$ | Ephemeral scalar sampled per transfer |
 | $$R\_e$$ | Ephemeral public key $$r\_e \cdot H$$ (published in event data) |
 | $$S$$ | ECDH shared secret point $$r\_e \cdot \text{PVK}\_B$$ |
 | $$s$$ | Scalar shared secret $$\text{ECDH}(r\_e, \text{PVK}\_B) = \text{Poseidon}(\delta\_{\text{ecdh}}, S.x, S.y)$$ (§2.4) |
-| $$\tilde{v}$$ | Encrypted transfer amount: $$v\_{\text{tx}} + \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s, \sigma)$$ |
+| $$\tilde{v}$$ | Encrypted transfer amount: $$v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s, \sigma)$$ |
 | $$\tilde{b}$$ | Encrypted balance scalar: $$v\_{\text{new}} + \text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk, \sigma)$$ |
 | $$\sigma$$ | Prover-chosen random salt, sampled per operation via the rejection sampling procedure of §2.2; canonical $$\mathbb{F}\_r$$ representative encoded as `BytesN<32>` |
 
@@ -340,7 +340,7 @@ $$W\_{\text{receive}} = (v\_r, r\_r) \quad \text{such that} \quad C\_{\text{rece
 | Event | Accumulator update |
 |:---|:---|
 | Deposit of public amount $$a$$ to this account | $$W\_{\text{receive}} \mathrel{+}= (a, 0)$$ |
-| Incoming transfer with event $$(R\_e, \tilde{v}, \sigma)$$ | Compute $$s = \text{ECDH}(vk, R\_e)$$ (§2.4); derive $$v\_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s, \sigma)$$ and $$r\_{\text{tx}} = \text{Poseidon}(\delta\_{\text{tx\\\_blind}}, s, \sigma)$$. Then $$W\_{\text{receive}} \mathrel{+}= (v\_{\text{tx}}, r\_{\text{tx}})$$ |
+| Incoming transfer with event $$(R\_e, \tilde{v}, \sigma)$$ | Compute $$s = \text{ECDH}(vk, R\_e)$$ (§2.4); derive $$v\_{\text{transfer}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s, \sigma)$$ and $$r\_{\text{transfer}} = \text{Poseidon}(\delta\_{\text{transfer\\\_blind}}, s, \sigma)$$. Then $$W\_{\text{receive}} \mathrel{+}= (v\_{\text{transfer}}, r\_{\text{transfer}})$$ |
 | Outgoing transfer/withdrawal of amount $$a$$ | Proof outputs new commitment with deterministic randomness. $$W\_{\text{spend}} \leftarrow (v\_s - a, \\; \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk, \sigma))$$ |
 | Merge | $$W\_{\text{spend}} \leftarrow (v\_s + v\_r, \\; r\_s + r\_r)$$; $$W\_{\text{receive}} \leftarrow (0, 0)$$ |
 | Set spender (escrow amount $$a$$) | Proof outputs new commitment. $$W\_{\text{spend}} \leftarrow (v\_s - a, \\; \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk, \sigma))$$ |
@@ -359,7 +359,7 @@ After every owner-initiated operation that produces a proof, $$r\_s$$ resets to 
 3. Recover the spendable balance blinding: $$r\_s = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk, \sigma)$$.
 4. Set $$W\_{\text{spend}} \leftarrow (v\_s, r\_s)$$ and $$W\_{\text{receive}} \leftarrow (0, 0)$$.
 5. Replay all events since the checkpoint in ledger order. For each event:
-   - **Incoming transfer** $$(R\_e, \tilde{v}, \sigma\_{\text{sender}})$$: compute $$s = \text{ECDH}(vk, R\_e)$$, derive $$v\_{\text{tx}}$$ and $$r\_{\text{tx}}$$. Accumulate $$W\_{\text{receive}} \mathrel{+}= (v\_{\text{tx}}, r\_{\text{tx}})$$.
+   - **Incoming transfer** $$(R\_e, \tilde{v}, \sigma\_{\text{sender}})$$: compute $$s = \text{ECDH}(vk, R\_e)$$, derive $$v\_{\text{transfer}}$$ and $$r\_{\text{transfer}}$$. Accumulate $$W\_{\text{receive}} \mathrel{+}= (v\_{\text{transfer}}, r\_{\text{transfer}})$$.
    - **Deposit** of amount $$a$$: accumulate $$W\_{\text{receive}} \mathrel{+}= (a, 0)$$.
    - **Merge**: fold $$W\_{\text{spend}} \leftarrow (W\_{\text{spend}}.v + W\_{\text{receive}}.v, \\; W\_{\text{spend}}.r + W\_{\text{receive}}.r)$$, reset $$W\_{\text{receive}} \leftarrow (0, 0)$$.
 6. Verify consistency: $$C\_{\text{spend}} \stackrel{?}{=} W\_{\text{spend}}.v \cdot G + W\_{\text{spend}}.r \cdot H$$ and $$C\_{\text{receive}} \stackrel{?}{=} W\_{\text{receive}}.v \cdot G + W\_{\text{receive}}.r \cdot H$$.
@@ -377,22 +377,22 @@ When a sender (spending key $$sk\_A$$) transfers to a recipient with public view
 $$R\_e = r\_e \cdot H$$
 $$S = r\_e \cdot \text{PVK}\_B$$
 $$s = \text{Poseidon}(\delta\_{\text{ecdh}}, S.x, S.y) \in \mathbb{F}\_r \qquad \text{(§2.4)}$$
-$$r\_{\text{tx}} = \text{Poseidon}(\delta\_{\text{tx\\\_blind}}, s, \sigma)$$
-$$\tilde{v} = v\_{\text{tx}} + \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s, \sigma)$$
+$$r\_{\text{transfer}} = \text{Poseidon}(\delta\_{\text{transfer\\\_blind}}, s, \sigma)$$
+$$\tilde{v} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s, \sigma)$$
 
-where $$v\_{\text{tx}}$$ is the transfer amount. The transfer commitment is $$C\_{\text{tx}} = \text{Com}(v\_{\text{tx}}, r\_{\text{tx}})$$. The ephemeral public key $$R\_e$$, encrypted amount $$\tilde{v}$$, and $$\sigma$$ are published in the transaction event data so recipients can derive both $$v\_{\text{tx}}$$ and $$r\_{\text{tx}}$$ during replay.
+where $$v\_{\text{transfer}}$$ is the transfer amount. The transfer commitment is $$C\_{\text{transfer}} = \text{Com}(v\_{\text{transfer}}, r\_{\text{transfer}})$$. The ephemeral public key $$R\_e$$, encrypted amount $$\tilde{v}$$, and $$\sigma$$ are published in the transaction event data so recipients can derive both $$v\_{\text{transfer}}$$ and $$r\_{\text{transfer}}$$ during replay.
 
-Since $$vk\_B \cdot R\_e = r\_e \cdot \text{PVK}\_B = S$$ by ECDH commutativity, both sender and recipient can independently derive $$r\_{\text{tx}}$$ and decrypt $$v\_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s, \sigma)$$, provided they know $$\sigma$$ emitted with the event. The auditor decrypts the transfer amount via a separate ECDH channel (Section 8.1).
+Since $$vk\_B \cdot R\_e = r\_e \cdot \text{PVK}\_B = S$$ by ECDH commutativity, both sender and recipient can independently derive $$r\_{\text{transfer}}$$ and decrypt $$v\_{\text{transfer}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s, \sigma)$$, provided they know $$\sigma$$ emitted with the event. The auditor decrypts the transfer amount via a separate ECDH channel (Section 8.1).
 
 **Note.** Each transfer involves two auditor ECDH exchanges: one with the recipient's auditor key ($$S\_{a,r} = r\_e \cdot K\_{\text{aud,r}}$$) and one with the sender's auditor key ($$S\_{a,s} = r\_e \cdot K\_{\text{aud,s}}$$). Both reuse the ephemeral scalar $$r\_e$$, as does the $$dvk\_i$$ escrow ECDH in `set_spender` (§7.11) when one is present. Neither auditor recovers any account's viewing key.
 
-**Why reusing $$r\_e$$ is safe.** Each ECDH channel keyed from the same $$r\_e$$ produces a distinct shared scalar because the counterparty public keys are distinct ($$\text{PVK}\_B$$, $$K\_{\text{aud,r}}$$, $$K\_{\text{aud,s}}$$, $$Y\_{\text{op}}$$ are independent Grumpkin points, none derivable from one another). Each channel further uses a distinct Poseidon domain tag ($$\delta\_{\text{tx\\\_blind}}/\delta\_{\text{tx\\\_amount}}$$ for the recipient channel, $$\delta\_{\text{aud\\\_r}}$$ and $$\delta\_{\text{aud\\\_s}}$$ for the two auditor channels, $$\delta\_{\text{esc\\\_dvk}}$$ for the spender escrow), so masks across channels are independent under the PRF assumption on Poseidon (§3.2). The channel masks are used as one-time pads against fresh per-transfer randomness ($$\sigma$$ or $$\sigma\_a$$), and each per-channel sponge re-absorbs that nonce, so a given mask is never reused even for the same counterparty across two operations. Together these three properties (distinct shared scalars, distinct domains, fresh per-operation nonce) close the standard ECDH key-reuse attack surface; the contract's enumeration of channels in §13 satisfies the domain-distinctness condition.
+**Why reusing $$r\_e$$ is safe.** Each ECDH channel keyed from the same $$r\_e$$ produces a distinct shared scalar because the counterparty public keys are distinct ($$\text{PVK}\_B$$, $$K\_{\text{aud,r}}$$, $$K\_{\text{aud,s}}$$, $$Y\_{\text{op}}$$ are independent Grumpkin points, none derivable from one another). Each channel further uses a distinct Poseidon domain tag ($$\delta\_{\text{transfer\\\_blind}}/\delta\_{\text{transfer\\\_amount}}$$ for the recipient channel, $$\delta\_{\text{aud\\\_r}}$$ and $$\delta\_{\text{aud\\\_s}}$$ for the two auditor channels, $$\delta\_{\text{esc\\\_dvk}}$$ for the spender escrow), so masks across channels are independent under the PRF assumption on Poseidon (§3.2). The channel masks are used as one-time pads against fresh per-transfer randomness ($$\sigma$$ or $$\sigma\_a$$), and each per-channel sponge re-absorbs that nonce, so a given mask is never reused even for the same counterparty across two operations. Together these three properties (distinct shared scalars, distinct domains, fresh per-operation nonce) close the standard ECDH key-reuse attack surface; the contract's enumeration of channels in §13 satisfies the domain-distinctness condition.
 
 ### 5.4 Anti-Poisoning Constraint
 
-The transfer circuit enforces that $$C\_{\text{tx}}$$ was constructed using the ECDH-derived $$r\_{\text{tx}}$$:
+The transfer circuit enforces that $$C\_{\text{transfer}}$$ was constructed using the ECDH-derived $$r\_{\text{transfer}}$$:
 
-$$C\_{\text{tx}} = v\_{\text{tx}} \cdot G + r\_{\text{tx}} \cdot H \quad \text{where} \quad r\_{\text{tx}} = \text{Poseidon}(\delta\_{\text{tx\\\_blind}}, s, \sigma)$$
+$$C\_{\text{transfer}} = v\_{\text{transfer}} \cdot G + r\_{\text{transfer}} \cdot H \quad \text{where} \quad r\_{\text{transfer}} = \text{Poseidon}(\delta\_{\text{transfer\\\_blind}}, s, \sigma)$$
 
 This prevents a malicious sender from committing with arbitrary blinding, which would cause the recipient to lose track of their accumulated blinding factor and be unable to spend.
 
@@ -599,26 +599,26 @@ $$\text{to}$$ is bound under `from.require_auth()` and does not appear in the pr
 
 ### 7.6 Confidential Transfer
 
-The sender (account $$A$$, spending key $$sk\_A$$) transfers a hidden amount $$v\_{\text{tx}}$$ to recipient $$B$$ (public viewing key $$\text{PVK}\_B$$).
+The sender (account $$A$$, spending key $$sk\_A$$) transfers a hidden amount $$v\_{\text{transfer}}$$ to recipient $$B$$ (public viewing key $$\text{PVK}\_B$$).
 
 **Sender computation:**
 
 1. Sample ephemeral scalar $$r\_e \in \mathbb{F}\_r$$ via the rejection sampling procedure (§2.2); sample $$\sigma \in \mathbb{F}\_r$$ via the same procedure
 2. Compute $$R\_e = r\_e \cdot H$$
 3. Compute $$S = r\_e \cdot \text{PVK}\_B$$, derive $$s = \text{Poseidon}(\delta\_{\text{ecdh}}, S.x, S.y)$$ (§2.4)
-4. Derive transfer blinding: $$r\_{\text{tx}} = \text{Poseidon}(\delta\_{\text{tx\\\_blind}}, s, \sigma)$$
-5. Derive encrypted amount: $$\tilde{v} = v\_{\text{tx}} + \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s, \sigma)$$
-6. Compute transfer commitment: $$C\_{\text{tx}} = v\_{\text{tx}} \cdot G + r\_{\text{tx}} \cdot H$$
+4. Derive transfer blinding: $$r\_{\text{transfer}} = \text{Poseidon}(\delta\_{\text{transfer\\\_blind}}, s, \sigma)$$
+5. Derive encrypted amount: $$\tilde{v} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s, \sigma)$$
+6. Compute transfer commitment: $$C\_{\text{transfer}} = v\_{\text{transfer}} \cdot G + r\_{\text{transfer}} \cdot H$$
 7. Compute new spendable commitment with deterministic randomness:
    - $$r\_A' = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk\_A, \sigma)$$
-   - $$C\_{\text{spend}}' = (v\_A - v\_{\text{tx}}) \cdot G + r\_A' \cdot H$$
-8. Compute encrypted balance scalar: $$\tilde{b} = (v\_A - v\_{\text{tx}}) + \text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk\_A, \sigma)$$
+   - $$C\_{\text{spend}}' = (v\_A - v\_{\text{transfer}}) \cdot G + r\_A' \cdot H$$
+8. Compute encrypted balance scalar: $$\tilde{b} = (v\_A - v\_{\text{transfer}}) + \text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk\_A, \sigma)$$
 9. Compute recipient-auditor ECDH shared scalar: $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$
 10. Squeeze recipient-auditor channel masks: $$(m\_{v,r}, m\_{r,r}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_r}}, s\_{a,r}, \sigma)$$
-11. Compute recipient-auditor ciphertexts: $$\tilde{v}\_{\text{aud,r}} = v\_{\text{tx}} + m\_{v,r}$$ and $$\tilde{r}\_{\text{aud,r}} = r\_{\text{tx}} + m\_{r,r}$$
+11. Compute recipient-auditor ciphertexts: $$\tilde{v}\_{\text{aud,r}} = v\_{\text{transfer}} + m\_{v,r}$$ and $$\tilde{r}\_{\text{aud,r}} = r\_{\text{transfer}} + m\_{r,r}$$
 12. Compute sender-auditor ECDH shared scalar: $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$
 13. Squeeze sender-auditor channel masks: $$(m\_{v,s}, m\_{b,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$
-14. Compute sender-auditor ciphertexts: $$\tilde{v}\_{\text{aud,s}} = v\_{\text{tx}} + m\_{v,s}$$ and $$\tilde{b}\_{\text{aud,s}} = (v\_A - v\_{\text{tx}}) + m\_{b,s}$$
+14. Compute sender-auditor ciphertexts: $$\tilde{v}\_{\text{aud,s}} = v\_{\text{transfer}} + m\_{v,s}$$ and $$\tilde{b}\_{\text{aud,s}} = (v\_A - v\_{\text{transfer}}) + m\_{b,s}$$
 
 **Circuit constraints (Transfer):**
 
@@ -627,24 +627,24 @@ The sender (account $$A$$, spending key $$sk\_A$$) transfers a hidden amount $$v
 | T1 | $$Y\_A = sk\_A \cdot H$$ (sender key ownership) |
 | T2 | $$vk\_A = \text{Poseidon}(\delta\_{\text{vk}}, sk\_A, \text{addr\\\_f})$$ (binds proof to contract) |
 | T3 | Prover knows opening $$(v\_A, r\_A)$$ of $$C\_{\text{spend}}^A$$ |
-| T4 | $$v\_A \in [0, 2^{127})$$, $$v\_{\text{tx}} \in [0, 2^{127})$$, $$v\_A - v\_{\text{tx}} \in [0, 2^{127})$$ (range validity, Section 2.6) |
+| T4 | $$v\_A \in [0, 2^{127})$$, $$v\_{\text{transfer}} \in [0, 2^{127})$$, $$v\_A - v\_{\text{transfer}} \in [0, 2^{127})$$ (range validity, Section 2.6) |
 | T5 | $$s = \text{ECDH}(r\_e, \text{PVK}\_B)$$ (recipient ECDH shared scalar correctly derived, §2.4) |
 | T6 | $$R\_e = r\_e \cdot H$$ (ephemeral key well-formed) |
-| T7 | $$r\_{\text{tx}} = \text{Poseidon}(\delta\_{\text{tx\\\_blind}}, s, \sigma)$$ (blinding correctly derived) |
-| T8 | $$C\_{\text{tx}} = v\_{\text{tx}} \cdot G + r\_{\text{tx}} \cdot H$$ (transfer commitment well-formed) |
-| T9 | $$\tilde{v} = v\_{\text{tx}} + \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s, \sigma)$$ (encrypted amount correct) |
+| T7 | $$r\_{\text{transfer}} = \text{Poseidon}(\delta\_{\text{transfer\\\_blind}}, s, \sigma)$$ (blinding correctly derived) |
+| T8 | $$C\_{\text{transfer}} = v\_{\text{transfer}} \cdot G + r\_{\text{transfer}} \cdot H$$ (transfer commitment well-formed) |
+| T9 | $$\tilde{v} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s, \sigma)$$ (encrypted amount correct) |
 | T10 | $$r\_A' = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk\_A, \sigma)$$ (deterministic randomness) |
-| T11 | $$C\_{\text{spend}}' = (v\_A - v\_{\text{tx}}) \cdot G + r\_A' \cdot H$$ (new sender balance) |
-| T12 | $$\tilde{b} = (v\_A - v\_{\text{tx}}) + \text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk\_A, \sigma)$$ (encrypted balance scalar) |
+| T11 | $$C\_{\text{spend}}' = (v\_A - v\_{\text{transfer}}) \cdot G + r\_A' \cdot H$$ (new sender balance) |
+| T12 | $$\tilde{b} = (v\_A - v\_{\text{transfer}}) + \text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk\_A, \sigma)$$ (encrypted balance scalar) |
 | T13 | $$r\_e \neq 0$$ (rules out $$R\_e = \mathcal{O}$$ and $$S, S\_{a,r}, S\_{a,s} = \mathcal{O}$$; otherwise every ECDH mask in this transfer collapses to a constant function of $$\sigma$$) |
 | T\_a1 | $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$ (recipient-auditor ECDH shared scalar, reuses ephemeral scalar) |
 | T\_a2 | $$(m\_{v,r}, m\_{r,r}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_r}}, s\_{a,r}, \sigma)$$ (recipient-auditor channel masks) |
-| T\_a3 | $$\tilde{v}\_{\text{aud,r}} = v\_{\text{tx}} + m\_{v,r}$$ (recipient-auditor encrypted transfer amount) |
-| T\_a4 | $$\tilde{r}\_{\text{aud,r}} = r\_{\text{tx}} + m\_{r,r}$$ (recipient-auditor encrypted transfer randomness, enables Pedersen-opening reconstruction of $$C\_{\text{receive}}$$, see Section 8.1) |
+| T\_a3 | $$\tilde{v}\_{\text{aud,r}} = v\_{\text{transfer}} + m\_{v,r}$$ (recipient-auditor encrypted transfer amount) |
+| T\_a4 | $$\tilde{r}\_{\text{aud,r}} = r\_{\text{transfer}} + m\_{r,r}$$ (recipient-auditor encrypted transfer randomness, enables Pedersen-opening reconstruction of $$C\_{\text{receive}}$$, see Section 8.1) |
 | T\_a5 | $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$ (sender-auditor ECDH shared scalar, reuses ephemeral scalar) |
 | T\_a6 | $$(m\_{v,s}, m\_{b,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$ (sender-auditor channel masks) |
-| T\_a7 | $$\tilde{v}\_{\text{aud,s}} = v\_{\text{tx}} + m\_{v,s}$$ (sender-auditor encrypted transfer amount) |
-| T\_a8 | $$\tilde{b}\_{\text{aud,s}} = (v\_A - v\_{\text{tx}}) + m\_{b,s}$$ (sender-auditor encrypted balance checkpoint) |
+| T\_a7 | $$\tilde{v}\_{\text{aud,s}} = v\_{\text{transfer}} + m\_{v,s}$$ (sender-auditor encrypted transfer amount) |
+| T\_a8 | $$\tilde{b}\_{\text{aud,s}} = (v\_A - v\_{\text{transfer}}) + m\_{b,s}$$ (sender-auditor encrypted balance checkpoint) |
 
 **Public inputs (24 fields, counting each Grumpkin point as two $$\mathbb{F}\_r$$ coordinates):**
 
@@ -656,13 +656,13 @@ The sender (account $$A$$, spending key $$sk\_A$$) transfers a hidden amount $$v
 | $$\text{addr\\\_f}$$ | Loaded from instance storage; set once at construction (§3.5) |
 | $$K\_{\text{aud,r}}$$ | Fetched from the auditor contract using recipient's `auditor_id` |
 | $$K\_{\text{aud,s}}$$ | Fetched from the auditor contract using sender's `auditor_id` |
-| $$C\_{\text{spend}}'$$, $$C\_{\text{tx}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\sigma$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to sender's `spendable_commitment`, $$C\_{\text{tx}}$$ added to recipient's `receiving_commitment`, the rest emitted in event |
+| $$C\_{\text{spend}}'$$, $$C\_{\text{transfer}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\sigma$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to sender's `spendable_commitment`, $$C\_{\text{transfer}}$$ added to recipient's `receiving_commitment`, the rest emitted in event |
 
-**Private witnesses:** $$sk\_A$$, $$vk\_A$$, $$v\_A$$, $$r\_A$$, $$v\_{\text{tx}}$$, $$r\_e$$.
+**Private witnesses:** $$sk\_A$$, $$vk\_A$$, $$v\_A$$, $$r\_A$$, $$v\_{\text{transfer}}$$, $$r\_e$$.
 
 **Post-verification:** The contract verifies the proof, then:
 - Sets $$A$$`.spendable_commitment` $$= C\_{\text{spend}}'$$
-- Adds to recipient: $$B$$`.receiving_commitment` $$\mathrel{+}= C\_{\text{tx}}$$
+- Adds to recipient: $$B$$`.receiving_commitment` $$\mathrel{+}= C\_{\text{transfer}}$$
 - Emits event with $$(R\_e, \tilde{v}, \sigma, \tilde{b}, \tilde{v}\_{\text{aud,r}}, \tilde{r}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}, \tilde{b}\_{\text{aud,s}})$$
 
 **Recipient processing.** Upon observing the event, the recipient computes $$s = \text{ECDH}(vk, R\_e)$$, derives amount and blinding. The decryption flow is independent of whether the sender was the owner or an spender.
@@ -721,24 +721,24 @@ The spender transfers from the owner's escrowed allowance to a recipient.
 | O1 | $$Y\_{\text{op}} = sk\_{\text{op}} \cdot H$$ (spender key ownership) |
 | O2 | Prover knows $$dvk\_i$$ and the opening $$(v\_a, r\_a)$$ of $$C\_a$$ |
 | O3 | $$r\_a = \text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a)$$ (allowance randomness matches stored state) |
-| O4 | $$v\_a \in [0, 2^{127})$$, $$v\_{\text{tx}} \in [0, 2^{127})$$, $$v\_a - v\_{\text{tx}} \in [0, 2^{127})$$ (range validity, Section 2.6) |
+| O4 | $$v\_a \in [0, 2^{127})$$, $$v\_{\text{transfer}} \in [0, 2^{127})$$, $$v\_a - v\_{\text{transfer}} \in [0, 2^{127})$$ (range validity, Section 2.6) |
 | O5 | $$s = \text{ECDH}(r\_e, \text{PVK}\_{\text{recipient}})$$ (recipient ECDH shared scalar, §2.4) |
 | O6 | $$R\_e = r\_e \cdot H$$ |
-| O7 | $$r\_{\text{tx}} = \text{Poseidon}(\delta\_{\text{tx\\\_blind}}, s, \sigma\_a)$$ (transfer blinding) |
-| O8 | $$C\_{\text{tx}} = v\_{\text{tx}} \cdot G + r\_{\text{tx}} \cdot H$$ |
-| O9 | $$\tilde{v} = v\_{\text{tx}} + \text{Poseidon}(\delta\_{\text{tx\\\_amount}}, s, \sigma\_a)$$ (encrypted amount) |
+| O7 | $$r\_{\text{transfer}} = \text{Poseidon}(\delta\_{\text{transfer\\\_blind}}, s, \sigma\_a)$$ (transfer blinding) |
+| O8 | $$C\_{\text{transfer}} = v\_{\text{transfer}} \cdot G + r\_{\text{transfer}} \cdot H$$ |
+| O9 | $$\tilde{v} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s, \sigma\_a)$$ (encrypted amount) |
 | O10 | $$r\_a' = \text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a')$$ (new allowance randomness) |
-| O11 | $$C\_a' = (v\_a - v\_{\text{tx}}) \cdot G + r\_a' \cdot H$$ (new allowance) |
-| O12 | $$\tilde{a}' = (v\_a - v\_{\text{tx}}) + \text{Poseidon}(\delta\_{\text{enc\\\_allow}}, dvk\_i, \sigma\_a')$$ (encrypted allowance) |
+| O11 | $$C\_a' = (v\_a - v\_{\text{transfer}}) \cdot G + r\_a' \cdot H$$ (new allowance) |
+| O12 | $$\tilde{a}' = (v\_a - v\_{\text{transfer}}) + \text{Poseidon}(\delta\_{\text{enc\\\_allow}}, dvk\_i, \sigma\_a')$$ (encrypted allowance) |
 | O13 | $$r\_e \neq 0$$ (rules out $$R\_e = \mathcal{O}$$ and $$S, S\_{a,r}, S\_{a,s} = \mathcal{O}$$; otherwise every ECDH mask in this transfer collapses to a constant function of $$\sigma\_a$$) |
 | O\_a1 | $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$ (recipient-auditor ECDH shared scalar, reuses ephemeral scalar) |
 | O\_a2 | $$(m\_{v,r}, m\_{r,r}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_r}}, s\_{a,r}, \sigma\_a)$$ (recipient-auditor channel masks) |
-| O\_a3 | $$\tilde{v}\_{\text{aud,r}} = v\_{\text{tx}} + m\_{v,r}$$ (recipient-auditor encrypted transfer amount) |
-| O\_a4 | $$\tilde{r}\_{\text{aud,r}} = r\_{\text{tx}} + m\_{r,r}$$ (recipient-auditor encrypted transfer randomness, enables Pedersen-opening reconstruction of $$C\_{\text{receive}}$$, see Section 8.1) |
+| O\_a3 | $$\tilde{v}\_{\text{aud,r}} = v\_{\text{transfer}} + m\_{v,r}$$ (recipient-auditor encrypted transfer amount) |
+| O\_a4 | $$\tilde{r}\_{\text{aud,r}} = r\_{\text{transfer}} + m\_{r,r}$$ (recipient-auditor encrypted transfer randomness, enables Pedersen-opening reconstruction of $$C\_{\text{receive}}$$, see Section 8.1) |
 | O\_a5 | $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$ (owner-auditor ECDH shared scalar, reuses ephemeral scalar) |
 | O\_a6 | $$(m\_{v,s}, m\_{a,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma\_a)$$ (owner-auditor channel masks) |
-| O\_a7 | $$\tilde{v}\_{\text{aud,s}} = v\_{\text{tx}} + m\_{v,s}$$ (owner-auditor encrypted transfer amount) |
-| O\_a8 | $$\tilde{a}\_{\text{aud,s}} = (v\_a - v\_{\text{tx}}) + m\_{a,s}$$ (owner-auditor encrypted post-transfer allowance) |
+| O\_a7 | $$\tilde{v}\_{\text{aud,s}} = v\_{\text{transfer}} + m\_{v,s}$$ (owner-auditor encrypted transfer amount) |
+| O\_a8 | $$\tilde{a}\_{\text{aud,s}} = (v\_a - v\_{\text{transfer}}) + m\_{a,s}$$ (owner-auditor encrypted post-transfer allowance) |
 
 **Public inputs (24 fields):**
 
@@ -749,11 +749,11 @@ The spender transfers from the owner's escrowed allowance to a recipient.
 | $$\text{PVK}\_{\text{recipient}}$$ | Loaded from recipient's `viewing_public_key` |
 | $$K\_{\text{aud,r}}$$ | Fetched from the auditor contract using recipient's `auditor_id` |
 | $$K\_{\text{aud,s}}$$ | Fetched from the auditor contract using **owner's** `auditor_id`, not spender's. The visibility model points balance- and allowance-checkpoint ciphertexts at the funds' owner. |
-| $$C\_a'$$, $$C\_{\text{tx}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{a}'$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$ | Prover-supplied; allowance fields written to delegation storage, $$C\_{\text{tx}}$$ added to recipient's `receiving_commitment`, the rest emitted in event |
+| $$C\_a'$$, $$C\_{\text{transfer}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{a}'$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$ | Prover-supplied; allowance fields written to delegation storage, $$C\_{\text{transfer}}$$ added to recipient's `receiving_commitment`, the rest emitted in event |
 
-**Private witnesses:** $$sk\_{\text{op}}$$, $$dvk\_i$$, $$v\_a$$, $$r\_a$$ (single-limb $$\mathbb{F}\_r$$; pinned by O3 to $$\text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a)$$), $$v\_{\text{tx}}$$, $$r\_e$$.
+**Private witnesses:** $$sk\_{\text{op}}$$, $$dvk\_i$$, $$v\_a$$, $$r\_a$$ (single-limb $$\mathbb{F}\_r$$; pinned by O3 to $$\text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a)$$), $$v\_{\text{transfer}}$$, $$r\_e$$.
 
-**Post-verification:** The contract checks `ledger.sequence() <= live_until_ledger`, updates `allowance_commitment`, `a_tilde`, stores `new_allowance_salt`, and adds $$C\_{\text{tx}}$$ to the recipient's `receiving_commitment`. Emits event with $$(R\_e, \tilde{v}, \sigma\_a, \tilde{v}\_{\text{aud,r}}, \tilde{r}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}, \tilde{a}\_{\text{aud,s}})$$.
+**Post-verification:** The contract checks `ledger.sequence() <= live_until_ledger`, updates `allowance_commitment`, `a_tilde`, stores `new_allowance_salt`, and adds $$C\_{\text{transfer}}$$ to the recipient's `receiving_commitment`. Emits event with $$(R\_e, \tilde{v}, \sigma\_a, \tilde{v}\_{\text{aud,r}}, \tilde{r}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}, \tilde{a}\_{\text{aud,s}})$$.
 
 **Recipient uniformity.** The recipient processes the incoming transfer identically to a direct transfer: compute $$s = \text{ECDH}(vk, R\_e)$$, derive amount and blinding. The decryption flow is independent of whether the sender was the owner or an spender.
 

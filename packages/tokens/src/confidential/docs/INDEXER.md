@@ -48,7 +48,7 @@ All events emitted by the confidential token (DESIGN_cont §11.2) with the follo
 |:--|:--|
 | `Register` | Start of the account's history; bounds the worst-case replay window. |
 | `Deposit` | Receiving-side replay: accumulates `(amount, 0)` into the receiving opening. |
-| `Transfer` (recipient side) | Receiving-side replay: carries the recipient-channel ciphertexts for `(v_tx, r_tx)`. |
+| `Transfer` (recipient side) | Receiving-side replay: carries the recipient-channel ciphertexts for `(v_transfer, r_transfer)`. |
 | `SpenderTransfer` (recipient side) | Receiving-side replay, as above. |
 | `Merge` | Folds the receiving opening into the spendable opening; resets the receiving side. |
 | `Withdraw`, `Transfer` (sender side), `SetSpender`, `RevokeSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the owner's spendable balance. `SetSpender`/`RevokeSpender` are in scope as owner checkpoints only — a spender recovers allowance state from the on-chain delegation entry (`allowance_commitment`, `encrypted_allowance`, `escrowed_dvk`, `allowance_salt`), not from the archive. The auditor-channel ciphertexts these events also carry are out of scope for wallet recovery. |
