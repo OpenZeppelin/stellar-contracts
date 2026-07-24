@@ -52,15 +52,15 @@ categories = ["no-std", "wasm"]
 version = "0.7.1"
 
 [workspace.dependencies]
-soroban-sdk = { version = "26.1.0", features = [
+soroban-sdk = { version = "27.0.2", features = [
     "experimental_spec_shaking_v2",
 ] }
-soroban-poseidon = "26.0.0"
+soroban-poseidon = "27.0.0"
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
-soroban-test-helpers = "0.2.3"
+soroban-test-helpers = "0.2.4"
 hex-literal = "1.0.0"
 ed25519-dalek = "2.1.1"
 k256 = "0.13.4"
