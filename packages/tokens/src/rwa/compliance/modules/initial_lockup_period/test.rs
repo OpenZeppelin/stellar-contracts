@@ -192,6 +192,33 @@ fn on_created_at_lock_bound_succeeds_after_pruning() {
 }
 
 #[test]
+fn on_created_prunes_expired_zero_amount_locks() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // A wallet seeded to the bound with zero-amount locks: nothing to
+        // subtract from `total_locked`, but the entries must still be
+        // dropped once expired or the wallet could never mint again.
+        let mut locks = Vec::new(&e);
+        for _ in 0..MAX_LOCKS {
+            locks.push_back(LockedTokens { amount: 0, release_ledger: 10 });
+        }
+        preset_locks(&e, &token, &wallet, &locks);
+
+        e.ledger().with_mut(|li| li.sequence_number = 10);
+        set_lockup_period(&e, &token, 100);
+        on_created(&e, &wallet, 10, &token);
+
+        let details = get_locked_details(&e, &token, &wallet);
+        assert_eq!(details.total_locked, 10);
+        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 10, release_ledger: 110 }]);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #407)")]
 fn preset_locks_panics_above_lock_bound() {
     let e = Env::default();

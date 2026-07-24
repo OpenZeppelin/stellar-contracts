@@ -541,10 +541,8 @@ fn prune_expired_locks(e: &Env, details: &mut LockedDetails) {
         }
     }
 
-    if pruned > 0 {
-        details.total_locked = sub_i128_or_panic(e, details.total_locked, pruned);
-        details.locks = remaining;
-    }
+    details.total_locked = sub_i128_or_panic(e, details.total_locked, pruned);
+    details.locks = remaining;
 }
 
 /// Consumes `amount` from the expired entries in `details`, oldest-first:
