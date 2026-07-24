@@ -36,6 +36,32 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// per-`token`, so a single compliance module contract can serve multiple
 /// tokens with independent allowlists.
 ///
+/// # Matching semantics and limitations
+///
+/// A recipient is admitted as soon as **one** country code on its identity
+/// appears in the allowlist; the remaining entries are not examined. The
+/// match is on the bare numeric country code alone, which has three
+/// consequences that stricter deployments must address with an additional
+/// compliance module registered alongside this one:
+///
+/// - **Any-match, not all-match.** A holder that is also tied to a
+///   non-allowlisted jurisdiction still passes, since a single allowed tie is
+///   sufficient. This module cannot express "every country on the identity must
+///   be allowed".
+/// - **Relation type is not distinguished.** The lookup uses only the numeric
+///   code, so every [`crate::rwa::identity_registry_storage::CountryRelation`]
+///   variant is treated identically — both the individual relations (residence,
+///   citizenship, source of funds, tax residency, custom) and the organization
+///   relations (incorporation, operating jurisdiction, tax jurisdiction, source
+///   of funds, custom). A country attached only as, say, source of funds is
+///   therefore accepted exactly as if it were the country of residence or
+///   incorporation.
+/// - **Entry validity metadata is not honored.** The per-entry
+///   [`crate::rwa::identity_registry_storage::CountryData::metadata`],
+///   documented as carrying a validity period such as a visa, is never
+///   consulted, so an expired tie stays eligible until an issuer removes the
+///   country data entry from the Identity Registry Storage.
+///
 /// This trait is designed to be used in conjunction with the
 /// [`ComplianceModule`] trait.
 #[contracttrait]
