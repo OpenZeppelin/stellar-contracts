@@ -1,5 +1,5 @@
 use stellar_confidential_lib::{
-    H, assert_on_curve_non_identity, commit, derive_allow_r, derive_tx_blind, domain, ecdh,
+    H, assert_on_curve_non_identity, commit, derive_allow_r, derive_transfer_blind, domain, ecdh,
     encrypt_allowance, encrypt_amount, scalar_mul, sponge_squeeze_2,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
@@ -23,7 +23,7 @@ mod tests;
 //                                                           stored state (the
 //                                                           contract-binding
 //                                                           anchor, see below).
-//   O4  v_a, v_tx, v_a - v_tx in [0, 2^127)                 Range validity
+//   O4  v_a, v_transfer, v_a - v_transfer in [0, 2^127)                 Range validity
 //                                                           (Section 2.6); the
 //                                                           [0, 2^127) bound is
 //                                                           the SEP-41 i128
@@ -35,14 +35,14 @@ mod tests;
 //                                                           scalar (2.4).
 //   O6  R_e        = r_e * H                                Ephemeral public
 //                                                           key.
-//   O7  r_tx       = Poseidon2(delta_tx_blind, s,
+//   O7  r_transfer       = Poseidon2(delta_transfer_blind, s,
 //                              sigma_a)                     Anti-poisoning
 //                                                           binding for the
 //                                                           transfer blinding.
-//   O8  C_tx       = v_tx * G + r_tx * H                    Transfer
+//   O8  C_transfer       = v_transfer * G + r_transfer * H                    Transfer
 //                                                           commitment.
-//   O9  v_tilde    = v_tx
-//                       + Poseidon2(delta_tx_amount, s,
+//   O9  v_tilde    = v_transfer
+//                       + Poseidon2(delta_transfer_amount, s,
 //                                   sigma_a)                Encrypted amount
 //                                                           (emitted).
 // Allowance state (new)
@@ -53,9 +53,9 @@ mod tests;
 //   O10 r_a'       = Poseidon2(delta_allow_r, dvk_i,
 //                              sigma_a')                    New allowance
 //                                                           randomness.
-//   O11 C_a'       = (v_a - v_tx) * G + r_a' * H            New allowance
+//   O11 C_a'       = (v_a - v_transfer) * G + r_a' * H            New allowance
 //                                                           commitment.
-//   O12 a_tilde'   = (v_a - v_tx)
+//   O12 a_tilde'   = (v_a - v_transfer)
 //                       + Poseidon2(delta_enc_allow, dvk_i,
 //                                   sigma_a')               Encrypted new
 //                                                           allowance scalar
@@ -72,9 +72,9 @@ mod tests;
 //                  = SpongeSqueeze_2(delta_aud_r,
 //                                    s_{a,r}, sigma_a)      Recipient-channel
 //                                                           sponge: two masks.
-//   O_a3 v_tilde_aud_r = v_tx + m_v_r                       Recipient-auditor
+//   O_a3 v_tilde_aud_r = v_transfer + m_v_r                       Recipient-auditor
 //                                                           encrypted amount.
-//   O_a4 r_tilde_aud_r = r_tx + m_r_r                       Recipient-auditor
+//   O_a4 r_tilde_aud_r = r_transfer + m_r_r                       Recipient-auditor
 //                                                           encrypted transfer
 //                                                           randomness.
 //   O_a5 s_{a,s}   = ecdh(r_e, K_aud_s)                     Owner-auditor ECDH
@@ -90,9 +90,9 @@ mod tests;
 //                  = SpongeSqueeze_2(delta_aud_s,
 //                                    s_{a,s}, sigma_a)      Owner-channel
 //                                                           sponge: two masks.
-//   O_a7 v_tilde_aud_s = v_tx + m_v_s                       Owner-auditor
+//   O_a7 v_tilde_aud_s = v_transfer + m_v_s                       Owner-auditor
 //                                                           encrypted amount.
-//   O_a8 a_tilde_aud_s = (v_a - v_tx) + m_a_s               Owner-auditor
+//   O_a8 a_tilde_aud_s = (v_a - v_transfer) + m_a_s               Owner-auditor
 //                                                           encrypted
 //                                                           post-transfer
 //                                                           allowance.
@@ -120,7 +120,7 @@ mod tests;
 //
 // Point-validation doctrine (Section 10.8)
 // ----------------------------------------
-// Y_op, C_a, C_a', C_tx, R_e, S, S_{a,r}, and S_{a,s} are bound to in-circuit
+// Y_op, C_a, C_a', C_transfer, R_e, S, S_{a,r}, and S_{a,s} are bound to in-circuit
 // multi_scalar_mul outputs (O1, O2, O11, O8, O6, O5, O_a1, O_a5) and are
 // therefore on-curve by construction -- no explicit check needed.
 // PVK_recipient was constrained on-curve when the recipient registered (R3,
@@ -156,8 +156,8 @@ mod tests;
 //   11   c_a_new_x            C_a'.x            Prover-supplied; written to
 //   12   c_a_new_y            C_a'.y              the delegation entry's new
 //                                                 allowance_commitment.
-//   13   c_tx_x               C_tx.x            Prover-supplied; added to
-//   14   c_tx_y               C_tx.y              `to.receiving_commitment`.
+//   13   c_transfer_x               C_transfer.x            Prover-supplied; added to
+//   14   c_transfer_y               C_transfer.y              `to.receiving_commitment`.
 //   15   r_e_x                R_e.x             Prover-supplied ephemeral key;
 //   16   r_e_y                R_e.y               emitted.
 //   17   v_tilde              v_tilde           Prover-supplied encrypted
@@ -185,7 +185,7 @@ mod tests;
 //           O3 to Poseidon2(delta_allow_r, dvk_i, sigma_a) = r_a.
 //   v_a     Plaintext current allowance value.
 //   r_a     Plaintext blinding factor for C_a (single-limb F_r; pinned by O3).
-//   v_tx    Plaintext transfer amount.
+//   v_transfer    Plaintext transfer amount.
 //   r_e     Ephemeral scalar for recipient + auditor ECDH; must satisfy
 //           r_e != 0 (O13).
 
@@ -194,7 +194,7 @@ fn main(
     dvk_i: Field,
     v_a: Field,
     r_a: Field,
-    v_tx: Field,
+    v_transfer: Field,
     r_e: Field,
     c_a_x: pub Field,
     c_a_y: pub Field,
@@ -209,8 +209,8 @@ fn main(
     k_aud_s_y: pub Field,
     c_a_new_x: pub Field,
     c_a_new_y: pub Field,
-    c_tx_x: pub Field,
-    c_tx_y: pub Field,
+    c_transfer_x: pub Field,
+    c_transfer_y: pub Field,
     r_e_x: pub Field,
     r_e_y: pub Field,
     v_tilde: pub Field,
@@ -245,8 +245,8 @@ fn main(
     // pattern; `assert_max_bit_size` is the Noir stdlib primitive that
     // implements it directly.
     v_a.assert_max_bit_size::<127>();
-    v_tx.assert_max_bit_size::<127>();
-    let v_a_new = v_a - v_tx;
+    v_transfer.assert_max_bit_size::<127>();
+    let v_a_new = v_a - v_transfer;
     v_a_new.assert_max_bit_size::<127>();
 
     // O6
@@ -261,15 +261,15 @@ fn main(
     let s_x = ecdh(r_e, pvk_recipient);
 
     // O7 (anti-poisoning, Section 5.4)
-    let r_tx = derive_tx_blind(s_x, sigma_a);
+    let r_transfer = derive_transfer_blind(s_x, sigma_a);
 
     // O8
-    let c_tx_derived = commit(v_tx, r_tx);
-    assert(c_tx_derived.x == c_tx_x);
-    assert(c_tx_derived.y == c_tx_y);
+    let c_transfer_derived = commit(v_transfer, r_transfer);
+    assert(c_transfer_derived.x == c_transfer_x);
+    assert(c_transfer_derived.y == c_transfer_y);
 
     // O9
-    let v_tilde_derived = encrypt_amount(v_tx, s_x, sigma_a);
+    let v_tilde_derived = encrypt_amount(v_transfer, s_x, sigma_a);
     assert(v_tilde_derived == v_tilde);
 
     // Salt rotation (implementation hardening).
@@ -296,14 +296,14 @@ fn main(
     // O_a1 (recipient-auditor shared-secret scalar)
     let s_a_r_x = ecdh(r_e, k_aud_r);
 
-    // O_a2 (recipient-channel masks: amount, then r_tx)
+    // O_a2 (recipient-channel masks: amount, then r_transfer)
     let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x, sigma_a);
 
     // O_a3
-    assert(v_tx + m_r[0] == v_tilde_aud_r);
+    assert(v_transfer + m_r[0] == v_tilde_aud_r);
 
     // O_a4
-    assert(r_tx + m_r[1] == r_tilde_aud_r);
+    assert(r_transfer + m_r[1] == r_tilde_aud_r);
 
     // O_a5 (owner-auditor shared-secret scalar)
     let s_a_s_x = ecdh(r_e, k_aud_s);
@@ -312,7 +312,7 @@ fn main(
     let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, sigma_a);
 
     // O_a7
-    assert(v_tx + m_s[0] == v_tilde_aud_s);
+    assert(v_transfer + m_s[0] == v_tilde_aud_s);
 
     // O_a8
     assert(v_a_new + m_s[1] == a_tilde_aud_s);

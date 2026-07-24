@@ -1,6 +1,6 @@
 use crate::main;
 use stellar_confidential_lib::{
-    commit, derive_allow_r, derive_tx_blind, domain, ecdh, encrypt_allowance, encrypt_amount, H,
+    commit, derive_allow_r, derive_transfer_blind, domain, ecdh, encrypt_allowance, encrypt_amount, H,
     scalar_mul, sponge_squeeze_2,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
@@ -10,8 +10,8 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 // SIGMA_A is the channel nonce reused across the allowance Poseidon (O3),
 // the recipient ECDH chain (O7 / O9), and both auditor sponges (O_a2 / O_a6)
 // -- see main.nr "Channel-nonce reuse". SIGMA_A_NEW is the fresh salt for the
-// post-transfer allowance derivations only (O10, O12). V_A / V_TX / V_A_NEW
-// give a non-trivial `v_a - v_tx` so O4 is exercised on a real subtraction.
+// post-transfer allowance derivations only (O10, O12). V_A / V_TRANSFER / V_A_NEW
+// give a non-trivial `v_a - v_transfer` so O4 is exercised on a real subtraction.
 //
 // Y_OP_X / Y_OP_Y and the auditor / recipient keys share fixture values with
 // withdraw/transfer (sk_op = 0xdead, K_aud_s/r and pvk scalars identical to
@@ -24,7 +24,7 @@ global DVK_I: Field = 0x44767669; // ASCII "Dvki"
 global SIGMA_A: Field = 0x01;
 global SIGMA_A_NEW: Field = 0x02;
 global V_A: Field = 1000;
-global V_TX: Field = 100;
+global V_TRANSFER: Field = 100;
 global V_A_NEW: Field = 900;
 global R_E: Field = 0xfeedface;
 
@@ -57,8 +57,8 @@ global K_AUD_S_X: Field = 0x22502c7b20b64aeaaaa4d4fa5f2f8600f9734e828f7284a8d143
 global K_AUD_S_Y: Field = 0x0419089353d24334f03f4a1c9c9b19282e32f6879c5c69b9cdffba6a13a7c5ed;
 global C_A_NEW_X: Field = 0x2d19aa5933ba41ebadb28d4c784ca4e405a1a6efcb5cf15e2c8d5e9a0552f178;
 global C_A_NEW_Y: Field = 0x0214719083236d5ecfc551fbc2b6d04fa8c95b8986fcfc7bbb8c0ff3cecd3dd1;
-global C_TX_X: Field = 0x26677e8f24cbbc929b8be4a8d470d4a0e54a3c8a351ceef295e6b99b2898ed1d;
-global C_TX_Y: Field = 0x089153eeedb04e49b206f7121341fdcb842a6ca19fb0f938167834dd10d42a97;
+global C_TRANSFER_X: Field = 0x26677e8f24cbbc929b8be4a8d470d4a0e54a3c8a351ceef295e6b99b2898ed1d;
+global C_TRANSFER_Y: Field = 0x089153eeedb04e49b206f7121341fdcb842a6ca19fb0f938167834dd10d42a97;
 global R_E_X: Field = 0x114ed4fcf2c57014eb678c577aa02f30ef590b713d7a6a5e87702d1c7f71957f;
 global R_E_Y: Field = 0x07a70cf826350d4f438c7a3c5e8761b0ae6cb63de757f0c96815f4057b9205f4;
 global V_TILDE: Field = 0x0b3b7be1cd27249ec6b32b4ecb840079e0354b8675e94aade6519e5428473ffa;
@@ -89,9 +89,9 @@ fn print_fixtures() {
     let r_e_pt = scalar_mul(R_E, H);
 
     let s_x = ecdh(R_E, pvk_recipient);
-    let r_tx = derive_tx_blind(s_x, SIGMA_A);
-    let c_tx = commit(V_TX, r_tx);
-    let v_tilde = encrypt_amount(V_TX, s_x, SIGMA_A);
+    let r_transfer = derive_transfer_blind(s_x, SIGMA_A);
+    let c_transfer = commit(V_TRANSFER, r_transfer);
+    let v_tilde = encrypt_amount(V_TRANSFER, s_x, SIGMA_A);
 
     let r_a_new = derive_allow_r(DVK_I, SIGMA_A_NEW);
     let c_a_new = commit(V_A_NEW, r_a_new);
@@ -99,12 +99,12 @@ fn print_fixtures() {
 
     let s_a_r_x = ecdh(R_E, k_aud_r);
     let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x, SIGMA_A);
-    let v_tilde_aud_r = V_TX + m_r[0];
-    let r_tilde_aud_r = r_tx + m_r[1];
+    let v_tilde_aud_r = V_TRANSFER + m_r[0];
+    let r_tilde_aud_r = r_transfer + m_r[1];
 
     let s_a_s_x = ecdh(R_E, k_aud_s);
     let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA_A);
-    let v_tilde_aud_s = V_TX + m_s[0];
+    let v_tilde_aud_s = V_TRANSFER + m_s[0];
     let a_tilde_aud_s = V_A_NEW + m_s[1];
 
     let yopx = y_op.x;
@@ -119,8 +119,8 @@ fn print_fixtures() {
     let ks_y = k_aud_s.y;
     let canx = c_a_new.x;
     let cany = c_a_new.y;
-    let ctxx = c_tx.x;
-    let ctxy = c_tx.y;
+    let c_transfer_x = c_transfer.x;
+    let c_transfer_y = c_transfer.y;
     let rex = r_e_pt.x;
     let rey = r_e_pt.y;
     println(f"Y_OP_X = {yopx}");
@@ -136,8 +136,8 @@ fn print_fixtures() {
     println(f"K_AUD_S_Y = {ks_y}");
     println(f"C_A_NEW_X = {canx}");
     println(f"C_A_NEW_Y = {cany}");
-    println(f"C_TX_X = {ctxx}");
-    println(f"C_TX_Y = {ctxy}");
+    println(f"C_TRANSFER_X = {c_transfer_x}");
+    println(f"C_TRANSFER_Y = {c_transfer_y}");
     println(f"R_E_X = {rex}");
     println(f"R_E_Y = {rey}");
     println(f"V_TILDE = {v_tilde}");
@@ -155,9 +155,9 @@ fn spender_transfer_fixtures_match_lib() {
     let c_a = commit(V_A, r_a);
     let pvk_recipient = scalar_mul(VK_RECIPIENT, H);
     let s_x = ecdh(R_E, pvk_recipient);
-    let r_tx = derive_tx_blind(s_x, SIGMA_A);
-    let c_tx = commit(V_TX, r_tx);
-    let v_tilde = encrypt_amount(V_TX, s_x, SIGMA_A);
+    let r_transfer = derive_transfer_blind(s_x, SIGMA_A);
+    let c_transfer = commit(V_TRANSFER, r_transfer);
+    let v_tilde = encrypt_amount(V_TRANSFER, s_x, SIGMA_A);
     let r_a_new = derive_allow_r(DVK_I, SIGMA_A_NEW);
     let c_a_new = commit(V_A_NEW, r_a_new);
     let a_tilde_new = encrypt_allowance(V_A_NEW, DVK_I, SIGMA_A_NEW);
@@ -169,8 +169,8 @@ fn spender_transfer_fixtures_match_lib() {
     assert(c_a.y == C_A_Y);
     assert(pvk_recipient.x == PVK_RECIPIENT_X);
     assert(pvk_recipient.y == PVK_RECIPIENT_Y);
-    assert(c_tx.x == C_TX_X);
-    assert(c_tx.y == C_TX_Y);
+    assert(c_transfer.x == C_TRANSFER_X);
+    assert(c_transfer.y == C_TRANSFER_Y);
     assert(v_tilde == V_TILDE);
     assert(c_a_new.x == C_A_NEW_X);
     assert(c_a_new.y == C_A_NEW_Y);
@@ -184,7 +184,7 @@ fn spender_transfer_auditor_fixtures_match_lib() {
     let r_e_pt = scalar_mul(R_E, H);
     let pvk_recipient = scalar_mul(VK_RECIPIENT, H);
     let s_x = ecdh(R_E, pvk_recipient);
-    let r_tx = derive_tx_blind(s_x, SIGMA_A);
+    let r_transfer = derive_transfer_blind(s_x, SIGMA_A);
     let s_a_r_x = ecdh(R_E, k_aud_r);
     let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x, SIGMA_A);
     let s_a_s_x = ecdh(R_E, k_aud_s);
@@ -196,9 +196,9 @@ fn spender_transfer_auditor_fixtures_match_lib() {
     assert(k_aud_s.y == K_AUD_S_Y);
     assert(r_e_pt.x == R_E_X);
     assert(r_e_pt.y == R_E_Y);
-    assert(V_TX + m_r[0] == V_TILDE_AUD_R);
-    assert(r_tx + m_r[1] == R_TILDE_AUD_R);
-    assert(V_TX + m_s[0] == V_TILDE_AUD_S);
+    assert(V_TRANSFER + m_r[0] == V_TILDE_AUD_R);
+    assert(r_transfer + m_r[1] == R_TILDE_AUD_R);
+    assert(V_TRANSFER + m_s[0] == V_TILDE_AUD_S);
     assert(V_A_NEW + m_s[1] == A_TILDE_AUD_S);
 }
 
@@ -212,7 +212,7 @@ fn run_main(
     dvk_i_in: Field,
     v_a_in: Field,
     r_a_in: Field,
-    v_tx_in: Field,
+    v_transfer_in: Field,
     r_e_in: Field,
     c_a_x_in: Field,
     c_a_y_in: Field,
@@ -227,8 +227,8 @@ fn run_main(
     k_aud_s_y_in: Field,
     c_a_new_x_in: Field,
     c_a_new_y_in: Field,
-    c_tx_x_in: Field,
-    c_tx_y_in: Field,
+    c_transfer_x_in: Field,
+    c_transfer_y_in: Field,
     r_e_x_in: Field,
     r_e_y_in: Field,
     v_tilde_in: Field,
@@ -244,7 +244,7 @@ fn run_main(
         dvk_i_in,
         v_a_in,
         r_a_in,
-        v_tx_in,
+        v_transfer_in,
         r_e_in,
         c_a_x_in,
         c_a_y_in,
@@ -259,8 +259,8 @@ fn run_main(
         k_aud_s_y_in,
         c_a_new_x_in,
         c_a_new_y_in,
-        c_tx_x_in,
-        c_tx_y_in,
+        c_transfer_x_in,
+        c_transfer_y_in,
         r_e_x_in,
         r_e_y_in,
         v_tilde_in,
@@ -279,7 +279,7 @@ fn run_fixture() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -294,8 +294,8 @@ fn run_fixture() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -316,13 +316,13 @@ fn matches_fixture() {
 #[test]
 fn second_transfer_against_same_allowance() {
     // Second happy-path point: same C_a (= same dvk_i, same v_a, same
-    // sigma_a) with a different v_tx. Exercises the case where the spender
+    // sigma_a) with a different v_transfer. Exercises the case where the spender
     // hasn't yet rotated the allowance commitment but produces a fresh
     // sigma_a_new and a fresh r_e on every call. The transfer-side ECDH
     // chain (O5..O9) is fully rederived; only O11/O12 share dvk_i + the new
     // sigma_a_new with the canonical fixture.
-    let v_tx_2: Field = 250;
-    let v_a_new_2: Field = V_A - v_tx_2; // 750
+    let v_transfer_2: Field = 250;
+    let v_a_new_2: Field = V_A - v_transfer_2; // 750
     let sigma_a_new_2: Field = 0x03;
     let r_e_2: Field = 0xfacecafe;
 
@@ -332,9 +332,9 @@ fn second_transfer_against_same_allowance() {
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
 
     let s_x = ecdh(r_e_2, pvk_recipient);
-    let r_tx = derive_tx_blind(s_x, SIGMA_A);
-    let c_tx = commit(v_tx_2, r_tx);
-    let v_tilde_2 = encrypt_amount(v_tx_2, s_x, SIGMA_A);
+    let r_transfer = derive_transfer_blind(s_x, SIGMA_A);
+    let c_transfer = commit(v_transfer_2, r_transfer);
+    let v_tilde_2 = encrypt_amount(v_transfer_2, s_x, SIGMA_A);
     let r_a_new_2 = derive_allow_r(DVK_I, sigma_a_new_2);
     let c_a_new_2 = commit(v_a_new_2, r_a_new_2);
     let a_tilde_new_2 = encrypt_allowance(v_a_new_2, DVK_I, sigma_a_new_2);
@@ -349,7 +349,7 @@ fn second_transfer_against_same_allowance() {
         DVK_I,
         V_A,
         R_A,
-        v_tx_2,
+        v_transfer_2,
         r_e_2,
         C_A_X,
         C_A_Y,
@@ -364,23 +364,23 @@ fn second_transfer_against_same_allowance() {
         K_AUD_S_Y,
         c_a_new_2.x,
         c_a_new_2.y,
-        c_tx.x,
-        c_tx.y,
+        c_transfer.x,
+        c_transfer.y,
         r_e_2_pt.x,
         r_e_2_pt.y,
         v_tilde_2,
         a_tilde_new_2,
         sigma_a_new_2,
-        v_tx_2 + m_r[0],
-        r_tx + m_r[1],
-        v_tx_2 + m_s[0],
+        v_transfer_2 + m_r[0],
+        r_transfer + m_r[1],
+        v_transfer_2 + m_s[0],
         v_a_new_2 + m_s[1],
     );
 }
 
 #[test]
 fn full_allowance_transfer() {
-    // Boundary: v_tx = v_a, so v_a_new = 0. C_a' commits to (0, r_a_new'),
+    // Boundary: v_transfer = v_a, so v_a_new = 0. C_a' commits to (0, r_a_new'),
     // which is a valid commitment to zero. a_tilde' and a_tilde_aud_s both
     // bind to 0 (plus mask) so the owner's auditor sees the post-transfer
     // allowance reach zero. The delegation entry isn't deleted (that's
@@ -390,8 +390,8 @@ fn full_allowance_transfer() {
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_x = ecdh(R_E, pvk_recipient);
-    let r_tx = derive_tx_blind(s_x, SIGMA_A);
-    let c_tx = commit(V_A, r_tx);
+    let r_transfer = derive_transfer_blind(s_x, SIGMA_A);
+    let c_transfer = commit(V_A, r_transfer);
     let v_tilde = encrypt_amount(V_A, s_x, SIGMA_A);
     let r_a_new = derive_allow_r(DVK_I, SIGMA_A_NEW);
     let c_a_new = commit(0, r_a_new);
@@ -421,15 +421,15 @@ fn full_allowance_transfer() {
         K_AUD_S_Y,
         c_a_new.x,
         c_a_new.y,
-        c_tx.x,
-        c_tx.y,
+        c_transfer.x,
+        c_transfer.y,
         R_E_X,
         R_E_Y,
         v_tilde,
         a_tilde_new,
         SIGMA_A_NEW,
         V_A + m_r[0],
-        r_tx + m_r[1],
+        r_transfer + m_r[1],
         V_A + m_s[0],
         0 + m_s[1],
     );
@@ -443,7 +443,7 @@ fn rejects_wrong_sk_op() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -458,8 +458,8 @@ fn rejects_wrong_sk_op() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -516,7 +516,7 @@ fn rejects_wrong_dvk_against_contract() {
         dvk_i_bad,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -531,8 +531,8 @@ fn rejects_wrong_dvk_against_contract() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -551,7 +551,7 @@ fn rejects_wrong_allowance_opening() {
     // / O_a8; recompute c_a_new, a_tilde_new, and a_tilde_aud_s against the
     // tampered v_a_new so only O2 fires.
     let v_a_bad: Field = V_A + 1;
-    let v_a_new_bad: Field = v_a_bad - V_TX;
+    let v_a_new_bad: Field = v_a_bad - V_TRANSFER;
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let r_a_new = derive_allow_r(DVK_I, SIGMA_A_NEW);
     let c_a_new_bad = commit(v_a_new_bad, r_a_new);
@@ -564,7 +564,7 @@ fn rejects_wrong_allowance_opening() {
         DVK_I,
         v_a_bad,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -579,8 +579,8 @@ fn rejects_wrong_allowance_opening() {
         K_AUD_S_Y,
         c_a_new_bad.x,
         c_a_new_bad.y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -595,23 +595,23 @@ fn rejects_wrong_allowance_opening() {
 
 #[test(should_fail)]
 fn rejects_v_a_new_out_of_range() {
-    // v_tx > v_a: v_a - v_tx underflows in the field to a value >= 2^128.
+    // v_transfer > v_a: v_a - v_transfer underflows in the field to a value >= 2^128.
     // O4's `v_a_new` range check fires. Every downstream public is
-    // recomputed against v_tx_too_large so the single firing constraint is
-    // O4's v_a_new range check (the v_a and v_tx individual sub-checks pass:
-    // V_A is in range and v_tx_too_large = V_A + 1 = 1001 is also in range).
-    let v_tx_too_large: Field = V_A + 1;
+    // recomputed against v_transfer_too_large so the single firing constraint is
+    // O4's v_a_new range check (the v_a and v_transfer individual sub-checks pass:
+    // V_A is in range and v_transfer_too_large = V_A + 1 = 1001 is also in range).
+    let v_transfer_too_large: Field = V_A + 1;
     let pvk_recipient =
         EmbeddedCurvePoint { x: PVK_RECIPIENT_X, y: PVK_RECIPIENT_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_x = ecdh(R_E, pvk_recipient);
-    let r_tx = derive_tx_blind(s_x, SIGMA_A);
-    let c_tx = commit(v_tx_too_large, r_tx);
-    let v_tilde = encrypt_amount(v_tx_too_large, s_x, SIGMA_A);
+    let r_transfer = derive_transfer_blind(s_x, SIGMA_A);
+    let c_transfer = commit(v_transfer_too_large, r_transfer);
+    let v_tilde = encrypt_amount(v_transfer_too_large, s_x, SIGMA_A);
     let r_a_new = derive_allow_r(DVK_I, SIGMA_A_NEW);
-    let c_a_new_invalid = commit(V_A - v_tx_too_large, r_a_new);
-    let a_tilde_new_invalid = encrypt_allowance(V_A - v_tx_too_large, DVK_I, SIGMA_A_NEW);
+    let c_a_new_invalid = commit(V_A - v_transfer_too_large, r_a_new);
+    let a_tilde_new_invalid = encrypt_allowance(V_A - v_transfer_too_large, DVK_I, SIGMA_A_NEW);
     let s_a_r_x = ecdh(R_E, k_aud_r);
     let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x, SIGMA_A);
     let s_a_s_x = ecdh(R_E, k_aud_s);
@@ -622,7 +622,7 @@ fn rejects_v_a_new_out_of_range() {
         DVK_I,
         V_A,
         R_A,
-        v_tx_too_large,
+        v_transfer_too_large,
         R_E,
         C_A_X,
         C_A_Y,
@@ -637,17 +637,17 @@ fn rejects_v_a_new_out_of_range() {
         K_AUD_S_Y,
         c_a_new_invalid.x,
         c_a_new_invalid.y,
-        c_tx.x,
-        c_tx.y,
+        c_transfer.x,
+        c_transfer.y,
         R_E_X,
         R_E_Y,
         v_tilde,
         a_tilde_new_invalid,
         SIGMA_A_NEW,
-        v_tx_too_large + m_r[0],
-        r_tx + m_r[1],
-        v_tx_too_large + m_s[0],
-        (V_A - v_tx_too_large) + m_s[1],
+        v_transfer_too_large + m_r[0],
+        r_transfer + m_r[1],
+        v_transfer_too_large + m_s[0],
+        (V_A - v_transfer_too_large) + m_s[1],
     );
 }
 
@@ -655,14 +655,14 @@ fn rejects_v_a_new_out_of_range() {
 fn rejects_v_a_out_of_range() {
     // 2^127 is exactly the boundary O4 rules out (Section 2.6 / 3.4 -- SEP-41
     // i128 non-negative range is [0, 2^127), so 2^127 is the smallest value
-    // that must fail). With v_a_huge - V_TX = 2^127 - 100 still in [0, 2^127),
+    // that must fail). With v_a_huge - V_TRANSFER = 2^127 - 100 still in [0, 2^127),
     // the v_a_new range check passes; only the `v_a.assert_max_bit_size<127>()`
     // sub-check of O4 fires. C_a, c_a_new, and a_tilde_aud_s are all
     // recomputed against v_a_huge / v_a_new_huge so O2 / O11 / O12 / O_a8
     // cannot coincidentally fire. R_A is independent of v_a so it stays
     // canonical.
     let v_a_huge: Field = 0x80000000000000000000000000000000;
-    let v_a_new_huge: Field = v_a_huge - V_TX;
+    let v_a_new_huge: Field = v_a_huge - V_TRANSFER;
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let c_a = commit(v_a_huge, R_A);
     let r_a_new = derive_allow_r(DVK_I, SIGMA_A_NEW);
@@ -676,7 +676,7 @@ fn rejects_v_a_out_of_range() {
         DVK_I,
         v_a_huge,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         c_a.x,
         c_a.y,
@@ -691,8 +691,8 @@ fn rejects_v_a_out_of_range() {
         K_AUD_S_Y,
         c_a_new.x,
         c_a_new.y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -706,21 +706,21 @@ fn rejects_v_a_out_of_range() {
 }
 
 #[test(should_fail)]
-fn rejects_v_tx_out_of_range() {
-    // v_tx = 2^127: O4's range check on v_tx fires. Every downstream public
-    // that depends on v_tx (C_tx, v_tilde, v_tilde_aud_r, v_tilde_aud_s) and
+fn rejects_v_transfer_out_of_range() {
+    // v_transfer = 2^127: O4's range check on v_transfer fires. Every downstream public
+    // that depends on v_transfer (C_transfer, v_tilde, v_tilde_aud_r, v_tilde_aud_s) and
     // on v_a_new (c_a_new, a_tilde_new, a_tilde_aud_s) is recomputed so the
     // only constraints that fail are O4's range sub-checks.
-    let v_tx_huge: Field = 0x80000000000000000000000000000000;
-    let v_a_new_huge: Field = V_A - v_tx_huge;
+    let v_transfer_huge: Field = 0x80000000000000000000000000000000;
+    let v_a_new_huge: Field = V_A - v_transfer_huge;
     let pvk_recipient =
         EmbeddedCurvePoint { x: PVK_RECIPIENT_X, y: PVK_RECIPIENT_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_x = ecdh(R_E, pvk_recipient);
-    let r_tx = derive_tx_blind(s_x, SIGMA_A);
-    let c_tx = commit(v_tx_huge, r_tx);
-    let v_tilde = encrypt_amount(v_tx_huge, s_x, SIGMA_A);
+    let r_transfer = derive_transfer_blind(s_x, SIGMA_A);
+    let c_transfer = commit(v_transfer_huge, r_transfer);
+    let v_tilde = encrypt_amount(v_transfer_huge, s_x, SIGMA_A);
     let r_a_new = derive_allow_r(DVK_I, SIGMA_A_NEW);
     let c_a_new = commit(v_a_new_huge, r_a_new);
     let a_tilde_new = encrypt_allowance(v_a_new_huge, DVK_I, SIGMA_A_NEW);
@@ -734,7 +734,7 @@ fn rejects_v_tx_out_of_range() {
         DVK_I,
         V_A,
         R_A,
-        v_tx_huge,
+        v_transfer_huge,
         R_E,
         C_A_X,
         C_A_Y,
@@ -749,16 +749,16 @@ fn rejects_v_tx_out_of_range() {
         K_AUD_S_Y,
         c_a_new.x,
         c_a_new.y,
-        c_tx.x,
-        c_tx.y,
+        c_transfer.x,
+        c_transfer.y,
         R_E_X,
         R_E_Y,
         v_tilde,
         a_tilde_new,
         SIGMA_A_NEW,
-        v_tx_huge + m_r[0],
-        r_tx + m_r[1],
-        v_tx_huge + m_s[0],
+        v_transfer_huge + m_r[0],
+        r_transfer + m_r[1],
+        v_transfer_huge + m_s[0],
         v_a_new_huge + m_s[1],
     );
 }
@@ -766,15 +766,15 @@ fn rejects_v_tx_out_of_range() {
 #[test(should_fail)]
 fn rejects_wrong_recipient_pvk() {
     // PVK_recipient replaced by Y_op (a valid on-curve point that isn't the
-    // registered recipient's PVK). S = r_e * PVK_recipient changes, so r_tx
-    // and v_tilde drift and O8 fails (C_tx no longer matches commit(v_tx,
-    // r_tx_new)).
+    // registered recipient's PVK). S = r_e * PVK_recipient changes, so r_transfer
+    // and v_tilde drift and O8 fails (C_transfer no longer matches commit(v_transfer,
+    // r_transfer_new)).
     run_main(
         SK_OP,
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -789,8 +789,8 @@ fn rejects_wrong_recipient_pvk() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -804,24 +804,24 @@ fn rejects_wrong_recipient_pvk() {
 }
 
 #[test(should_fail)]
-fn rejects_poisoned_c_tx() {
-    // Anti-poisoning (Section 5.4): a prover that commits C_tx with arbitrary
-    // blinding -- here r_tx + 1 -- desynchronizes the recipient's accumulated
-    // blinding. O7 + O8 together close this attack: r_tx is uniquely
-    // determined by Poseidon2(delta_tx_blind, s, sigma_a), so any C_tx not
-    // built from that exact r_tx fails O8.
+fn rejects_poisoned_c_transfer() {
+    // Anti-poisoning (Section 5.4): a prover that commits C_transfer with arbitrary
+    // blinding -- here r_transfer + 1 -- desynchronizes the recipient's accumulated
+    // blinding. O7 + O8 together close this attack: r_transfer is uniquely
+    // determined by Poseidon2(delta_transfer_blind, s, sigma_a), so any C_transfer not
+    // built from that exact r_transfer fails O8.
     let pvk_recipient =
         EmbeddedCurvePoint { x: PVK_RECIPIENT_X, y: PVK_RECIPIENT_Y, is_infinite: false };
     let s_x = ecdh(R_E, pvk_recipient);
-    let r_tx_poisoned = derive_tx_blind(s_x, SIGMA_A) + 1;
-    let c_tx_poisoned = commit(V_TX, r_tx_poisoned);
+    let r_transfer_poisoned = derive_transfer_blind(s_x, SIGMA_A) + 1;
+    let c_transfer_poisoned = commit(V_TRANSFER, r_transfer_poisoned);
 
     run_main(
         SK_OP,
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -836,8 +836,8 @@ fn rejects_poisoned_c_tx() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        c_tx_poisoned.x,
-        c_tx_poisoned.y,
+        c_transfer_poisoned.x,
+        c_transfer_poisoned.y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -852,13 +852,13 @@ fn rejects_poisoned_c_tx() {
 
 #[test(should_fail)]
 fn rejects_tampered_v_tilde() {
-    // O9 fires: v_tilde + 1 no longer matches v_tx + Poseidon2(TX_AMOUNT, ...).
+    // O9 fires: v_tilde + 1 no longer matches v_transfer + Poseidon2(TRANSFER_AMOUNT, ...).
     run_main(
         SK_OP,
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -873,8 +873,8 @@ fn rejects_tampered_v_tilde() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE + 1,
@@ -903,7 +903,7 @@ fn rejects_tampered_a_tilde_new() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -918,8 +918,8 @@ fn rejects_tampered_a_tilde_new() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -940,7 +940,7 @@ fn rejects_tampered_c_a_new() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -955,8 +955,8 @@ fn rejects_tampered_c_a_new() {
         K_AUD_S_Y,
         C_A_NEW_X + 1,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -974,8 +974,8 @@ fn rejects_sigma_a_new_equal_to_sigma_a() {
     // Salt-rotation hardening: the circuit rejects `sigma_a' == sigma_a`
     // even though Section 7.8 does not require it. With `sigma_a' = sigma_a`:
     //   r_a_new = derive_allow_r(dvk_i, sigma_a_new) = r_a
-    //   c_a_new = (V_A - V_TX) * G + r_a * H
-    //   a_tilde_new = encrypt_allowance(V_A - V_TX, dvk_i, sigma_a_new)
+    //   c_a_new = (V_A - V_TRANSFER) * G + r_a * H
+    //   a_tilde_new = encrypt_allowance(V_A - V_TRANSFER, dvk_i, sigma_a_new)
     // All downstream publics are recomputed consistently so the only
     // firing constraint is `assert(sigma_a_new != sigma_a)`.
     let r_a_new = derive_allow_r(DVK_I, SIGMA_A);
@@ -987,7 +987,7 @@ fn rejects_sigma_a_new_equal_to_sigma_a() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -1002,8 +1002,8 @@ fn rejects_sigma_a_new_equal_to_sigma_a() {
         K_AUD_S_Y,
         c_a_new.x,
         c_a_new.y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -1021,7 +1021,7 @@ fn rejects_r_e_zero() {
     // O13 fires: r_e = 0 would force R_e = O (identity) and collapse every
     // ECDH in this transfer (S, S_{a,r}, S_{a,s} all become O), making every
     // mask a knowable constant function of sigma_a. Every r_e-dependent
-    // public (R_e = (0, 0) identity-encoding, C_tx / v_tilde derived against
+    // public (R_e = (0, 0) identity-encoding, C_transfer / v_tilde derived against
     // s_x = 0, and both auditor channels' ciphertexts derived against
     // s_a_{r,s}.x = 0) is recomputed so the `assert(r_e != 0)` check is the
     // only constraint that can catch this -- removing O13 would let the
@@ -1031,9 +1031,9 @@ fn rejects_r_e_zero() {
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_x_zero = ecdh(0, pvk_recipient);
-    let r_tx_zero = derive_tx_blind(s_x_zero, SIGMA_A);
-    let c_tx_zero = commit(V_TX, r_tx_zero);
-    let v_tilde_zero = encrypt_amount(V_TX, s_x_zero, SIGMA_A);
+    let r_transfer_zero = derive_transfer_blind(s_x_zero, SIGMA_A);
+    let c_transfer_zero = commit(V_TRANSFER, r_transfer_zero);
+    let v_tilde_zero = encrypt_amount(V_TRANSFER, s_x_zero, SIGMA_A);
     let s_a_r_x_zero = ecdh(0, k_aud_r);
     let m_r_zero = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x_zero, SIGMA_A);
     let s_a_s_x_zero = ecdh(0, k_aud_s);
@@ -1044,7 +1044,7 @@ fn rejects_r_e_zero() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         0,
         C_A_X,
         C_A_Y,
@@ -1059,16 +1059,16 @@ fn rejects_r_e_zero() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        c_tx_zero.x,
-        c_tx_zero.y,
+        c_transfer_zero.x,
+        c_transfer_zero.y,
         0,
         0,
         v_tilde_zero,
         A_TILDE_NEW,
         SIGMA_A_NEW,
-        V_TX + m_r_zero[0],
-        r_tx_zero + m_r_zero[1],
-        V_TX + m_s_zero[0],
+        V_TRANSFER + m_r_zero[0],
+        r_transfer_zero + m_r_zero[1],
+        V_TRANSFER + m_s_zero[0],
         V_A_NEW + m_s_zero[1],
     );
 }
@@ -1078,7 +1078,7 @@ fn rejects_wrong_r_e() {
     // r_e mismatches the public R_e: O6 fails because scalar_mul(r_e+1, H)
     // no longer equals the canonical (R_E_X, R_E_Y). R_e itself is left
     // canonical (so O6 catches the mismatch) but every other r_e-dependent
-    // public (C_tx, v_tilde, both auditor channels) is recomputed against
+    // public (C_transfer, v_tilde, both auditor channels) is recomputed against
     // r_e+1 so O8 / O9 / O_a3 / O_a4 / O_a7 / O_a8 cannot coincidentally
     // fire.
     let r_e_bad: Field = R_E + 1;
@@ -1087,9 +1087,9 @@ fn rejects_wrong_r_e() {
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_x_bad = ecdh(r_e_bad, pvk_recipient);
-    let r_tx_bad = derive_tx_blind(s_x_bad, SIGMA_A);
-    let c_tx_bad = commit(V_TX, r_tx_bad);
-    let v_tilde_bad = encrypt_amount(V_TX, s_x_bad, SIGMA_A);
+    let r_transfer_bad = derive_transfer_blind(s_x_bad, SIGMA_A);
+    let c_transfer_bad = commit(V_TRANSFER, r_transfer_bad);
+    let v_tilde_bad = encrypt_amount(V_TRANSFER, s_x_bad, SIGMA_A);
     let s_a_r_x_bad = ecdh(r_e_bad, k_aud_r);
     let m_r_bad = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x_bad, SIGMA_A);
     let s_a_s_x_bad = ecdh(r_e_bad, k_aud_s);
@@ -1100,7 +1100,7 @@ fn rejects_wrong_r_e() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         r_e_bad,
         C_A_X,
         C_A_Y,
@@ -1115,16 +1115,16 @@ fn rejects_wrong_r_e() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        c_tx_bad.x,
-        c_tx_bad.y,
+        c_transfer_bad.x,
+        c_transfer_bad.y,
         R_E_X,
         R_E_Y,
         v_tilde_bad,
         A_TILDE_NEW,
         SIGMA_A_NEW,
-        V_TX + m_r_bad[0],
-        r_tx_bad + m_r_bad[1],
-        V_TX + m_s_bad[0],
+        V_TRANSFER + m_r_bad[0],
+        r_transfer_bad + m_r_bad[1],
+        V_TRANSFER + m_s_bad[0],
         V_A_NEW + m_s_bad[1],
     );
 }
@@ -1138,7 +1138,7 @@ fn rejects_off_curve_k_aud_r() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -1153,8 +1153,8 @@ fn rejects_off_curve_k_aud_r() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -1176,7 +1176,7 @@ fn rejects_identity_k_aud_r() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -1191,8 +1191,8 @@ fn rejects_identity_k_aud_r() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -1212,7 +1212,7 @@ fn rejects_off_curve_k_aud_s() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -1227,8 +1227,8 @@ fn rejects_off_curve_k_aud_s() {
         2,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -1248,7 +1248,7 @@ fn rejects_identity_k_aud_s() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -1263,8 +1263,8 @@ fn rejects_identity_k_aud_s() {
         0,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -1285,7 +1285,7 @@ fn rejects_tampered_v_tilde_aud_r() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -1300,8 +1300,8 @@ fn rejects_tampered_v_tilde_aud_r() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -1322,7 +1322,7 @@ fn rejects_tampered_r_tilde_aud_r() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -1337,8 +1337,8 @@ fn rejects_tampered_r_tilde_aud_r() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -1359,7 +1359,7 @@ fn rejects_tampered_v_tilde_aud_s() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -1374,8 +1374,8 @@ fn rejects_tampered_v_tilde_aud_s() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -1396,7 +1396,7 @@ fn rejects_tampered_a_tilde_aud_s() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -1411,8 +1411,8 @@ fn rejects_tampered_a_tilde_aud_s() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -1434,7 +1434,7 @@ fn rejects_wrong_k_aud_r() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -1449,8 +1449,8 @@ fn rejects_wrong_k_aud_r() {
         K_AUD_S_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,
@@ -1472,7 +1472,7 @@ fn rejects_wrong_k_aud_s() {
         DVK_I,
         V_A,
         R_A,
-        V_TX,
+        V_TRANSFER,
         R_E,
         C_A_X,
         C_A_Y,
@@ -1487,8 +1487,8 @@ fn rejects_wrong_k_aud_s() {
         Y_OP_Y,
         C_A_NEW_X,
         C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
         R_E_X,
         R_E_Y,
         V_TILDE,

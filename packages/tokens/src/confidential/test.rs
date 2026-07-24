@@ -229,7 +229,7 @@ fn transfer_data(e: &Env) -> Bytes {
     TransferData {
         payload: TransferPayload {
             c_spend_new: fixture_point(e),
-            c_tx: fixture_point(e),
+            c_transfer: fixture_point(e),
             r_e_point: fixture_point(e),
             v_tilde: fixture_field(e, 0x11),
             b_tilde: fixture_field(e, 0x12),
@@ -267,7 +267,7 @@ fn spender_transfer_data(e: &Env) -> Bytes {
     SpenderTransferData {
         payload: SpenderTransferPayload {
             c_a_new: fixture_point(e),
-            c_tx: fixture_point(e),
+            c_transfer: fixture_point(e),
             r_e_point: fixture_point(e),
             v_tilde: fixture_field(e, 0x31),
             a_tilde_new: fixture_field(e, 0x32),
