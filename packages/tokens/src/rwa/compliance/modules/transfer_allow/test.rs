@@ -97,6 +97,34 @@ fn on_transfer_refreshes_recipient_ttl_when_sender_allowlisted() {
 }
 
 #[test]
+fn on_transfer_refreshes_sender_ttl_when_recipient_allowlisted() {
+    let e = Env::default();
+    let module_id = e.register(TestTransferAllowContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        allow_user(&e, &token, &from);
+        allow_user(&e, &token, &to);
+
+        // Age the sender entry to the brink of expiry.
+        let from_key = TransferAllowStorageKey::AllowedUser(token.clone(), from.clone());
+        let ttl = e.storage().persistent().get_ttl(&from_key);
+        e.ledger().with_mut(|l| {
+            l.sequence_number += ttl;
+        });
+
+        // The recipient is allowlisted, so a short-circuit on the `from`-read
+        // would skip the sender lookup: the read-time extension must still
+        // refresh the sender entry.
+        on_transfer(&e, &from, &to, &TransferKind::Standard, &token);
+
+        assert_eq!(e.storage().persistent().get_ttl(&from_key), MODULE_EXTEND_AMOUNT);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #406)")]
 fn on_transfer_panics_when_neither_party_allowlisted() {
     let e = Env::default();
