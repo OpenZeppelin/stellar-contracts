@@ -361,12 +361,36 @@ impl RWA {
     ///
     /// # Errors
     ///
+    /// * [`RWAError::InsufficientBalance`] - When `amount` exceeds the total
+    ///   balance of `user_address`.
+    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
+    ///   configured.
+    /// * refer to
+    ///   [`Compliance::destroyed`](crate::rwa::compliance::Compliance::destroyed)
+    ///   errors.
     /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///
     /// * topics - `["burn", user_address: Address]`
     /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// This function bypasses freezing restrictions and can unfreeze tokens
+    /// as needed: when `amount` exceeds the free (unfrozen) balance, the
+    /// difference is unfrozen first, so a partially frozen balance is
+    /// destroyed in place.
+    ///
+    /// Locked tokens are not given the same treatment. The `Destroyed` hook
+    /// carries no notion of a privileged burn, so a compliance module can
+    /// reject the burn by panicking regardless of who issued it. In
+    /// particular, with the
+    /// [`initial_lockup_period`](crate::rwa::compliance::modules::initial_lockup_period)
+    /// module registered, a burn that dips into still-locked tokens is
+    /// rejected; destroying a locked position takes a forced transfer to a
+    /// treasury wallet (which consumes the locks) followed by a burn from
+    /// that treasury.
     ///
     /// # Security Warning
     ///
