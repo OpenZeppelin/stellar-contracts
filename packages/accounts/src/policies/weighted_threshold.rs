@@ -40,15 +40,33 @@
 //!
 //! 1. **Review current weights** using `get_signer_weights()` and threshold
 //!    using `get_threshold()`
-//! 2. **Before removing signers**: Update weights using `set_signer_weight()`
-//!    or adjust threshold using `set_threshold()` to ensure it remains
-//!    achievable
+//! 2. **Before removing signers**: Lower the threshold using `set_threshold()`
+//!    or reduce weights using `set_signer_weight()` so it remains achievable
 //! 3. **After adding signers**: Set weights for new signers using
-//!    `set_signer_weight()` and adjust threshold if needed to maintain security
-//!    level
+//!    `set_signer_weight()` and adjust the threshold if needed to maintain the
+//!    security level
 //!
-//! **Failure to follow this process may result in permanent DoS or silent
-//! security degradation.**
+//! ## Required Operation Ordering
+//!
+//! Both `set_threshold()` and `set_signer_weight()` enforce the invariant
+//! `threshold <= total signer weight` on **every individual call**. Because
+//! each call is validated in isolation, reconfiguration is strictly
+//! order-sensitive:
+//!
+//! - **When adding weight and raising the threshold**: call
+//!   `set_signer_weight()` **first** to increase the total weight, then
+//!   `set_threshold()`. Raising the threshold first reverts if the new
+//!   threshold exceeds the current total weight.
+//! - **When removing a signer or reducing weight**: call `set_threshold()`
+//!   **first** to lower the threshold, then `set_signer_weight()`. Reducing the
+//!   weight first reverts if it drops the total weight below the current
+//!   threshold.
+//!
+//! Calls in the wrong order revert with
+//! [`WeightedThresholdError::InvalidThreshold`] (error 3211) mid-sequence.
+//!
+//! **Failure to follow this process may result in permanent DoS, silent
+//! security degradation, or a mid-sequence `InvalidThreshold` revert.**
 //!
 //! ## Example Usage
 //!
@@ -332,6 +350,10 @@ pub fn enforce(
 /// signers to ensure the threshold remains achievable, or AFTER adding signers
 /// to maintain the intended approval percentage.
 ///
+/// The new threshold must not exceed the current total signer weight, so when
+/// raising the threshold and adding weight, call `set_signer_weight()` first.
+/// See the module-level "Required Operation Ordering" section for details.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
@@ -341,7 +363,8 @@ pub fn enforce(
 ///
 /// # Errors
 ///
-/// * [`WeightedThresholdError::InvalidThreshold`] - When threshold is 0.
+/// * [`WeightedThresholdError::InvalidThreshold`] - When threshold is 0, or
+///   when it exceeds the current total signer weight.
 /// * [`WeightedThresholdError::SmartAccountNotInstalled`] - When the policy is
 ///   not installed.
 ///
@@ -390,6 +413,10 @@ pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_
 /// **Call this function AFTER adding new signers** to the ContextRule to assign
 /// them appropriate weights. Signers without configured weights contribute 0
 /// weight, which may create confusion about the actual security level.
+///
+/// The updated total weight must not drop below the current threshold, so when
+/// removing a signer or reducing weight, call `set_threshold()` first. See the
+/// module-level "Required Operation Ordering" section for details.
 ///
 /// # Arguments
 ///
