@@ -43,7 +43,8 @@ pub fn is_user_allowed(e: &Env, token: &Address, user: &Address) -> bool {
 ///
 /// Both parties' allowlist entries are looked up unconditionally so that the
 /// read-time TTL extension in [`is_user_allowed`] refreshes each allowlisted
-/// party on every transfer, regardless of the other party's status.
+/// party on every allowlist-checked (standard or delegated) transfer,
+/// regardless of the other party's status.
 ///
 /// # Arguments
 ///
