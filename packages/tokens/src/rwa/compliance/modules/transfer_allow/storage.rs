@@ -58,7 +58,12 @@ pub fn on_transfer(e: &Env, from: &Address, to: &Address, kind: &TransferKind, t
         TransferKind::Forced | TransferKind::Recovery => return,
         TransferKind::Standard | TransferKind::Delegated(_) => {}
     }
-    if !is_user_allowed(e, token, from) && !is_user_allowed(e, token, to) {
+    // Look up both parties unconditionally (no short-circuit) so the
+    // read-time TTL extension in `is_user_allowed` refreshes each allowlisted
+    // party regardless of the other's status.
+    let from_allowed = is_user_allowed(e, token, from);
+    let to_allowed = is_user_allowed(e, token, to);
+    if !from_allowed && !to_allowed {
         panic_with_error!(e, ComplianceModuleError::UserNotAllowed);
     }
 }
