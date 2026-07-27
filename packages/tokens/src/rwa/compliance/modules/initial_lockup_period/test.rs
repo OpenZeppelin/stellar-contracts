@@ -7,10 +7,13 @@ use soroban_sdk::{
 };
 
 use crate::rwa::compliance::{
-    modules::initial_lockup_period::storage::{
-        debit_forced, get_locked_amount, get_locked_details, get_lockup_period,
-        is_preset_completed, mark_preset_completed, migrate_locks, on_created, on_destroyed,
-        on_transfer, preset_locks, set_lockup_period, LockedTokens,
+    modules::initial_lockup_period::{
+        storage::{
+            debit_forced, get_locked_amount, get_locked_details, get_lockup_period,
+            is_preset_completed, mark_preset_completed, migrate_locks, on_created, on_destroyed,
+            on_transfer, preset_locks, set_lockup_period, LockedTokens,
+        },
+        MAX_LOCKS,
     },
     TransferKind,
 };
@@ -80,6 +83,155 @@ fn on_created_zero_amount_creates_no_lock() {
 
         assert_eq!(get_locked_details(&e, &token, &wallet).locks.len(), 0);
         assert_eq!(get_locked_amount(&e, &token, &wallet), 0);
+    });
+}
+
+#[test]
+fn on_created_prunes_expired_locks() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_lockup_period(&e, &token, 100);
+        on_created(&e, &wallet, 50, &token); // releases at t=100
+
+        // The first lock has expired by the second mint: instead of letting
+        // the entry grow, the mint drops it while appending the new lock.
+        e.ledger().with_mut(|li| li.sequence_number = 100);
+        on_created(&e, &wallet, 30, &token); // releases at t=200
+
+        let details = get_locked_details(&e, &token, &wallet);
+        assert_eq!(details.total_locked, 30);
+        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 30, release_ledger: 200 }]);
+        assert_eq!(get_locked_amount(&e, &token, &wallet), 30);
+    });
+}
+
+#[test]
+fn on_created_pruning_keeps_active_locks() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_lockup_period(&e, &token, 100);
+        on_created(&e, &wallet, 50, &token); // releases at t=100
+        e.ledger().with_mut(|li| li.sequence_number = 50);
+        on_created(&e, &wallet, 40, &token); // releases at t=150
+
+        // Only the first lock has expired: the mint prunes it and carries
+        // the still-active one over untouched.
+        e.ledger().with_mut(|li| li.sequence_number = 120);
+        on_created(&e, &wallet, 30, &token); // releases at t=220
+
+        let details = get_locked_details(&e, &token, &wallet);
+        assert_eq!(details.total_locked, 70);
+        assert_eq!(
+            details.locks,
+            vec![
+                &e,
+                LockedTokens { amount: 40, release_ledger: 150 },
+                LockedTokens { amount: 30, release_ledger: 220 },
+            ]
+        );
+        assert_eq!(get_locked_amount(&e, &token, &wallet), 70);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #407)")]
+fn on_created_panics_at_lock_bound() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        let mut locks = Vec::new(&e);
+        for _ in 0..MAX_LOCKS {
+            locks.push_back(LockedTokens { amount: 1, release_ledger: 1_000_000 });
+        }
+        preset_locks(&e, &token, &wallet, &locks);
+
+        // Every seeded lock is still active, so the mint cannot make room
+        // by pruning and must reject instead.
+        set_lockup_period(&e, &token, 100);
+        on_created(&e, &wallet, 10, &token);
+    });
+}
+
+#[test]
+fn on_created_at_lock_bound_succeeds_after_pruning() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // The wallet sits at the bound, but its oldest lock releases at
+        // t=10.
+        let mut locks = vec![&e, LockedTokens { amount: 1, release_ledger: 10 }];
+        for _ in 1..MAX_LOCKS {
+            locks.push_back(LockedTokens { amount: 1, release_ledger: 1_000_000 });
+        }
+        preset_locks(&e, &token, &wallet, &locks);
+
+        // Once that lock expires, the mint prunes it and the append fits
+        // within the bound again.
+        e.ledger().with_mut(|li| li.sequence_number = 10);
+        set_lockup_period(&e, &token, 100);
+        on_created(&e, &wallet, 10, &token);
+
+        let details = get_locked_details(&e, &token, &wallet);
+        assert_eq!(details.locks.len(), MAX_LOCKS);
+        assert_eq!(details.total_locked, i128::from(MAX_LOCKS) - 1 + 10);
+    });
+}
+
+#[test]
+fn on_created_prunes_expired_zero_amount_locks() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // A wallet seeded to the bound with zero-amount locks: nothing to
+        // subtract from `total_locked`, but the entries must still be
+        // dropped once expired or the wallet could never mint again.
+        let mut locks = Vec::new(&e);
+        for _ in 0..MAX_LOCKS {
+            locks.push_back(LockedTokens { amount: 0, release_ledger: 10 });
+        }
+        preset_locks(&e, &token, &wallet, &locks);
+
+        e.ledger().with_mut(|li| li.sequence_number = 10);
+        set_lockup_period(&e, &token, 100);
+        on_created(&e, &wallet, 10, &token);
+
+        let details = get_locked_details(&e, &token, &wallet);
+        assert_eq!(details.total_locked, 10);
+        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 10, release_ledger: 110 }]);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #407)")]
+fn preset_locks_panics_above_lock_bound() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        let mut locks = Vec::new(&e);
+        for _ in 0..=MAX_LOCKS {
+            locks.push_back(LockedTokens { amount: 1, release_ledger: 1_000_000 });
+        }
+        preset_locks(&e, &token, &wallet, &locks);
     });
 }
 
