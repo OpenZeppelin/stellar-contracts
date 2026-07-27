@@ -41,11 +41,6 @@ pub fn is_user_allowed(e: &Env, token: &Address, user: &Address) -> bool {
 /// and recovery) transfers are exempt from the policy, and no bookkeeping
 /// exists in this module, so they pass through untouched.
 ///
-/// Both parties' allowlist entries are looked up unconditionally so that the
-/// read-time TTL extension in [`is_user_allowed`] refreshes each allowlisted
-/// party on every allowlist-checked (standard or delegated) transfer,
-/// regardless of the other party's status.
-///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
@@ -63,6 +58,9 @@ pub fn on_transfer(e: &Env, from: &Address, to: &Address, kind: &TransferKind, t
         TransferKind::Forced | TransferKind::Recovery => return,
         TransferKind::Standard | TransferKind::Delegated(_) => {}
     }
+    // Look up both parties unconditionally (no short-circuit) so the
+    // read-time TTL extension in `is_user_allowed` refreshes each allowlisted
+    // party regardless of the other's status.
     let from_allowed = is_user_allowed(e, token, from);
     let to_allowed = is_user_allowed(e, token, to);
     if !from_allowed && !to_allowed {
