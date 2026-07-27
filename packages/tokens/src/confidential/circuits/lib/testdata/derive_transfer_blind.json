@@ -1,7 +1,7 @@
 {
-  "primitive": "derive_tx_blind",
+  "primitive": "derive_transfer_blind",
   "design_doc_refs": ["Constraint T7", "Constraint O7"],
-  "description": "ECDH-derived blinding for the transfer commitment: r_tx = Poseidon2(TX_BLIND, s, sigma).",
+  "description": "ECDH-derived blinding for the transfer commitment: r_transfer = Poseidon2(TRANSFER_BLINDING, s, sigma).",
   "vectors": [
     {
       "inputs": { "s": "0x12345", "sigma": "0x01" },

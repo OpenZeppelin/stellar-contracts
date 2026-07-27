@@ -81,8 +81,8 @@ global POSEIDON2_IV_BASE: Field = 18446744073709551616; // 2^64
 /// | `delta_vk`        | 2     | `VIEWING_KEY`                     |
 /// | `delta_dvk`       | 3     | `DELEGATION_VIEWING_KEY`          |
 /// | `delta_spend_r`   | 4     | `SPEND_RANDOMNESS`                |
-/// | `delta_tx_blind`  | 5     | `TX_BLINDING`                     |
-/// | `delta_tx_amount` | 6     | `TX_AMOUNT`                       |
+/// | `delta_transfer_blind`  | 5     | `TRANSFER_BLINDING`                     |
+/// | `delta_transfer_amount` | 6     | `TRANSFER_AMOUNT`                       |
 /// | `delta_enc_bal`   | 7     | `ENCRYPTED_BALANCE`               |
 /// | `delta_enc_allow` | 8     | `ENCRYPTED_ALLOWANCE`             |
 /// | `delta_allow_r`   | 9     | `ALLOWANCE_RANDOMNESS`            |
@@ -106,11 +106,11 @@ pub mod domain {
     /// `r' = Poseidon2(SPEND_RANDOMNESS, vk, sigma)`. Constraints W5/T10/S9/V6 (`delta_spend_r`).
     pub global SPEND_RANDOMNESS: Field = 4;
     /// ECDH-derived blinding for the transfer commitment:
-    /// `r_tx = Poseidon2(TX_BLINDING, s, sigma)`. Constraints T7/O7 (`delta_tx_blind`).
-    pub global TX_BLINDING: Field = 5;
+    /// `r_transfer = Poseidon2(TRANSFER_BLINDING, s, sigma)`. Constraints T7/O7 (`delta_transfer_blind`).
+    pub global TRANSFER_BLINDING: Field = 5;
     /// Mask for the encrypted transfer amount:
-    /// `v_tilde = v_tx + Poseidon2(TX_AMOUNT, s, sigma)`. Constraints T9/O9 (`delta_tx_amount`).
-    pub global TX_AMOUNT: Field = 6;
+    /// `v_tilde = v_transfer + Poseidon2(TRANSFER_AMOUNT, s, sigma)`. Constraints T9/O9 (`delta_transfer_amount`).
+    pub global TRANSFER_AMOUNT: Field = 6;
     /// Mask for the encrypted balance scalar:
     /// `b_tilde = v_new + Poseidon2(ENCRYPTED_BALANCE, vk, sigma)`.
     /// Constraints W7/T12/S11/V8 (`delta_enc_bal`).
@@ -171,7 +171,7 @@ pub fn scalar_mul(scalar: Field, point: EmbeddedCurvePoint) -> EmbeddedCurvePoin
 /// binding costs a single Poseidon2 permutation.
 ///
 /// Use this whenever the *scalar* shared secret is what downstream Poseidon
-/// helpers expect (every `derive_tx_blind` / `encrypt_amount` /
+/// helpers expect (every `derive_transfer_blind` / `encrypt_amount` /
 /// `encrypt_auditor_*` call). When the full shared-secret *point* is needed,
 /// reach for `scalar_mul` directly.
 pub fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> Field {
@@ -271,19 +271,19 @@ pub fn derive_allow_r(dvk: Field, sigma_a: Field) -> Field {
     poseidon_with_domain(domain::ALLOWANCE_RANDOMNESS, [dvk, sigma_a])
 }
 
-/// ECDH-derived blinding for the transfer commitment `C_tx`.
+/// ECDH-derived blinding for the transfer commitment `C_transfer`.
 /// Constraints T7 / O7. `s` is the recipient-ECDH shared-secret scalar
 /// produced by [`ecdh`].
-pub fn derive_tx_blind(s: Field, sigma: Field) -> Field {
-    poseidon_with_domain(domain::TX_BLINDING, [s, sigma])
+pub fn derive_transfer_blind(s: Field, sigma: Field) -> Field {
+    poseidon_with_domain(domain::TRANSFER_BLINDING, [s, sigma])
 }
 
 // ################## ENCRYPTED SCALARS ##################
 
 /// Encrypts the transfer amount under the recipient's ECDH shared secret.
-/// Constraints T9 / O9. `v_tilde = v_tx + Poseidon2(TX_AMOUNT, s, sigma)`.
-pub fn encrypt_amount(v_tx: Field, s: Field, sigma: Field) -> Field {
-    v_tx + poseidon_with_domain(domain::TX_AMOUNT, [s, sigma])
+/// Constraints T9 / O9. `v_tilde = v_transfer + Poseidon2(TRANSFER_AMOUNT, s, sigma)`.
+pub fn encrypt_amount(v_transfer: Field, s: Field, sigma: Field) -> Field {
+    v_transfer + poseidon_with_domain(domain::TRANSFER_AMOUNT, [s, sigma])
 }
 
 /// Encrypts the new spendable balance under the owner's viewing key.

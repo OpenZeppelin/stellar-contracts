@@ -132,7 +132,7 @@ pub struct WithdrawData {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransferPayload {
     pub c_spend_new: Point,
-    pub c_tx: Point,
+    pub c_transfer: Point,
     pub r_e_point: Point,
     pub v_tilde: BytesN<32>,
     pub b_tilde: BytesN<32>,
@@ -158,7 +158,7 @@ pub struct TransferData {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpenderTransferPayload {
     pub c_a_new: Point,
-    pub c_tx: Point,
+    pub c_transfer: Point,
     pub r_e_point: Point,
     pub v_tilde: BytesN<32>,
     pub a_tilde_new: BytesN<32>,
@@ -689,7 +689,7 @@ pub fn confidential_transfer(
 
     // PI order (DESIGN §7.6):
     //   C_spend_A, Y_A, PVK_B, addr_f, K_aud_r, K_aud_s,
-    //   C_spend', C_tx, R_e, v_tilde, b_tilde, sigma,
+    //   C_spend', C_transfer, R_e, v_tilde, b_tilde, sigma,
     //   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &sender.spendable_commitment);
@@ -699,7 +699,7 @@ pub fn confidential_transfer(
     append_point(&mut pi, &k_aud_r);
     append_point(&mut pi, &k_aud_s);
     append_point(&mut pi, &payload.c_spend_new);
-    append_point(&mut pi, &payload.c_tx);
+    append_point(&mut pi, &payload.c_transfer);
     append_point(&mut pi, &payload.r_e_point);
     append_field(&mut pi, &payload.v_tilde);
     append_field(&mut pi, &payload.b_tilde);
@@ -712,7 +712,7 @@ pub fn confidential_transfer(
     verify(e, CircuitType::Transfer, &pi, proof);
 
     set_spendable(e, from, &payload.c_spend_new);
-    add_to_receiving(e, to, &payload.c_tx);
+    add_to_receiving(e, to, &payload.c_transfer);
 
     emit_transfer(
         e,
@@ -794,7 +794,7 @@ pub fn confidential_transfer_from(
     let sigma_a = delegation.allowance_salt.clone();
     // PI order (DESIGN §7.8):
     //   C_a, sigma_a, Y_op, PVK_recipient, K_aud_r, K_aud_s,
-    //   C_a', C_tx, R_e, v_tilde, a_tilde', sigma_a',
+    //   C_a', C_transfer, R_e, v_tilde, a_tilde', sigma_a',
     //   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &delegation.allowance_commitment);
@@ -804,7 +804,7 @@ pub fn confidential_transfer_from(
     append_point(&mut pi, &k_aud_r);
     append_point(&mut pi, &k_aud_s);
     append_point(&mut pi, &payload.c_a_new);
-    append_point(&mut pi, &payload.c_tx);
+    append_point(&mut pi, &payload.c_transfer);
     append_point(&mut pi, &payload.r_e_point);
     append_field(&mut pi, &payload.v_tilde);
     append_field(&mut pi, &payload.a_tilde_new);
@@ -824,7 +824,7 @@ pub fn confidential_transfer_from(
         .persistent()
         .set(&ConfidentialTokenStorageKey::Delegation(from.clone(), spender.clone()), &delegation);
 
-    add_to_receiving(e, to, &payload.c_tx);
+    add_to_receiving(e, to, &payload.c_transfer);
 
     emit_spender_transfer(
         e,
@@ -1195,22 +1195,22 @@ fn set_spendable(e: &Env, account: &Address, c_spend_new: &Point) {
     e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &data);
 }
 
-/// Adds `c_tx` to `account.receiving_commitment` via Grumpkin homomorphic
+/// Adds `c_transfer` to `account.receiving_commitment` via Grumpkin homomorphic
 /// addition. Used by deposits and incoming transfers.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The recipient address.
-/// * `c_tx` - The commitment to fold in.
+/// * `c_transfer` - The commitment to fold in.
 ///
 /// # Errors
 ///
 /// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` is not
 ///   registered.
-fn add_to_receiving(e: &Env, account: &Address, c_tx: &Point) {
+fn add_to_receiving(e: &Env, account: &Address, c_transfer: &Point) {
     let mut data = get_account(e, account);
-    data.receiving_commitment = Grumpkin::add(e, &data.receiving_commitment, c_tx);
+    data.receiving_commitment = Grumpkin::add(e, &data.receiving_commitment, c_transfer);
     e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &data);
 }
 
