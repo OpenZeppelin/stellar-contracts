@@ -40,8 +40,9 @@
 //!
 //! 1. **Review current weights** using `get_signer_weights()` and threshold
 //!    using `get_threshold()`
-//! 2. **Before removing signers**: Lower the threshold using `set_threshold()`
-//!    or reduce weights using `set_signer_weight()` so it remains achievable
+//! 2. **Before removing signers or reducing weight**: Lower the threshold using
+//!    `set_threshold()` first, then reduce weights using `set_signer_weight()`,
+//!    so the threshold remains achievable
 //! 3. **After adding signers**: Set weights for new signers using
 //!    `set_signer_weight()` and adjust the threshold if needed to maintain the
 //!    security level
@@ -50,8 +51,7 @@
 //!
 //! Both `set_threshold()` and `set_signer_weight()` enforce the invariant
 //! `threshold <= total signer weight` on **every individual call**. Because
-//! each call is validated in isolation, reconfiguration is strictly
-//! order-sensitive:
+//! each call is validated in isolation, reconfiguration is order-sensitive:
 //!
 //! - **When adding weight and raising the threshold**: call
 //!   `set_signer_weight()` **first** to increase the total weight, then
@@ -62,11 +62,15 @@
 //!   weight first reverts if it drops the total weight below the current
 //!   threshold.
 //!
-//! Calls in the wrong order revert with
-//! [`WeightedThresholdError::InvalidThreshold`] (error 3211) mid-sequence.
+//! A call reverts with [`WeightedThresholdError::InvalidThreshold`] (error
+//! 3211) whenever it would leave `threshold > total signer weight`. A
+//! wrong-order sequence therefore fails at the first step whose intermediate
+//! state violates that invariant.
 //!
-//! **Failure to follow this process may result in permanent DoS, silent
-//! security degradation, or a mid-sequence `InvalidThreshold` revert.**
+//! **Failure to keep weights and threshold in sync with the ContextRule's
+//! signer set may result in permanent DoS or silent security degradation.
+//! Performing the updates in the wrong order additionally risks an
+//! `InvalidThreshold` revert mid-sequence.**
 //!
 //! ## Example Usage
 //!
