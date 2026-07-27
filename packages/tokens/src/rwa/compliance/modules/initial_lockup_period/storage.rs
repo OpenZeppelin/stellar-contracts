@@ -313,6 +313,11 @@ pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
 /// the locked region. Panics when `from`'s unlocked holdings do not cover
 /// `amount`.
 ///
+/// Unlike [`on_transfer`], there is no privileged variant: the token's
+/// `Destroyed` hook carries no transfer kind, so every burn is held to the
+/// unlocked rule. A locked position is destroyed by a forced transfer to a
+/// treasury wallet followed by a burn from that treasury.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.

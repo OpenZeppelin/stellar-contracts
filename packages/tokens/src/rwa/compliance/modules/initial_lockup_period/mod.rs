@@ -60,6 +60,14 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// preserved, so the investor's remaining lockup follows the balance onto
 /// the new wallet.
 ///
+/// Burns have no such privileged variant: the `Destroyed` hook does not
+/// distinguish who issued the burn, so a burn that dips into still-locked
+/// tokens is always rejected and a locked position cannot be destroyed in
+/// place. Note that this differs from partially frozen tokens, which the
+/// token unfreezes automatically to cover a burn. Destroying a locked
+/// position is a two-step operation: a forced transfer to a treasury wallet
+/// (which consumes the locks) followed by a burn from that treasury.
+///
 /// The wallet's balance is never mirrored: the token passes it into each
 /// hook via [`crate::rwa::compliance::AccountSnapshot`], and the module
 /// derives the spendable amount as `balance - still_locked` on the spot. A
