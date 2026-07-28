@@ -71,7 +71,9 @@ mod utils;
 #[cfg(test)]
 mod test;
 
-pub use extensions::{burnable, consecutive, enumerable, royalties, votes};
+pub use extensions::{
+    burnable, combinations, combinations::Compose, consecutive, enumerable, royalties, votes,
+};
 pub use overrides::{Base, ContractOverrides};
 // ################## TRAIT ##################
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, String};
@@ -100,19 +102,22 @@ pub use utils::sequential;
 ///   compatibility and overrides for
 ///   [`crate::non_fungible::extensions::enumerable::NonFungibleEnumerable`])
 ///   trait, incompatible with
-///   [`crate::non_fungible::extensions::burnable::NonFungibleBurnable`]) and
-///   [`crate::non_fungible::extensions::consecutive::NonFungibleConsecutive`]
-///   trait.
+///   [`crate::non_fungible::extensions::consecutive::Consecutive`] trait.
 /// * [`crate::non_fungible::extensions::consecutive::Consecutive`] (enabling
 ///   the compatibility and overrides for
 ///   [`crate::non_fungible::extensions::consecutive::NonFungibleConsecutive`])
 ///   trait, incompatible with
-///   [`crate::non_fungible::extensions::burnable::NonFungibleBurnable`]) and
-///   [`crate::non_fungible::extensions::enumerable::NonFungibleEnumerable`]
+///   [`crate::non_fungible::extensions::enumerable::Enumerable`] trait.
+/// * [`crate::non_fungible::extensions::votes::NonFungibleVotes`] (enabling the
+///   compatibility and overrides for [`stellar_governance::votes::Votes`])
 ///   trait.
 ///
-/// The default implementations of this trait for `Base`, `Enumerable`, and
-/// `Consecutive` can be found by navigating to `ContractType::{method_name}`.
+/// The contract type is selected with
+/// [`crate::non_fungible::combinations::Compose`]; invalid combinations are
+/// rejected at compile time.
+///
+/// The default implementations of this trait for each contract type can be
+/// found by navigating to `ContractType::{method_name}`.
 /// For example, the implementation of [`NonFungibleToken::transfer`] for the
 /// `Enumerable` contract type can be found at
 /// [`crate::non_fungible::extensions::enumerable::Enumerable::transfer`].
@@ -120,11 +125,14 @@ pub use utils::sequential;
 pub trait NonFungibleToken {
     /// Helper type that allows some of the functionality of the base trait to
     /// be overridden based on the extensions implemented.
-    /// [`crate::non_fungible::Base`] should be used as the type when
-    /// not using
-    /// [`crate::non_fungible::extensions::enumerable::Enumerable`] or
-    /// [`crate::non_fungible::extensions::consecutive::Consecutive`]
-    /// extensions.
+    /// The contract type is selected with
+    /// [`crate::non_fungible::combinations::Compose`], by listing the
+    /// contract types that override the `Base` behavior: `Compose<(Base,)>`
+    /// for the vanilla case, `Compose<(Enumerable,)>` for an enumerable
+    /// token, and so on. Extensions that add functionality without
+    /// overriding behavior (e.g.
+    /// [`crate::non_fungible::burnable::NonFungibleBurnable`]) have no
+    /// contract type and do not appear in the list.
     type ContractType: ContractOverrides;
 
     /// Returns the number of tokens owned by `account`.

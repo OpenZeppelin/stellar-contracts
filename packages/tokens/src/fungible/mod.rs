@@ -74,7 +74,9 @@ mod utils;
 #[cfg(test)]
 mod test;
 
-pub use extensions::{allowlist, blocklist, burnable, capped, votes};
+pub use extensions::{
+    allowlist, blocklist, burnable, capped, combinations, combinations::Compose, votes,
+};
 pub use overrides::{Base, ContractOverrides};
 use soroban_sdk::{
     contracterror, contractevent, contracttrait, Address, Env, MuxedAddress, String,
@@ -116,10 +118,17 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 ///   [`crate::rwa::RWAToken`]) trait, incompatible with
 ///   [`crate::fungible::allowlist::AllowList`] trait and
 ///   [`crate::fungible::blocklist::BlockList`] trait.
+/// * [`crate::vault::Vault`] (enabling the compatibility and overrides for
+///   [`crate::vault::FungibleVault`]) trait.
+/// * [`crate::fungible::votes::FungibleVotes`] (enabling the compatibility and
+///   overrides for [`stellar_governance::votes::Votes`]) trait.
 ///
-/// The default implementations of this trait for `Base`, `Allowlist`,
-/// `Blocklist` and `RWA` can be found by navigating to:
-/// `ContractType::{method_name}`.
+/// The contract type is selected with
+/// [`crate::fungible::combinations::Compose`]; invalid combinations are
+/// rejected at compile time.
+///
+/// The default implementations of this trait for each contract type can be
+/// found by navigating to: `ContractType::{method_name}`.
 ///
 /// For example, the implementation of [`FungibleToken::transfer`] for the
 /// `Allowlist` contract type can be found at
@@ -128,10 +137,13 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 pub trait FungibleToken {
     /// Helper type that allows some of the functionality of the base trait to
     /// be overridden based on the extensions implemented.
-    /// [`crate::fungible::Base`] should be used as the type when
-    /// not using
-    /// [`crate::fungible::allowlist::AllowList`] or
-    /// [`crate::fungible::blocklist::BlockList`] extensions.
+    /// The contract type is selected with
+    /// [`crate::fungible::combinations::Compose`], by listing the contract
+    /// types that override the `Base` behavior: `Compose<(Base,)>` for the
+    /// vanilla case, `Compose<(AllowList,)>` for an allowlist token, and so
+    /// on. Extensions that add functionality without overriding behavior
+    /// (e.g. [`crate::fungible::burnable::FungibleBurnable`]) have no
+    /// contract type and do not appear in the list.
     type ContractType: ContractOverrides;
 
     /// Returns the total amount of tokens in circulation.

@@ -5,7 +5,9 @@
 use soroban_sdk::{contract, contractimpl, vec, Address, Env, String, Symbol, Vec};
 use stellar_access::access_control::{set_admin, AccessControl};
 use stellar_macros::{has_any_role, has_role, only_admin, only_any_role, only_role};
-use stellar_tokens::non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
+use stellar_tokens::non_fungible::{
+    burnable::NonFungibleBurnable, Base, Compose, NonFungibleToken,
+};
 
 #[contract]
 pub struct ExampleContract;
@@ -46,7 +48,7 @@ impl ExampleContract {
 
 #[contractimpl(contracttrait)]
 impl NonFungibleToken for ExampleContract {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 }
 
 // for this contract, the `burn*` functions are only meant to be called by
