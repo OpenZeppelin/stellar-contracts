@@ -175,7 +175,7 @@ The wallet must:
 | **Verifier contract** | Validates zero-knowledge proofs on-chain. Stores one verification key per operation type. |
 | **Auditor contract** | Manages auditor public keys. Shared across tokens. |
 | **Noir circuits** | Six proof circuits (register, withdraw, transfer, spender transfer, set spender, revoke spender). Written in Noir, compiled to UltraHonk. |
-| **Client library** | SDK for wallets: key management, proof generation, event processing, balance tracking, encryption/decryption. |
+| **Client library** | SDK for wallets: key management, proof generation, event processing, balance tracking, encryption/decryption. Specified in [SDK.md](./SDK.md). |
 
 ---
 
