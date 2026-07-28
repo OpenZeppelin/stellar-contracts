@@ -81,14 +81,15 @@ global POSEIDON2_IV_BASE: Field = 18446744073709551616; // 2^64
 /// | `delta_vk`        | 2     | `VIEWING_KEY`                     |
 /// | `delta_dvk`       | 3     | `DELEGATION_VIEWING_KEY`          |
 /// | `delta_spend_r`   | 4     | `SPEND_RANDOMNESS`                |
-/// | `delta_tx_blind`  | 5     | `TX_BLINDING`                     |
-/// | `delta_tx_amount` | 6     | `TX_AMOUNT`                       |
+/// | `delta_transfer_blind`  | 5     | `TRANSFER_BLINDING`                     |
+/// | `delta_transfer_amount` | 6     | `TRANSFER_AMOUNT`                       |
 /// | `delta_enc_bal`   | 7     | `ENCRYPTED_BALANCE`               |
 /// | `delta_enc_allow` | 8     | `ENCRYPTED_ALLOWANCE`             |
 /// | `delta_allow_r`   | 9     | `ALLOWANCE_RANDOMNESS`            |
 /// | `delta_esc_dvk`   | 10    | `ESCROWED_DELEGATION_VIEWING_KEY` |
 /// | `delta_aud_s`     | 11    | `AUDITOR_SENDER`                  |
 /// | `delta_aud_r`     | 12    | `AUDITOR_RECIPIENT`               |
+/// | `delta_ecdh`      | 13    | `ECDH_SHARED_SECRET`              |
 pub mod domain {
     /// Soroban Address compression into a single `F_r` Field:
     /// `address_to_field(a) = Poseidon2(ADDRESS, lo(a), hi(a))`.
@@ -105,11 +106,11 @@ pub mod domain {
     /// `r' = Poseidon2(SPEND_RANDOMNESS, vk, sigma)`. Constraints W5/T10/S9/V6 (`delta_spend_r`).
     pub global SPEND_RANDOMNESS: Field = 4;
     /// ECDH-derived blinding for the transfer commitment:
-    /// `r_tx = Poseidon2(TX_BLINDING, s, sigma)`. Constraints T7/O7 (`delta_tx_blind`).
-    pub global TX_BLINDING: Field = 5;
+    /// `r_transfer = Poseidon2(TRANSFER_BLINDING, s, sigma)`. Constraints T7/O7 (`delta_transfer_blind`).
+    pub global TRANSFER_BLINDING: Field = 5;
     /// Mask for the encrypted transfer amount:
-    /// `v_tilde = v_tx + Poseidon2(TX_AMOUNT, s, sigma)`. Constraints T9/O9 (`delta_tx_amount`).
-    pub global TX_AMOUNT: Field = 6;
+    /// `v_tilde = v_transfer + Poseidon2(TRANSFER_AMOUNT, s, sigma)`. Constraints T9/O9 (`delta_transfer_amount`).
+    pub global TRANSFER_AMOUNT: Field = 6;
     /// Mask for the encrypted balance scalar:
     /// `b_tilde = v_new + Poseidon2(ENCRYPTED_BALANCE, vk, sigma)`.
     /// Constraints W7/T12/S11/V8 (`delta_enc_bal`).
@@ -136,6 +137,10 @@ pub mod domain {
     /// 2 yields the per-transfer Pedersen randomness mask.
     /// Constraints T_a2 / O_a2 (`delta_aud_r`).
     pub global AUDITOR_RECIPIENT: Field = 12;
+    /// ECDH shared-secret scalar extraction:
+    /// `s = Poseidon2(ECDH_SHARED_SECRET, S.x, S.y)`.
+    /// Section 2.4 (`delta_ecdh`). See [`ecdh`].
+    pub global ECDH_SHARED_SECRET: Field = 13;
 }
 
 // ################## CORE PRIMITIVES ##################
@@ -154,14 +159,24 @@ pub fn scalar_mul(scalar: Field, point: EmbeddedCurvePoint) -> EmbeddedCurvePoin
     multi_scalar_mul([point], [EmbeddedCurveScalar::from_field(scalar)])
 }
 
-/// ECDH shared-secret extraction: returns `(s*P).x` per Section 2.4.
+/// ECDH shared-secret scalar extraction per Section 2.4: computes
+/// `S = scalar * P` and binds both coordinates into the output via the
+/// Poseidon funnel, `s = Poseidon2(ECDH_SHARED_SECRET, S.x, S.y)`.
+///
+/// Absorbing `S.y` removes the negation invariance of an x-only extraction:
+/// `P` and `-P = (P.x, -P.y)` share an x-coordinate, so `(scalar * P).x`
+/// alone maps a key and its negation (`-PVK = (-vk) * H`, itself a valid,
+/// canonical registration) to the same shared secret for every scalar.
+/// The absorb `[tag, S.x, S.y]` fills exactly one rate-3 block, so the
+/// binding costs a single Poseidon2 permutation.
 ///
 /// Use this whenever the *scalar* shared secret is what downstream Poseidon
-/// helpers expect (every `derive_tx_blind` / `encrypt_amount` /
+/// helpers expect (every `derive_transfer_blind` / `encrypt_amount` /
 /// `encrypt_auditor_*` call). When the full shared-secret *point* is needed,
 /// reach for `scalar_mul` directly.
 pub fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> Field {
-    scalar_mul(scalar, point).x
+    let s = scalar_mul(scalar, point);
+    poseidon_with_domain(domain::ECDH_SHARED_SECRET, [s.x, s.y])
 }
 
 /// Asserts `p` is on Grumpkin AND not the identity. Use this for every
@@ -179,6 +194,11 @@ pub fn assert_on_curve_non_identity(p: EmbeddedCurvePoint) {
 /// Poseidon2 sponge with rate=3, capacity=1, matching Noir stdlib's hasher and
 /// Barretenberg's Poseidon2 sponge. IV = `len * 2^64` placed at the capacity
 /// position; absorb `RATE` field elements per permutation; squeeze `state[0]`.
+/// The empty input still applies the squeeze permutation, returning
+/// `poseidon2_permutation([0, 0, 0, 0], 4)[0]` -- the same convention as the
+/// on-chain sponge, which always permutes before squeezing. That branch is
+/// comptime-dead for every `M >= 1` instantiation, and `poseidon_with_domain`
+/// guarantees `M >= 1` on every reachable path.
 fn sponge<let M: u32>(inputs: [Field; M]) -> Field {
     let iv: Field = (M as Field) * POSEIDON2_IV_BASE;
     let mut state: [Field; 4] = [0, 0, 0, iv];
@@ -192,7 +212,7 @@ fn sponge<let M: u32>(inputs: [Field; M]) -> Field {
     }
 
     let remainder: u32 = M - full * 3;
-    if remainder != 0 {
+    if (remainder != 0) | (M == 0) {
         for i in 0..remainder {
             state[i] += inputs[full * 3 + i];
         }
@@ -251,18 +271,19 @@ pub fn derive_allow_r(dvk: Field, sigma_a: Field) -> Field {
     poseidon_with_domain(domain::ALLOWANCE_RANDOMNESS, [dvk, sigma_a])
 }
 
-/// ECDH-derived blinding for the transfer commitment `C_tx`.
-/// Constraints T7 / O7. `s` is the recipient-ECDH shared secret x-coordinate.
-pub fn derive_tx_blind(s: Field, sigma: Field) -> Field {
-    poseidon_with_domain(domain::TX_BLINDING, [s, sigma])
+/// ECDH-derived blinding for the transfer commitment `C_transfer`.
+/// Constraints T7 / O7. `s` is the recipient-ECDH shared-secret scalar
+/// produced by [`ecdh`].
+pub fn derive_transfer_blind(s: Field, sigma: Field) -> Field {
+    poseidon_with_domain(domain::TRANSFER_BLINDING, [s, sigma])
 }
 
 // ################## ENCRYPTED SCALARS ##################
 
 /// Encrypts the transfer amount under the recipient's ECDH shared secret.
-/// Constraints T9 / O9. `v_tilde = v_tx + Poseidon2(TX_AMOUNT, s, sigma)`.
-pub fn encrypt_amount(v_tx: Field, s: Field, sigma: Field) -> Field {
-    v_tx + poseidon_with_domain(domain::TX_AMOUNT, [s, sigma])
+/// Constraints T9 / O9. `v_tilde = v_transfer + Poseidon2(TRANSFER_AMOUNT, s, sigma)`.
+pub fn encrypt_amount(v_transfer: Field, s: Field, sigma: Field) -> Field {
+    v_transfer + poseidon_with_domain(domain::TRANSFER_AMOUNT, [s, sigma])
 }
 
 /// Encrypts the new spendable balance under the owner's viewing key.
@@ -278,17 +299,18 @@ pub fn encrypt_allowance(v_a: Field, dvk: Field, sigma_a: Field) -> Field {
 }
 
 /// Delegation-key escrow mask for the spender handoff at `set_spender`. Section 7.11.
-/// `escrowed_dvk = dvk + Poseidon2(ESC_DVK, s, op_i)` where `s = (r_e * Y_op).x`.
+/// `escrowed_dvk = dvk + Poseidon2(ESC_DVK, s, op_i)` where `s = ecdh(r_e, Y_op)`.
 pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
     dvk + poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, op_i])
 }
 
 // ################## AUDITOR-CHANNEL SPONGE ##################
 
-/// Poseidon2 sponge with two squeezes. Absorbs `(d, s_x, sigma)` and returns
+/// Poseidon2 sponge with two squeezes. Absorbs `(d, s_x, sigma)` -- where
+/// `s_x` is the ECDH shared-secret scalar produced by [`ecdh`] -- and returns
 /// the first two rate-elements of the post-permutation state in order.
 ///
-/// Implements `SpongeSqueeze_2(delta, S.x, sigma)` from Section 2.5. The canonical
+/// Implements `SpongeSqueeze_2(delta, s, sigma)` from Section 2.5. The canonical
 /// squeeze order is: index 0 = amount mask, index 1 = balance / randomness
 /// mask, fixed by Sections 7 and 8. With rate = 3 the absorb fits one block
 /// and both outputs are served from the same permutation, so the constraint
@@ -302,14 +324,19 @@ pub fn sponge_squeeze_2(d: Field, s_x: Field, sigma: Field) -> [Field; 2] {
     [state[0], state[1]]
 }
 
-/// Sender-auditor encrypted balance/allowance checkpoint for circuits whose
-/// auditor block emits a single ciphertext (Withdraw W_a3/W_a4, RevokeSpender
-/// V_a3/V_a5, SetSpender S_a3/S_a5).
+/// Sender-auditor encrypted balance checkpoint for circuits whose auditor
+/// block emits a single ciphertext (Withdraw W_a3/W_a4).
 ///
-/// `b_tilde_aud_s = v_new + Poseidon2(AUDITOR_SENDER, s_a_s_x, sigma)`.
-/// The two-squeeze sender-channel form (Transfer T_a6-T_a8, SpenderTransfer
-/// O_a6-O_a8) is a different composition that callers spell out directly with
-/// `sponge_squeeze_2`.
+/// `b_tilde_aud_s = v_new + sponge_squeeze_2(AUDITOR_SENDER, s_a_s_x, sigma)[1]`,
+/// where `s_a_s_x` is the sender-auditor ECDH shared-secret scalar produced by
+/// [`ecdh`].
+/// The pad is the sponge's *second* squeeze -- the slot every two-ciphertext
+/// sender channel (Transfer T_a6-T_a8, SetSpender S_a3-S_a5, RevokeSpender
+/// V_a3-V_a5, SpenderTransfer O_a6-O_a8) uses for its balance/allowance mask.
+/// The first squeeze is reserved for amount masks, so a balance checkpoint
+/// never shares a pad with an amount ciphertext even if a `(r_e, sigma)` pair
+/// is mistakenly reused across operations (the pair must be unique per proof;
+/// DESIGN Section 2.5).
 pub fn encrypt_auditor_sender_balance(v_new: Field, s_a_s_x: Field, sigma: Field) -> Field {
-    v_new + poseidon_with_domain(domain::AUDITOR_SENDER, [s_a_s_x, sigma])
+    v_new + sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, sigma)[1]
 }

@@ -24,10 +24,6 @@ impl ComplianceContract {
     pub fn bind_tokens(e: &Env, tokens: Vec<Address>, operator: Address) {
         binder::bind_tokens(e, &tokens);
     }
-
-    pub fn get_token_index(e: &Env, token: Address) -> u32 {
-        binder::get_token_index(e, &token)
-    }
 }
 
 #[contractimpl(contracttrait)]

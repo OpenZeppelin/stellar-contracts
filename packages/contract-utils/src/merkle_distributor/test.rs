@@ -2,9 +2,10 @@ extern crate std;
 
 use hex_literal::hex;
 use soroban_sdk::{
-    contract, contracttype, testutils::Address as _, vec, Address, BytesN, Env, Vec,
+    contract, contracttype,
+    testutils::{Address as _, Events},
+    vec, Address, BytesN, Env, Vec,
 };
-use stellar_event_assertion::EventAssertion;
 
 use crate::{
     crypto::sha256::Sha256,
@@ -96,13 +97,11 @@ fn test_set_root_and_successful_claim_emits_events() {
         Distributor::set_root(&e, root.clone());
         assert_eq!(Distributor::get_root(&e), root);
 
-        let assert = EventAssertion::new(&e, address.clone());
-        assert.assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
 
         // Set claimed and verify event
         Distributor::set_claimed(&e, 1);
-        let assert = EventAssertion::new(&e, address.clone());
-        assert.assert_event_count(2);
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 

@@ -19,6 +19,28 @@ Reproducible from the circuit sources with the pinned toolchain:
 Both versions are pinned in `.github/workflows/noir.yml`. CI re-runs the
 extraction and diffs against the files here; any drift fails the build.
 
+## Proving
+
+Proofs the deployed verifier accepts must be generated with the same
+pinned toolchain and non-default `bb` flags:
+
+```bash
+nargo execute --package circuit_<name> <witness_name>
+bb prove -s ultra_honk --oracle_hash keccak \
+   -b target/circuit_<name>.json -w target/<witness_name>.gz -o <out_dir>
+```
+
+- `--oracle_hash keccak` is required: the on-chain verifier
+  ([rs-soroban-ultrahonk](https://github.com/NethermindEth/rs-soroban-ultrahonk))
+  reproduces the Fiat-Shamir transcript with Keccak, while `bb` defaults to
+  `poseidon2`. A proof generated with the default transcript is rejected.
+- Do **not** pass `--zk`: the verifier currently implements only the non-zk
+  `ultra_flavor`.
+
+The verifier backend is unfinished (see the module-level warning in
+`../../verifier/mod.rs`). This recipe is provisional and will be finalized
+together with the verifier, including the zero-knowledge setting.
+
 ## Regenerating
 
 ```bash

@@ -3,7 +3,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 use crate::rwa::compliance::{
     modules::{
         initial_lockup_period::{
-            emit_lockup_period_set, emit_lockup_state_preset, emit_preset_completed,
+            emit_lockup_period_set, emit_lockup_state_preset, emit_preset_completed, MAX_LOCKS,
         },
         storage::{add_i128_or_panic, require_non_negative_amount, sub_i128_or_panic},
         ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
@@ -23,8 +23,8 @@ pub struct LockedTokens {
 /// The lock entries tracked for one `(token, wallet)` pair, together with
 /// their running aggregate. `total_locked` always equals the sum of the
 /// `locks` amounts, including entries whose release time has already
-/// passed: expired entries are consumed lazily by transfers and burns, not
-/// by the passage of time.
+/// passed: expired entries are consumed lazily by transfers and burns and
+/// pruned by subsequent mints, not by the passage of time.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LockedDetails {
@@ -170,6 +170,8 @@ pub fn set_lockup_period(e: &Env, token: &Address, period: u32) {
 ///   negative.
 /// * [`ComplianceModuleError::PresetAlreadyCompleted`] - When the preset phase
 ///   has already been finalized.
+/// * [`ComplianceModuleError::LockBoundExceeded`] - When `locks` holds more
+///   than [`MAX_LOCKS`] entries.
 /// * [`ComplianceModuleError::MathOverflow`] - When summing the lock amounts
 ///   overflows.
 ///
@@ -184,6 +186,9 @@ pub fn set_lockup_period(e: &Env, token: &Address, period: u32) {
 pub fn preset_locks(e: &Env, token: &Address, wallet: &Address, locks: &Vec<LockedTokens>) {
     if is_preset_completed(e, token) {
         panic_with_error!(e, ComplianceModuleError::PresetAlreadyCompleted);
+    }
+    if locks.len() > MAX_LOCKS {
+        panic_with_error!(e, ComplianceModuleError::LockBoundExceeded);
     }
 
     let mut total_locked = 0;
@@ -219,20 +224,26 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
     emit_preset_completed(e, token);
 }
 
-/// Records a transfer out of `from`: consumes expired locks when `amount`
-/// dips into the locked region. The recipient is untouched, since incoming
-/// transfers never create locks. Panics when `from`'s unlocked holdings do
-/// not cover `amount`, unless the transfer is forced: a privileged
-/// operation (forced transfer, recovery) overrides the lockup policy, so
-/// the moved amount is covered by consuming locks oldest-first, expired or
-/// not, instead of rejecting. This keeps the lock schedule consistent with
-/// the wallet's remaining balance and is what allows
-/// `recover_balance` to move a wallet with active locks.
+/// Records a transfer out of `from`, dispatching on `kind`:
+///
+/// * Standard and delegated transfers consume expired locks when `amount` dips
+///   into the locked region, and panic when `from`'s unlocked holdings do not
+///   cover `amount`. The recipient is untouched, since incoming transfers never
+///   create locks.
+/// * Forced transfers (seizures) override the lockup policy instead of being
+///   rejected: the moved amount is covered by consuming locks oldest-first,
+///   expired or not. The consumed entries leave the books with the seized
+///   tokens; the recipient gains nothing.
+/// * Recovery transfers migrate instead of consuming: the lock entries covering
+///   the moved amount leave `from` and are re-created on `to` with their
+///   release times preserved, so the investor's remaining lockup follows the
+///   balance onto the new wallet.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `from` - The sender wallet.
+/// * `to` - The recipient wallet.
 /// * `balance` - The sender's token balance, as of before the transfer.
 /// * `amount` - The transferred amount.
 /// * `kind` - Who initiated the transfer and under what authority.
@@ -242,7 +253,9 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 ///
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
 /// * [`ComplianceModuleError::InsufficientUnlockedBalance`] - When `amount`
-///   exceeds the sender's unlocked holdings and the transfer is not forced.
+///   exceeds the sender's unlocked holdings and the transfer is not privileged.
+/// * [`ComplianceModuleError::MathOverflow`] - When migrating locks onto the
+///   recipient overflows its lock aggregate.
 ///
 /// # Security Warning
 ///
@@ -250,22 +263,27 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 pub fn on_transfer(
     e: &Env,
     from: &Address,
+    to: &Address,
     balance: i128,
     amount: i128,
     kind: &TransferKind,
     token: &Address,
 ) {
     require_non_negative_amount(e, amount);
-    if *kind == TransferKind::Forced {
-        debit_forced(e, token, from, balance, amount);
-    } else {
-        debit_unlocked(e, token, from, balance, amount);
+    match kind {
+        TransferKind::Forced => debit_forced(e, token, from, balance, amount),
+        TransferKind::Recovery => migrate_locks(e, token, from, to, balance, amount),
+        TransferKind::Standard | TransferKind::Delegated(_) => {
+            debit_unlocked(e, token, from, balance, amount)
+        }
     }
 }
 
 /// Records a mint to `to`: when a lockup period is configured, appends a lock
-/// entry releasing after that period. The wallet's balance is owned by the
-/// token, so nothing else is tracked.
+/// entry releasing after that period. Expired entries are pruned in the same
+/// write, keeping the stored vector bounded by the wallet's concurrently
+/// active locks rather than its lifetime mint count. The wallet's balance is
+/// owned by the token, so nothing else is tracked.
 ///
 /// # Arguments
 ///
@@ -277,6 +295,8 @@ pub fn on_transfer(
 /// # Errors
 ///
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
+/// * [`ComplianceModuleError::LockBoundExceeded`] - When the wallet already
+///   holds [`MAX_LOCKS`] unexpired lock entries.
 /// * [`ComplianceModuleError::MathOverflow`] - When the lock aggregate
 ///   overflows.
 ///
@@ -289,6 +309,10 @@ pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
     let period = get_lockup_period(e, token);
     if period > 0 && amount > 0 {
         let mut details = get_locked_details(e, token, to);
+        prune_expired_locks(e, &mut details);
+        if details.locks.len() >= MAX_LOCKS {
+            panic_with_error!(e, ComplianceModuleError::LockBoundExceeded);
+        }
         details.locks.push_back(LockedTokens {
             amount,
             release_ledger: e.ledger().sequence().saturating_add(period),
@@ -301,6 +325,11 @@ pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
 /// Records a burn from `from`: consumes expired locks when `amount` dips into
 /// the locked region. Panics when `from`'s unlocked holdings do not cover
 /// `amount`.
+///
+/// Unlike [`on_transfer`], there is no privileged variant: the token's
+/// `Destroyed` hook carries no transfer kind, so every burn is held to the
+/// unlocked rule. A locked position is destroyed by a forced transfer to a
+/// treasury wallet followed by a burn from that treasury.
 ///
 /// # Arguments
 ///
@@ -385,11 +414,13 @@ pub fn debit_unlocked(e: &Env, token: &Address, wallet: &Address, balance: i128,
 }
 
 /// Debits `amount` from `wallet`'s holdings under `token` for a forced
-/// transfer: when the amount dips into the locked region, lock entries are
-/// consumed oldest-first regardless of whether they have released. The
-/// lockup policy is an investor-facing rule the admin is consciously
-/// overriding, but the lock schedule must still shrink with the departing
-/// tokens or it would exceed the wallet's remaining balance.
+/// transfer (seizure): when the amount dips into the locked region, lock
+/// entries are consumed oldest-first regardless of whether they have
+/// released. The lockup policy is an investor-facing rule the admin is
+/// consciously overriding, but the lock schedule must still shrink with
+/// the departing tokens or it would exceed the wallet's remaining balance.
+/// For recovery transfers, which migrate the consumed entries to the new
+/// wallet instead of dropping them, see [`migrate_locks`].
 ///
 /// # Arguments
 ///
@@ -410,10 +441,79 @@ pub fn debit_forced(e: &Env, token: &Address, wallet: &Address, balance: i128, a
     if details.total_locked > 0 {
         let free = (balance - details.total_locked).max(0);
         if amount > free {
-            consume_locks_forced(e, &mut details, sub_i128_or_panic(e, amount, free));
+            let _ = consume_locks_forced(e, &mut details, sub_i128_or_panic(e, amount, free));
             set_locked_details(e, token, wallet, &details);
         }
     }
+}
+
+/// Migrates the lock entries covering `amount` from `from` to `to` for a
+/// recovery transfer: the portion of the moved amount not covered by
+/// `from`'s never-locked free balance is consumed from its entries
+/// oldest-first, expired or not, and the consumed pieces are re-created on
+/// `to` with their release times preserved, merging with any entries `to`
+/// already holds. A recovery moves the investor's balance to a new wallet,
+/// so the remaining lockup follows the tokens instead of being released
+/// early. Consumption stops when the entries are exhausted; it never
+/// panics on shortfall.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token address.
+/// * `from` - The wallet the balance leaves (the lost wallet).
+/// * `to` - The wallet the balance arrives on (the investor's new wallet).
+/// * `balance` - `from`'s token balance, as of before the operation.
+/// * `amount` - The amount to migrate. Must be non-negative; the caller is
+///   responsible for validating it before calling.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::MathOverflow`] - When crediting `to`'s lock
+///   aggregate overflows.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks and bypasses the unlocked
+/// balance check.
+pub fn migrate_locks(
+    e: &Env,
+    token: &Address,
+    from: &Address,
+    to: &Address,
+    balance: i128,
+    amount: i128,
+) {
+    let mut src = get_locked_details(e, token, from);
+    if src.total_locked == 0 {
+        return;
+    }
+
+    let free = (balance - src.total_locked).max(0);
+    if amount <= free {
+        // should be unreachable if called via `recover_balance`, this is just a
+        // security belt for the case that the caller is not `recover_balance`
+        // and does not check the free balance for example, maybe useful for
+        // partial recovery in the future
+        return;
+    }
+
+    let moved = consume_locks_forced(e, &mut src, sub_i128_or_panic(e, amount, free));
+    set_locked_details(e, token, from, &src);
+
+    if moved.is_empty() {
+        return;
+    }
+
+    // Read the destination only after the source write, so a recovery onto
+    // the same wallet observes the already-debited entries and reduces to a
+    // no-op instead of duplicating them.
+    let mut dst = get_locked_details(e, token, to);
+    for lock in moved.iter() {
+        dst.total_locked = add_i128_or_panic(e, dst.total_locked, lock.amount);
+        dst.locks.push_back(lock);
+    }
+    set_locked_details(e, token, to, &dst);
 }
 
 /// Returns the sum of lock amounts whose release time has passed.
@@ -426,6 +526,28 @@ fn expired_amount(e: &Env, locks: &Vec<LockedTokens>) -> i128 {
         }
     }
     expired
+}
+
+/// Drops the entries in `details` whose release time has passed, reducing
+/// `total_locked` by the dropped amounts. Expired entries are already
+/// spendable ([`get_locked_amount`] subtracts them), so dropping them
+/// changes nothing about what the wallet can move; it only keeps the
+/// stored vector bounded by the number of active locks.
+fn prune_expired_locks(e: &Env, details: &mut LockedDetails) {
+    let now = e.ledger().sequence();
+    let mut pruned = 0;
+    let mut remaining = Vec::new(e);
+
+    for lock in details.locks.iter() {
+        if lock.release_ledger <= now {
+            pruned = add_i128_or_panic(e, pruned, lock.amount);
+        } else {
+            remaining.push_back(lock);
+        }
+    }
+
+    details.total_locked = sub_i128_or_panic(e, details.total_locked, pruned);
+    details.locks = remaining;
 }
 
 /// Consumes `amount` from the expired entries in `details`, oldest-first:
@@ -464,12 +586,14 @@ fn consume_expired_locks(e: &Env, details: &mut LockedDetails, amount: i128) {
 /// Consumes `amount` from the entries in `details` oldest-first, regardless
 /// of release time: fully-consumed entries are dropped, a partially-consumed
 /// entry keeps its remainder, and `total_locked` is reduced by what was
-/// consumed. Used by [`debit_forced`], where the lock schedule must shrink
-/// with the departing tokens rather than block them. Consumption stops when
-/// the entries are exhausted; it never panics on shortfall.
-fn consume_locks_forced(e: &Env, details: &mut LockedDetails, amount: i128) {
+/// consumed. Returns the consumed pieces with their release times
+/// preserved: [`debit_forced`] discards them (the tokens are seized), while
+/// [`migrate_locks`] re-creates them on the destination wallet. Consumption
+/// stops when the entries are exhausted; it never panics on shortfall.
+fn consume_locks_forced(e: &Env, details: &mut LockedDetails, amount: i128) -> Vec<LockedTokens> {
     let mut to_consume = amount;
     let mut consumed = 0;
+    let mut consumed_entries = Vec::new(e);
     let mut remaining = Vec::new(e);
 
     for lock in details.locks.iter() {
@@ -477,9 +601,14 @@ fn consume_locks_forced(e: &Env, details: &mut LockedDetails, amount: i128) {
             if lock.amount <= to_consume {
                 to_consume -= lock.amount;
                 consumed += lock.amount;
+                consumed_entries.push_back(lock);
             } else {
                 remaining.push_back(LockedTokens {
                     amount: lock.amount - to_consume,
+                    release_ledger: lock.release_ledger,
+                });
+                consumed_entries.push_back(LockedTokens {
+                    amount: to_consume,
                     release_ledger: lock.release_ledger,
                 });
                 consumed += to_consume;
@@ -492,4 +621,5 @@ fn consume_locks_forced(e: &Env, details: &mut LockedDetails, amount: i128) {
 
     details.total_locked = sub_i128_or_panic(e, details.total_locked, consumed);
     details.locks = remaining;
+    consumed_entries
 }

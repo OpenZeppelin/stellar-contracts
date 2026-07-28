@@ -65,10 +65,6 @@ impl IdentityRegistryStorage for MockIRSContract {
         unreachable!("remove_identity is not used in these tests");
     }
 
-    fn modify_identity(_e: &Env, _account: Address, _identity: Address, _operator: Address) {
-        unreachable!("modify_identity is not used in these tests");
-    }
-
     fn recover_identity(
         _e: &Env,
         _old_account: Address,
@@ -289,5 +285,19 @@ fn on_transfer_forced_is_exempt_from_policy() {
         // No IRS configured and no allowlist: a standard transfer would
         // panic, but a forced one passes through untouched.
         on_transfer(&e, &to, &TransferKind::Forced, &token);
+    });
+}
+
+#[test]
+fn on_transfer_recovery_is_exempt_from_policy() {
+    let e = Env::default();
+    let module_id = e.register(TestCountryAllowContract, ());
+    let token = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // No IRS configured and no allowlist: a standard transfer would
+        // panic, but a recovery passes through untouched.
+        on_transfer(&e, &to, &TransferKind::Recovery, &token);
     });
 }

@@ -42,8 +42,17 @@ pub enum ComplianceHook {
 /// executing. At the same time, bookkeeping modules must still observe the
 /// movement or their records drift from reality. Passing the kind into the
 /// hook makes that decision explicit and per-module: a policy module exempts
-/// [`TransferKind::Forced`] from its checks, while an accounting module
-/// updates its books for every kind.
+/// the privileged kinds from its checks, while an accounting module updates
+/// its books for every kind.
+///
+/// The two privileged kinds differ in what happens to the tokens. A
+/// [`TransferKind::Forced`] transfer is a seizure: the tokens leave the
+/// holder, so wallet-bound module state (e.g. a lock schedule) is consumed
+/// along with them. A [`TransferKind::Recovery`] transfer is a wallet
+/// migration: the same investor continues on a new wallet, so wallet-bound
+/// state should move to the destination rather than disappear. A module
+/// that treats the two identically should do so as an explicit decision,
+/// not as a fallback.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TransferKind {
@@ -52,10 +61,17 @@ pub enum TransferKind {
     /// A delegate moves the holder's tokens via `transfer_from`; carries the
     /// delegate (spender) address.
     Delegated(Address),
-    /// A privileged operation (forced transfer, account recovery) moves the
-    /// tokens. Policy modules should generally exempt this kind; bookkeeping
-    /// must still be applied.
+    /// A privileged operation seizes the tokens (`forced_transfer`): the
+    /// tokens leave the holder for another party. Policy modules should
+    /// generally exempt this kind; bookkeeping must still be applied, and
+    /// wallet-bound restrictions are consumed with the departing tokens.
     Forced,
+    /// A privileged operation migrates a lost wallet's balance to the same
+    /// investor's new wallet (`recover_balance`). Policy modules should
+    /// generally exempt this kind; bookkeeping must still be applied, and
+    /// wallet-bound state (e.g. lock schedules) should move to the
+    /// destination wallet.
+    Recovery,
 }
 
 /// A point-in-time view of one account, captured as of *before* the operation

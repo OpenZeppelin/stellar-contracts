@@ -1,7 +1,7 @@
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 use stellar_confidential_lib::{assert_on_curve_non_identity, ecdh};
 
-// Minimal circuit wrapping `ecdh(scalar, point) -> shared_secret_x`.
+// Minimal circuit wrapping `ecdh(scalar, point) -> shared_secret_scalar`.
 //
 // The on-curve / non-identity check is part of the gadget by design:
 // production circuits must validate every public-input key (R_e, Y, PVK,

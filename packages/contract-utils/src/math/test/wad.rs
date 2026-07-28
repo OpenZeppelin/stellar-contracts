@@ -952,10 +952,25 @@ fn test_exp_underflow_returns_zero() {
 }
 
 #[test]
-fn test_exp_at_lower_bound_returns_zero() {
+fn test_exp_at_solmate_cutoff_returns_zero() {
     let e = Env::default();
-    let bound = Wad::from_raw(-42_139_678_854_452_767_551);
-    assert_eq!(bound.exp(&e), Wad::from_raw(0));
+    // Solmate's original underflow cutoff, floor(ln(0.5e-18) * 1e18). It sits
+    // well below EXP_INPUT_MIN nowadays, but stays pinned to keep the port
+    // aligned with the reference implementation.
+    let cutoff = Wad::from_raw(-42_139_678_854_452_767_551);
+    assert_eq!(cutoff.exp(&e), Wad::from_raw(0));
+}
+
+#[test]
+fn test_exp_near_underflow_crossing_is_nonzero() {
+    // Guards EXP_INPUT_MIN against being raised too far: results only
+    // truncate to 0 below ≈ -41.446 (where e^x * 1e18 drops under 1), so
+    // inputs just above that must keep producing nonzero values.
+    let e = Env::default();
+    // e^-41 * 1e18 ≈ 1.56
+    assert_eq!(Wad::from_integer(&e, -41).exp(&e), Wad::from_raw(1));
+    // e^-40 * 1e18 ≈ 4.25
+    assert_eq!(Wad::from_integer(&e, -40).exp(&e), Wad::from_raw(4));
 }
 
 #[test]
@@ -980,6 +995,36 @@ fn test_checked_exp_underflow_returns_zero() {
     let e = Env::default();
     let very_negative = Wad::from_integer(&e, -100);
     assert_eq!(very_negative.checked_exp(&e), Some(Wad::from_raw(0)));
+}
+
+#[test]
+fn test_checked_exp_underflow_band_returns_zero() {
+    // Regression: inputs in (-42.139..., -41.935...] drive the final scaling
+    // shift to exactly 256, which the EVM defines as 0 but soroban's
+    // `U256::shr` rejects. They must take the `EXP_INPUT_MIN` early return
+    // instead of trapping.
+    let e = Env::default();
+    for raw in [
+        -42_139_678_854_452_767_550, // just above Solmate's cutoff
+        -42_000_000_000_000_000_000,
+        -41_935_404_423_876_691_220, // EXP_INPUT_MIN: largest input with k = -61
+    ] {
+        assert_eq!(Wad::from_raw(raw).checked_exp(&e), Some(Wad::from_raw(0)));
+    }
+    // Just above EXP_INPUT_MIN: runs the full algorithm (k = -60, shift 255)
+    // and still truncates to 0.
+    assert_eq!(Wad::from_raw(-41_935_404_423_876_691_219).checked_exp(&e), Some(Wad::from_raw(0)));
+}
+
+#[test]
+fn test_powf_underflow_band_returns_zero() {
+    // 0.5^60.7: the intermediate y * ln(x) ≈ -42.07 lands in the band that
+    // used to trap (see test_checked_exp_underflow_band_returns_zero).
+    let e = Env::default();
+    let half = Wad::from_raw(500_000_000_000_000_000);
+    let exponent = Wad::from_raw(60_700_000_000_000_000_000);
+    assert_eq!(half.checked_powf(&e, exponent), Some(Wad::from_raw(0)));
+    assert_eq!(half.powf(&e, exponent), Wad::from_raw(0));
 }
 
 #[test]

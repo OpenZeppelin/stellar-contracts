@@ -14,6 +14,55 @@
 //! Instead of simple country codes, it uses a sophisticated model that pairs
 //! relationship types with country codes.
 //!
+//! ## What Is Stored, and For Whom
+//!
+//! Three families of entries are kept, all keyed by the wallet (account)
+//! address:
+//!
+//! - `Identity(wallet) -> Address`: the pointer to the wallet's identity
+//!   contract, an external contract implementing
+//!   [`crate::rwa::identity_verification::identity_claims::IdentityClaims`]
+//!   that holds the investor's claims. Several wallets may point to the same
+//!   identity: the identity represents the investor, the wallets are its keys.
+//! - `IdentityProfile(wallet)`: registry-side metadata, an [`IdentityType`]
+//!   plus the country data entries. This is kept per wallet, not per identity,
+//!   so two wallets of the same investor each carry their own copy.
+//! - `RecoveredTo(old_wallet) -> new_wallet`: a permanent tombstone written by
+//!   account recovery; recovered wallets can never be registered again.
+//!
+//! ## Lifecycle Operations
+//!
+//! - `add_identity` registers a wallet under an identity contract.
+//! - `remove_identity` deletes a wallet's registration and profile. It is
+//!   rejected while the wallet still holds a balance in any linked token.
+//! - `recover_identity` handles wallet loss: the same identity moves to a new
+//!   wallet, and the old wallet is tombstoned.
+//!
+//! ## Replacing an Identity
+//!
+//! There is deliberately no in-place pointer swap: ERC-3643's
+//! `updateIdentity` has no equivalent here. The identity address does double
+//! duty downstream: besides locating the claims, it is the key under which
+//! compliance modules aggregate per-investor accounting (aggregate balances,
+//! transfer counters). Swapping the pointer under a funded wallet would
+//! silently re-key that accounting, and would amount to changing the tokens'
+//! beneficial owner without a transfer, bypassing every compliance check. An
+//! in-place swap also would not save anything real: issuer attestations bind
+//! to the identity address, so claims never carry over to a replacement
+//! contract, and re-attestation is required regardless.
+//!
+//! Replacing a wallet's identity contract (compromise, provider migration,
+//! erroneous registration) is therefore a two-step operation on an emptied
+//! wallet: the balance leaves first through regular or forced transfers, so
+//! every token movement passes through the compliance hooks, then
+//! `remove_identity` followed by `add_identity` with the new identity.
+//!
+//! One caveat remains: time-windowed transfer counters are keyed by identity
+//! and are not balance-backed, so re-registration starts fresh windows. That
+//! is correct when the wallet genuinely changes investors; a replacement for
+//! the same investor should wait out open transfer windows, since counters
+//! are not migrated.
+//!
 //! ## Flexible Country Relations
 //!
 //! The system supports flexible mixing of country relationship types to
@@ -309,8 +358,8 @@ use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, Int
 pub use storage::{
     add_country_data_entries, add_identity, delete_country_data, get_country_data,
     get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
-    modify_identity, recover_identity, remove_identity, stored_identity, validate_country_data,
-    CountryData, CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
+    recover_identity, remove_identity, stored_identity, validate_country_data, CountryData,
+    CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
     OrganizationCountryRelation,
 };
 
@@ -376,30 +425,12 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling [`remove_identity`] for the
     /// implementation.
+    ///
+    /// The library-provided [`remove_identity`] rejects removal while
+    /// `account` holds a non-zero balance in any linked token, so that
+    /// identity-keyed compliance state is never orphaned; refer to its
+    /// documentation.
     fn remove_identity(e: &Env, account: Address, operator: Address);
-
-    /// Modifies an existing identity.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The Soroban environment.
-    /// * `account` - The account address whose identity is being modified.
-    /// * `new_identity` - The new identity address.
-    /// * `operator` - The address authorizing the invocation.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["identity_modified", old_identity: Address, new_identity:
-    ///   Address]`
-    /// * data - `[]`
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Access control should be
-    /// enforced on `operator` before calling [`modify_identity`] for the
-    /// implementation.
-    fn modify_identity(e: &Env, account: Address, identity: Address, operator: Address);
 
     /// Recovers an identity by transferring it from an old account to a new
     /// account.
@@ -586,6 +617,8 @@ pub enum IRSError {
     MetadataTooManyEntries = 326,
     /// Metadata string value is too long (exceeds MAX_METADATA_STRING_LEN).
     MetadataStringTooLong = 327,
+    /// The account still holds a balance in a linked token.
+    AccountHasBalance = 328,
 }
 
 // ################## CONSTANTS ##################
@@ -652,28 +685,6 @@ pub struct IdentityUnstored {
 /// * `identity` - The identity address that was removed.
 pub fn emit_identity_unstored(e: &Env, account: &Address, identity: &Address) {
     IdentityUnstored { account: account.clone(), identity: identity.clone() }.publish(e);
-}
-
-/// Event emitted when an identity is modified for an account.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IdentityModified {
-    #[topic]
-    pub old_identity: Address,
-    #[topic]
-    pub new_identity: Address,
-}
-
-/// Emits an event when an identity is modified for an account.
-///
-/// # Arguments
-///
-/// * `e` - The Soroban environment.
-/// * `old_identity` - The previous identity address.
-/// * `new_identity` - The new identity address.
-pub fn emit_identity_modified(e: &Env, old_identity: &Address, new_identity: &Address) {
-    IdentityModified { old_identity: old_identity.clone(), new_identity: new_identity.clone() }
-        .publish(e);
 }
 
 /// Event emitted when an identity is recovered for a new account.

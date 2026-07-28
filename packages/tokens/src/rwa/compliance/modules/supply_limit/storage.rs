@@ -2,7 +2,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::rwa::compliance::modules::{
     storage::{add_i128_or_panic, require_non_negative_amount, sub_i128_or_panic},
-    supply_limit::{emit_supply_count_updated, emit_supply_limit_set},
+    supply_limit::{emit_preset_completed, emit_supply_count_updated, emit_supply_limit_set},
     ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
 };
 
@@ -13,6 +13,8 @@ pub enum SupplyLimitStorageKey {
     SupplyLimit(Address),
     /// Per-token running supply counter maintained by this module.
     SupplyCount(Address),
+    /// Per-token flag indicating that the preset migration phase is finalized.
+    PresetCompleted(Address),
 }
 
 // ################## QUERY STATE ##################
@@ -52,6 +54,23 @@ pub fn get_supply_count(e: &Env, token: &Address) -> i128 {
     }
 }
 
+/// Returns `true` when the preset phase for `token` has been finalized,
+/// blocking any further preset writes.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token address.
+pub fn is_preset_completed(e: &Env, token: &Address) -> bool {
+    let key = SupplyLimitStorageKey::PresetCompleted(token.clone());
+    if e.storage().persistent().has(&key) {
+        e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
+        true
+    } else {
+        false
+    }
+}
+
 // ################## CHANGE STATE ##################
 
 /// Sets the supply cap for `token`.
@@ -79,6 +98,67 @@ pub fn set_supply_limit(e: &Env, token: &Address, limit: i128) {
     let key = SupplyLimitStorageKey::SupplyLimit(token.clone());
     e.storage().persistent().set(&key, &limit);
     emit_supply_limit_set(e, token, limit);
+}
+
+/// Pre-seeds the running supply counter for `token`. Useful when
+/// registering this module on a token that already has circulating supply.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token address.
+/// * `supply` - The current circulating supply to record.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::InvalidAmount`] - When `supply` is negative.
+/// * [`ComplianceModuleError::PresetAlreadyCompleted`] - When the preset phase
+///   has already been finalized.
+///
+/// # Events
+///
+/// * topics - `["supply_count_updated", token: Address]`
+/// * data - `[supply: i128]`
+///
+/// # Notes
+///
+/// `supply` may exceed the configured limit: when migrating a token whose
+/// existing supply is already above the intended cap, the counter must still
+/// reflect reality. Mints stay blocked until burns bring the tracked supply
+/// back under the limit.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
+pub fn preset_supply_count(e: &Env, token: &Address, supply: i128) {
+    require_non_negative_amount(e, supply);
+    if is_preset_completed(e, token) {
+        panic_with_error!(e, ComplianceModuleError::PresetAlreadyCompleted);
+    }
+    set_supply_count(e, token, supply);
+}
+
+/// Finalizes the preset phase for `token`. After this call, invoking
+/// [`preset_supply_count`] will panic with
+/// [`ComplianceModuleError::PresetAlreadyCompleted`].
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token address.
+///
+/// # Events
+///
+/// * topics - `["preset_completed", token: Address]`
+/// * data - `[]`
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
+pub fn mark_preset_completed(e: &Env, token: &Address) {
+    let key = SupplyLimitStorageKey::PresetCompleted(token.clone());
+    e.storage().persistent().set(&key, &());
+    emit_preset_completed(e, token);
 }
 
 /// Records a mint of `amount` against `token`, incrementing the running

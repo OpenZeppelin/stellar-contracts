@@ -32,6 +32,16 @@ impl SupplyLimit for SupplyLimitContract {
     fn set_supply_limit(e: &Env, token: Address, limit: i128, operator: Address) {
         supply_limit::set_supply_limit(e, &token, limit);
     }
+
+    #[only_role(operator, "manager")]
+    fn preset_supply_count(e: &Env, token: Address, supply: i128, operator: Address) {
+        supply_limit::preset_supply_count(e, &token, supply);
+    }
+
+    #[only_role(operator, "manager")]
+    fn mark_preset_completed(e: &Env, token: Address, operator: Address) {
+        supply_limit::mark_preset_completed(e, &token);
+    }
 }
 
 #[contractimpl(contracttrait)]

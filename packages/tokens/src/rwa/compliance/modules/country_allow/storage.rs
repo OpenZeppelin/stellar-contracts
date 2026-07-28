@@ -38,6 +38,15 @@ pub fn is_country_allowed(e: &Env, token: &Address, country: u32) -> bool {
 /// Returns `true` if `account` has at least one allowed country in the IRS for
 /// `token`.
 ///
+/// The check returns on the first country code that appears in the allowlist
+/// and matches on the bare numeric code alone: it does not require every tie
+/// to be allowed, does not distinguish the relation type (residence,
+/// citizenship, source of funds, ...), and does not honor per-entry validity
+/// [`metadata`](crate::rwa::identity_registry_storage::CountryData::metadata).
+/// See the
+/// [`CountryAllow`](crate::rwa::compliance::modules::country_allow::CountryAllow)
+/// trait docs for the full limitations.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
@@ -60,9 +69,9 @@ pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
 /// Rejects a transfer whose recipient has no allowed country, by panicking.
 ///
 /// Country allowlist checks are recipient-based, so the sender and amount
-/// are intentionally ignored. Forced (admin/recovery) transfers are exempt
-/// from the policy, and no bookkeeping exists in this module, so they pass
-/// through untouched.
+/// are intentionally ignored. Privileged (forced and recovery) transfers
+/// are exempt from the policy, and no bookkeeping exists in this module,
+/// so they pass through untouched.
 ///
 /// # Arguments
 ///
@@ -74,11 +83,12 @@ pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
 /// # Errors
 ///
 /// * [`ComplianceModuleError::CountryNotAllowed`] - When the recipient has no
-///   allowed country and the transfer is not forced.
+///   allowed country and the transfer is not privileged.
 /// * refer to [`can_receive`] errors.
 pub fn on_transfer(e: &Env, to: &Address, kind: &TransferKind, token: &Address) {
-    if *kind == TransferKind::Forced {
-        return;
+    match kind {
+        TransferKind::Forced | TransferKind::Recovery => return,
+        TransferKind::Standard | TransferKind::Delegated(_) => {}
     }
     if !can_receive(e, to, token) {
         panic_with_error!(e, ComplianceModuleError::CountryNotAllowed);

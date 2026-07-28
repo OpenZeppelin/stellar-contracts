@@ -56,17 +56,26 @@ impl InitialLockupPeriod for InitialLockupPeriodContract {
 impl ComplianceModule for InitialLockupPeriodContract {
     // Enforces the lockup: panics with `InsufficientUnlockedBalance` when
     // the transfer exceeds the sender's unlocked holdings (forced transfers
-    // consume locks instead of being rejected).
+    // consume locks instead of being rejected; recoveries migrate them to
+    // the destination wallet).
     fn on_transfer(
         e: &Env,
         from: AccountSnapshot,
-        _to: AccountSnapshot,
+        to: AccountSnapshot,
         amount: i128,
         kind: TransferKind,
         token: Address,
     ) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
-        initial_lockup_period::on_transfer(e, &from.address, from.balance, amount, &kind, &token);
+        initial_lockup_period::on_transfer(
+            e,
+            &from.address,
+            &to.address,
+            from.balance,
+            amount,
+            &kind,
+            &token,
+        );
     }
 
     fn on_created(e: &Env, to: AccountSnapshot, amount: i128, token: Address) {

@@ -503,3 +503,165 @@ fn is_on_curve_rejects_x_equal_to_modulus() {
     let p = BytesN::from_array(&e, &bytes);
     assert!(!Grumpkin::is_on_curve(&e, &p));
 }
+
+// ################## UNIT TESTS — arithmetic input validation
+// ##################
+
+/// `(1, 2)`: `2² = 4 ≠ 1³ − 17 (mod r)`, so canonical but off-curve.
+fn off_curve_point(e: &Env) -> Point {
+    let mut bytes = [0u8; 64];
+    bytes[31] = 1;
+    bytes[63] = 2;
+    BytesN::from_array(e, &bytes)
+}
+
+/// `be(r) || be(r)` — decodes to `(0, 0)` under the host's mod-`r` reduction
+/// but is bytewise distinct from the canonical all-zero identity encoding.
+fn pseudo_identity(e: &Env) -> Point {
+    let mut bytes = [0u8; 64];
+    bytes[..32].copy_from_slice(&FR_MODULUS_BE);
+    bytes[32..].copy_from_slice(&FR_MODULUS_BE);
+    BytesN::from_array(e, &bytes)
+}
+
+/// A real curve point with `r` added to its x-coordinate: satisfies the curve
+/// equation after mod-`r` reduction, but is a non-canonical encoding.
+fn non_canonical_x_point(e: &Env) -> Point {
+    let mut bytes = rand_point(e, &[0x5A; 32]).to_array();
+    let mut x = [0u8; 32];
+    x.copy_from_slice(&bytes[..32]);
+    let x_plus_r = add_modulus_be(&x).expect("canonical x < r, so x + r < 2r < 2^256");
+    bytes[..32].copy_from_slice(&x_plus_r);
+    BytesN::from_array(e, &bytes)
+}
+
+#[test]
+fn pseudo_identity_is_not_the_identity() {
+    let e = Env::default();
+    let pseudo = pseudo_identity(&e);
+    assert!(!Grumpkin::is_identity(&pseudo));
+    assert!(!Grumpkin::is_on_curve(&e, &pseudo));
+}
+
+#[test]
+fn sub_handles_identity_operands() {
+    let e = Env::default();
+    let p = rand_point(&e, &[0xEE; 32]);
+    let o = Grumpkin::identity(&e);
+    assert_eq!(Grumpkin::sub(&e, &p, &o).to_array(), p.to_array());
+    assert_eq!(Grumpkin::sub(&e, &o, &p).to_array(), Grumpkin::neg(&e, &p).to_array());
+    assert_eq!(Grumpkin::sub(&e, &o, &o).to_array(), [0u8; 64]);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn add_rejects_off_curve_first_operand() {
+    let e = Env::default();
+    let p = rand_point(&e, &[0x11; 32]);
+    let _ = Grumpkin::add(&e, &off_curve_point(&e), &p);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn add_rejects_off_curve_second_operand() {
+    let e = Env::default();
+    let p = rand_point(&e, &[0x11; 32]);
+    let _ = Grumpkin::add(&e, &p, &off_curve_point(&e));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn add_rejects_pseudo_identity() {
+    let e = Env::default();
+    let p = rand_point(&e, &[0x22; 32]);
+    let _ = Grumpkin::add(&e, &p, &pseudo_identity(&e));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn add_rejects_non_canonical_x() {
+    let e = Env::default();
+    let p = rand_point(&e, &[0x33; 32]);
+    let _ = Grumpkin::add(&e, &p, &non_canonical_x_point(&e));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn sub_rejects_off_curve_minuend() {
+    let e = Env::default();
+    let p = rand_point(&e, &[0x44; 32]);
+    let _ = Grumpkin::sub(&e, &off_curve_point(&e), &p);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn sub_rejects_off_curve_subtrahend() {
+    let e = Env::default();
+    let p = rand_point(&e, &[0x44; 32]);
+    let _ = Grumpkin::sub(&e, &p, &off_curve_point(&e));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn sub_rejects_pseudo_identity() {
+    let e = Env::default();
+    let p = rand_point(&e, &[0x55; 32]);
+    let _ = Grumpkin::sub(&e, &p, &pseudo_identity(&e));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn sub_rejects_non_canonical_x() {
+    let e = Env::default();
+    let p = rand_point(&e, &[0x55; 32]);
+    let _ = Grumpkin::sub(&e, &non_canonical_x_point(&e), &p);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn neg_rejects_off_curve_point() {
+    let e = Env::default();
+    let _ = Grumpkin::neg(&e, &off_curve_point(&e));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn neg_rejects_pseudo_identity() {
+    let e = Env::default();
+    let _ = Grumpkin::neg(&e, &pseudo_identity(&e));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn neg_rejects_non_canonical_x() {
+    let e = Env::default();
+    let _ = Grumpkin::neg(&e, &non_canonical_x_point(&e));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn mul_rejects_off_curve_point() {
+    let e = Env::default();
+    let _ = Grumpkin::mul(&e, &off_curve_point(&e), 5);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn mul_rejects_pseudo_identity() {
+    let e = Env::default();
+    let _ = Grumpkin::mul(&e, &pseudo_identity(&e), 3);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn mul_rejects_non_canonical_x() {
+    let e = Env::default();
+    let _ = Grumpkin::mul(&e, &non_canonical_x_point(&e), 7);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1403)")]
+fn mul_rejects_off_curve_point_even_with_zero_scalar() {
+    let e = Env::default();
+    let _ = Grumpkin::mul(&e, &off_curve_point(&e), 0);
+}

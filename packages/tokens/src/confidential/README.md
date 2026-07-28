@@ -29,8 +29,11 @@ confidential/
 ├── compliance/     # turnkey ComplianceHooks: freeze, SAC passthrough, external policy
 ├── circuits/       # Noir/UltraHonk circuits + pinned VKs
 └── docs/
-    ├── DESIGN.md       # full protocol specification
-    └── COMPLIANCE.md   # compliance-extension specification
+    ├── DESIGN.md                  # protocol specification, §1–§7
+    ├── DESIGN_cont.md             # protocol specification, §8–§13
+    ├── COMPLIANCE.md              # compliance-extension specification
+    ├── SELECTIVE_DISCLOSURE.md    # off-chain selective-disclosure layer
+    └── OVERVIEW.md                # user-flows overview
 ```
 
 A single deployment is **three contracts** wired together:
@@ -93,8 +96,10 @@ pin and re-extraction procedure.
 
 ## Documentation
 
-- [`docs/DESIGN.md`](./docs/DESIGN.md) — full protocol specification
-  (cryptographic preliminaries, account model, circuits, public-input
-  tables, security analysis).
+- [`docs/DESIGN.md`](./docs/DESIGN.md) — protocol specification, §1–§7
+  (cryptographic preliminaries, account model, operations, public-input
+  tables).
+- [`docs/DESIGN_cont.md`](./docs/DESIGN_cont.md) — protocol specification,
+  §8–§13 (auditing, security analysis, proof system, interface).
 - [`docs/COMPLIANCE.md`](./docs/COMPLIANCE.md) — compliance extension
   specification.

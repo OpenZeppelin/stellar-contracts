@@ -510,7 +510,7 @@ pub trait Governor {
     /// identifier.
     ///
     /// This function is only relevant when queuing is enabled, i.e., when
-    /// [`Self::proposals_need_queuing`] is overridden to return `true`. If
+    /// [`Governor::proposals_need_queuing`] is overridden to return `true`. If
     /// queuing is not enabled, calling this function will revert with
     /// [`GovernorError::QueueNotEnabled`].
     ///
@@ -526,7 +526,7 @@ pub trait Governor {
     ///
     /// The default implementation uses **open queueing**: any account can
     /// queue a succeeded proposal without authentication. To enable it,
-    /// override [`Self::proposals_need_queuing`] to return `true`:
+    /// override [`Governor::proposals_need_queuing`] to return `true`:
     ///
     /// ```ignore
     /// #[contractimpl(contracttrait)]

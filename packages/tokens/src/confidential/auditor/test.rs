@@ -1,8 +1,7 @@
 extern crate std;
 
-use soroban_sdk::{contract, BytesN, Env};
+use soroban_sdk::{contract, testutils::Events, BytesN, Env};
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
-use stellar_event_assertion::EventAssertion;
 
 use crate::confidential::auditor::storage::{
     get_key, register_key, rotate_key, validate_point, AuditorStorageKey,
@@ -49,8 +48,7 @@ fn register_and_get_key_works() {
 
         assert_eq!(get_key(&e, 1), p);
 
-        let assertion = EventAssertion::new(&e, address.clone());
-        assertion.assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -224,7 +222,7 @@ fn rotate_emits_rotation_event() {
         rotate_key(&e, 1, &new);
 
         // 2 events: AuditorRegistered + AuditorRotated.
-        EventAssertion::new(&e, address.clone()).assert_event_count(2);
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 
