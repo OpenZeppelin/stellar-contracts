@@ -3,7 +3,7 @@ extern crate std;
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env};
 
 use crate::{
-    fungible::Base,
+    fungible::{total_supply::total_supply, Base},
     vault::{Vault, MAX_DECIMALS_OFFSET},
 };
 
@@ -219,7 +219,7 @@ fn deposit_functionality() {
 
         // Check results
         assert_eq!(Base::balance(&e, &user), shares_minted);
-        assert_eq!(Base::total_supply(&e), shares_minted);
+        assert_eq!(total_supply(&e), shares_minted);
         assert_eq!(Vault::total_assets(&e), deposit_amount);
 
         // For first deposit, shares should equal assets with offset
@@ -249,7 +249,7 @@ fn mint_functionality() {
             Vault::mint(&e, shares_to_mint, user.clone(), user.clone(), user.clone());
 
         assert_eq!(Base::balance(&e, &user), shares_to_mint);
-        assert_eq!(Base::total_supply(&e), shares_to_mint);
+        assert_eq!(total_supply(&e), shares_to_mint);
         assert_eq!(assets_deposited, required_assets);
     });
 }
@@ -312,7 +312,7 @@ fn redeem_functionality() {
 
         // Check results
         assert_eq!(Base::balance(&e, &user), shares_minted - shares_to_redeem);
-        assert_eq!(Base::total_supply(&e), shares_minted - shares_to_redeem);
+        assert_eq!(total_supply(&e), shares_minted - shares_to_redeem);
 
         // Should receive approximately half the original deposit
         let expected_assets = deposit_amount / 2;
@@ -544,7 +544,7 @@ fn deposit_transfer_from() {
 
         // Check results
         assert_eq!(Base::balance(&e, &user), shares_minted);
-        assert_eq!(Base::total_supply(&e), shares_minted);
+        assert_eq!(total_supply(&e), shares_minted);
         assert_eq!(Vault::total_assets(&e), deposit_amount);
 
         // For first deposit, shares should equal assets with offset
@@ -611,7 +611,7 @@ fn mint_transfer_from() {
 
         // Check results
         assert_eq!(Base::balance(&e, &user), shares_to_mint);
-        assert_eq!(Base::total_supply(&e), shares_to_mint);
+        assert_eq!(total_supply(&e), shares_to_mint);
         assert_eq!(assets_deposited, required_assets);
     });
 }
