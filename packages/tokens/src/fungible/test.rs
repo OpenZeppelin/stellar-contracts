@@ -23,7 +23,6 @@ fn initial_state() {
     let address = e.register(MockContract, ());
     let account = Address::generate(&e);
     e.as_contract(&address, || {
-        assert_eq!(Base::total_supply(&e), 0);
         assert_eq!(Base::balance(&e, &account), 0);
     });
 }
@@ -495,7 +494,6 @@ fn update_mints_tokens() {
     e.as_contract(&address, || {
         Base::update(&e, None, Some(&to), 100);
         assert_eq!(Base::balance(&e, &to), 100);
-        assert_eq!(Base::total_supply(&e), 100);
     });
 }
 
@@ -509,7 +507,6 @@ fn update_burns_tokens() {
         Base::mint(&e, &from, 100);
         Base::update(&e, Some(&from), None, 50);
         assert_eq!(Base::balance(&e, &from), 50);
-        assert_eq!(Base::total_supply(&e), 50);
     });
 }
 
@@ -762,7 +759,6 @@ fn mint_works() {
     e.as_contract(&address, || {
         Base::mint(&e, &account, 100);
         assert_eq!(Base::balance(&e, &account), 100);
-        assert_eq!(Base::total_supply(&e), 100);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);

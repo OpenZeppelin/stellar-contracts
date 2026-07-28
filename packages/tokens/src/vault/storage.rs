@@ -2,7 +2,10 @@ use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
 use stellar_contract_utils::math::{i128_fixed_point::mul_div_with_rounding, Rounding};
 
 use crate::{
-    fungible::{Base, ContractOverrides},
+    fungible::{
+        total_supply::{decrease_total_supply, increase_total_supply, TotalSupplyOverrides},
+        Base, ContractOverrides,
+    },
     vault::{emit_deposit, emit_withdraw, VaultTokenError, MAX_DECIMALS_OFFSET},
 };
 
@@ -13,6 +16,10 @@ impl ContractOverrides for Vault {
         Vault::decimals(e)
     }
 }
+
+// The vault's share math requires the total supply of shares, so the vault
+// contract type is inherently supply-aware.
+impl TotalSupplyOverrides for Vault {}
 
 /// Storage keys for the data associated with the vault extension
 #[contracttype]
@@ -744,6 +751,7 @@ impl Vault {
             token_client.transfer_from(operator, from, &e.current_contract_address(), &assets);
         }
 
+        increase_total_supply(e, shares);
         Base::update(e, None, Some(receiver), shares);
     }
 
@@ -787,6 +795,7 @@ impl Vault {
             Base::spend_allowance(e, owner, operator, shares);
         }
         Base::update(e, Some(owner), None, shares);
+        decrease_total_supply(e, shares);
         let token_client = token::Client::new(e, &Self::query_asset(e));
         // `safeTransfer` mechanism is not present in the base module, (will be provided
         // as an extension)

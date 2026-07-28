@@ -18,7 +18,6 @@ fn burn_works() {
         Base::mint(&e, &account, 100);
         Base::burn(&e, &account, 50);
         assert_eq!(Base::balance(&e, &account), 50);
-        assert_eq!(Base::total_supply(&e), 50);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
@@ -40,7 +39,6 @@ fn burn_with_allowance_works() {
         Base::burn_from(&e, &spender, &owner, 30);
         assert_eq!(Base::balance(&e, &owner), 70);
         assert_eq!(Base::balance(&e, &spender), 0);
-        assert_eq!(Base::total_supply(&e), 70);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
@@ -60,7 +58,6 @@ fn burn_with_insufficient_balance_panics() {
     e.as_contract(&address, || {
         Base::mint(&e, &account, 100);
         assert_eq!(Base::balance(&e, &account), 100);
-        assert_eq!(Base::total_supply(&e), 100);
         Base::burn(&e, &account, 101);
     });
 }
@@ -76,7 +73,6 @@ fn burn_with_no_allowance_panics() {
     e.as_contract(&address, || {
         Base::mint(&e, &owner, 100);
         assert_eq!(Base::balance(&e, &owner), 100);
-        assert_eq!(Base::total_supply(&e), 100);
         Base::burn_from(&e, &spender, &owner, 50);
     });
 }
@@ -94,7 +90,6 @@ fn burn_with_insufficient_allowance_panics() {
         Base::approve(&e, &owner, &spender, 50, 100);
         assert_eq!(Base::allowance(&e, &owner, &spender), 50);
         assert_eq!(Base::balance(&e, &owner), 100);
-        assert_eq!(Base::total_supply(&e), 100);
         Base::burn_from(&e, &spender, &owner, 60);
     });
 }

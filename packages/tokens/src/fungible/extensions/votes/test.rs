@@ -3,7 +3,9 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env, MuxedAddress};
 use stellar_governance::votes::{delegate, get_delegate, get_votes, get_voting_units};
 
-use crate::fungible::{extensions::votes::FungibleVotes, Base, ContractOverrides};
+use crate::fungible::{
+    extensions::votes::FungibleVotes, total_supply::TotalSupplyOverrides, Base, ContractOverrides,
+};
 
 #[contract]
 struct MockContract;
@@ -24,7 +26,7 @@ fn mint_updates_voting_units() {
         FungibleVotes::mint(&e, &alice, 100);
 
         assert_eq!(Base::balance(&e, &alice), 100);
-        assert_eq!(Base::total_supply(&e), 100);
+        assert_eq!(<FungibleVotes as TotalSupplyOverrides>::total_supply(&e), 100);
         assert_eq!(get_voting_units(&e, &alice), 100);
     });
 }
@@ -55,7 +57,7 @@ fn burn_updates_voting_units() {
         FungibleVotes::burn(&e, &alice, 30);
 
         assert_eq!(Base::balance(&e, &alice), 70);
-        assert_eq!(Base::total_supply(&e), 70);
+        assert_eq!(<FungibleVotes as TotalSupplyOverrides>::total_supply(&e), 70);
         assert_eq!(get_voting_units(&e, &alice), 70);
     });
 }

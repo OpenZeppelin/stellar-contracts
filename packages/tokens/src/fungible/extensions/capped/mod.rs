@@ -4,12 +4,17 @@
 /// Instead, the `capped` extension modifies the business logic of the `mint`
 /// function to enforce a supply cap.
 ///
+/// The cap is checked against the tracked total supply, so this extension is
+/// meant to be used together with
+/// [`crate::fungible::total_supply::FungibleTotalSupply`] (or another
+/// supply-aware contract type).
+///
 /// This module provides the following helper functions:
 /// - `set_cap`: Sets the maximum token supply.
 /// - `query_cap`: Returns the maximum token supply.
 /// - `check_cap`: Panics if minting a specified `amount` added to the given
 ///   `total_supply` would exceed the cap. Should be used before calling
-///   `mint()`.
+///   [`crate::fungible::total_supply::mint`].
 mod storage;
 pub use self::storage::{check_cap, query_cap, set_cap, CapStorageKey};
 #[cfg(test)]
