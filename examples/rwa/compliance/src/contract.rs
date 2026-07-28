@@ -4,7 +4,7 @@ use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Ve
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::only_role;
 use stellar_tokens::rwa::{
-    compliance::{self as compliance, Compliance, ComplianceHook},
+    compliance::{self as compliance, AccountSnapshot, Compliance, ComplianceHook, TransferKind},
     utils::token_binder::{self as binder, TokenBinder},
 };
 
@@ -23,10 +23,6 @@ impl ComplianceContract {
     #[only_role(operator, "manager")]
     pub fn bind_tokens(e: &Env, tokens: Vec<Address>, operator: Address) {
         binder::bind_tokens(e, &tokens);
-    }
-
-    pub fn get_token_index(e: &Env, token: Address) -> u32 {
-        binder::get_token_index(e, &token)
     }
 }
 

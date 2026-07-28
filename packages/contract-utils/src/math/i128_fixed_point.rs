@@ -255,7 +255,8 @@ fn checked_div_floor(r: i128, z: i128) -> Option<i128> {
         let remainder = r.checked_rem_euclid(z)?;
 
         // no need to check for div overflow (i128::MIN / -1),
-        // because it doesn't fall under this if branch
+        // because it doesn't fall under this if branch, and
+        // z cannot be zero because in this branch either
         (r / z).checked_sub(if remainder > 0 { 1 } else { 0 })
     } else {
         // floor taken by default for a positive or zero result
@@ -285,7 +286,7 @@ fn checked_div_ceil(r: i128, z: i128) -> Option<i128> {
         // floor taken by default for a positive result
         let remainder = r.checked_rem_euclid(z)?;
 
-        // check for div overflow (i128::MIN / -1)
+        // check for div overflow (i128::MIN / -1) and division by zero (z == 0)
         r.checked_div(z)?.checked_add(if remainder > 0 { 1 } else { 0 })
     }
 }

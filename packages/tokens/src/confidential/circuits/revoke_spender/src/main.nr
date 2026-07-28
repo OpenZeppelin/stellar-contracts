@@ -53,11 +53,11 @@ mod tests;
 // Auditor block (owner-auditor visibility, Section 8.1 / 8.5)
 //   V_a1 R_e       = r_e * H                             Ephemeral key for
 //                                                        auditor ECDH.
-//   V_a2 S_{a,s}   = r_e * K_{aud,s}                     Owner-auditor ECDH
-//                                                        shared secret.
+//   V_a2 s_{a,s}   = ecdh(r_e, K_{aud,s})                Owner-auditor ECDH
+//                                                        shared scalar (2.4).
 //   V_a3 (m_v, m_b)
 //                  = SpongeSqueeze_2(delta_aud_s,
-//                                    S_{a,s}.x, sigma)   Owner-channel sponge,
+//                                    s_{a,s}, sigma)     Owner-channel sponge,
 //                                                        two squeezes.
 //   V_a4 v_tilde_aud_s = v_a + m_v                       Owner-auditor
 //                                                        encrypted reclaimed
@@ -82,12 +82,12 @@ mod tests;
 //   Idx  Param            Symbol         Source / Note
 //   ---  -----            ------         -------------------------------------
 //   0    c_spend_x        C_spend.x      Loaded from owner's
-//   1    c_spend_y        C_spend.y        `spendable_balance`.
+//   1    c_spend_y        C_spend.y        `spendable_commitment`.
 //   2    c_a_x            C_a.x          Loaded from the (account, spender)
 //   3    c_a_y            C_a.y            delegation entry.
 //   4    sigma_a          sigma_a        Loaded from the delegation entry
 //                                          (`allowance_salt`).
-//   5    y_x              Y.x            Loaded from owner's `spending_key`.
+//   5    y_x              Y.x            Loaded from owner's `spending_public_key`.
 //   6    y_y              Y.y
 //   7    op_i             op_i           `address_to_field(spender)`,
 //                                          computed per-call (Section 2.7).
@@ -95,7 +95,7 @@ mod tests;
 //   9    k_aud_s_x        K_aud_s.x      Fetched from the auditor contract
 //   10   k_aud_s_y        K_aud_s.y        by owner's `auditor_id`.
 //   11   c_spend_new_x    C_spend'.x     Prover-supplied; written to
-//   12   c_spend_new_y    C_spend'.y       owner's `spendable_balance` on
+//   12   c_spend_new_y    C_spend'.y       owner's `spendable_commitment` on
 //                                          success.
 //   13   b_tilde          b_tilde        Prover-supplied encrypted balance
 //                                          scalar; emitted.
@@ -208,7 +208,7 @@ fn main(
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_s);
 
-    // V_a2 (shared secret x-coordinate)
+    // V_a2 (shared-secret scalar)
     let s_a_s_x = ecdh(r_e, k_aud_s);
 
     // V_a3 (owner-channel masks: reclaimed amount, then balance checkpoint)

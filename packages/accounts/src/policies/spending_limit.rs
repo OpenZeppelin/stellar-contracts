@@ -246,6 +246,15 @@ pub fn enforce(
                             panic_with_error!(e, SpendingLimitError::LessThanZero)
                         }
 
+                        // A zero-amount transfer moves no funds and has no effect on the
+                        // spending budget, so it is always permitted. Without this guard a
+                        // zero transfer would be rejected whenever `cached_total_spent`
+                        // exceeds `spending_limit` (reachable after `set_spending_limit`
+                        // lowers the limit below the amount already spent in the window).
+                        if amount == 0 {
+                            return;
+                        }
+
                         // Clean up old entries outside the rolling window BEFORE checking limit
                         let removed_amount = cleanup_old_entries(
                             &mut data.spending_history,

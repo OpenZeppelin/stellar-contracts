@@ -163,7 +163,7 @@ pub fn has_claim_topic(e: &Env, issuer: &Address, claim_topic: u32) -> bool {
 ///
 /// # Events
 ///
-/// * topics - `["claim_added", claim_topic: u32]`
+/// * topics - `["claim_topic_added", claim_topic: u32]`
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -212,7 +212,7 @@ pub fn add_claim_topic(e: &Env, claim_topic: u32) {
 ///
 /// # Events
 ///
-/// * topics - `["claim_removed", claim_topic: u32]`
+/// * topics - `["claim_topic_removed", claim_topic: u32]`
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -281,7 +281,7 @@ pub fn remove_claim_topic(e: &Env, claim_topic: u32) {
 ///
 /// # Events
 ///
-/// * topics - `["issuer_added", trusted_issuer: Address]`
+/// * topics - `["trusted_issuer_added", trusted_issuer: Address]`
 /// * data - `[claim_topics: Vec<u32>]`
 ///
 /// # Security Warning
@@ -358,7 +358,7 @@ pub fn add_trusted_issuer(e: &Env, trusted_issuer: &Address, claim_topics: &Vec<
 ///
 /// # Events
 ///
-/// * topics - `["issuer_removed", trusted_issuer: Address]`
+/// * topics - `["trusted_issuer_removed", trusted_issuer: Address]`
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -428,7 +428,7 @@ pub fn remove_trusted_issuer(e: &Env, trusted_issuer: &Address) {
 ///
 /// # Events
 ///
-/// * topics - `["topics_updated", trusted_issuer: Address]`
+/// * topics - `["issuer_topics_updated", trusted_issuer: Address]`
 /// * data - `[claim_topics: Vec<u32>]`
 ///
 /// # Security Warning

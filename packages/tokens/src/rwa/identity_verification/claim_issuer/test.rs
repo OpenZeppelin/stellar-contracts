@@ -13,10 +13,9 @@ use p256::{
 };
 use soroban_sdk::{
     contract, contractimpl,
-    testutils::{Address as _, Ledger as _},
+    testutils::{Address as _, Events, Ledger as _},
     Address, Bytes, BytesN, Env, Map, Vec,
 };
-use stellar_event_assertion::EventAssertion;
 
 use crate::rwa::identity_verification::{
     claim_issuer::{
@@ -509,7 +508,7 @@ fn set_and_check_claim_revocation() {
         set_claim_revoked(&e, &identity, claim_topic, &claim_data, true);
 
         assert!(is_claim_revoked(&e, &identity, claim_topic, &claim_data));
-        EventAssertion::new(&e, contract_id.clone()).assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -589,7 +588,7 @@ fn topic_specific_key_management() {
         remove_key(&e, &public_key, &registry, 1, topic);
         assert!(!is_key_allowed_for_topic(&e, &public_key, 1, topic));
         // 1 KeyAllowed + 1 KeyRemoved
-        EventAssertion::new(&e, contract_id.clone()).assert_event_count(2);
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 
@@ -1164,7 +1163,7 @@ fn invalidate_claim_signatures_increments_nonce() {
         invalidate_claim_signatures(&e, &identity, claim_topic);
         assert_eq!(get_current_nonce_for(&e, &identity, claim_topic), 2);
         // 2 SignaturesInvalidated
-        EventAssertion::new(&e, contract_id.clone()).assert_event_count(2);
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 

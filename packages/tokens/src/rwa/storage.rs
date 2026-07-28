@@ -4,10 +4,11 @@ use stellar_contract_utils::pausable::{paused, PausableError};
 use crate::{
     fungible::{emit_transfer, Base, ContractOverrides},
     rwa::{
-        compliance::ComplianceClient, emit_address_frozen, emit_burn, emit_compliance_set,
-        emit_identity_verifier_set, emit_mint, emit_recovery_success,
-        emit_token_onchain_id_updated, emit_tokens_frozen, emit_tokens_unfrozen,
-        IdentityVerifierClient, RWAError, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
+        compliance::{AccountSnapshot, ComplianceClient, TransferKind},
+        emit_address_frozen, emit_burn, emit_compliance_set, emit_identity_verifier_set, emit_mint,
+        emit_recovery_success, emit_token_onchain_id_updated, emit_tokens_frozen,
+        emit_tokens_unfrozen, IdentityVerifierClient, RWAError, FROZEN_EXTEND_AMOUNT,
+        FROZEN_TTL_THRESHOLD,
     },
 };
 
@@ -161,6 +162,23 @@ impl RWA {
         total_balance - frozen_tokens
     }
 
+    /// Captures an [`AccountSnapshot`] of `address` from the token's current
+    /// state: its total balance and partially-frozen amount. Must be called
+    /// before any balance or freeze mutation so the snapshot reflects the
+    /// pre-operation figures handed to the compliance hooks.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `address` - The wallet to snapshot.
+    pub fn account_snapshot(e: &Env, address: &Address) -> AccountSnapshot {
+        AccountSnapshot {
+            address: address.clone(),
+            balance: Base::balance(e, address),
+            frozen: Self::get_frozen_tokens(e, address),
+        }
+    }
+
     // ################## CHANGE STATE ##################
 
     /// Forced transfer of `amount` tokens from `from` to `to`.
@@ -168,9 +186,10 @@ impl RWA {
     /// The `to` address must pass identity verification. `from` is not required
     /// to be verified, so this privileged action remains usable to pull
     /// tokens out of accounts whose identity is no longer valid
-    /// (sanctioned, revoked, or compromised wallets). This is also what
-    /// makes `forced_transfer` suitable as the underlying primitive for
-    /// [`Self::recover_balance`].
+    /// (sanctioned, revoked, or compromised wallets). The same mechanics
+    /// back [`Self::recover_balance`], which reports
+    /// [`TransferKind::Recovery`] to the compliance contract instead of
+    /// [`TransferKind::Forced`].
     ///
     /// This function can unfreeze tokens if needed for regulatory compliance.
     /// It bypasses paused state and frozen address checks.
@@ -197,19 +216,14 @@ impl RWA {
     /// # Notes
     ///
     /// This function bypasses freezing restrictions and can unfreeze tokens
-    /// as needed. It's intended for regulatory compliance and recovery
-    /// scenarios.
+    /// as needed. It's intended for regulatory compliance scenarios such as
+    /// court-ordered seizures.
     ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: This function bypasses authorization and freezing checks.
     /// Should only be used by authorized compliance or admin functions.
     pub fn forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        let from_balance = Base::balance(e, from);
-        if from_balance < amount {
-            panic_with_error!(e, RWAError::InsufficientBalance);
-        }
-
         // Verify identity for the `to` address only; `from` is intentionally
         // skipped so this privileged action can still move tokens out of
         // accounts whose identity is no longer valid.
@@ -217,12 +231,43 @@ impl RWA {
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
         identity_verifier_client.verify_identity(to);
 
-        // Check if we need to unfreeze tokens to complete the transfer
-        let free_tokens = Self::get_free_tokens(e, from);
+        Self::privileged_transfer(e, from, to, amount, &TransferKind::Forced);
+    }
+
+    /// Shared mechanics behind [`Self::forced_transfer`] and
+    /// [`Self::recover_balance`]: moves `amount` from `from` to `to`,
+    /// bypassing paused state and freezing restrictions (unfreezing as
+    /// needed), and reports the movement to the compliance contract as
+    /// `kind`. The two public entry points differ only in the kind they
+    /// report, which is what lets compliance modules tell a seizure from a
+    /// wallet migration.
+    ///
+    /// Performs no identity verification; each caller verifies the recipient
+    /// before delegating here, so the check runs exactly once per invocation.
+    fn privileged_transfer(
+        e: &Env,
+        from: &Address,
+        to: &Address,
+        amount: i128,
+        kind: &TransferKind,
+    ) {
+        // Snapshot before any unfreeze/balance mutation so the hook observes
+        // the pre-operation state. A privileged transfer has no spender: it is
+        // an administrative pull, not a delegated move.
+        let from_snapshot = Self::account_snapshot(e, from);
+        let to_snapshot = Self::account_snapshot(e, to);
+
+        if from_snapshot.balance < amount {
+            panic_with_error!(e, RWAError::InsufficientBalance);
+        }
+
+        // Check if we need to unfreeze tokens to complete the transfer. The
+        // snapshot is still current: nothing has mutated the balance or
+        // frozen amount since it was captured.
+        let free_tokens = from_snapshot.balance - from_snapshot.frozen;
         if free_tokens < amount {
             let tokens_to_unfreeze = amount - free_tokens;
-            let current_frozen = Self::get_frozen_tokens(e, from);
-            let new_frozen = current_frozen - tokens_to_unfreeze;
+            let new_frozen = from_snapshot.frozen - tokens_to_unfreeze;
 
             e.storage().persistent().set(&RWAStorageKey::FrozenTokens(from.clone()), &new_frozen);
             emit_tokens_unfrozen(e, from, tokens_to_unfreeze);
@@ -232,7 +277,13 @@ impl RWA {
 
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
-        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
+        compliance_client.transferred(
+            &from_snapshot,
+            &to_snapshot,
+            &amount,
+            kind,
+            &e.current_contract_address(),
+        );
 
         emit_transfer(e, from, to, None, amount);
     }
@@ -251,8 +302,6 @@ impl RWA {
     /// * [`RWAError::AddressFrozen`] - When the recipient address is frozen.
     /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
     ///   configured.
-    /// * [`RWAError::MintNotCompliant`] - When the mint operation violates
-    ///   compliance rules.
     /// * refer to [`Base::update`] errors.
     ///
     /// # Events
@@ -289,19 +338,14 @@ impl RWA {
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
         identity_verifier_client.verify_identity(to);
 
-        let compliance_addr = Self::compliance(e);
-        let compliance_client = ComplianceClient::new(e, &compliance_addr);
-
-        let can_create: bool =
-            compliance_client.can_create(to, &amount, &e.current_contract_address());
-
-        if !can_create {
-            panic_with_error!(e, RWAError::MintNotCompliant);
-        }
+        // Snapshot before the mint so the hook observes the pre-mint balance.
+        let to_snapshot = Self::account_snapshot(e, to);
 
         Base::update(e, None, Some(to), amount);
 
-        compliance_client.created(to, &amount, &e.current_contract_address());
+        let compliance_addr = Self::compliance(e);
+        let compliance_client = ComplianceClient::new(e, &compliance_addr);
+        compliance_client.created(&to_snapshot, &amount, &e.current_contract_address());
 
         emit_mint(e, to, amount);
     }
@@ -317,6 +361,13 @@ impl RWA {
     ///
     /// # Errors
     ///
+    /// * [`RWAError::InsufficientBalance`] - When `amount` exceeds the total
+    ///   balance of `user_address`.
+    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
+    ///   configured.
+    /// * refer to
+    ///   [`Compliance::destroyed`](crate::rwa::compliance::Compliance::destroyed)
+    ///   errors.
     /// * refer to [`Base::update`] errors.
     ///
     /// # Events
@@ -324,22 +375,44 @@ impl RWA {
     /// * topics - `["burn", user_address: Address]`
     /// * data - `[amount: i128]`
     ///
+    /// # Notes
+    ///
+    /// This function bypasses freezing restrictions and can unfreeze tokens
+    /// as needed: when `amount` exceeds the free (unfrozen) balance, the
+    /// difference is unfrozen first, so a partially frozen balance is
+    /// destroyed in place.
+    ///
+    /// Locked tokens are not given the same treatment. The `Destroyed` hook
+    /// carries no notion of a privileged burn, so a compliance module can
+    /// reject the burn by panicking regardless of who issued it. In
+    /// particular, with the
+    /// [`initial_lockup_period`](crate::rwa::compliance::modules::initial_lockup_period)
+    /// module registered, a burn that dips into still-locked tokens is
+    /// rejected; destroying a locked position takes a forced transfer to a
+    /// treasury wallet (which consumes the locks) followed by a burn from
+    /// that treasury.
+    ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: This function bypasses authorization checks and should
     /// only be used internally or in admin functions that implement their own
     /// authorization logic.
     pub fn burn(e: &Env, user_address: &Address, amount: i128) {
-        if amount > Base::balance(e, user_address) {
+        // Snapshot before any unfreeze/balance mutation so the hook observes
+        // the pre-burn state.
+        let from_snapshot = Self::account_snapshot(e, user_address);
+
+        if amount > from_snapshot.balance {
             panic_with_error!(e, RWAError::InsufficientBalance);
         }
 
-        // Check if we need to unfreeze tokens to complete the burn
-        let free_tokens = Self::get_free_tokens(e, user_address);
+        // Check if we need to unfreeze tokens to complete the burn. The
+        // snapshot is still current: nothing has mutated the balance or
+        // frozen amount since it was captured.
+        let free_tokens = from_snapshot.balance - from_snapshot.frozen;
         if free_tokens < amount {
             let tokens_to_unfreeze = amount - free_tokens;
-            let current_frozen = Self::get_frozen_tokens(e, user_address);
-            let new_frozen = current_frozen - tokens_to_unfreeze;
+            let new_frozen = from_snapshot.frozen - tokens_to_unfreeze;
 
             e.storage()
                 .persistent()
@@ -351,7 +424,7 @@ impl RWA {
 
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
-        compliance_client.destroyed(user_address, &amount, &e.current_contract_address());
+        compliance_client.destroyed(&from_snapshot, &amount, &e.current_contract_address());
 
         emit_burn(e, user_address, amount);
     }
@@ -388,7 +461,16 @@ impl RWA {
     /// the old account and applies it to the new account, maintaining
     /// regulatory compliance.
     ///
-    /// This functions does not concern itself with the Identity Management.
+    /// State owned by this contract (the frozen status) is migrated directly
+    /// by this function. State held by compliance modules is handled through
+    /// the transfer hook: the recovery is reported to the compliance contract
+    /// as a transfer of kind [`TransferKind::Recovery`], and each module
+    /// decides how to treat it. Policy modules exempt it like a forced
+    /// transfer, while bookkeeping modules migrate wallet-bound state
+    /// instead of consuming it (e.g. the initial lockup period module moves
+    /// the old account's lock entries to the new account).
+    ///
+    /// This function does not concern itself with the Identity Management.
     /// If the old account's identity should be removed, it should be done on
     /// the Identity Stack.
     ///
@@ -398,7 +480,7 @@ impl RWA {
     /// checks. Should only be used by authorized recovery or admin
     /// functions.
     pub fn recover_balance(e: &Env, old_account: &Address, new_account: &Address) -> bool {
-        // Verify identity for the new account
+        // Verify identity for the new account.
         let identity_verifier_addr = Self::identity_verifier(e);
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
         identity_verifier_client.verify_identity(new_account);
@@ -423,9 +505,17 @@ impl RWA {
         let frozen_tokens = Self::get_frozen_tokens(e, old_account);
         let is_address_frozen = Self::is_frozen(e, old_account);
 
-        // Use forced_transfer to transfer all tokens (this handles unfreezing as
-        // needed)
-        Self::forced_transfer(e, old_account, new_account, lost_balance);
+        // Move all tokens with the shared privileged mechanics (handles
+        // unfreezing as needed), reporting the movement as a recovery so
+        // compliance modules migrate wallet-bound state instead of
+        // consuming it.
+        Self::privileged_transfer(
+            e,
+            old_account,
+            new_account,
+            lost_balance,
+            &TransferKind::Recovery,
+        );
 
         // Preserve frozen tokens on the new account if there were any
         if frozen_tokens > 0 {
@@ -560,8 +650,7 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - `["token_info", name: Symbol, symbol: Symbol, decimals: u32,
-    ///   version: Symbol, onchain_id: Address]`
+    /// * topics - `["token_onchain_id_updated", onchain_id: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -606,7 +695,7 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - ["identity_verifier_set", identity_verifier: Address]
+    /// * topics - `["identity_verifier_set", identity_verifier: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -626,8 +715,8 @@ impl RWA {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `from` - The address of the sender.
-    /// * `to` - The address of the receiver.
+    /// * `from` - Snapshot of the sender, as of before the transfer.
+    /// * `to` - Snapshot of the receiver, as of before the transfer.
     /// * `amount` - The amount of tokens to transfer.
     ///
     /// # Errors
@@ -638,45 +727,27 @@ impl RWA {
     /// * [`RWAError::InsufficientFreeTokens`] - If the sender does not have
     ///   enough free tokens.
     /// * refer to [`Self::identity_verifier`] errors.
-    /// * refer to [`Self::compliance`] errors.
     /// * refer to [`IdentityVerifierClient::verify_identity`] errors.
-    /// * refer to [`Base::update`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `["to_muxed_id: Option<u64>, amount: i128"]`
-    pub fn validate_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+    pub fn validate_transfer(e: &Env, from: &AccountSnapshot, to: &AccountSnapshot, amount: i128) {
         // Check if contract is paused
         if paused(e) {
             panic_with_error!(e, PausableError::EnforcedPause);
         }
 
         // Check if addresses are frozen
-        if Self::is_frozen(e, from) || Self::is_frozen(e, to) {
+        if Self::is_frozen(e, &from.address) || Self::is_frozen(e, &to.address) {
             panic_with_error!(e, RWAError::AddressFrozen);
         }
 
         // Check if there are enough free tokens (not frozen)
-        let free_tokens = Self::get_free_tokens(e, from);
-        if free_tokens < amount {
+        if from.balance - from.frozen < amount {
             panic_with_error!(e, RWAError::InsufficientFreeTokens);
         }
 
         let identity_verifier_addr = Self::identity_verifier(e);
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
-        identity_verifier_client.verify_identity(from);
-        identity_verifier_client.verify_identity(to);
-
-        // Validate compliance rules for the transfer
-        let compliance_addr = Self::compliance(e);
-        let compliance_client = ComplianceClient::new(e, &compliance_addr);
-        let can_transfer: bool =
-            compliance_client.can_transfer(from, to, &amount, &e.current_contract_address());
-
-        if !can_transfer {
-            panic_with_error!(e, RWAError::TransferNotCompliant);
-        }
+        identity_verifier_client.verify_identity(&from.address);
+        identity_verifier_client.verify_identity(&to.address);
     }
 
     // ################## OVERRIDDEN FUNCTIONS ##################
@@ -702,12 +773,23 @@ impl RWA {
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         from.require_auth();
 
-        Self::validate_transfer(e, from, to, amount);
+        // Snapshot before the update so the hook observes the pre-transfer
+        // state.
+        let from_snapshot = Self::account_snapshot(e, from);
+        let to_snapshot = Self::account_snapshot(e, to);
+
+        Self::validate_transfer(e, &from_snapshot, &to_snapshot, amount);
 
         Base::update(e, Some(from), Some(to), amount);
 
         let compliance_client = ComplianceClient::new(e, &Self::compliance(e));
-        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
+        compliance_client.transferred(
+            &from_snapshot,
+            &to_snapshot,
+            &amount,
+            &TransferKind::Standard,
+            &e.current_contract_address(),
+        );
         emit_transfer(e, from, to, None, amount);
     }
 
@@ -732,14 +814,25 @@ impl RWA {
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         spender.require_auth();
 
-        Self::validate_transfer(e, from, to, amount);
+        // Snapshot before the update so the hook observes the pre-transfer
+        // state. `spender` is the delegate moving the holder's tokens.
+        let from_snapshot = Self::account_snapshot(e, from);
+        let to_snapshot = Self::account_snapshot(e, to);
+
+        Self::validate_transfer(e, &from_snapshot, &to_snapshot, amount);
 
         Base::spend_allowance(e, from, spender, amount);
 
         Base::update(e, Some(from), Some(to), amount);
 
         let compliance_client = ComplianceClient::new(e, &Self::compliance(e));
-        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
+        compliance_client.transferred(
+            &from_snapshot,
+            &to_snapshot,
+            &amount,
+            &TransferKind::Delegated(spender.clone()),
+            &e.current_contract_address(),
+        );
         emit_transfer(e, from, to, None, amount);
     }
 }

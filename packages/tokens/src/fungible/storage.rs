@@ -186,7 +186,7 @@ impl Base {
     ///
     /// # Events
     ///
-    /// * topics - `["approve", from: Address, spender: Address]`
+    /// * topics - `["approve", owner: Address, spender: Address]`
     /// * data - `[amount: i128, live_until_ledger: u32]`
     ///
     /// # Notes

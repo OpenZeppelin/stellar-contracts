@@ -349,12 +349,10 @@ impl Wad {
         self.0.checked_mul(n).map(Wad)
     }
 
-    /// Checked division by integer. Returns `None` on division by zero.
+    /// Checked division by integer. Returns `None` on division by zero or on
+    /// overflow (`i128::MIN / -1`).
     pub fn checked_div_int(self, n: i128) -> Option<Wad> {
-        if n == 0 {
-            return None;
-        }
-        Some(Wad(self.0 / n))
+        self.0.checked_div(n).map(Wad)
     }
 
     /// Returns the absolute value of the Wad.
@@ -522,8 +520,8 @@ impl Wad {
     /// This is **not** a generic power function — for `x^y` with an arbitrary
     /// base, use [`Wad::powf`]. `Wad::exp` is the inverse of [`Wad::ln`]
     ///
-    /// Returns `0` for inputs at or below `≈ -42.139` (the result rounds to 0
-    /// in WAD precision). Panics for inputs at or above `≈ 135.305` (overflow).
+    /// Returns `0` for inputs below `≈ -41.446` (the result truncates to 0 in
+    /// WAD precision). Panics for inputs at or above `≈ 135.305` (overflow).
     ///
     /// # Arguments
     ///

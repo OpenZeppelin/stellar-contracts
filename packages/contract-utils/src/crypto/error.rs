@@ -10,4 +10,7 @@ pub enum CryptoError {
     MerkleIndexOutOfBounds = 1401,
     /// No data in hasher state.
     HasherEmptyState = 1402,
+    /// The point is neither the canonical identity encoding nor a canonical
+    /// on-curve point.
+    InvalidPoint = 1403,
 }

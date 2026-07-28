@@ -247,8 +247,8 @@ pub trait NonFungibleToken {
     ///
     /// # Events
     ///
-    /// * topics - `["approve", from: Address, to: Address]`
-    /// * data - `[token_id: u32, live_until_ledger: u32]`
+    /// * topics - `["approve", approver: Address, token_id: u32]`
+    /// * data - `[approved: Address, live_until_ledger: u32]`
     fn approve(
         e: &Env,
         approver: Address,
@@ -279,7 +279,7 @@ pub trait NonFungibleToken {
     ///
     /// # Events
     ///
-    /// * topics - `["approve_for_all", from: Address]`
+    /// * topics - `["approve_for_all", owner: Address]`
     /// * data - `[operator: Address, live_until_ledger: u32]`
     fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
         Self::ContractType::approve_for_all(e, &owner, &operator, live_until_ledger);

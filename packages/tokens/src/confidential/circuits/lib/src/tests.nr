@@ -1,11 +1,11 @@
 use crate::{
-    assert_on_curve_non_identity, commit, derive_allow_r, derive_spend_r, derive_tx_blind, domain,
+    assert_on_curve_non_identity, commit, derive_allow_r, derive_spend_r, derive_transfer_blind, domain,
     dvk_from_vk_op, ecdh, encrypt_allowance, encrypt_amount, encrypt_auditor_sender_balance,
-    encrypt_balance, encrypt_esc_dvk, G, H, poseidon_with_domain, pvk_from_vk, scalar_mul,
+    encrypt_balance, encrypt_esc_dvk, G, H, poseidon_with_domain, pvk_from_vk, scalar_mul, sponge,
     sponge_squeeze_2, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
-use std::hash::{derive_generators, pedersen_commitment};
+use std::hash::{derive_generators, pedersen_commitment, poseidon2_permutation};
 
 /// Provenance check: reproduces G and H from Barretenberg's `derive_generators`
 /// at run time. If this test fails, the hardcoded constants above have drifted
@@ -68,7 +68,7 @@ fn commit_homomorphic() {
 
 #[test]
 fn ecdh_symmetric() {
-    // ECDH symmetry: (a) * (b*H) and (b) * (a*H) yield the same shared x.
+    // ECDH symmetry: (a) * (b*H) and (b) * (a*H) yield the same shared scalar.
     let a: Field = 12345;
     let b: Field = 67890;
     let a_pub = scalar_mul(a, H);
@@ -76,6 +76,19 @@ fn ecdh_symmetric() {
     let s_a_b = ecdh(a, b_pub);
     let s_b_a = ecdh(b, a_pub);
     assert(s_a_b == s_b_a);
+}
+
+#[test]
+fn ecdh_binds_negated_key() {
+    // A point and its negation share an x-coordinate, so an x-only extraction
+    // would satisfy ecdh(a, P) == ecdh(a, -P) for every scalar, collapsing
+    // each (vk, -vk) registration pair onto one shared secret. Absorbing S.y
+    // must keep the two apart.
+    let a: Field = 12345;
+    let p = scalar_mul(67890, H);
+    let neg_p = EmbeddedCurvePoint { x: p.x, y: 0 - p.y, is_infinite: false };
+    assert_on_curve_non_identity(neg_p);
+    assert(ecdh(a, p) != ecdh(a, neg_p));
 }
 
 #[test]
@@ -140,14 +153,15 @@ fn domain_separation_distinct() {
     let h_vk = poseidon_with_domain(domain::VIEWING_KEY, [a, b]);
     let h_dvk = poseidon_with_domain(domain::DELEGATION_VIEWING_KEY, [a, b]);
     let h_sr = poseidon_with_domain(domain::SPEND_RANDOMNESS, [a, b]);
-    let h_tb = poseidon_with_domain(domain::TX_BLINDING, [a, b]);
-    let h_ta = poseidon_with_domain(domain::TX_AMOUNT, [a, b]);
+    let h_tb = poseidon_with_domain(domain::TRANSFER_BLINDING, [a, b]);
+    let h_ta = poseidon_with_domain(domain::TRANSFER_AMOUNT, [a, b]);
     let h_eb = poseidon_with_domain(domain::ENCRYPTED_BALANCE, [a, b]);
     let h_ea = poseidon_with_domain(domain::ENCRYPTED_ALLOWANCE, [a, b]);
     let h_ar = poseidon_with_domain(domain::ALLOWANCE_RANDOMNESS, [a, b]);
     let h_ed = poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [a, b]);
     let h_as = poseidon_with_domain(domain::AUDITOR_SENDER, [a, b]);
     let h_ar2 = poseidon_with_domain(domain::AUDITOR_RECIPIENT, [a, b]);
+    let h_es = poseidon_with_domain(domain::ECDH_SHARED_SECRET, [a, b]);
 
     // Distinct from VK.
     assert(h_vk != h_addr);
@@ -161,6 +175,7 @@ fn domain_separation_distinct() {
     assert(h_vk != h_ed);
     assert(h_vk != h_as);
     assert(h_vk != h_ar2);
+    assert(h_vk != h_es);
 
     // The two auditor channels must yield distinct masks under identical
     // inputs -- if they collide, the same shared-secret `S.x` would leak the
@@ -178,8 +193,8 @@ fn encrypt_decrypt_round_trip() {
     let sigma: Field = 0xcafe;
 
     let v_tilde = encrypt_amount(v, s, sigma);
-    let mask_tx = poseidon_with_domain(domain::TX_AMOUNT, [s, sigma]);
-    assert(v_tilde - mask_tx == v);
+    let mask_transfer = poseidon_with_domain(domain::TRANSFER_AMOUNT, [s, sigma]);
+    assert(v_tilde - mask_transfer == v);
 
     let b_tilde = encrypt_balance(v, s, sigma);
     let mask_bal = poseidon_with_domain(domain::ENCRYPTED_BALANCE, [s, sigma]);
@@ -193,9 +208,21 @@ fn encrypt_decrypt_round_trip() {
     let mask_esc = poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, sigma]);
     assert(dvk_escrowed - mask_esc == v);
 
+    // The auditor balance checkpoint pads with the sponge's second squeeze
+    // (the balance slot), not the single-squeeze funnel.
     let b_tilde_aud_s = encrypt_auditor_sender_balance(v, s, sigma);
-    let mask_aud_s = poseidon_with_domain(domain::AUDITOR_SENDER, [s, sigma]);
+    let mask_aud_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s, sigma)[1];
     assert(b_tilde_aud_s - mask_aud_s == v);
+}
+
+#[test]
+fn sponge_empty_input_applies_squeeze_permutation() {
+    // The on-chain sponge always applies the final squeeze permutation, even
+    // over an empty absorb (IV = 0 for length 0). The in-circuit sponge must
+    // agree at the boundary rather than return the initial rate cell (0).
+    let h = sponge::<0>([]);
+    assert(h == poseidon2_permutation([0, 0, 0, 0], 4)[0]);
+    assert(h != 0);
 }
 
 #[test]
@@ -228,7 +255,7 @@ fn sponge_squeeze_2_outputs_distinct() {
 
 #[test]
 fn sponge_squeeze_channel_separation() {
-    // Same (S.x, sigma) under the two channel domains must produce different
+    // Same (s, sigma) under the two channel domains must produce different
     // mask pairs. This is the property that makes a leaked sender-channel
     // ciphertext useless for decrypting the recipient channel and vice versa.
     let s_x: Field = 0xcafe;
@@ -253,7 +280,7 @@ fn print_fixtures() {
     let op_i: Field = 0xabcd;
     let v: Field = 1000;
     let r: Field = 42;
-    let v_tx: Field = 100;
+    let v_transfer: Field = 100;
     let v_a: Field = 500;
     let r_e: Field = 0xfeedface;
     let s_ecdh: Field = 0x12345;
@@ -272,7 +299,7 @@ fn print_fixtures() {
     println(f"scalar_mul_Y.x = {yx}");
     println(f"scalar_mul_Y.y = {yy}");
 
-    // ecdh(r_e, H) -- shared secret x
+    // ecdh(r_e, H) -- shared-secret scalar
     let e = ecdh(r_e, H);
     println(f"ecdh = {e}");
 
@@ -299,12 +326,12 @@ fn print_fixtures() {
     let r_a = derive_allow_r(dvk, sigma_a);
     println(f"derive_allow_r = {r_a}");
 
-    // derive_tx_blind(s, sigma)
-    let r_tx = derive_tx_blind(s_ecdh, sigma);
-    println(f"derive_tx_blind = {r_tx}");
+    // derive_transfer_blind(s, sigma)
+    let r_transfer = derive_transfer_blind(s_ecdh, sigma);
+    println(f"derive_transfer_blind = {r_transfer}");
 
-    // encrypt_amount(v_tx, s, sigma)
-    let v_tilde = encrypt_amount(v_tx, s_ecdh, sigma);
+    // encrypt_amount(v_transfer, s, sigma)
+    let v_tilde = encrypt_amount(v_transfer, s_ecdh, sigma);
     println(f"encrypt_amount = {v_tilde}");
 
     // encrypt_balance(v, vk, sigma)
@@ -330,7 +357,7 @@ fn print_fixtures() {
     println(f"sponge_squeeze_2_AUDITOR_SENDER_0 = {ss2_s0}");
     println(f"sponge_squeeze_2_AUDITOR_SENDER_1 = {ss2_s1}");
 
-    // sponge_squeeze_2(AUDITOR_RECIPIENT, s, sigma) -- (amount, r_tx) masks
+    // sponge_squeeze_2(AUDITOR_RECIPIENT, s, sigma) -- (amount, r_transfer) masks
     let ss2_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_ecdh, sigma);
     let ss2_r0 = ss2_r[0];
     let ss2_r1 = ss2_r[1];
@@ -356,7 +383,7 @@ fn fixtures_match_testdata() {
     let op_i: Field = 0xabcd;
     let v: Field = 1000;
     let r: Field = 42;
-    let v_tx: Field = 100;
+    let v_transfer: Field = 100;
     let v_a: Field = 500;
     let r_e: Field = 0xfeedface;
     let s_ecdh: Field = 0x12345;
@@ -370,7 +397,7 @@ fn fixtures_match_testdata() {
     assert(y_pt.y == 0x29116280600c10ead1fdbd9ab4b571896030679bf554d7f1ebf681e5147de21b);
 
     assert(
-        ecdh(r_e, H) == 0x114ed4fcf2c57014eb678c577aa02f30ef590b713d7a6a5e87702d1c7f71957f,
+        ecdh(r_e, H) == 0x105fa0a0e003bf2072dff4e53da5a288bee77e894392ada1ac6ae99bb2b8568b,
     );
 
     let vk = vk_from_sk(sk, addr_f);
@@ -392,12 +419,12 @@ fn fixtures_match_testdata() {
             == 0x0afda20e062a277afc0c86e31ea22597ee2c094b1b9cd08b8d8a2a212a8af1ee,
     );
     assert(
-        derive_tx_blind(s_ecdh, sigma)
+        derive_transfer_blind(s_ecdh, sigma)
             == 0x274c4f45d57544efca9f6f505e6b29ae098f1d30243de28f7cef62d05484c83d,
     );
 
     assert(
-        encrypt_amount(v_tx, s_ecdh, sigma)
+        encrypt_amount(v_transfer, s_ecdh, sigma)
             == 0x2a07070eb651b03ecc22453ad1cc69a39567ca27fb4224e8727a5fbc83091526,
     );
     assert(
@@ -422,14 +449,15 @@ fn fixtures_match_testdata() {
     assert(ss2_r[0] == SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_0);
     assert(ss2_r[1] == SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_1);
 
-    // encrypt_auditor_sender_balance is the canonical composition:
-    // v + Poseidon2(AUDITOR_SENDER, [s, sigma]). The mask matches the first
-    // squeeze of `sponge_squeeze_2` on the same absorb (single permutation,
-    // same state[0]) -- pin against the squeeze_2 vector so the helper and
-    // the raw funnel can't drift apart.
+    // encrypt_auditor_sender_balance pads with the sponge's *second*
+    // squeeze -- the balance slot, matching the two-ciphertext sender
+    // channels (Transfer T_a6). The first squeeze stays reserved for amount
+    // masks so the checkpoint pad can never collide with an amount pad even
+    // under (r_e, sigma) reuse. Pin against the squeeze_2 vector so the
+    // helper and the raw sponge can't drift apart.
     assert(
         encrypt_auditor_sender_balance(v, s_ecdh, sigma)
-            == v + SPONGE_SQUEEZE_2_AUDITOR_SENDER_0,
+            == v + SPONGE_SQUEEZE_2_AUDITOR_SENDER_1,
     );
     assert(
         poseidon_with_domain(domain::AUDITOR_SENDER, [s_ecdh, sigma])
@@ -454,7 +482,7 @@ global SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_1: Field =
 
 #[test]
 fn derive_helpers_deterministic_and_distinct() {
-    // derive_spend_r, derive_allow_r, derive_tx_blind must each be
+    // derive_spend_r, derive_allow_r, derive_transfer_blind must each be
     // deterministic and produce distinct outputs from the same inputs
     // (domain separation hygiene).
     let a: Field = 0xbeef;
@@ -466,8 +494,8 @@ fn derive_helpers_deterministic_and_distinct() {
     let r2 = derive_allow_r(a, b);
     assert(r2 == derive_allow_r(a, b));
 
-    let r3 = derive_tx_blind(a, b);
-    assert(r3 == derive_tx_blind(a, b));
+    let r3 = derive_transfer_blind(a, b);
+    assert(r3 == derive_transfer_blind(a, b));
 
     assert(r1 != r2);
     assert(r1 != r3);

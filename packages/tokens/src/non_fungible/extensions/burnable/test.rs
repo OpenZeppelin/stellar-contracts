@@ -1,9 +1,12 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Env};
-use stellar_event_assertion::EventAssertion;
+use soroban_sdk::{
+    contract,
+    testutils::{Address as _, Events},
+    Address, Env, Event,
+};
 
-use crate::non_fungible::Base;
+use crate::non_fungible::{extensions::burnable::Burn, Approve, ApproveForAll, Base, Mint};
 
 #[contract]
 struct MockContract;
@@ -22,10 +25,16 @@ fn burn_works() {
 
         assert!(Base::balance(&e, &owner) == 0);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
-        event_assert.assert_non_fungible_mint(&owner, token_id);
-        event_assert.assert_non_fungible_burn(&owner, token_id);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 2);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Mint { to: owner.clone(), token_id }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &Burn { from: owner.clone(), token_id }.to_xdr(&e, &address)
+        );
     });
 }
 
@@ -45,11 +54,26 @@ fn burn_from_with_approve_works() {
 
         assert!(Base::balance(&e, &owner) == 0);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(3);
-        event_assert.assert_non_fungible_mint(&owner, token_id);
-        event_assert.assert_non_fungible_approve(&owner, &spender, token_id, 1000);
-        event_assert.assert_non_fungible_burn(&owner, token_id);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 3);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Mint { to: owner.clone(), token_id }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &Approve {
+                approver: owner.clone(),
+                token_id,
+                approved: spender.clone(),
+                live_until_ledger: 1000,
+            }
+            .to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(2).unwrap(),
+            &Burn { from: owner.clone(), token_id }.to_xdr(&e, &address)
+        );
     });
 }
 
@@ -70,11 +94,25 @@ fn burn_from_with_operator_works() {
 
         assert!(Base::balance(&e, &owner) == 0);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(3);
-        event_assert.assert_non_fungible_mint(&owner, token_id);
-        event_assert.assert_approve_for_all(&owner, &operator, 1000);
-        event_assert.assert_non_fungible_burn(&owner, token_id);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 3);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Mint { to: owner.clone(), token_id }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &ApproveForAll {
+                owner: owner.clone(),
+                operator: operator.clone(),
+                live_until_ledger: 1000
+            }
+            .to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(2).unwrap(),
+            &Burn { from: owner.clone(), token_id }.to_xdr(&e, &address)
+        );
     });
 }
 
@@ -92,10 +130,16 @@ fn burn_from_with_owner_works() {
 
         assert!(Base::balance(&e, &owner) == 0);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
-        event_assert.assert_non_fungible_mint(&owner, token_id);
-        event_assert.assert_non_fungible_burn(&owner, token_id);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 2);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Mint { to: owner.clone(), token_id }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &Burn { from: owner.clone(), token_id }.to_xdr(&e, &address)
+        );
     });
 }
 

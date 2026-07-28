@@ -22,7 +22,6 @@ serde-json-core = { workspace = true }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 soroban-test-helpers = { workspace = true }
-stellar-event-assertion = { workspace = true }
 ed25519-dalek = { workspace = true }
 p256 = { workspace = true, features = ["ecdsa"] }
 hex-literal = { workspace = true }

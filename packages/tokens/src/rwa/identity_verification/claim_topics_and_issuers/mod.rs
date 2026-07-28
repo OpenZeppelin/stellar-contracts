@@ -7,6 +7,12 @@ use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, Map
 
 /// Trait for managing claim topics and trusted issuers for RWA tokens.
 ///
+/// This contract is the requirement side of identity verification: it states
+/// which claim topics a holder's identity must carry (for example KYC, AML),
+/// and which claim issuers are trusted to attest each topic. Verification
+/// checks these requirements against the claims found on the holder's
+/// identity contract.
+///
 /// [`ClaimTopicsAndIssuers`] trait is not expected to be an extension to a RWA
 /// smart contract, but it is a separate contract on its own. This design allows
 /// it to be shared across many RWA tokens. Note that, there is no `RWA` bound
@@ -39,7 +45,7 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// # Events
     ///
-    /// * topics - `["claim_added", claim_topic: u32]`
+    /// * topics - `["claim_topic_added", claim_topic: u32]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -67,7 +73,7 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// # Events
     ///
-    /// * topics - `["claim_removed", claim_topic: u32]`
+    /// * topics - `["claim_topic_removed", claim_topic: u32]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -117,7 +123,7 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// # Events
     ///
-    /// * topics - `["issuer_added", trusted_issuer: Address]`
+    /// * topics - `["trusted_issuer_added", trusted_issuer: Address]`
     /// * data - `[claim_topics: Vec<u32>]`
     ///
     /// # Notes
@@ -152,7 +158,7 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// # Events
     ///
-    /// * topics - `["issuer_removed", trusted_issuer: Address]`
+    /// * topics - `["trusted_issuer_removed", trusted_issuer: Address]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -191,7 +197,7 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// # Events
     ///
-    /// * topics - `["topics_updated", trusted_issuer: Address]`
+    /// * topics - `["issuer_topics_updated", trusted_issuer: Address]`
     /// * data - `[claim_topics: Vec<u32>]`
     ///
     /// # Notes

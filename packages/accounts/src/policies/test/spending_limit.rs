@@ -439,6 +439,46 @@ fn set_spending_limit_success() {
 }
 
 #[test]
+fn enforce_zero_amount_allowed_after_limit_reduction() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    // Spend 900,000, within the original limit.
+    e.as_contract(&address, || {
+        let context = create_transfer_context(&e, 900_000);
+        enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
+    });
+
+    // Lower the limit below the amount already spent in the window.
+    e.as_contract(&address, || {
+        set_spending_limit(&e, 500_000, &context_rule, &smart_account);
+        let data = get_spending_limit_data(&e, context_rule.id, &smart_account);
+        assert!(data.cached_total_spent > data.spending_limit);
+    });
+
+    // A zero-amount transfer moves no funds and must be permitted even though
+    // `cached_total_spent` now exceeds `spending_limit`. It also must not mutate
+    // the spending history or cached total.
+    e.as_contract(&address, || {
+        let context = create_transfer_context(&e, 0);
+        enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
+
+        let data = get_spending_limit_data(&e, context_rule.id, &smart_account);
+        assert_eq!(data.cached_total_spent, 900_000);
+        assert_eq!(data.spending_history.len(), 1);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #3222)")]
 fn set_invalid_spending_limit() {
     let e = Env::default();

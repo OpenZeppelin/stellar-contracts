@@ -1,9 +1,12 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Env};
-use stellar_event_assertion::EventAssertion;
+use soroban_sdk::{
+    contract,
+    testutils::{Address as _, Events},
+    Address, Env, Event,
+};
 
-use crate::non_fungible::{extensions::enumerable::Enumerable, Base, NFTStorageKey};
+use crate::non_fungible::{extensions::enumerable::Enumerable, Base, Mint, NFTStorageKey};
 
 #[contract]
 struct MockContract;
@@ -21,10 +24,16 @@ fn test_total_supply() {
 
         assert_eq!(Enumerable::total_supply(&e), 2);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
-        event_assert.assert_non_fungible_mint(&owner, token_id1);
-        event_assert.assert_non_fungible_mint(&owner, token_id2);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 2);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Mint { to: owner.clone(), token_id: token_id1 }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &Mint { to: owner.clone(), token_id: token_id2 }.to_xdr(&e, &address)
+        );
     });
 }
 

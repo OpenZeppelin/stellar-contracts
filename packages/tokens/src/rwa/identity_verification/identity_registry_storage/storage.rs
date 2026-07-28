@@ -122,17 +122,20 @@
 /// - **Cannot recover to an already-recovered account**: An account that was
 ///   previously used as a recovery target cannot be used again.
 /// - **Proper sequencing enforced**: The system enforces the correct recovery
-///   sequence: `recover_identity` must be called before `recovery_balance` to
+///   sequence: `recover_identity` must be called before `recover_balance` to
 ///   ensure identity verification precedes asset transfer.
 use soroban_sdk::{
-    contracttype, panic_with_error, Address, Env, IntoVal, Map, String, Symbol, TryFromVal, Val,
-    Vec,
+    contracttype, panic_with_error, token::TokenClient, Address, Env, IntoVal, Map, String, Symbol,
+    TryFromVal, Val, Vec,
 };
 
-use crate::rwa::identity_verification::identity_registry_storage::{
-    emit_country_data_event, emit_identity_modified, emit_identity_recovered, emit_identity_stored,
-    emit_identity_unstored, CountryDataEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
-    IDENTITY_TTL_THRESHOLD, MAX_COUNTRY_ENTRIES, MAX_METADATA_ENTRIES, MAX_METADATA_STRING_LEN,
+use crate::rwa::{
+    identity_verification::identity_registry_storage::{
+        emit_country_data_event, emit_identity_recovered, emit_identity_stored,
+        emit_identity_unstored, CountryDataEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
+        IDENTITY_TTL_THRESHOLD, MAX_COUNTRY_ENTRIES, MAX_METADATA_ENTRIES, MAX_METADATA_STRING_LEN,
+    },
+    utils::token_binder::linked_tokens,
 };
 
 /// Represents the type of identity holder
@@ -332,7 +335,7 @@ pub fn get_recovered_to(e: &Env, old_account: &Address) -> Option<Address> {
 /// * data - `[]`
 ///
 /// Emits for each country data added:
-/// * topics - `["country_added", account: Address]`
+/// * topics - `["country_data_added", account: Address]`
 /// * data - `[country_data: Val]`
 ///
 /// # Security Warning
@@ -384,46 +387,15 @@ pub fn add_identity(
     }
 }
 
-/// Modifies an existing identity.
-///
-/// # Arguments
-///
-/// * `e` - The Soroban environment.
-/// * `account` - The account address whose identity is being modified.
-/// * `new_identity` - The new identity address.
-///
-/// # Errors
-///
-/// * [`IRSError::IdentityNotFound`] - If no identity is found for the
-///   `account`.
-///
-/// # Events
-///
-/// * topics - `["identity_modified", old_identity: Address, new_identity:
-///   Address]`
-/// * data - `[]`
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks and should only
-/// be used:
-/// - During contract initialization/construction
-/// - In admin functions that implement their own authorization logic
-///
-/// Using this function in public-facing methods may create significant security
-/// risks as it could allow unauthorized modifications.
-pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
-    let key = IRSStorageKey::Identity(account.clone());
-
-    let old_identity = get_persistent_entry(e, &key)
-        .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
-
-    e.storage().persistent().set(&key, new_identity);
-
-    emit_identity_modified(e, &old_identity, new_identity);
-}
-
 /// Removes an identity and all associated country data.
+///
+/// The account must not hold a balance in any linked token. Compliance
+/// modules key their per-investor state (aggregate balances, transfer
+/// counters) by the identity resolved through this registry; removing the
+/// identity of a funded account, and later re-registering the account under
+/// another identity, would orphan that state. A funded account is expected
+/// to be emptied first, through regular or forced transfers, so that every
+/// token movement passes through the compliance hooks.
 ///
 /// # Arguments
 ///
@@ -434,6 +406,8 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
 ///
 /// * [`IRSError::IdentityNotFound`] - If no identity is found for the
 ///   `account`.
+/// * [`IRSError::AccountHasBalance`] - If `account` holds a non-zero balance in
+///   any linked token.
 ///
 /// # Events
 ///
@@ -441,8 +415,23 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
 /// * data - `[]`
 ///
 /// Emits for each country data removed:
-/// * topics - `["country_removed", account: Address]`
+/// * topics - `["country_data_removed", account: Address]`
 /// * data - `[country_data: Val]`
+///
+/// # Notes
+///
+/// One cross-contract `balance` call is made per linked token; the token
+/// binder's `MAX_TOKENS` cap is sized so this sweep fits within a single
+/// transaction. The zero balance check is only as complete as the token
+/// binder registry: a token that resolves identities through this contract
+/// without being bound to it is not checked.
+///
+/// The check covers balance-backed module state. Time-windowed transfer
+/// counters are flow-based and stay keyed to the old identity: a wallet
+/// re-registered under a new identity starts fresh windows. That is correct
+/// when the wallet genuinely changes investors; an identity replacement for
+/// the same investor should wait out open transfer windows, since counters
+/// are not migrated.
 ///
 /// # Security Warning
 ///
@@ -461,6 +450,13 @@ pub fn remove_identity(e: &Env, account: &Address) {
         .persistent()
         .get(&identity_key)
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
+
+    for token in linked_tokens(e).iter() {
+        if TokenClient::new(e, &token).balance(account) != 0 {
+            panic_with_error!(e, IRSError::AccountHasBalance);
+        }
+    }
+
     e.storage().persistent().remove(&identity_key);
 
     emit_identity_unstored(e, account, &identity);
@@ -575,7 +571,7 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
 /// # Events
 ///
 /// Emits for each country data added:
-/// * topics - `["country_added", account: Address]`
+/// * topics - `["country_data_added", account: Address]`
 /// * data - `[country_data: Val]`
 ///
 /// # Security Warning
@@ -629,7 +625,7 @@ pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &
 ///
 /// # Events
 ///
-/// * topics - `["country_modified", account: Address]`
+/// * topics - `["country_data_modified", account: Address]`
 /// * data - `[country_data: Val]`
 ///
 /// # Security Warning
@@ -673,7 +669,7 @@ pub fn modify_country_data(e: &Env, account: &Address, index: u32, country_data:
 ///
 /// # Events
 ///
-/// * topics - `["country_removed", account: Address]`
+/// * topics - `["country_data_removed", account: Address]`
 /// * data - `[country_data: Val]`
 ///
 /// # Security Warning

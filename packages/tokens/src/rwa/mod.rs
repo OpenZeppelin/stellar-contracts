@@ -42,13 +42,19 @@
 //! modules to be available from external contracts:
 //!
 //! ### Compliance Module:
-//! - `fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token:
-//!   Address) -> bool;`
-//! - `fn can_create(e: &Env, to: Address, amount: i128, token: Address) ->
-//!   bool;`
-//! - `fn created(e: &Env, to: Address, amount: i128, token: Address);`
-//! - `fn destroyed(e: &Env, from: Address, amount: i128, token: Address);`
-//! - `fn transferred(e: &Env, from: Address, to: Address, amount: i128, token:
+//! One hook per token operation, called after the operation's state changes
+//! but within the same transaction. Compliance rejects an operation by
+//! panicking from the hook, which reverts everything atomically. Each account
+//! is passed as an [`compliance::AccountSnapshot`] capturing its pre-operation
+//! `balance` and `frozen` amount, so a module never needs to call back into
+//! the token (reentrancy is impossible in Soroban). The transfer hook also
+//! receives a [`compliance::TransferKind`] identifying who moved the tokens
+//! and under what authority, so privileged (forced/recovery) operations can be
+//! exempted from policy while bookkeeping still applies.
+//! - `fn transferred(e: &Env, from: AccountSnapshot, to: AccountSnapshot,
+//!   amount: i128, kind: TransferKind, token: Address);`
+//! - `fn created(e: &Env, to: AccountSnapshot, amount: i128, token: Address);`
+//! - `fn destroyed(e: &Env, from: AccountSnapshot, amount: i128, token:
 //!   Address);`
 //!
 //! ### Identity Verifier Module:
@@ -213,7 +219,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Errors
     ///
-    /// * [`RWAError::AddressFrozen`] - When the address is frozen.
+    /// * [`RWAError::InsufficientBalance`] - When the amount to burn exceeds
+    ///   the balance.
+    /// * [`RWAError::LessThanZero`] - When the amount is negative.
     ///
     /// # Events
     ///
@@ -250,7 +258,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// * topics - `["transfer", old_account: Address, new_account: Address]`
     /// * data - `[amount: i128]`
-    /// * topics - `["recovery", old_account: Address, new_account: Address]`
+    /// * topics - `["recovery_success", old_account: Address, new_account:
+    ///   Address]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -446,7 +455,7 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Events
     ///
-    /// * topics - ["identity_verifier_set", identity_verifier: Address]
+    /// * topics - `["identity_verifier_set", identity_verifier: Address]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -484,10 +493,6 @@ pub enum RWAError {
     InsufficientFreeTokens = 303,
     /// Indicates an identity cannot be verified.
     IdentityVerificationFailed = 304,
-    /// Indicates the transfer does not comply with the compliance rules.
-    TransferNotCompliant = 305,
-    /// Indicates the mint operation does not comply with the compliance rules.
-    MintNotCompliant = 306,
     /// Indicates the compliance contract is not set.
     ComplianceNotSet = 307,
     /// Indicates the onchain ID is not set.

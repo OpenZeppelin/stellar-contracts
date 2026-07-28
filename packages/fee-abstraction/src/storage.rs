@@ -55,10 +55,10 @@ pub enum FeeAbstractionApproval {
 ///
 /// # Events
 ///
-/// * topics - `["ForwardExecuted", user: Address, target_contract: Address]`
+/// * topics - `["forward_executed", user: Address, target_contract: Address]`
 /// * data - `[target_fn: Symbol, target_args: Vec<Val>]`
 ///
-/// * topics - `["FeeCollected", user: Address, recipient: Address]`
+/// * topics - `["fee_collected", user: Address, recipient: Address]`
 /// * data - `[token: Address, amount: i128]`
 ///
 /// # Errors
@@ -136,7 +136,7 @@ pub fn collect_fee_and_invoke(
 ///
 /// # Events
 ///
-/// * topics - `["FeeCollected", user: Address, recipient: Address]`
+/// * topics - `["fee_collected", user: Address, recipient: Address]`
 /// * data - `[token: Address, amount: i128]`
 ///
 /// # Errors
@@ -235,7 +235,7 @@ pub fn is_fee_token_allowlist_enabled(e: &Env) -> bool {
 ///
 /// # Events
 ///
-/// * topics - `["FeeTokenAllowlistUpdated", token: Address]`
+/// * topics - `["fee_token_allowlist_updated", token: Address]`
 /// * data - `[allowed: bool]`
 ///
 /// # Security Warning
@@ -359,7 +359,7 @@ pub fn is_allowed_fee_token(e: &Env, token: &Address) -> bool {
 ///
 /// # Events
 ///
-/// * topics - `["TokensSwept", token: Address, recipient: Address]`
+/// * topics - `["tokens_swept", token: Address, recipient: Address]`
 /// * data - `[amount: i128]`
 ///
 /// # Security Warning

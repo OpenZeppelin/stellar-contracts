@@ -13,7 +13,6 @@ packages/
 ├── fee-abstraction/ # fee forwarder
 ├── governance/      # governor, timelock, votes
 ├── macros/          # only_owner / only_role / when_paused, etc.
-├── test-utils/      # event-assertion helper crate
 ├── tokens/          # fungible + non_fungible + rwa + vault
 └── zk-email/        # zk-email auth primitives
 examples/            # one example crate per feature; cdylib only
@@ -176,9 +175,20 @@ Reversing the two is a common mistake.
 - Library-internal calls go inside
   `e.as_contract(&address, || { ... })`; example tests go through the
   generated `ExampleContractClient`.
-- Event assertions: `EventAssertion::new(&e, address.clone())` from
-  `stellar-event-assertion`. Hand-decoding `e.events().all()` is a
-  violation when an `assert_*` helper exists.
+- Event assertions: compare the emitted entry against the typed
+  `#[contractevent]` struct serialized with `.to_xdr(&e, &address)`:
+  ```rust
+  let events = e.events().all();
+  assert_eq!(events.events().len(), 1);
+  assert_eq!(
+      events.events().first().unwrap(),
+      &Transfer { from: from.clone(), to: to.clone(), amount }.to_xdr(&e, &address),
+  );
+  ```
+  Use `.first()` for index 0 and `.get(i)` for later events (clippy's
+  `get_first` rejects `.get(0)`). Hand-decoding topics/data out of
+  `e.events().all()` field-by-field is a violation — build the event
+  struct and let `to_xdr` produce the wire form.
 - Panic tests use the numeric form:
   `#[should_panic(expected = "Error(Contract, #<code>)")]`.
 

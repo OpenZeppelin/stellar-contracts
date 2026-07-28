@@ -1,10 +1,13 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::{only_admin, only_role};
-use stellar_tokens::rwa::compliance::modules::{
-    country_allow::{storage as country_allow, CountryAllow},
-    storage::{self as compliance_storage, set_irs_address},
-    ComplianceModule,
+use stellar_tokens::rwa::compliance::{
+    modules::{
+        country_allow::{storage as country_allow, CountryAllow},
+        storage::{self as compliance_storage, set_irs_address},
+        ComplianceModule,
+    },
+    AccountSnapshot, TransferKind,
 };
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
@@ -53,25 +56,25 @@ impl CountryAllow for CountryAllowContract {
 
 #[contractimpl(contracttrait)]
 impl ComplianceModule for CountryAllowContract {
-    // No need to implement logic in these hooks for this module, as the compliance
-    // check is only done in the can_transfer and can_create functions.
-    fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
-
-    // No need to implement logic in these hooks for this module, as the compliance
-    // check is only done in the can_transfer and can_create functions.
-    fn on_created(_e: &Env, _to: Address, _amount: i128, _token: Address) {}
-
-    // No need to implement logic in these hooks for this module, as the compliance
-    // check is only done in the can_transfer and can_create functions.
-    fn on_destroyed(_e: &Env, _from: Address, _amount: i128, _token: Address) {}
-
-    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool {
-        country_allow::can_transfer(e, &from, &to, amount, &token)
+    // The hooks mutate no module state (the allowlist check only panics on
+    // violation), so no caller authentication is needed.
+    fn on_transfer(
+        e: &Env,
+        _from: AccountSnapshot,
+        to: AccountSnapshot,
+        _amount: i128,
+        kind: TransferKind,
+        token: Address,
+    ) {
+        country_allow::on_transfer(e, &to.address, &kind, &token);
     }
 
-    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
-        country_allow::can_create(e, &to, amount, &token)
+    fn on_created(e: &Env, to: AccountSnapshot, _amount: i128, token: Address) {
+        country_allow::on_created(e, &to.address, &token);
     }
+
+    // Burns are not restricted by this module.
+    fn on_destroyed(_e: &Env, _from: AccountSnapshot, _amount: i128, _token: Address) {}
 
     fn name(e: &Env) -> String {
         String::from_str(e, "CountryAllowModule")

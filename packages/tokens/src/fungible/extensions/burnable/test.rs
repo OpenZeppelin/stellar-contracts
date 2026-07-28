@@ -1,9 +1,12 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Env};
-use stellar_event_assertion::EventAssertion;
+use soroban_sdk::{
+    contract,
+    testutils::{Address as _, Events},
+    Address, Env, Event,
+};
 
-use crate::fungible::Base;
+use crate::fungible::{extensions::burnable::Burn, Approve, Base, Mint};
 
 #[contract]
 struct MockContract;
@@ -20,10 +23,16 @@ fn burn_works() {
         assert_eq!(Base::balance(&e, &account), 50);
         assert_eq!(Base::total_supply(&e), 50);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
-        event_assert.assert_fungible_mint(&account, 100);
-        event_assert.assert_fungible_burn(&account, 50);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 2);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Mint { to: account.clone(), amount: 100 }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &Burn { from: account.clone(), amount: 50 }.to_xdr(&e, &address)
+        );
     });
 }
 
@@ -42,11 +51,26 @@ fn burn_with_allowance_works() {
         assert_eq!(Base::balance(&e, &spender), 0);
         assert_eq!(Base::total_supply(&e), 70);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(3);
-        event_assert.assert_fungible_mint(&owner, 100);
-        event_assert.assert_fungible_approve(&owner, &spender, 30, 1000);
-        event_assert.assert_fungible_burn(&owner, 30);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 3);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Mint { to: owner.clone(), amount: 100 }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &Approve {
+                owner: owner.clone(),
+                spender: spender.clone(),
+                amount: 30,
+                live_until_ledger: 1000,
+            }
+            .to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(2).unwrap(),
+            &Burn { from: owner.clone(), amount: 30 }.to_xdr(&e, &address)
+        );
     });
 }
 

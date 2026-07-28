@@ -42,18 +42,23 @@ impl ConfidentialVerifierContract {
 #[contractimpl(contracttrait)]
 impl ConfidentialVerifier for ConfidentialVerifierContract {
     #[only_role(operator, "manager")]
-    fn register_verification_key(e: &Env, circuit_type: CircuitType, vk: Bytes, operator: Address) {
-        verifier::register_verification_key(e, circuit_type, &vk);
+    fn register_verification_key(
+        e: &Env,
+        circuit_type: CircuitType,
+        verification_key: Bytes,
+        operator: Address,
+    ) {
+        verifier::register_verification_key(e, circuit_type, &verification_key);
     }
 
     #[only_role(operator, "manager")]
     fn update_verification_key(
         e: &Env,
         circuit_type: CircuitType,
-        new_vk: Bytes,
+        new_verification_key: Bytes,
         operator: Address,
     ) {
-        verifier::update_verification_key(e, circuit_type, &new_vk);
+        verifier::update_verification_key(e, circuit_type, &new_verification_key);
     }
 }
 

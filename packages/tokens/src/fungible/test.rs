@@ -6,12 +6,12 @@ use soroban_sdk::{
         storage::{Instance, Persistent},
         Address as _, Events, Ledger, MuxedAddress as _,
     },
-    Address, Env, FromVal, IntoVal, Map, MuxedAddress, String, Symbol, TryFromVal, Val,
+    Address, Env, Event, FromVal, IntoVal, Map, MuxedAddress, String, Symbol, TryFromVal, Val,
 };
-use stellar_event_assertion::EventAssertion;
 
 use crate::fungible::{
-    Base, FungibleStorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
+    Approve, Base, FungibleStorageKey, Mint, MuxedTransfer, Transfer, BALANCE_EXTEND_AMOUNT,
+    INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
 };
 
 #[contract]
@@ -70,9 +70,18 @@ fn approve_with_event() {
         let allowance_val = Base::allowance(&e, &owner, &spender);
         assert_eq!(allowance_val, 50);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
-        event_assert.assert_fungible_approve(&owner, &spender, allowance_data.0, allowance_data.1);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 1);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Approve {
+                owner: owner.clone(),
+                spender: spender.clone(),
+                amount: allowance_data.0,
+                live_until_ledger: allowance_data.1,
+            }
+            .to_xdr(&e, &address)
+        );
     });
 }
 
@@ -242,10 +251,17 @@ fn transfer_works() {
         assert_eq!(Base::balance(&e, &from), 50);
         assert_eq!(Base::balance(&e, &recipient), 50);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
-        event_assert.assert_fungible_mint(&from, 100);
-        event_assert.assert_fungible_transfer(&from, &recipient, 50);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 2);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Mint { to: from.clone(), amount: 100 }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &Transfer { from: from.clone(), to: recipient.clone(), amount: 50 }
+                .to_xdr(&e, &address)
+        );
     });
 }
 
@@ -281,14 +297,21 @@ fn transfer_muxed_address_works() {
         assert_eq!(Base::balance(&e, &from), 50);
         assert_eq!(Base::balance(&e, &recipient.address()), 50);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
-        event_assert.assert_fungible_mint(&from, 100);
-        event_assert.assert_fungible_muxed_transfer(
-            &from,
-            &recipient.address(),
-            recipient.id(),
-            50,
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 2);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Mint { to: from.clone(), amount: 100 }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &MuxedTransfer {
+                from: from.clone(),
+                to: recipient.address(),
+                to_muxed_id: recipient.id(),
+                amount: 50,
+            }
+            .to_xdr(&e, &address)
         );
     });
 }
@@ -431,11 +454,27 @@ fn approve_and_transfer_from() {
         let updated_allowance = Base::allowance(&e, &owner, &spender);
         assert_eq!(updated_allowance, 20);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(3);
-        event_assert.assert_fungible_mint(&owner, 100);
-        event_assert.assert_fungible_approve(&owner, &spender, 50, 1000);
-        event_assert.assert_fungible_transfer(&owner, &recipient, 30);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 3);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Mint { to: owner.clone(), amount: 100 }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(1).unwrap(),
+            &Approve {
+                owner: owner.clone(),
+                spender: spender.clone(),
+                amount: 50,
+                live_until_ledger: 1000,
+            }
+            .to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(2).unwrap(),
+            &Transfer { from: owner.clone(), to: recipient.clone(), amount: 30 }
+                .to_xdr(&e, &address)
+        );
     });
 }
 
@@ -764,9 +803,12 @@ fn mint_works() {
         assert_eq!(Base::balance(&e, &account), 100);
         assert_eq!(Base::total_supply(&e), 100);
 
-        let mut event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
-        event_assert.assert_fungible_mint(&account, 100);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 1);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Mint { to: account.clone(), amount: 100 }.to_xdr(&e, &address)
+        );
     });
 }
 

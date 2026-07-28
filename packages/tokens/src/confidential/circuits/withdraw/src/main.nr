@@ -39,11 +39,17 @@ mod tests;
 // Auditor block (sender-auditor visibility, Section 8.1)
 //   W_a1 R_e         = r_e * H                         Ephemeral key for
 //                                                      auditor ECDH.
-//   W_a2 S_{a,s}     = r_e * K_{aud,s}                 Sender-auditor ECDH
-//                                                      shared secret.
-//   W_a3 m_b         = SpongeSqueeze_1(delta_aud_s,
-//                                     S_{a,s}.x, sigma) Sender-channel
-//                                                      sponge, single squeeze.
+//   W_a2 s_{a,s}     = ecdh(r_e, K_{aud,s})            Sender-auditor ECDH
+//                                                      shared scalar (2.4).
+//   W_a3 m_b         = SpongeSqueeze_2(delta_aud_s,
+//                                     s_{a,s},
+//                                     sigma)[1]         Sender-channel sponge,
+//                                                      second squeeze (the
+//                                                      balance slot; the
+//                                                      first-squeeze amount
+//                                                      slot is unused -- the
+//                                                      withdrawal amount is
+//                                                      public).
 //   W_a4 b_tilde_aud_s = (v - a) + m_b                  Sender-auditor
 //                                                      encrypted balance
 //                                                      checkpoint (emitted).
@@ -63,9 +69,9 @@ mod tests;
 // --------------------------------------------------------
 //   Idx  Param          Symbol        Source / Note
 //   ---  -----          ------        -------------------------------------
-//   0    c_spend_x      C_spend.x     Loaded from `from.spendable_balance`.
+//   0    c_spend_x      C_spend.x     Loaded from `from.spendable_commitment`.
 //   1    c_spend_y      C_spend.y
-//   2    y_x            Y.x           Loaded from `from.spending_key`.
+//   2    y_x            Y.x           Loaded from `from.spending_public_key`.
 //   3    y_y            Y.y
 //   4    addr_f           addr_f          `env.current_contract_address()`.
 //   5    k_aud_s_x      K_aud_s.x     Fetched from the auditor contract by
@@ -75,7 +81,7 @@ mod tests;
 //                                     (Section 3.4), W4 then closes
 //                                     a < 2^127 in-circuit.
 //   8    c_spend_new_x  C_spend'.x    Prover-supplied; written to
-//   9    c_spend_new_y  C_spend'.y      `from.spendable_balance` on success.
+//   9    c_spend_new_y  C_spend'.y      `from.spendable_commitment` on success.
 //   10   sigma          sigma         Prover-supplied random salt; emitted.
 //   11   b_tilde        b_tilde       Prover-supplied encrypted balance
 //                                     scalar; emitted.
@@ -159,7 +165,7 @@ fn main(
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_s);
 
-    // W_a2 (shared secret x-coordinate)
+    // W_a2 (shared-secret scalar)
     let s_a_s_x = ecdh(r_e, k_aud_s);
 
     // W_a3 + W_a4

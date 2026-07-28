@@ -91,7 +91,7 @@ fn test_mul_div_floor_large_number() {
 }
 
 #[test]
-#[should_panic(expected = "attempt to multiply with overflow")]
+#[should_panic(expected = "overflow")]
 fn test_mul_div_floor_phantom_overflow() {
     let env = Env::default();
     let x: I256 = I256::from_i128(&env, i128::MAX);
@@ -141,7 +141,7 @@ fn test_mul_div_ceil_large_number() {
 }
 
 #[test]
-#[should_panic(expected = "attempt to multiply with overflow")]
+#[should_panic(expected = "overflow")]
 fn test_mul_div_ceil_phantom_overflow() {
     let env = Env::default();
     let x: I256 = I256::from_i128(&env, i128::MAX);

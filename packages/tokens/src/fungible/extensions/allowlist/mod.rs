@@ -51,15 +51,15 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// # Events
     ///
-    /// * topics - `["allow", user: Address]`
+    /// * topics - `["user_allowed", user: Address]`
     /// * data - `[]`
     ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced on `operator` before calling [`storage::allow_user`] for the
-    /// implementation.
+    /// enforced on `operator` before calling [`AllowList::allow_user`] for
+    /// the implementation.
     fn allow_user(e: &Env, user: Address, operator: Address);
 
     /// Disallows a user from receiving and transferring tokens.
@@ -72,7 +72,7 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// # Events
     ///
-    /// * topics - `["disallow", user: Address]`
+    /// * topics - `["user_disallowed", user: Address]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -80,7 +80,7 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
-    /// [`storage::disallow_user`] for the implementation.
+    /// [`AllowList::disallow_user`] for the implementation.
     fn disallow_user(e: &Env, user: Address, operator: Address);
 }
 

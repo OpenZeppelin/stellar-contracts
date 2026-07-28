@@ -1,9 +1,14 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 
-use crate::rwa::compliance::modules::{
-    max_balance::{emit_id_balance_preset, emit_max_balance_set, emit_preset_completed},
-    storage::{add_i128_or_panic, get_irs_client, require_non_negative_amount, sub_i128_or_panic},
-    ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+use crate::rwa::compliance::{
+    modules::{
+        max_balance::{emit_id_balance_preset, emit_max_balance_set, emit_preset_completed},
+        storage::{
+            add_i128_or_panic, get_irs_client, require_non_negative_amount, sub_i128_or_panic,
+        },
+        ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+    },
+    TransferKind,
 };
 
 #[contracttype]
@@ -87,80 +92,6 @@ pub fn is_preset_completed(e: &Env, token: &Address) -> bool {
 pub fn get_id_balance_of(e: &Env, token: &Address, account: &Address) -> i128 {
     let identity = get_irs_client(e, token).stored_identity(account);
     get_id_balance(e, token, &identity)
-}
-
-/// Returns `true` when crediting `amount` to `account`'s identity would
-/// leave the aggregate balance at or below the configured maximum for
-/// `token`.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `account` - The recipient wallet whose identity is checked.
-/// * `amount` - The amount that would be credited.
-/// * `token` - The token address.
-///
-/// # Errors
-///
-/// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
-/// * [`ComplianceModuleError::MathOverflow`] - When adding `amount` to the
-///   current tracked balance overflows.
-/// * refer to [`get_irs_client`] errors.
-pub fn can_receive(e: &Env, account: &Address, amount: i128, token: &Address) -> bool {
-    require_non_negative_amount(e, amount);
-    let max = get_max_balance(e, token);
-    if amount > max {
-        return false;
-    }
-    let identity = get_irs_client(e, token).stored_identity(account);
-    let current = get_id_balance(e, token, &identity);
-    add_i128_or_panic(e, current, amount) <= max
-}
-
-/// Returns `true` when the transfer recipient can absorb `amount` without
-/// exceeding the per-identity cap. Transfers where `from` and `to` resolve
-/// to the same identity are treated as no-ops: the tracked aggregate balance
-/// does not change, so the cap is always satisfied. In all other cases the only
-/// identity that can breach the cap is the recipient.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `from` - The sender address.
-/// * `to` - The recipient address.
-/// * `amount` - The transfer amount.
-/// * `token` - The token address.
-///
-/// # Errors
-///
-/// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
-/// * refer to [`can_receive`] errors.
-pub fn can_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &Address) -> bool {
-    require_non_negative_amount(e, amount);
-
-    let irs = get_irs_client(e, token);
-    if irs.stored_identity(from) == irs.stored_identity(to) {
-        return true;
-    }
-
-    can_receive(e, to, amount, token)
-}
-
-/// Returns `true` when the mint recipient can absorb `amount` without
-/// exceeding the per-identity cap.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `to` - The recipient address.
-/// * `amount` - The minted amount.
-/// * `token` - The token address.
-///
-/// # Errors
-///
-/// * refer to [`can_receive`] errors.
-pub fn can_create(e: &Env, to: &Address, amount: i128, token: &Address) -> bool {
-    can_receive(e, to, amount, token)
 }
 
 // ################## CHANGE STATE ##################
@@ -294,8 +225,20 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 
 /// Records a transfer between two wallets: debits the sender's identity and
 /// credits the recipient's identity. Panics if crediting the recipient would
-/// exceed the per-identity cap. Transfers where `from` and `to` resolve to
-/// the same identity are no-ops: no debit, no credit, no cap check.
+/// exceed the per-identity cap, unless the transfer is privileged: a forced
+/// transfer or a recovery is exempt from the cap, but the aggregate
+/// balances are still updated so the books stay true. Transfers where
+/// `from` and `to` resolve to the same identity are no-ops: no debit, no
+/// credit, no cap check. The aggregates are keyed by identity, so a genuine
+/// recovery (same investor, new wallet) lands on the same-identity no-op
+/// path and the books are untouched; the cap exemption matters only when a
+/// privileged movement crosses identities.
+///
+/// When `from`'s live identity entry has already been removed by account
+/// recovery, the sender is resolved through the IRS recovery record rather than
+/// reverting on the source lookup, so a forced/recovery transfer still updates
+/// the books. Once `from` recovered to `to`, both sides resolve to the same
+/// identity and the movement is a same-identity no-op.
 ///
 /// # Arguments
 ///
@@ -303,13 +246,15 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 /// * `from` - The sender wallet.
 /// * `to` - The recipient wallet.
 /// * `amount` - The transferred amount.
+/// * `kind` - Who initiated the transfer and under what authority.
 /// * `token` - The token address.
 ///
 /// # Errors
 ///
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
 /// * [`ComplianceModuleError::MaxBalanceExceeded`] - When the recipient's new
-///   aggregate balance would exceed the configured maximum.
+///   aggregate balance would exceed the configured maximum and the transfer is
+///   not privileged.
 /// * [`ComplianceModuleError::MathOverflow`] - When the recipient's credit
 ///   addition overflows.
 /// * [`ComplianceModuleError::MathUnderflow`] - When the sender's debit
@@ -319,19 +264,49 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
-pub fn on_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &Address) {
+pub fn on_transfer(
+    e: &Env,
+    from: &Address,
+    to: &Address,
+    amount: i128,
+    kind: &TransferKind,
+    token: &Address,
+) {
     require_non_negative_amount(e, amount);
 
     let irs = get_irs_client(e, token);
-    let id_from = irs.stored_identity(from);
     let id_to = irs.stored_identity(to);
+
+    // `from`'s live identity entry may have been removed by account recovery
+    // (`recover_identity` moves the identity to the new wallet and deletes the
+    // old mapping). When the live lookup fails with a contract error, resolve
+    // the sender through the recovery record so a forced/recovery transfer stays
+    // bookkeeping-correct instead of reverting here. A sender that was never
+    // registered (failed lookup, no recovery record) re-raises the IRS error.
+    let id_from = match irs.try_stored_identity(from) {
+        Ok(Ok(id)) => id,
+        Err(Ok(err)) => match irs.get_recovered_to(from) {
+            Some(recovered_wallet) => irs.stored_identity(&recovered_wallet),
+            None => panic_with_error!(e, err),
+        },
+        // A conversion failure or host-level invoke error is unreachable with a
+        // correctly configured IRS; terminate by re-issuing the call.
+        _ => irs.stored_identity(from),
+    };
 
     if id_from == id_to {
         return;
     }
 
     debit_identity(e, token, &id_from, amount);
-    credit_identity(e, token, &id_to, amount);
+    match kind {
+        TransferKind::Forced | TransferKind::Recovery => {
+            credit_identity_unchecked(e, token, &id_to, amount)
+        }
+        TransferKind::Standard | TransferKind::Delegated(_) => {
+            credit_identity(e, token, &id_to, amount)
+        }
+    }
 }
 
 /// Records a mint to `to`: credits the recipient's identity. Panics if the
@@ -436,6 +411,33 @@ pub fn credit_identity(e: &Env, token: &Address, identity: &Address, amount: i12
         panic_with_error!(e, ComplianceModuleError::MaxBalanceExceeded);
     }
     set_id_balance(e, token, identity, next);
+}
+
+/// Credits `amount` to `identity`'s tracked aggregate balance under `token`
+/// without enforcing the per-identity cap. Used for forced transfers, where
+/// the cap is an investor-facing policy the admin is consciously overriding
+/// but the books must still record the movement.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token address.
+/// * `identity` - The identity (on-chain ID) address.
+/// * `amount` - The amount to credit. Must be non-negative; the caller is
+///   responsible for validating it before calling.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::MathOverflow`] - When adding `amount` to the
+///   current balance overflows.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks and skips the per-identity
+/// cap check.
+pub fn credit_identity_unchecked(e: &Env, token: &Address, identity: &Address, amount: i128) {
+    let current = get_id_balance(e, token, identity);
+    set_id_balance(e, token, identity, add_i128_or_panic(e, current, amount));
 }
 
 /// Debits `amount` from `identity`'s tracked aggregate balance under `token`.

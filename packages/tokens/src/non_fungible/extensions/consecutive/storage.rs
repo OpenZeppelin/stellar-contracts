@@ -373,7 +373,7 @@ impl Consecutive {
     ///
     /// # Events
     ///
-    /// * topics - `["approve", owner: Address, token_id: u32]`
+    /// * topics - `["approve", approver: Address, token_id: u32]`
     /// * data - `[approved: Address, live_until_ledger: u32]`
     ///
     /// # Notes

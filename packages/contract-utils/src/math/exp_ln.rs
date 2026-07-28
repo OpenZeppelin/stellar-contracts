@@ -26,10 +26,20 @@ use soroban_sdk::{Env, I256, U256};
 
 /// Input threshold at/below which `exp_wad(x)` returns 0.
 ///
-/// For `x` this small, `e^x * 10^18` evaluates to less than `0.5`, which
-/// truncates to `0` in WAD precision. The exact value is
-/// `floor(ln(0.5 * 10^-18) * 10^18)` ≈ `-42.139 * 10^18`.
-const EXP_INPUT_MIN: i128 = -42_139_678_854_452_767_551;
+/// Solmate's cutoff is `floor(ln(0.5 * 10^-18) * 10^18)` ≈ `-42.139 * 10^18`
+/// (where `e^x * 10^18` drops below `0.5`), and inputs just above it flow
+/// through the algorithm to the final `>> (195 - k)` scaling. In that band
+/// the range-reduction exponent `k` reaches `-61`, making the shift amount
+/// exactly 256, which the EVM defines as 0 but soroban's `U256::shr` rejects
+/// as out of domain. The same inputs must therefore be caught by this early
+/// return instead.
+///
+/// The value is `floor(-60.5 * ln(2) * 10^18)`: the largest input for which
+/// `k = round(x / ln(2))` reaches `-61`. Everything at/below it is exactly
+/// the set of inputs Solmate zeroes via EVM shift semantics, and returning 0
+/// remains the correct truncated result, since `e^x * 10^18` only reaches 1
+/// at `x = -18 * ln(10) * 10^18` ≈ `-41.446 * 10^18`, well above this cutoff.
+const EXP_INPUT_MIN: i128 = -41_935_404_423_876_691_220;
 
 /// Input threshold at/above which `exp_wad(x)` overflows.
 ///
@@ -229,6 +239,8 @@ pub(super) fn exp_wad(e: &Env, x: i128) -> Option<i128> {
 
     // k is i32-sized after range reduction; narrow via to_i128.
     let k_i128 = k.to_i128()?;
+    // The `EXP_INPUT_MIN` early return guarantees `k >= -60`, keeping this
+    // below 256 (the EVM yields 0 for shifts >= 256; `U256::shr` traps).
     let shr_amount = (195_i128 - k_i128) as u32;
 
     let result_bytes = r_u256.mul(&final_mul).shr(shr_amount).to_be_bytes();

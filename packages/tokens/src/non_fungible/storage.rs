@@ -311,7 +311,7 @@ impl Base {
     ///
     /// # Events
     ///
-    /// * topics - `["approve", owner: Address, token_id: u32]`
+    /// * topics - `["approve", approver: Address, token_id: u32]`
     /// * data - `[approved: Address, live_until_ledger: u32]`
     ///
     /// # Notes
@@ -351,7 +351,7 @@ impl Base {
     ///
     /// # Events
     ///
-    /// * topics - `["approve", owner: Address]`
+    /// * topics - `["approve_for_all", owner: Address]`
     /// * data - `[operator: Address, live_until_ledger: u32]`
     ///
     /// # Notes

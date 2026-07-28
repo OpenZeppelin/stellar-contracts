@@ -1,15 +1,19 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, symbol_short, testutils::Address as _, Address, Env,
-    String,
+    contract, contractimpl, panic_with_error, symbol_short,
+    testutils::{Address as _, Events},
+    Address, Env, Event, String,
 };
 use stellar_contract_utils::pausable;
-use stellar_event_assertion::EventAssertion;
 
 use crate::{
-    fungible::ContractOverrides,
-    rwa::{storage::RWAStorageKey, IdentityVerifier, RWAError, RWA},
+    fungible::{ContractOverrides, Transfer},
+    rwa::{
+        compliance::{AccountSnapshot, TransferKind},
+        storage::RWAStorageKey,
+        IdentityVerifier, RWAError, RecoverySuccess, TokensUnfrozen, RWA,
+    },
 };
 
 #[contract]
@@ -51,25 +55,29 @@ struct MockCompliance;
 
 #[contractimpl]
 impl MockCompliance {
-    pub fn can_transfer(
+    // Compliance rejects by panicking from the hook. The `tx_ok` / `mint_ok`
+    // flags let tests flip this mock into rejection mode.
+    pub fn transferred(
         e: Env,
-        _from: Address,
-        _to: Address,
+        _from: AccountSnapshot,
+        _to: AccountSnapshot,
         _amount: i128,
+        kind: TransferKind,
         _contract: Address,
-    ) -> bool {
-        e.storage().persistent().get(&symbol_short!("tx_ok")).unwrap_or(true)
+    ) {
+        let ok: bool = e.storage().persistent().get(&symbol_short!("tx_ok")).unwrap_or(true);
+        assert!(ok, "compliance rejected transfer");
+        // Record the reported kind so tests can assert which one the token
+        // sent for a given operation.
+        e.storage().persistent().set(&symbol_short!("last_kind"), &kind);
     }
 
-    pub fn can_create(e: Env, _to: Address, _amount: i128, _contract: Address) -> bool {
-        e.storage().persistent().get(&symbol_short!("mint_ok")).unwrap_or(true)
+    pub fn created(e: Env, _to: AccountSnapshot, _amount: i128, _contract: Address) {
+        let ok: bool = e.storage().persistent().get(&symbol_short!("mint_ok")).unwrap_or(true);
+        assert!(ok, "compliance rejected mint");
     }
 
-    pub fn transferred(_e: Env, _from: Address, _to: Address, _amount: i128, _contract: Address) {}
-
-    pub fn created(_e: Env, _to: Address, _amount: i128, _contract: Address) {}
-
-    pub fn destroyed(_e: Env, _from: Address, _amount: i128, _contract: Address) {}
+    pub fn destroyed(_e: Env, _from: AccountSnapshot, _amount: i128, _contract: Address) {}
 }
 
 #[contract]
@@ -123,7 +131,7 @@ fn set_and_get_onchain_id() {
         let onchain_id = Address::generate(&e);
         RWA::set_onchain_id(&e, &onchain_id);
         assert_eq!(RWA::onchain_id(&e), onchain_id);
-        EventAssertion::new(&e, address.clone()).assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -147,7 +155,7 @@ fn set_and_get_compliance() {
         let compliance = Address::generate(&e);
         RWA::set_compliance(&e, &compliance);
         assert_eq!(RWA::compliance(&e), compliance);
-        EventAssertion::new(&e, address.clone()).assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -171,7 +179,7 @@ fn set_and_get_identity_verifier() {
         let identity_verifier = Address::generate(&e);
         RWA::set_identity_verifier(&e, &identity_verifier);
         assert_eq!(RWA::identity_verifier(&e), identity_verifier);
-        EventAssertion::new(&e, address.clone()).assert_event_count(1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -199,7 +207,7 @@ fn mint_tokens() {
         assert_eq!(RWA::balance(&e, &to), 100);
         assert_eq!(RWA::total_supply(&e), 100);
         // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted
-        EventAssertion::new(&e, address.clone()).assert_event_count(3);
+        assert_eq!(e.events().all().events().len(), 3);
     });
 }
 
@@ -217,7 +225,7 @@ fn mint_without_compliance_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #306)")]
+#[should_panic(expected = "compliance rejected mint")]
 fn mint_fails_when_not_compliant() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
@@ -305,7 +313,45 @@ fn burn_tokens() {
         assert_eq!(RWA::balance(&e, &account), 70);
         assert_eq!(RWA::total_supply(&e), 70);
         // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 Burned
-        EventAssertion::new(&e, address.clone()).assert_event_count(4);
+        assert_eq!(e.events().all().events().len(), 4);
+    });
+}
+
+#[test]
+fn burn_with_token_unfreezing() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        RWA::mint(&e, &account, 100);
+
+        // Freeze 60 tokens, leaving 40 free
+        RWA::freeze_partial_tokens(&e, &account, 60);
+        assert_eq!(RWA::get_frozen_tokens(&e, &account), 60);
+        assert_eq!(RWA::get_free_tokens(&e, &account), 40);
+
+        // Burn 70 tokens (more than free tokens)
+        // This should automatically unfreeze 30 tokens (70 - 40)
+        RWA::burn(&e, &account, 70);
+
+        assert_eq!(RWA::balance(&e, &account), 30);
+        assert_eq!(RWA::total_supply(&e), 30);
+
+        // Verify frozen tokens were reduced by 30 (60 - 30 = 30)
+        assert_eq!(RWA::get_frozen_tokens(&e, &account), 30);
+        assert_eq!(RWA::get_free_tokens(&e, &account), 0);
+
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen
+        // + 1 TokensUnfrozen + 1 Burned
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 6);
+        assert_eq!(
+            events.events().get(4).unwrap(),
+            &TokensUnfrozen { user_address: account.clone(), amount: 30 }.to_xdr(&e, &address)
+        );
     });
 }
 
@@ -358,7 +404,7 @@ fn address_freezing() {
         RWA::set_address_frozen(&e, &user, false);
         assert!(!RWA::is_frozen(&e, &user));
         // 1 AddressFrozen (true) + 1 AddressFrozen (false)
-        EventAssertion::new(&e, address.clone()).assert_event_count(2);
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 
@@ -385,7 +431,7 @@ fn partial_token_freezing() {
         assert_eq!(RWA::get_frozen_tokens(&e, &user), 20);
         // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen + 1
         // TokensUnfrozen
-        EventAssertion::new(&e, address.clone()).assert_event_count(5);
+        assert_eq!(e.events().all().events().len(), 5);
     });
 }
 
@@ -447,9 +493,69 @@ fn recover_balance() {
         // Verify tokens were transferred
         assert_eq!(RWA::balance(&e, &old_account), 0);
         assert_eq!(RWA::balance(&e, &new_account), 100);
-        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 Transfer (forced) + 1
-        // RecoverySuccess
-        EventAssertion::new(&e, address.clone()).assert_event_count(5);
+
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 Transfer
+        // (recovery) + 1 RecoverySuccess
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 5);
+        assert_eq!(
+            events.events().get(3).unwrap(),
+            &Transfer { from: old_account.clone(), to: new_account.clone(), amount: 100 }
+                .to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(4).unwrap(),
+            &RecoverySuccess { old_account: old_account.clone(), new_account: new_account.clone() }
+                .to_xdr(&e, &address)
+        );
+    });
+}
+
+#[test]
+fn recover_balance_reports_recovery_kind() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let old_account = Address::generate(&e);
+    let new_account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let compliance = set_and_return_compliance(&e);
+
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("recovery"), &new_account);
+        });
+
+        RWA::mint(&e, &old_account, 100);
+        let success = RWA::recover_balance(&e, &old_account, &new_account);
+        assert!(success);
+
+        // The compliance hook saw the movement as a recovery, not a seizure.
+        let kind: TransferKind = e.as_contract(&compliance, || {
+            e.storage().persistent().get(&symbol_short!("last_kind")).unwrap()
+        });
+        assert_eq!(kind, TransferKind::Recovery);
+    });
+}
+
+#[test]
+fn forced_transfer_reports_forced_kind() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let _ = set_and_return_identity_verifier(&e);
+        let compliance = set_and_return_compliance(&e);
+
+        RWA::mint(&e, &from, 100);
+        RWA::forced_transfer(&e, &from, &to, 40);
+
+        let kind: TransferKind = e.as_contract(&compliance, || {
+            e.storage().persistent().get(&symbol_short!("last_kind")).unwrap()
+        });
+        assert_eq!(kind, TransferKind::Forced);
     });
 }
 
@@ -618,8 +724,8 @@ fn forced_transfer_succeeds_when_from_identity_unverified() {
 
         // Revoke `from`'s identity after the mint. forced_transfer must still
         // succeed because it only verifies `to`; this is what lets it pull
-        // tokens out of sanctioned/compromised wallets and underlies
-        // `recover_balance`.
+        // tokens out of sanctioned/compromised wallets. `recover_balance`
+        // shares the same mechanics.
         e.as_contract(&identity_verifier, || {
             e.storage().persistent().set(&symbol_short!("id_deny"), &from);
         });
@@ -659,6 +765,15 @@ fn forced_transfer_with_token_unfreezing() {
         assert_eq!(RWA::get_frozen_tokens(&e, &from), 30);
         assert_eq!(RWA::get_free_tokens(&e, &from), 0); // 30 balance - 30
                                                         // frozen = 0 free
+
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen
+        // + 1 TokensUnfrozen + 1 Transfer
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 6);
+        assert_eq!(
+            events.events().get(4).unwrap(),
+            &TokensUnfrozen { user_address: from.clone(), amount: 30 }.to_xdr(&e, &address)
+        );
     });
 }
 
@@ -998,7 +1113,7 @@ fn transfer_fails_when_contract_paused() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #305)")]
+#[should_panic(expected = "compliance rejected transfer")]
 fn transfer_fails_when_not_compliant() {
     let e = Env::default();
     e.mock_all_auths();
