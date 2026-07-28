@@ -8,7 +8,7 @@ use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_macros::{only_admin, only_role};
 use stellar_tokens::{
-    fungible::{Base, Compose, FungibleToken},
+    fungible::{total_supply::FungibleTotalSupply, Base, Compose, FungibleToken},
     rwa::{RWAError, RWAToken, RWA},
 };
 
@@ -86,6 +86,9 @@ impl FungibleToken for RWATokenContract {
         RWA::transfer(e, &from, &to, amount);
     }
 }
+
+#[contractimpl(contracttrait)]
+impl FungibleTotalSupply for RWATokenContract {}
 
 #[contractimpl(contracttrait)]
 impl RWAToken for RWATokenContract {

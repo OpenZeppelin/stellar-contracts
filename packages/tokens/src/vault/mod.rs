@@ -17,6 +17,10 @@ use crate::fungible::FungibleToken;
 ///
 /// The vault maintains a conversion rate between shares and assets based on
 /// the total supply of shares and total assets held by the vault contract.
+/// The `Vault` contract type is therefore inherently supply-aware, and vault
+/// contracts are expected to also implement
+/// [`crate::fungible::total_supply::FungibleTotalSupply`] to expose the
+/// supply of shares.
 ///
 /// # Design Overview
 ///

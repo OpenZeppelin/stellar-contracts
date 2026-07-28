@@ -1,9 +1,22 @@
-use soroban_sdk::{Address, Env, MuxedAddress};
-use stellar_governance::votes::transfer_voting_units;
+use soroban_sdk::{panic_with_error, Address, Env, MuxedAddress};
+use stellar_governance::votes::{get_total_supply, transfer_voting_units};
 
-use crate::fungible::{overrides::BurnableOverrides, Base, ContractOverrides};
+use crate::fungible::{
+    overrides::BurnableOverrides, total_supply::TotalSupplyOverrides, Base, ContractOverrides,
+    FungibleTokenError,
+};
 
 pub struct FungibleVotes;
+
+// The voting checkpoints already track the total supply; the query is served
+// from them instead of a separate supply entry.
+impl TotalSupplyOverrides for FungibleVotes {
+    fn total_supply(e: &Env) -> i128 {
+        get_total_supply(e)
+            .try_into()
+            .unwrap_or_else(|_| panic_with_error!(e, FungibleTokenError::MathOverflow))
+    }
+}
 
 impl ContractOverrides for FungibleVotes {
     fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {

@@ -2,7 +2,7 @@
 
 use soroban_sdk::{contract, contractimpl, Address, Env, MuxedAddress, String};
 use stellar_tokens::{
-    fungible::{Base, Compose, FungibleToken},
+    fungible::{total_supply::FungibleTotalSupply, Base, Compose, FungibleToken},
     vault::{FungibleVault, Vault},
 };
 
@@ -38,6 +38,9 @@ impl FungibleToken for ExampleContract {
         Vault::decimals(e)
     }
 }
+
+#[contractimpl(contracttrait)]
+impl FungibleTotalSupply for ExampleContract {}
 
 #[contractimpl(contracttrait)]
 impl FungibleVault for ExampleContract {}
