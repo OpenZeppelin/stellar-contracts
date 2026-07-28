@@ -52,32 +52,25 @@ An implementation MUST separate the following concerns. The boundaries are norma
 | Chain adapter | §9 | Reads, payload encoding, submission, typed errors | I/O |
 | Role facades | §10–§12 | Holder wallet, auditor, disclosure, indexer clients | Stateful |
 
-The crypto core MUST NOT depend on any layer above it, and MUST NOT perform network or filesystem access.
-
 ---
 
 ## 3. Roles and Capability Separation
 
-Five roles consume the protocol. Each holds distinct key material and MUST be *structurally* incapable of exceeding its capability. A facade that accepts an auditor key and exposes a spend-witness builder is non-conformant even if no caller invokes it.
+Five roles consume the protocol. Each holds distinct key material and MUST be *structurally* incapable of exceeding its capability.
 
-| Role | Holds | Can | Cannot |
-|:--|:--|:--|:--|
-| Holder | Root, $$sk$$, $$vk$$ | Spend, withdraw, merge, delegate, disclose, read own balances | Read another account's balances |
-| Spender | Own $$sk_{\text{op}}$$, escrowed $$dvk_i$$ | Spend from the allowance, read allowance state, disclose own spender transfers | Touch the owner's spendable balance; exceed or extend the allowance |
-| Auditor | Auditor secret $$k$$ | Decrypt both channels for accounts bound to its `auditor_id` (DESIGN_cont.md §8.1) | Construct any opening of a post-merge spendable balance; authorize anything |
-| Disclosure recipient | $$(r_R, P_R)$$ | Verify a disclosure proof and recover the disclosed amount | Compel a disclosure; read anything undisclosed |
-| Observer | Nothing | Read commitments, ciphertexts, ephemerals, addresses, public amounts | Recover any hidden value |
-
-Two consequences an implementation MUST honour:
-
-- **Viewing capability never implies spending capability.** $$vk$$ cannot recover $$sk$$ (DESIGN.md §4.2, Poseidon2 preimage resistance). A facade constructed from $$vk$$ alone MUST be able to decrypt and reconstruct state but MUST NOT be able to produce a proof for any spending circuit.
-- **The auditor's capability is forward-only and receiving-side only** (DESIGN_cont.md §8.2). §11 specifies how this MUST be represented in the auditor's data model.
+| Role | Holds | Can |
+|:--|:--|:--|
+| Holder | Root, $$sk$$, $$vk$$ | Spend, withdraw, merge, delegate, disclose, read own balances |
+| Spender | Own $$sk_{\text{op}}$$, escrowed $$dvk_i$$ | Spend from the allowance, read allowance state, disclose own spender transfers |
+| Auditor | Auditor secret $$k$$ | Decrypt both channels for accounts bound to its `auditor_id` (DESIGN_cont.md §8.1) |
+| Disclosure recipient | $$(r_R, P_R)$$ | Verify a disclosure proof and recover the disclosed amount |
+| Observer | Nothing | Read commitments, ciphertexts, ephemerals, addresses, public amounts |
 
 ---
 
 ## 4. Crypto Core
 
-Every requirement in this section is reproduced from `circuits/lib/src/lib.nr`, which is the source of truth wherever this document and the protocol documents disagree; §16 records the disagreements.
+Every requirement in this section is reproduced from `circuits/lib/src/lib.nr`, which is the source of truth wherever this document and the protocol documents disagree.
 
 ### 4.1 Fields and the `q` / `p` notation hazard
 
@@ -88,8 +81,6 @@ Two moduli are in play, and confusing them silently corrupts state (§4.6).
 | $$r$$ | `0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001` | BN254 scalar field. Noir's `Field`; the host's `Bn254Fr`; Grumpkin **coordinate** field | `FR_MODULUS` |
 | $$q$$ | `0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47` | BN254 base field. Grumpkin **scalar** (multiplier) field, i.e. the group order | `FP_MODULUS`, and conventionally $$p$$ in the pairing literature |
 
-DESIGN.md §2.2 names the group order $$\mathbb{F}_q$$, while the general BN254 literature names that same modulus $$p$$. This document uses $$q$$ to match the protocol documents. Implementations MUST NOT assume $$p \neq q$$ on encountering both names: an implementation that treats them as distinct will produce openings that do not match on-chain points.
-
 $$r < q$$, so every $$\mathbb{F}_r$$ element is already a valid Grumpkin scalar with no reduction, which is why a Noir `Field` can be passed to `multi_scalar_mul` unambiguously.
 
 ### 4.2 Canonicality
@@ -98,11 +89,11 @@ A value is a **canonical** $$\mathbb{F}_r$$ representative iff it is a 32-byte b
 
 - Every $$\mathbb{F}_r$$ value the SDK emits — into a payload, an event assertion, a proof input, or persisted state — MUST be canonical.
 - The SDK MUST reject a non-canonical value at its own boundary rather than relying on the contract's check. The contract does check, but a client that produces non-canonical bytes has already lost byte-uniqueness in the local state that recovery reads from.
-- Points are encoded as `BytesN<64>` = $$\text{be}(x) \\| \text{be}(y)$$, a **flat** 64-byte value. The identity $$\mathcal{O}$$ is all 64 bytes zero, and decodes back to the identity. Implementations MUST NOT encode a point as a nested `{x, y}` structure (§9.2).
+- Points are encoded as `BytesN<64>` = $$\text{be}(x) \\| \text{be}(y)$$, a **flat** 64-byte value. The identity $$\mathcal{O}$$ is all 64 bytes zero, and decodes back to the identity.
 
 ### 4.3 Poseidon2 sponge
 
-DESIGN.md §2.5 does not specify this construction (§16.1). An implementation that uses its language's general-purpose Poseidon2 hash instead will produce different digests for every derivation, and every proof it builds will fail verification.
+DESIGN.md §2.5 does not specify this construction.
 
 The construction is a sponge over $$\mathbb{F}_r$$ with **width 4, rate 3, capacity 1**:
 
@@ -112,13 +103,9 @@ The construction is a sponge over $$\mathbb{F}_r$$ with **width 4, rate 3, capac
 4. If $$M$$ is not a multiple of 3, add the remaining inputs into `state[0..]` from lane 0 upward and apply one further permutation. This trailing permutation MUST also be applied when $$M = 0$$, so the empty input hashes to $$\text{permute}([0,0,0,0])[0]$$ and not to zero.
 5. Squeeze `state[0]`.
 
-The permutation itself is Barretenberg's Poseidon2 over BN254 $$\mathbb{F}_r$$ at width 4, as referenced in DESIGN.md §2.5. Implementations SHOULD build the sponge above around a library's raw permutation rather than use the library's own sponge or hash wrapper, whose padding and IV conventions are its own.
-
 **The domain-tagged funnel.** Every Poseidon2 invocation in the protocol routes through one entry point that places the domain tag as the **first absorbed element**:
 
 $$\text{poseidon\\\_with\\\_domain}(\delta, [x_1, \ldots, x_n]) = \text{sponge}([\delta, x_1, \ldots, x_n])$$
-
-An implementation MUST NOT expose a raw `sponge` to its own higher layers as the means of computing a protocol value.
 
 **Two-lane squeeze.** The auditor channels use:
 
@@ -196,7 +183,9 @@ Implementations MUST hardcode the exact numeric values below. Deviating breaks c
 
 Values 1–13 are DESIGN_cont.md §13. SELECTIVE_DISCLOSURE.md §2.2 introduces the remaining three without assigning numbers, and this document assigns them 14–16. Tags 14–16 are never absorbed inside a core circuit, so they are not part of the on-chain wire contract, but they are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
 
-All sixteen values MUST be distinct. $$\delta_{\text{disc}}$$ takes 16 rather than 13 because $$\delta_{\text{ecdh}}$$ holds 13 and the disclosure circuits invoke the ECDH derivation themselves, so sharing the tag would place a disclosure pad and an ECDH shared scalar on one domain inside a single circuit.
+All sixteen values MUST be distinct, and each MUST be used in exactly one sponge mode. Distinctness alone is insufficient, because $$\text{SpongeSqueeze}_2(\delta, s, \sigma)[0]$$ equals $$\text{poseidon\\\_with\\\_domain}(\delta, [s, \sigma])$$ (§4.3): a tag used in both modes over the same $$(s, \sigma)$$ produces the same field element in both, so one mode's output reproduces the other's pad. Tags 11 and 12 are sponge-mode tags; the remaining fourteen are plain-funnel tags.
+
+$$\delta_{\text{disc}}$$ takes 16 rather than 13 because $$\delta_{\text{ecdh}}$$ holds 13 and the disclosure circuits invoke the ECDH derivation themselves, so sharing the tag would place a disclosure pad and an ECDH shared scalar on one domain inside a single circuit.
 
 ### 4.9 Address compression
 
@@ -286,8 +275,9 @@ An implementation MUST therefore additionally, for every circuit it supports:
 
 ### 6.3 Vectors this specification requires
 
-Two derivations specified here have no fixture in `circuits/lib/testdata/` because neither is absorbed inside a core circuit. Both nonetheless require one, since two clients serving the same account must agree:
+Three derivations this document specifies or relies on have no fixture in `circuits/lib/testdata/`, because none of them is computed inside a core circuit. Each requires one:
 
+- **$$\text{address\\\_to\\\_field}$$** (§4.9). The circuits receive $$\text{addr\\\_f}$$ as an opaque public input, so this derivation is implemented twice — by the contract on-chain and by every client — and the existing fixtures pin $$\text{addr\\\_f}$$ only as a fixed constant. It is the sole primitive with two independent implementations, and §4.9's bootstrap check detects a divergence only against an already-deployed contract.
 - **$$\delta_{\text{eph}}$$ derivation** (§10.5). Nothing in any circuit constrains $$r_e$$, so a fixture is the only mechanism keeping a user's clients in agreement; where they disagree, transfers sent from one are not disclosable from another.
 - **The §5.1 $$sk$$ chain**, from a fixed root, $$\text{addr\\\_f}$$, and $$\text{acct\\\_f}$$ through to $$sk$$, $$vk$$, $$Y$$, and $$\text{PVK}$$, without which recovery from seed is untestable across implementations.
 
