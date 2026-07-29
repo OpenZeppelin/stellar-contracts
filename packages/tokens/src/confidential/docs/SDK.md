@@ -30,7 +30,7 @@ Four properties of the protocol place correctness and confidentiality in the cli
 
 ### 2.1 Terminology
 
-- **Root** — the highest-entropy secret an implementation holds for an account family: a BIP-39 seed, or a raw 32-byte value (§5).
+- **Root** — the secret an implementation feeds to §5.1's derivation: a BIP-39 seed, a SEP-0053 signature by a signer on the account, or a raw 32-byte value (§5).
 - **Opening** — the pair $$(v, r)$$ such that $$C = v \cdot G + r \cdot H$$ for an on-chain commitment $$C$$.
 - **Checkpoint** — an owner-initiated proof-carrying event publishing $$(\tilde{b}, \sigma)$$ for the owner's spendable balance: `Withdraw`, sender-side `Transfer`, `SetSpender`, `RevokeSpender` (DESIGN_cont.md §9.5). Defined identically in INDEXER.md §2.
 - **Witness material** — any value that appears as a private witness in any circuit: $$sk$$, $$vk$$, $$dvk_i$$, $$v$$, $$r$$, $$r_e$$, $$v_{\text{transfer}}$$, and every intermediate derived from them.
@@ -93,31 +93,19 @@ A value is a **canonical** $$\mathbb{F}_r$$ representative iff it is a 32-byte b
 
 ### 4.3 Poseidon2 sponge
 
-DESIGN.md §2.5 does not specify this construction.
+The sponge construction, its width and rate, the IV placement, the padding rule, and the two-lane form of $$\text{SpongeSqueeze}_2$$ are specified normatively in DESIGN.md §2.5. What follows is what that construction additionally requires of a client.
 
-The construction is a sponge over $$\mathbb{F}_r$$ with **width 4, rate 3, capacity 1**:
-
-1. Let $$M$$ be the number of input field elements. Compute the initialisation value $$\text{iv} = M \cdot 2^{64}$$.
-2. Initialise the state as $$[0, 0, 0, \text{iv}]$$ — the IV occupies the **capacity** lane, `state[3]`.
-3. For each full block of 3 inputs: **add** each input into `state[0]`, `state[1]`, `state[2]` respectively (addition in $$\mathbb{F}_r$$, not assignment), then apply the Poseidon2 permutation to the width-4 state.
-4. If $$M$$ is not a multiple of 3, add the remaining inputs into `state[0..]` from lane 0 upward and apply one further permutation. This trailing permutation MUST also be applied when $$M = 0$$, so the empty input hashes to $$\text{permute}([0,0,0,0])[0]$$ and not to zero.
-5. Squeeze `state[0]`.
+**Two self-checks are available before any proof is generated.** The absorbed length in $$\text{SpongeSqueeze}_2$$ is always 3, so its IV is fixed at $$3 \cdot 2^{64}$$; and its first lane is identical to $$\text{poseidon\\\_with\\\_domain}(\delta, [s, \sigma])$$ on the same inputs. An implementation that reproduces both has the block layout and the IV lane right.
 
 **The domain-tagged funnel.** Every Poseidon2 invocation in the protocol routes through one entry point that places the domain tag as the **first absorbed element**:
 
 $$\text{poseidon\\\_with\\\_domain}(\delta, [x_1, \ldots, x_n]) = \text{sponge}([\delta, x_1, \ldots, x_n])$$
 
-**Two-lane squeeze.** The auditor channels use:
-
-$$\text{SpongeSqueeze}_2(\delta, s, \sigma) = \big(\text{state}[0], \text{state}[1]\big) \quad \text{where} \quad \text{state} = \text{permute}([\delta, \\, s, \\, \sigma, \\, 3 \cdot 2^{64}])$$
-
-This is one permutation, two lanes. DESIGN.md §2.5's phrasing ("followed by $$n$$ sequential squeezes") describes a different construction and MUST NOT be implemented literally (§16.1). Two consequences serve as self-checks: the IV is fixed at $$3 \cdot 2^{64}$$ because the absorbed length is always 3, and the first lane is therefore identical to $$\text{poseidon\\\_with\\\_domain}(\delta, [s, \sigma])$$ on the same inputs.
-
-Squeeze-slot assignment is canonical and MUST be followed: lane 0 is always an amount mask, lane 1 is always a balance, allowance, or per-transfer-randomness mask. Single-ciphertext channels — the `Withdraw` balance checkpoint (DESIGN.md W_a3/W_a4) — take lane **1** and leave lane 0 unused, so a checkpoint pad can never coincide with an amount pad. Implementations MUST NOT substitute a plain domain-tagged hash for the lane-1 value.
+Squeeze-slot assignment is canonical and MUST be followed: lane 0 is always an amount mask, lane 1 is always a balance, allowance, or per-transfer-randomness mask. Single-ciphertext channels — the `Withdraw` balance checkpoint (DESIGN.md W_a3/W_a4) — take lane **1** and leave lane 0 unused, so a checkpoint pad can never coincide with an amount pad.
 
 ### 4.4 Generators and commitments
 
-$$G$$ and $$H$$ are Barretenberg's `derive_generators("DEFAULT_DOMAIN_SEPARATOR")` outputs at indices 0 and 1, fixed in DESIGN_cont.md §10.4 and `lib.nr`. Implementations MUST hardcode both affine coordinate pairs and MUST NOT assume any discrete-log relation between them.
+$$G$$ and $$H$$ are Barretenberg's `derive_generators("DEFAULT_DOMAIN_SEPARATOR")` outputs at indices 0 and 1, fixed in DESIGN_cont.md §10.4.
 
 $$\text{commit}(v, r) = v \cdot G + r \cdot H$$
 
@@ -130,8 +118,6 @@ $$\text{ECDH}(a, B) = \text{poseidon\\\_with\\\_domain}(\delta_{\text{ecdh}}, [S
 **Both coordinates MUST be absorbed.** An x-only extraction is negation-invariant: $$P$$ and $$-P$$ share an x-coordinate, and $$-\text{PVK} = (-vk) \cdot H$$ is itself a valid canonical registration, so an x-only map would collapse each $$(vk, -vk)$$ pair onto one shared secret (DESIGN.md §2.4). The absorb fills exactly one rate-3 block.
 
 The derivation MUST fail rather than proceed if $$S$$ is the identity: with $$\sigma$$ public, an identity shared secret makes every derived ciphertext trivially decryptable, which is why the circuits carry explicit nonzero-scalar constraints (DESIGN_cont.md §10.8).
-
-Callers needing the shared-secret *point* rather than the scalar MUST use scalar multiplication directly; the two MUST NOT be conflated in one interface.
 
 ### 4.6 Blinding accumulation — mod $$q$$, never mod $$r$$
 
@@ -151,16 +137,7 @@ Secret scalars — $$sk$$, $$r_e$$ when sampled, $$\sigma$$, $$\sigma_a$$ — MU
 2. Clear the top **2** bits, yielding a 254-bit candidate.
 3. Reject and redraw if the candidate is $$\geq r$$, or if it is zero and the call site requires nonzero.
 
-Two non-conformant shortcuts MUST be avoided:
-
-- **Reduction instead of rejection.** $$2^{256}/r \approx 5.29$$, so reducing a uniform 256-bit draw modulo $$r$$ gives residues with either 6 preimages (about 29% of them) or 5 (the rest): the most likely values occur 20% more often than the least likely.
-- **Over-masking.** Clearing more than 2 bits makes the rejection test unreachable and silently narrows the output range. Clearing a full byte, for instance, yields a uniform draw over $$[0, 2^{248})$$ rather than $$[0, r)$$ — ample entropy for a secret, but a divergence from the specified procedure that no fixture would catch.
-
-With the 2-bit mask the rejection rate is $$1 - r/2^{254} \approx 24.4\%$$, for an expected 1.32 draws per scalar.
-
 ### 4.8 Domain separators
-
-Implementations MUST hardcode the exact numeric values below. Deviating breaks cross-implementation derivation of every key, mask, and ciphertext in the protocol (DESIGN_cont.md §13).
 
 | Tag | Value | Absorbed in a core circuit? |
 |:--|:--:|:--|
@@ -181,25 +158,25 @@ Implementations MUST hardcode the exact numeric values below. Deviating breaks c
 | $$\delta_{\text{eph}}$$ | 15 | No — client convention (§10.5) |
 | $$\delta_{\text{disc}}$$ | 16 | No — off-chain disclosure only |
 
-Values 1–13 are DESIGN_cont.md §13. SELECTIVE_DISCLOSURE.md §2.2 introduces the remaining three without assigning numbers, and this document assigns them 14–16. Tags 14–16 are never absorbed inside a core circuit, so they are not part of the on-chain wire contract, but they are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
+Values 1–13 are defined in DESIGN_cont.md §13., SELECTIVE_DISCLOSURE.md §2.2 introduces the remaining three without assigning numbers, and this document assigns them 14–16. Tags 14–16 are never absorbed inside a core circuit, so they are not part of the on-chain wire contract, but they are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
 
-All sixteen values MUST be distinct, and each MUST be used in exactly one sponge mode. Distinctness alone is insufficient, because $$\text{SpongeSqueeze}_2(\delta, s, \sigma)[0]$$ equals $$\text{poseidon\\\_with\\\_domain}(\delta, [s, \sigma])$$ (§4.3): a tag used in both modes over the same $$(s, \sigma)$$ produces the same field element in both, so one mode's output reproduces the other's pad. Tags 11 and 12 are sponge-mode tags; the remaining fourteen are plain-funnel tags.
-
-$$\delta_{\text{disc}}$$ takes 16 rather than 13 because $$\delta_{\text{ecdh}}$$ holds 13 and the disclosure circuits invoke the ECDH derivation themselves, so sharing the tag would place a disclosure pad and an ECDH shared scalar on one domain inside a single circuit.
+All sixteen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tags 11 and 12 are the two-mask tags; the remaining fourteen, including 14–16, are single-output tags.
 
 ### 4.9 Address compression
 
 $$\text{address\\\_to\\\_field}(a) = \text{poseidon\\\_with\\\_domain}(\delta_{\text{addr}}, [\text{lo}(a), \text{hi}(a)])$$
 
-where $$\text{enc}(a)$$ is the 56-character ASCII strkey (SEP-23), and $$\text{lo}$$ and $$\text{hi}$$ interpret its lower and upper 28 bytes respectively in **little-endian** order (DESIGN.md §2.7). Implementations MUST reject any input whose strkey encoding is not exactly 56 bytes, and MUST obtain the strkey from their language's stellar-strkey library rather than parsing `ScAddress` XDR.
+where $$\text{enc}(a)$$ is the 56-character ASCII strkey (SEP-23), and $$\text{lo}$$ and $$\text{hi}$$ interpret its lower and upper 28 bytes respectively in **little-endian** order (DESIGN.md §2.7). Implementations MUST obtain the strkey from their language's stellar-strkey library.
 
-**Bootstrap check (RECOMMENDED).** On first contact with a deployment, an implementation SHOULD compute $$\text{addr\\\_f}$$ for the contract's own address and assert equality against the value the contract stores in instance storage (DESIGN.md §3.5). Because $$\text{addr\\\_f}$$ is a Poseidon2 output over a known input, any divergence in the sponge convention (§4.3), the domain tags (§4.8), or the limb decomposition surfaces as an inequality before any proof is generated.
+**Bootstrap check.** On first contact with a deployment, an implementation MAY compute $$\text{addr\\\_f}$$ for the contract's own address and assert equality against the value the contract stores in instance storage (DESIGN.md §3.5).
 
 ---
 
 ## 5. Key Derivation
 
-DESIGN.md §4 specifies the hierarchy **below** $$sk$$ — $$vk$$ from $$(sk, \text{addr\\\_f})$$, $$\text{PVK}$$ from $$vk$$, $$dvk_i$$ from $$(vk, \text{op}_i)$$ — and this document changes none of it. It does not specify where $$sk$$ itself comes from. This section supplies a derivation, because recovery from a seed is a stated protocol property (DESIGN.md §5.2 *Recovery*, DESIGN_cont.md §9.5, INDEXER.md §1) and two clients given the same seed would otherwise derive different accounts.
+DESIGN.md §4 specifies the hierarchy below $$sk$$ — $$vk$$ from $$(sk, \text{addr\\\_f})$$, $$\text{PVK}$$ from $$vk$$, $$dvk_i$$ from $$(vk, \text{op}_i)$$. It does not specify where $$sk$$ itself comes from. This section supplies a derivation, because recovery from a seed is a stated protocol property (DESIGN.md §5.2 *Recovery*, DESIGN_cont.md §9.5, INDEXER.md §1) and two clients given the same backup material would otherwise derive different accounts.
+
+The derivation is a single function (§5.1) over a **root**. For an account controlled by a Stellar ed25519 key that root may come from either of two classes: the BIP-39 seed the account's key was itself derived from (§5.3), or a deterministic signature by the key that controls the account (§5.4). §5.2 states which to choose and what each costs.
 
 ### 5.1 Derivation
 
@@ -209,21 +186,17 @@ where:
 
 | Input | Definition |
 |:--|:--|
-| $$\text{root}$$ | The 64-byte BIP-39 seed (§5.2), or a raw 32-byte value (§5.3) |
+| $$\text{root}$$ | The account's root, per its class: a 64-byte BIP-39 seed (§5.3), a 64-byte signer signature (§5.4), or a raw 32-byte value (§5.5) |
 | $$\text{addr\\\_f}$$ | $$\text{address\\\_to\\\_field}$$ of the confidential token contract (§4.9) |
 | $$\text{acct\\\_f}$$ | $$\text{address\\\_to\\\_field}$$ of the address being registered |
 | $$j$$ | Rejection counter, starting at 0 |
 | $$\text{RS}$$ | The §4.7 procedure applied to the 32-byte HKDF output: clear the top 2 bits, accept iff the result is in $$[1, r)$$, otherwise increment $$j$$ and re-derive |
 
-The candidate MUST also be rejected if the resulting $$vk = \text{poseidon\\\_with\\\_domain}(\delta_{\text{vk}}, [sk, \text{addr\\\_f}])$$ is zero, since registration constraint R5 requires $$vk \neq 0$$. Both rejections have probability on the order of $$2^{-254}$$.
+The candidate MUST also be rejected if the resulting $$vk = \text{poseidon\\\_with\\\_domain}(\delta_{\text{vk}}, [sk, \text{addr\\\_f}])$$ is zero, since registration constraint R5 requires $$vk \neq 0$$.
 
 Why each element is present:
 
-**Rejection sampling, not reduction.** The output inherits §4.7's uniformity over $$\mathbb{F}_r$$. Feeding a raw HKDF output through a modular reduction instead reintroduces the non-uniformity quantified in §4.7.
-
 **HKDF-SHA-512, not Poseidon2.** No circuit constrains how $$sk$$ was obtained — the register circuit constrains only $$Y = sk \cdot H$$ (R1) and $$vk$$'s derivation from $$sk$$ (R2). There is therefore no in-circuit consistency argument for Poseidon2 here, and SHA-512 keeps the seed-custody path on a primitive that every BIP-39 library and secure element already implements. Implementations MUST NOT substitute a different KDF, since the choice is arbitrary in isolation but must be identical across clients.
-
-**Derived from the seed, not from the SEP-0005 signing key.** SLIP-0010 hardened children are derivable from the parent *private* key, so any key derived beneath `m/44'/148'/i'` is recoverable by whoever obtains that ed25519 secret, and exporting an account secret key is a routine operation in Stellar wallets. Deriving from the seed under a distinct salt keeps the confidential key and the transaction-signing key siblings rather than ancestor and descendant, so compromise of the signing key does not confer the ability to view or spend confidential balances. Implementations MUST NOT derive $$sk$$ from, or store it alongside, the ed25519 secret.
 
 **Bound to $$\text{addr\\\_f}$$.** $$vk$$ is already deployment-scoped by DESIGN.md §4.2, which bounds the blast radius of a *viewing*-key compromise to one deployment. Binding $$sk$$ likewise bounds a *spending*-key compromise, and the contract address is known whenever a client talks to a deployment.
 
@@ -231,28 +204,85 @@ Why each element is present:
 
 **No account-index input.** Binding $$\text{acct\\\_f}$$ makes a separate SEP-0005 index redundant: the address determines the account, and the index is merely the path that produced the address. Implementations MUST NOT introduce one.
 
-### 5.2 Seed roots
+**One salt across all root classes.** The classes differ in their ikm, and a signer root's domain separation lives in the message it signs (§5.4) rather than in the salt, so a per-class salt would separate nothing the ikm does not already separate. The class is recorded per account (§5.5) because the classes differ in what regenerates the key, not because the derivation needs to tell them apart.
 
-For accounts controlled by a Stellar ed25519 key, `root` SHOULD be the 64-byte BIP-39 seed produced from a mnemonic and optional passphrase — the same seed SEP-0005 derives account keys from. Implementations SHOULD accept 24-word mnemonics (256-bit entropy) and MAY accept 12-word.
+### 5.2 Choosing a root class
 
-### 5.3 Non-seed roots
+For an account whose key came from a mnemonic, both classes reproduce $$sk$$ from that mnemonic, so neither forfeits seed recovery; a signer root additionally covers accounts with no mnemonic behind them. The classes differ in what the confidential client must hold and in whether the ed25519 signing key becomes a single point of failure for confidential funds.
+
+**The rule.** An implementation that already holds the mnemonic for an account SHOULD use a seed root: a signer root buys nothing there, because the seed is in the process either way, and it costs the coupling described below. An implementation that does not hold the mnemonic, and should not — an account fronted by a hardware wallet, or one that exists only as an exported `S…` secret with no mnemonic behind it — SHOULD use a signer root. An implementation MAY support both, and MUST record which produced each account (§5.5).
+
+| | Seed root (§5.3) | Signer root (§5.4) |
+|:--|:--|:--|
+| ikm | 64-byte BIP-39 seed | 64-byte SEP-0053 signature |
+| Requires of the custody stack | mnemonic or seed export | SEP-0053 message signing |
+| What the confidential client holds | authority over every account and asset under the mnemonic | authority over one confidential account on one deployment |
+| If the ed25519 secret leaks | confidential balances unaffected | view and spend of the confidential account, unrecoverably |
+| Reproducible from | the mnemonic and its passphrase | the enrolled signer, or the mnemonic and passphrase plus the recorded SEP-0005 index |
+| Survives signer rotation | yes | no |
+| Needs a deterministic signer | no | yes — excludes randomised and threshold ed25519 signers |
+| Account discovery (§5.6) | offline, full index scan | one signature per candidate index |
+
+**The coupling is the whole cost of a signer root.** Whoever obtains the ed25519 secret can recompute the signature and therefore $$sk$$, gaining both view and spend of the confidential account. Stellar's operational culture makes this live rather than theoretical: exporting and pasting an `S…` secret is a routine act, and the confidential account does not recover from it. `register` is single-use (DESIGN_cont.md §11), so $$sk$$ cannot be rotated in place; remediation means registering a fresh address and moving the funds through a transfer that links the old address to the new one. Under a seed root the signing key can leak with no consequence for confidential balances, because the two keys are siblings rather than ancestor and descendant.
+
+**The host exposure is the whole benefit of a signer root.** §13 establishes that $$sk$$ is necessarily host-resident: proving takes it as a private witness, so a device that does not prove internally must hand it to the host. Hardware custody therefore cannot protect $$sk$$ under either class; what it can still protect is the mnemonic. A seed root puts authority over every account and every asset under that mnemonic into the confidential client's process, while a signer root puts one 64-byte value there whose authority is one confidential account on one deployment. A seed root consequently requires a hardware-wallet user to put the mnemonic into software, exposing every account under it to a client that needs one.
+
+**Neither class dominates.** A seed root minimises credential-leak risk; a signer root minimises host-exposure risk. Which of the two is live is a property of how the account is already held, so the choice is keyed to custody shape rather than settled here for every deployment.
+
+### 5.3 Seed roots
+
+A seed root is the 64-byte BIP-39 seed produced from a mnemonic and optional passphrase — the same seed SEP-0005 derives account keys from. Implementations SHOULD accept 24-word mnemonics (256-bit entropy) and MAY accept 12-word.
+
+The seed itself is the ikm, never a SLIP-0010 child of it. Deriving $$sk$$ beneath `m/44'/148'/i'` would place it under the ed25519 account key rather than beside it, since SLIP-0010 hardened children are derivable from the parent *private* key. That reproduces §5.2's coupling without the SEP-0053 envelope that bounds a harvested signature to one account, and without the enrolment record that makes the coupling visible to recovery. Implementations MUST NOT derive a seed root from any node of the SEP-0005 path.
+
+### 5.4 Signer roots
+
+A signer root is a SEP-0053 signature over a message naming this protocol, the deployment, and the account:
+
+$$\text{msg} = \texttt{"openzeppelin/confidential-token/v1/sk"} \\,\\|\\, \texttt{0x0a} \\,\\|\\, \text{enc}(\text{contract}) \\,\\|\\, \texttt{0x0a} \\,\\|\\, \text{enc}(\text{account})$$
+
+$$\text{root} = \text{Ed25519-Sign}\big(sk_{\text{ed}}, \\;\\; \text{SHA-256}(\text{prefix} \\,\\|\\, \text{msg})\big)$$
+
+where `prefix` is SEP-0053's 24 ASCII bytes `Stellar Signed Message:\n`, $$\text{enc}$$ is the 56-character strkey of §4.9, and $$sk_{\text{ed}}$$ is the ed25519 secret of a signer on the account. The message is 151 bytes, printable ASCII apart from its two separators, and carries the strkeys rather than their §4.9 compressions so that a wallet rendering SEP-0053 messages as text shows the user addresses they can compare against the deployment they intend to register on. The 64-byte signature is HKDF input material unchanged.
+
+Binding both addresses into the *message* rather than relying on §5.1's `info` alone is what bounds a harvested signature: a dapp that tricks a user into signing once obtains the root for that account on that deployment, not for every account the key controls on every deployment.
+
+**The SEP-0053 envelope is mandatory even where the secret is extractable.** A client holding the raw ed25519 secret MUST compute this signature itself rather than use the secret as ikm directly. One form then covers both custody shapes: an account enrolled through a wallet prompt is reproducible by a client that later imports the secret, and the reverse.
+
+**Availability is not guaranteed.** A signer root exists only where the custody stack implements SEP-0053 message signing, and support across Stellar wallets and hardware apps is uneven. An implementation MUST treat its absence as an expected outcome and fall back to §5.3 or §5.5, not fail enrolment.
+
+**Verify the signature before using it.** An implementation MUST verify the returned signature against the ed25519 public key it expects to have signed, and MUST abort on mismatch. A wallet with a different account selected returns a well-formed signature over the same message, yielding a wrong but entirely usable $$sk$$: registration succeeds, and the account is then unreproducible from the key the user believes controls it.
+
+**Determinism is a precondition.** RFC 8032 ed25519 derives its nonce from the secret and the message, so a conforming signer returns the same 64 bytes forever. Signers that randomise the nonce do not, and threshold and MPC ed25519 are in that category — the nonce is generated per signing session, so a signature does not reproduce in the next one. An implementation MUST obtain the signature twice from independent invocations and MUST abort if they differ. That detects the common case and not every case, since a signer can be deterministic within a session and not across sessions, so an implementation MUST additionally offer $$sk$$ export as a direct-import backup (§5.5) and SHOULD prompt for it before the account first receives funds.
+
+**The ikm MUST NOT be persisted.** The 64-byte signature is equivalent to $$sk$$ for this account and deployment. Implementations MUST derive on demand; where $$sk$$ itself is cached, §13's storage-at-rest rules govern it.
+
+**Record the enrolled signer.** A Stellar address may have signers besides its master key, and $$sk$$ is keyed to the *address* through $$\text{acct\\\_f}$$ rather than to the key that signed for it, so which signer enrolled is not recoverable from the address or from chain state. Implementations MUST record the enrolled ed25519 public key and MUST NOT assume it is the master key. A second client enrolling the same address with a different signer derives a different $$sk$$ whose $$Y$$ does not match the registered spending public key; §5.6's comparison detects that and cannot repair it.
+
+**Signer rotation orphans the account.** `set_options` can replace or remove the key controlling an address, and the confidential account survives that rotation while its root does not. An implementation SHOULD compare the recorded signer against the address's current signer set on sync and surface a warning when the enrolled key is no longer among them, because discarding that key after rotation destroys the only seedless path back to $$sk$$.
+
+**Discovery degrades.** §5.6's scan derives $$sk$$ once per candidate index, which under a signer root means one signature per candidate — a user approval each on a hardware wallet, and nothing at all for an index whose key the custody stack will not sign with. An implementation MUST NOT present signer-root discovery as equivalent to seed-root discovery.
+
+### 5.5 Raw roots and imported keys
 
 Implementations MUST also accept a raw 32-byte `root`, used unchanged as HKDF input material. Two cases require it:
 
-- **Contract addresses.** A confidential account registered by a smart account or other contract address has no mnemonic, and its root comes from whatever custody mechanism controls the contract.
+- **Contract addresses.** A confidential account registered by a smart account or other contract address has no mnemonic and no ed25519 signer of its own, and its root comes from whatever custody mechanism controls the contract.
 - **Imported keys.** Deployments predating this specification hold $$sk$$ values sampled directly from a CSPRNG with no root behind them. Such a key MUST remain usable as a first-class account secret via direct import, bypassing §5.1 entirely.
 
-An implementation MUST record, per account, which of the three forms produced its $$sk$$ — seed-derived, raw-root-derived, or directly imported — because only the first two are reproducible from backup material, and a user MUST NOT be shown a recovery-phrase affordance for an account whose key it cannot regenerate.
+An implementation MUST record, per account, which of the four forms produced its $$sk$$ — seed root, signer root, raw root, or direct import — because they differ in what regenerates the key: backup words, a live signer, a stored 32-byte value, or nothing beyond the stored $$sk$$. A user MUST NOT be shown a recovery-phrase affordance for an account whose key cannot be regenerated from a phrase, and a signer-root account MUST NOT be presented as phrase-recoverable unless its enrolled SEP-0005 index is recorded alongside the signer (§5.4).
 
-### 5.4 Recovery and account discovery
+### 5.6 Recovery and account discovery
 
-Recovering an account family requires the mnemonic, its passphrase if any, and the contract address. The set of addresses is discovered rather than remembered:
+Recovering a seed-root account family requires the mnemonic, its passphrase if any, and the contract address. The set of addresses is discovered rather than remembered:
 
 1. Enumerate candidate Stellar addresses by scanning SEP-0005 indices $$i = 0, 1, 2, \ldots$$ from the seed.
 2. For each candidate address, compute $$\text{acct\\\_f}$$, derive $$sk$$ per §5.1, and compute $$Y = sk \cdot H$$.
 3. Read the account record at that address and compare its stored spending public key against $$Y$$. A match identifies a registered confidential account belonging to this root.
 
 Implementations exposing this scan MUST pin a gap limit — a number of consecutive unregistered indices after which scanning stops — and MUST surface it, since an account beyond the limit is invisible to recovery even though its funds exist. Scanning MUST NOT be presented as exhaustive.
+
+Recovering a signer-root account requires the enrolled signer, either directly or by re-deriving it from the mnemonic at the recorded SEP-0005 index (§5.5). Step 2 then costs one signature per candidate rather than one hash, so an implementation SHOULD drive signer-root recovery from its own per-account record and SHOULD NOT scan blindly. An account whose enrolled signer is neither held nor re-derivable is unrecoverable, and only the direct import of a previously exported $$sk$$ reaches it.
 
 ---
 
@@ -279,7 +309,7 @@ Three derivations this document specifies or relies on have no fixture in `circu
 
 - **$$\text{address\\\_to\\\_field}$$** (§4.9). The circuits receive $$\text{addr\\\_f}$$ as an opaque public input, so this derivation is implemented twice — by the contract on-chain and by every client — and the existing fixtures pin $$\text{addr\\\_f}$$ only as a fixed constant. It is the sole primitive with two independent implementations, and §4.9's bootstrap check detects a divergence only against an already-deployed contract.
 - **$$\delta_{\text{eph}}$$ derivation** (§10.5). Nothing in any circuit constrains $$r_e$$, so a fixture is the only mechanism keeping a user's clients in agreement; where they disagree, transfers sent from one are not disclosable from another.
-- **The §5.1 $$sk$$ chain**, from a fixed root, $$\text{addr\\\_f}$$, and $$\text{acct\\\_f}$$ through to $$sk$$, $$vk$$, $$Y$$, and $$\text{PVK}$$, without which recovery from seed is untestable across implementations.
+- **The §5.1 $$sk$$ chain**, from a fixed root, $$\text{addr\\\_f}$$, and $$\text{acct\\\_f}$$ through to $$sk$$, $$vk$$, $$Y$$, and $$\text{PVK}$$, without which recovery from backup material is untestable across implementations. Each root class needs one: the seed-root vector from a fixed mnemonic and passphrase, and the signer-root vector from a fixed ed25519 secret through §5.4's message, its SEP-0053 preimage, and the resulting signature. The signature step is where two clients most plausibly diverge, being the only step in the chain whose format is set outside this document.
 
 ---
 
@@ -414,7 +444,7 @@ where $$vk$$ is the originator's viewing key and $$\sigma_E$$ the operation's sa
 
 **Three consequences an implementation MUST handle.**
 
-First, **it widens the viewing-key blast radius, retroactively.** DESIGN_cont.md §9.4 states that a $$vk$$ holder cannot construct openings of any commitment. Under this convention a $$vk$$ holder recomputes $$r_e$$, hence the recipient shared scalar, hence $$r_{\text{transfer}}$$ — a full opening of every transfer commitment the account ever created, including transfers predating the compromise, and those commitments sit inside recipients' receiving balances. The *amounts* were already inferable by differencing checkpoints and netting merges, so that capability is not new; the openings are, and they extend a capability DESIGN_cont.md §8.2 otherwise scopes to the recipient's auditor (§16.2). An implementation MUST treat $$vk$$ accordingly in §13 and MUST NOT export it as a read-only credential without stating this.
+First, **it widens the viewing-key blast radius, retroactively.** DESIGN_cont.md §9.4 states that a $$vk$$ holder cannot construct openings of any commitment. Under this convention a $$vk$$ holder recomputes $$r_e$$, hence the recipient shared scalar, hence $$r_{\text{transfer}}$$ — a full opening of every transfer commitment the account ever created, including transfers predating the compromise, and those commitments sit inside recipients' receiving balances. The *amounts* were already inferable by differencing checkpoints and netting merges, so that capability is not new; the openings are, and they extend a capability DESIGN_cont.md §8.2 otherwise scopes to the recipient's auditor (§16.1). An implementation MUST treat $$vk$$ accordingly in §13 and MUST NOT export it as a read-only credential without stating this.
 
 Second, **the salt requirement of §10.4 is promoted from unlinkability to confidentiality.**
 
@@ -518,7 +548,7 @@ RPC and archive compose: the RPC serves the recent tail, the archive everything 
 
 $$vk$$ MUST NOT be presented as a safely-shareable read-only credential. It exposes every historical balance checkpoint, every incoming amount, every delegation allowance, and — under §10.5 — the opening of every transfer the account originated. Its only guarantee is that it cannot authorize spending.
 
-**Storage at rest.** Persisted openings are as sensitive as the amounts they represent, and a persisted root is equivalent to the funds. Implementations MUST document what they persist and where, and SHOULD encrypt both at rest under a key that is not itself derived from persisted material.
+**Storage at rest.** Persisted openings are as sensitive as the amounts they represent, and a persisted root is equivalent to the funds. Implementations MUST document what they persist and where, and SHOULD encrypt both at rest under a key that is not itself derived from persisted material. A signer root (§5.4) MUST NOT be persisted at all, since it is reproducible on demand from the signer.
 
 **Logging and telemetry.** Witness material, decrypted amounts, balances, and openings MUST NOT reach logs, telemetry, analytics, error reports, or crash dumps.
 
@@ -565,10 +595,6 @@ This document is versioned with the protocol documentation set. A change to any 
 
 Each item below is a place where the protocol documents are silent, mutually inconsistent, or behind the circuits. This document states the assumption it makes so that implementations agree in the interim; each still needs a decision in the document that owns it.
 
-**16.1 — The Poseidon2 sponge convention is not specified, and §2.5's description of the two-lane squeeze does not match the circuits.** DESIGN.md §2.5 cites external references for the permutation but fixes neither the sponge construction (width, rate, IV placement, absorb-by-addition, padding) nor the trailing-permutation rule; the only authority is `circuits/lib/src/lib.nr`. Separately, §2.5 describes $$\text{SpongeSqueeze}_n$$ as "a single absorb … followed by $$n$$ sequential squeezes", whereas the implementation performs one permutation and takes two lanes. §4.3 specifies the implementation's behaviour. An implementation following §2.5 alone fails every proof.
+**16.1 — Deterministic $$r_e$$ contradicts DESIGN.md §7.6 and revises DESIGN_cont.md §9.4.** DESIGN.md §7.6 step 1 instructs the sender to sample $$r_e$$; SELECTIVE_DISCLOSURE.md §7 and §15.2 instruct deriving it. These are opposite, and a client built to §7.6 alone permanently forecloses sender-side disclosure. §10.5 adopts derivation. Adopting it protocol-wide also requires amending DESIGN_cont.md §9.4, whose claim that a $$vk$$ holder "cannot construct openings of any commitment" no longer holds, and DESIGN_cont.md §8.2, whose scoping of receiving-side opening capability to the recipient's auditor becomes incomplete.
 
-**16.2 — Deterministic $$r_e$$ contradicts DESIGN.md §7.6 and revises DESIGN_cont.md §9.4.** DESIGN.md §7.6 step 1 instructs the sender to sample $$r_e$$; SELECTIVE_DISCLOSURE.md §7 and §15.2 instruct deriving it. These are opposite, and a client built to §7.6 alone permanently forecloses sender-side disclosure. §10.5 adopts derivation. Adopting it protocol-wide also requires amending DESIGN_cont.md §9.4, whose claim that a $$vk$$ holder "cannot construct openings of any commitment" no longer holds, and DESIGN_cont.md §8.2, whose scoping of receiving-side opening capability to the recipient's auditor becomes incomplete.
-
-**16.3 — DESIGN_cont.md §11's read methods have drifted from the contract.** §11 and §11.3 give `confidential_balance(account) -> Bytes` and `get_spender(account, spender) -> Bytes`; the contract returns typed structures and names the second method differently. §9.1 therefore treats the contract crate as authoritative and describes reads by role rather than by signature.
-
-**16.4 — Optional hardening: bind $$\text{acct\\\_f}$$ into $$vk$$.** §5.1's $$\text{acct\\\_f}$$ binding prevents the identical-$$Y$$-and-$$\text{PVK}$$ linkage by client convention. Binding the registering address into $$vk$$ at DESIGN.md §4.2 would make it impossible by construction, at the cost of changing constraint R2 and every verification key.
+**16.2 — Optional hardening: bind $$\text{acct\\\_f}$$ into $$vk$$.** §5.1's $$\text{acct\\\_f}$$ binding prevents the identical-$$Y$$-and-$$\text{PVK}$$ linkage by client convention. Binding the registering address into $$vk$$ at DESIGN.md §4.2 would make it impossible by construction, at the cost of changing constraint R2 and every verification key.
