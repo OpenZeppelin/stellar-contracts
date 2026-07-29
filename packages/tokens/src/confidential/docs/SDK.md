@@ -6,7 +6,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are to be interpreted 
 
 - **SDK implementers** MUST satisfy §4–§12.
 - **Wallet, auditor, and application integrators** MUST NOT bypass §13; the security properties of the protocol do not survive it.
-- **Port authors** (mobile, hardware wallet, a second language) MUST pass §6 and expose §15.
+- **Port authors** (mobile, hardware wallet, a second language) MUST pass §6.
 
 **Scope.** This document specifies obligations, not an API. It does not prescribe function signatures, module names, package layout, or class design, and it does not restate protocol formulas that [DESIGN.md](./DESIGN.md) already fixes — each requirement cites its source section instead.
 
@@ -195,7 +195,7 @@ where:
 
 The candidate MUST also be rejected if the resulting $$vk = \text{poseidon\\\_with\\\_domain}(\delta_{\text{vk}}, [sk, \text{addr\\\_f}])$$ is zero, since registration constraint R5 requires $$vk \neq 0$$.
 
-**The IKM is the root's bytes, verbatim.** HKDF-Extract accepts input keying material of any length, so neither class hashes, truncates, pads, or re-encodes its root: the 64 signature bytes or the 32 raw bytes go in as they are. It is the one §5.1 input whose length varies, and the one a text rendering can be mistaken for — a client passing a root's hex or base32 form rather than its bytes derives a different $$sk$$ from the same backup material, and §6.3's vector is what catches it.
+**The IKM is the root's bytes, verbatim.** HKDF-Extract accepts input keying material of any length, the 64 signature bytes or the 32 raw bytes go in as they are.
 
 Why each element is present:
 
@@ -206,8 +206,6 @@ Why each element is present:
 **Bound to $$\text{acct\\\_f}$$.** $$vk$$ depends only on $$(sk, \text{addr\\\_f})$$, so the same $$sk$$ registered under two addresses yields the same $$vk$$, hence identical $$Y$$ and identical $$\text{PVK}$$ published under both accounts and readable by any observer through the account read method, linking two addresses that are otherwise unlinkable. Implementations MUST derive a distinct $$sk$$ per address.
 
 **No account-index input.** Binding $$\text{acct\\\_f}$$ makes a separate SEP-0005 index redundant: the address determines the account, and the index is merely the path that produced the address.
-
-**Not the BIP-39 seed, and not a SLIP-0010 node.** A seed-derived root would work for a client holding the mnemonic, and is what shielded protocols whose key *is* the account authority do — Zcash's ZIP-32 places shielded keys at purpose `32'` beside BIP-44's `44'`, siblings under one seed. It is the wrong shape here, for two reasons. It adds no reach: a client holding the mnemonic can derive the ed25519 key and produce §5.2's signature locally, so every account a seed root could serve a signer root serves too, while the converse fails for hardware, MPC-fronted, and `S…`-only accounts. And it would make the class a per-client choice on an irreversible commitment: `register` is single-use, so a seed-rooted account would be permanently operable only by clients holding the mnemonic. Solana's Token-2022 confidential-transfer extension reaches the same conclusion from the same position, deriving its ElGamal and AES keys from a signature over a domain-separated message and offering no standardised mnemonic path. Implementations MUST NOT use a BIP-39 seed, or any node of the SEP-0005 path, as a root; a client holding the mnemonic MUST derive the ed25519 key from it and take the §5.2 route.
 
 ### 5.2 Signer roots
 
@@ -223,11 +221,11 @@ Binding both addresses into the *message* rather than relying on §5.1's `info` 
 
 **The SEP-0053 envelope is mandatory even where the secret is extractable.** A client holding the raw ed25519 secret MUST compute this signature itself rather than use the secret's 32 bytes as the IKM directly. One form then covers both custody shapes: an account enrolled through a wallet prompt is reproducible by a client that later imports the secret, and the reverse.
 
-**The ed25519 key is a single point of failure, and this MUST be disclosed.** Whoever obtains the ed25519 secret can recompute the signature and therefore $$sk$$, gaining both view and spend of the confidential account. Exporting and pasting an `S…` secret is a routine act on Stellar, and the confidential account does not recover from it: `register` is single-use, so $$sk$$ cannot be rotated in place, and remediation means registering a fresh address and moving the funds through a transfer that links the old address to the new one. Balance history disclosed this way is disclosed permanently. An implementation MUST state, at the point where it offers to create a confidential account, that the account's confidentiality is bounded by the secrecy of the account's signing key.
+**The ed25519 key is a single point of failure, and this MUST be disclosed.** Whoever obtains the ed25519 secret can recompute the signature and therefore $$sk$$, gaining both view and spend of the confidential account. `register` is single-use, so $$sk$$ cannot be rotated in place, and remediation means registering a fresh address and moving the funds through a transfer. An implementation MUST state, at the point where it offers to create a confidential account, that the account's confidentiality is bounded by the secrecy of the account's signing key.
 
 **Availability is not guaranteed.** A signer root exists only where the custody stack implements SEP-0053 message signing, and support across Stellar wallets and hardware apps is uneven. An implementation MUST treat its absence as an expected outcome and fall back to a raw root (§5.3), which is not reproducible from anything the user already holds and therefore MUST be backed up explicitly, rather than fail enrolment.
 
-**Verify the signature before using it.** An implementation MUST verify the returned signature against the ed25519 public key it expects to have signed, and MUST abort on mismatch. A wallet with a different account selected returns a well-formed signature over the same message, yielding a wrong but entirely usable $$sk$$: registration succeeds, and the account is then unreproducible from the key the user believes controls it. An implementation MUST additionally reject an all-zero signature in constant time, since some signer implementations return a default signature instead of failing, and those 64 zero bytes are a root every such account would share.
+**Verify the signature before using it.** An implementation MUST verify the returned signature against the ed25519 public key it expects to have signed, and MUST abort on mismatch. A wallet with a different account selected returns a well-formed signature over the same message, yielding a wrong but entirely usable $$sk$$: registration succeeds, and the account is then unreproducible from the key the user believes controls it.
 
 **Determinism is a precondition.** RFC 8032 ed25519 derives its nonce from the secret and the message, so a conforming signer returns the same 64 bytes forever. Signers that randomise the nonce do not, and threshold and MPC ed25519 are in that category — the nonce is generated per signing session, so a signature does not reproduce in the next one. An implementation MUST obtain the signature twice from independent invocations and MUST abort if they differ. That detects the common case and not every case, since a signer can be deterministic within a session and not across sessions, so an implementation MUST additionally offer $$sk$$ export as a direct-import backup (§5.3) and SHOULD prompt for it before the account first receives funds.
 
@@ -258,8 +256,6 @@ Recovering a signer-root account requires the enrolled signer (§5.2) and the co
 1. Enumerate candidate Stellar addresses by scanning SEP-0005 indices $$i = 0, 1, 2, \ldots$$ from the seed.
 2. For each candidate address, compute $$\text{acct\\\_f}$$, obtain the §5.2 signature from that index's key, derive $$sk$$ per §5.1, and compute $$Y = sk \cdot H$$.
 3. Read the account record at that address and compare its stored spending public key against $$Y$$. A match identifies a registered confidential account belonging to this signer.
-
-Implementations exposing this scan MUST pin a gap limit — a number of consecutive unregistered indices after which scanning stops — and MUST surface it, since an account beyond the limit is invisible to recovery even though its funds exist. Scanning MUST NOT be presented as exhaustive.
 
 Step 2 needs a signature rather than a hash, so a client that cannot sign locally SHOULD drive recovery from its own per-account record instead of scanning (§5.2). An account registered under a raw root, or under a signer that is neither held nor reproducible, is not reachable by any scan: only the direct import of a previously exported $$sk$$ recovers it.
 
@@ -325,15 +321,9 @@ Where a deployment permits verification-key rotation (DESIGN.md §3.5), an imple
 
 ### 8.3 Backend pluggability and the trust boundary
 
-Proving MUST sit behind an interface that admits multiple backends — in-process WASM, a native binary, a remote service — because the viable choice differs per platform and because proving-library packaging is itself a portability hazard. Browser bundlers, for instance, break worker-spawning proving libraries by rewriting the worker URL into a hashed chunk, so an implementation targeting browsers MUST allow the backend to be supplied by the host application rather than resolved statically.
+Proving MUST sit behind an interface that admits multiple backends — in-process WASM, a native binary, a remote service — because the viable choice differs per platform. Browser bundlers, for instance, break worker-spawning proving libraries by rewriting the worker URL into a hashed chunk, so an implementation targeting browsers MUST allow the backend to be supplied by the host application rather than resolved statically.
 
 **Witness material MUST NOT cross the trust boundary by default** (§2.1). Remote proving discloses the spending key, the balance, and the transfer amount to the prover. An implementation MAY offer it, but MUST require explicit opt-in, MUST NOT select it as a fallback when a local backend fails, and MUST state precisely which values leave the device.
-
-### 8.4 Latency
-
-Proof generation is a multi-second, CPU-bound, user-blocking operation. Implementations MUST expose progress and cancellation, and MUST NOT hold a lock over wallet state for the duration, since an incoming transfer arriving mid-proof is expected and harmless (DESIGN_cont.md §9.1).
-
-Backends SHOULD be constructed once per circuit and reused; initialisation loads the proving system and its reference string and dominates the cost of a single proof.
 
 ---
 
@@ -349,10 +339,10 @@ Auditor keys MUST be read from the auditor contract by the account's bound `audi
 
 Proof-carrying entry points take an XDR-encoded payload. Its byte representation is fixed by Soroban's canonical XDR rules, so independent implementations compiling against the same `#[contracttype]` definitions produce byte-identical payloads (DESIGN_cont.md §11).
 
-Payloads MUST be produced by encoding those definitions. Implementations SHOULD generate the encoder from the contract's interface rather than hand-assembling the structure, and where hand-assembly is unavoidable MUST pin it with a round-trip test against the contract's own decoder. Two specifics:
+Two specifics:
 
-- **Points are flat 64-byte values**, not nested two-field structures (§4.2). The nested form encodes without error and decodes to nothing usable.
-- **Struct fields serialise as a map with symbol keys in canonical sorted order.** Hand-sorting with a host language's default string comparison agrees with the canonical order for the current lowercase-and-underscore field names, but nothing preserves that agreement across a field rename.
+- Points are flat 64-byte values, not nested two-field structures (§4.2).
+- Struct fields serialise as a map with symbol keys in canonical sorted order.
 
 ### 9.3 Authorization and submission
 
@@ -362,7 +352,7 @@ Operations SHOULD be simulated before submission, which catches a stale commitme
 
 ### 9.4 Typed errors
 
-The adapter MUST surface contract failures as typed, distinguishable outcomes rather than opaque host errors. At minimum it MUST separate:
+The adapter MUST surface contract failures as typed, distinguishable outcomes. At minimum it MUST separate:
 
 | Class | Meaning | Caller's next step |
 |:--|:--|:--|
@@ -388,7 +378,7 @@ Persistence MUST be pluggable, since the same core serves environments with very
 
 Event application MUST be ordered, deduplicated, and idempotent in combination, and an implementation MUST state which layer discharges each obligation. The three are commonly split, with ordering and dedup at the event source and application left non-idempotent, which is conformant only if the split is explicit.
 
-- **Ordering.** Events MUST be applied in emission order, because reconstruction is order-sensitive: a merge and a deposit in the same ledger produce different state depending on which is applied first. The canonical total order is INDEXER.md §3.4's $$(\text{ledger\\\_seq}, \text{tx\\\_application\\\_order}, \text{event\\\_index})$$. Implementations MUST NOT order by event id string, whose components are not ordering keys.
+- **Ordering.** Events MUST be applied in emission order, because reconstruction is order-sensitive: a merge and a deposit in the same ledger produce different state depending on which is applied first. The canonical total order is INDEXER.md §3.4's $$(\text{ledger\\\_seq}, \text{tx\\\_application\\\_order}, \text{event\\\_index})$$.
 - **Deduplication.** Events MUST be deduplicated by event id, since a hybrid source (§12.4) can deliver the same event twice at its seam.
 - **Idempotence.** Either application is idempotent, or dedup provably precedes it. Crediting rules accumulate, so a duplicate inflates a balance.
 
@@ -427,7 +417,7 @@ First, **it widens the viewing-key blast radius, retroactively.** DESIGN_cont.md
 
 Second, **the salt requirement of §10.4 is promoted from unlinkability to confidentiality.**
 
-Third, **disclosability is unverifiable on-chain.** Nothing distinguishes a derived $$r_e$$ from a sampled one, so a client cannot determine whether a given historical transfer is disclosable without attempting it, and a user moving between clients can accumulate a mixed history. An implementation that supports both MUST record, per account, the ledger range over which the derived convention applied, and MUST use that record when presenting disclosability (§12.2). An implementation offering a sampled-$$r_e$$ path MUST either retain $$(r_e, v_{\text{transfer}})$$ per outbound transfer or state that those transfers are permanently undisclosable.
+Third, **disclosability is unverifiable on-chain.** Nothing distinguishes a derived $$r_e$$ from a sampled one, so a client cannot determine whether a given historical transfer is disclosable without attempting it, and a user moving between clients can accumulate a mixed history. An implementation offering a sampled $$r_e$$ path MUST either retain $$(r_e, v_{\text{transfer}})$$ per outbound transfer or state that those transfers are permanently undisclosable.
 
 ### 10.6 Consistency checking
 
@@ -447,7 +437,7 @@ It MUST also surface the recovery path: every subsequent inbound confidential tr
 
 Received funds are spendable only after a merge (DESIGN.md §7.4). A wallet SHOULD merge automatically, or prompt, ahead of a spend that the spendable balance alone cannot cover.
 
-Merge is proof-less and owner-authorized. Incoming transfers touch only the receiving balance, so they cannot invalidate an in-flight spend proof, and no third party can front-run a merge (DESIGN_cont.md §9.1). Implementations MUST NOT introduce a spend path that references the receiving balance directly, and MUST NOT gate spending on the absence of incoming activity.
+Merge is proof-less and owner-authorized. Incoming transfers touch only the receiving balance, so they cannot invalidate an in-flight spend proof, and no third party can front-run a merge (DESIGN_cont.md §9.1).
 
 ### 10.9 Recovery
 
@@ -456,7 +446,7 @@ Recovery follows DESIGN.md §5.2 and DESIGN_cont.md §9.5: locate the latest che
 Two obligations follow from data availability:
 
 - Recovery from a root alone depends on a conforming indexer (INDEXER.md). Without one, a client can see that funds exist but cannot reconstruct the opening needed to spend them.
-- **With RPC-only event access, a client MUST sync at least once per RPC retention window**, and MUST warn when it has not. The spendable side is robust, since each checkpoint is self-contained, but the receiving side is a running sum, so a crediting event that ages out before it is applied takes its opening with it permanently. Implementations MUST NOT present RPC-only operation as equivalent to indexed operation.
+- **With RPC-only event access, a client MUST sync at least once per RPC retention window**, and MUST warn when it has not. The spendable side is robust, since each checkpoint is self-contained, but the receiving side is a running sum, so a crediting event that ages out before it is applied takes its opening with it permanently.
 
 ### 10.10 Spender-side wallet
 
@@ -483,7 +473,7 @@ The two channels differ in what they yield (DESIGN_cont.md §8.1):
 
 **Cross-channel agreement.** Where an auditor holds the key for both parties, the amount decrypts independently on each channel and the circuit constrains both to the same value, so the two MUST agree. An implementation SHOULD perform this comparison and treat disagreement as evidence that $$k$$ is not the auditor key for both parties of that event.
 
-**Scope MUST be represented, not implied.** The recipient-channel capability is forward-only, receiving-side only, and reset by merge (DESIGN_cont.md §8.2). An auditor's data model MUST distinguish "no activity in this period" from "activity not decryptable because it predates the current key", and MUST NOT present a reconstructed receiving balance as covering a period before the key was active. Rotation itself needs no replay on the sender side: the next owner-initiated proof operation publishes a fresh balance checkpoint under the new key.
+**Scope MUST be represented, not implied.** The recipient-channel capability is forward-only, receiving-side only, and reset by merge (DESIGN_cont.md §8.2). Rotation itself needs no replay on the sender side: the next owner-initiated proof operation publishes a fresh balance checkpoint under the new key.
 
 An auditor facade MUST NOT be able to construct a spending witness, and MUST NOT be able to open a post-merge spendable balance, since merge folds the receiving randomness into a blinding that depends on $$vk$$.
 
@@ -503,7 +493,7 @@ The verifier MUST be distributable independently of any wallet, since its purpos
 
 Verification MUST include comparing the circuit's verification key against the pinned key for that disclosure circuit, without which the proof attests to an unknown statement.
 
-Where §10.5's epoch record shows a transfer predates the derived-$$r_e$$ convention, an implementation MUST report it as not disclosable rather than attempting and reporting a failure.
+Where §10.5's epoch record shows a transfer predates the derived $$r_e$$ convention, an implementation MUST report it as not disclosable rather than attempting and reporting a failure.
 
 ### 12.3 Indexer client
 
@@ -541,7 +531,7 @@ $$vk$$ MUST NOT be presented as a safely-shareable read-only credential. It expo
 
 ## 14. Non-Functional Requirements
 
-**Proving latency.** Single-digit seconds on contemporary hardware is the design target (OVERVIEW.md). Implementations MUST treat it as user-visible; §8.4's progress and cancellation are requirements.
+**Proving latency.** Single-digit seconds on contemporary hardware is the design target (OVERVIEW.md). Implementations MUST treat it as user-visible.
 
 **Sync and replay bounds.** The replay window runs from the account's latest checkpoint, or from registration for an account that has received but never spent, which is unbounded in age. Implementations MUST NOT assume a bounded window, and SHOULD use the archive's checkpoint lookup where available (INDEXER.md §6, C1) so that a dormant account is not obliged to transfer its entire history.
 
