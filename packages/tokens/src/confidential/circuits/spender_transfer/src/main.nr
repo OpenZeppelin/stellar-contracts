@@ -258,10 +258,10 @@ fn main(
     // the recipient's registration via R3, trusted on read).
     let pvk_recipient =
         EmbeddedCurvePoint { x: pvk_recipient_x, y: pvk_recipient_y, is_infinite: false };
-    let s_x = ecdh(r_e, pvk_recipient);
+    let s = ecdh(r_e, pvk_recipient);
 
     // O7 (anti-poisoning, Section 5.4)
-    let r_transfer = derive_transfer_blind(s_x, sigma_a);
+    let r_transfer = derive_transfer_blind(s, sigma_a);
 
     // O8
     let c_transfer_derived = commit(v_transfer, r_transfer);
@@ -269,7 +269,7 @@ fn main(
     assert(c_transfer_derived.y == c_transfer_y);
 
     // O9
-    let v_tilde_derived = encrypt_amount(v_transfer, s_x, sigma_a);
+    let v_tilde_derived = encrypt_amount(v_transfer, s, sigma_a);
     assert(v_tilde_derived == v_tilde);
 
     // Salt rotation (implementation hardening).
@@ -294,10 +294,10 @@ fn main(
     assert_on_curve_non_identity(k_aud_s);
 
     // O_a1 (recipient-auditor shared-secret scalar)
-    let s_a_r_x = ecdh(r_e, k_aud_r);
+    let s_a_r = ecdh(r_e, k_aud_r);
 
     // O_a2 (recipient-channel masks: amount, then r_transfer)
-    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x, sigma_a);
+    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, sigma_a);
 
     // O_a3
     assert(v_transfer + m_r[0] == v_tilde_aud_r);
@@ -306,10 +306,10 @@ fn main(
     assert(r_transfer + m_r[1] == r_tilde_aud_r);
 
     // O_a5 (owner-auditor shared-secret scalar)
-    let s_a_s_x = ecdh(r_e, k_aud_s);
+    let s_a_s = ecdh(r_e, k_aud_s);
 
     // O_a6 (owner-channel masks: amount, then post-transfer allowance)
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, sigma_a);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, sigma_a);
 
     // O_a7
     assert(v_transfer + m_s[0] == v_tilde_aud_s);

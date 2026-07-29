@@ -261,10 +261,10 @@ fn main(
     assert_on_curve_non_identity(k_aud_s);
 
     // S_a2 (owner-auditor shared-secret scalar)
-    let s_a_s_x = ecdh(r_e, k_aud_s);
+    let s_a_s = ecdh(r_e, k_aud_s);
 
     // S_a3 (owner-channel masks: amount, then balance)
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, sigma);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, sigma);
 
     // S_a4
     assert(v_a + m_s[0] == v_tilde_aud_s);

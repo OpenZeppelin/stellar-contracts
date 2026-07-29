@@ -228,15 +228,15 @@ fn sponge_empty_input_applies_squeeze_permutation() {
 #[test]
 fn sponge_squeeze_2_first_matches_poseidon_with_domain() {
     // SpongeSqueeze_n shares a single absorb (Section 2.5); the single-squeeze
-    // form is just `poseidon_with_domain(d, [s_x, sigma])`, and it must equal
+    // form is just `poseidon_with_domain(d, [s, sigma])`, and it must equal
     // the first output of `sponge_squeeze_2` on the same absorb. If this
     // diverges, a circuit doing the single-squeeze form cannot be substituted
     // for the first output of `sponge_squeeze_2` and vice versa.
     let d: Field = domain::AUDITOR_RECIPIENT;
-    let s_x: Field = 0x12345;
+    let s: Field = 0x12345;
     let sigma: Field = 0x6789;
-    let m2 = sponge_squeeze_2(d, s_x, sigma);
-    assert(m2[0] == poseidon_with_domain(d, [s_x, sigma]));
+    let m2 = sponge_squeeze_2(d, s, sigma);
+    assert(m2[0] == poseidon_with_domain(d, [s, sigma]));
 }
 
 #[test]
@@ -247,9 +247,9 @@ fn sponge_squeeze_2_outputs_distinct() {
     // independence assumption that justifies the dual-mask construction
     // (Section 8.1, the recipient-auditor ciphertext pair).
     let d: Field = domain::AUDITOR_SENDER;
-    let s_x: Field = 0x42;
+    let s: Field = 0x42;
     let sigma: Field = 0x07;
-    let m = sponge_squeeze_2(d, s_x, sigma);
+    let m = sponge_squeeze_2(d, s, sigma);
     assert(m[0] != m[1]);
 }
 
@@ -258,10 +258,10 @@ fn sponge_squeeze_channel_separation() {
     // Same (s, sigma) under the two channel domains must produce different
     // mask pairs. This is the property that makes a leaked sender-channel
     // ciphertext useless for decrypting the recipient channel and vice versa.
-    let s_x: Field = 0xcafe;
+    let s: Field = 0xcafe;
     let sigma: Field = 0xdead;
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_x, sigma);
-    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_x, sigma);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s, sigma);
+    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s, sigma);
     assert(m_s[0] != m_r[0]);
     assert(m_s[1] != m_r[1]);
 }
