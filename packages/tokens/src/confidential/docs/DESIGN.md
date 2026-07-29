@@ -101,7 +101,7 @@ In this design both $$v$$ and $$r$$ are drawn from $$\mathbb{F}\_r \subset \math
 
 **Homomorphism.** $$\text{Com}(v\_1, r\_1) + \text{Com}(v\_2, r\_2) = \text{Com}(v\_1 + v\_2, r\_1 + r\_2)$$. Scalar addition in the commitment relation is over $$\mathbb{F}\_q^{\text{BN254}}$$ -- the scalar field of $$\mathbb{G}$$, equivalently the order of the Grumpkin group. Since every committed value is bounded by $$2^{127}$$ (§2.6) and the number of additions across the lifetime of any one commitment is far below $$2^{127}$$, the value component never wraps in $$\mathbb{F}\_q$$ and the homomorphic relation holds in $$\mathbb{Z}$$ for values. The blinding component is added in $$\mathbb{F}\_q$$ and may reduce mod $$q$$ on accumulation; the only place this has operational consequences is the wallet's post-merge spend witness, where the canonical $$\mathbb{F}\_q$$ representative of $$r\_s + r\_r$$ can land in $$[r, q)$$ with probability bounded at $$(q-r)/q \approx 2^{-127}$$ per merge (see §10.4 *Post-merge witness availability*).
 
-**Generators.** $$G$$ and $$H$$ are inherited from Barretenberg's standard Grumpkin Pedersen instantiation (the same generators that the toolchain's `pedersen_commitment` and `pedersen_hash` primitives use). Their provenance is part of the toolchain's audited surface, so the contract inherits both the generators and the soundness assumption that $$\log\_G H$$ is unknown. The Noir circuits import them as `embedded_curve_ops::generator()`.
+**Generators.** $$G$$ and $$H$$ are inherited from Barretenberg's standard Grumpkin Pedersen instantiation (the same generators that the toolchain's `pedersen_commitment` and `pedersen_hash` primitives use). Their provenance is part of the toolchain's audited surface, so the contract inherits both the generators and the soundness assumption that $$\log\_G H$$ is unknown. Concretely they are `derive_generators("DEFAULT_DOMAIN_SEPARATOR")` at indices 0 and 1; the values are listed in [DESIGN_cont.md](./DESIGN_cont.md) §10.4.
 
 ### 2.4 Elliptic Curve Diffie-Hellman
 
@@ -126,6 +126,16 @@ The system uses **Poseidon2**, the algebraic hash function native to Noir's stan
 - [HorizenLabs reference implementation](https://github.com/HorizenLabs/poseidon2) - parameter generation script (`poseidon2_rust_params.sage`)
 - [Noir stdlib `hash/mod.nr`](https://github.com/noir-lang/noir/blob/master/noir_stdlib/src/hash/mod.nr) - sponge construction wrapping the `Poseidon2Permutation` ACIR opcode
 
+**Sponge construction.** Every Poseidon2 value in this specification is produced by the following sponge over $$\mathbb{F}\_r$$ at width $$t = 4$$, rate 3, capacity 1.
+
+1. Let $$M$$ be the number of absorbed field elements, counting the leading domain tag. Set $$\text{iv} = M \cdot 2^{64}$$.
+2. Initialise the state to $$[0, 0, 0, \text{iv}]$$, placing the IV in the capacity lane $$\text{state}[3]$$.
+3. For each full block of three inputs, **add** them into $$\text{state}[0], \text{state}[1], \text{state}[2]$$ -- addition in $$\mathbb{F}\_r$$, not assignment -- then apply the permutation.
+4. If $$M$$ is not a multiple of three, add the remaining inputs into $$\text{state}[0]$$ upward and apply one further permutation. This trailing permutation is also applied when $$M = 0$$, so the empty input hashes to $$\text{permute}([0,0,0,0])[0]$$ rather than to zero.
+5. Output $$\text{state}[0]$$.
+
+The domain tag is always the first element absorbed, so $$\text{Poseidon2}(\delta, x\_1, \ldots, x\_n)$$ throughout this document denotes this sponge applied to $$(\delta, x\_1, \ldots, x\_n)$$.
+
 **Usage in this system:**
 
 - Key derivation: $$vk = \text{Poseidon2}(\delta\_{\text{vk}}, sk, \text{addr\\\_f})$$
@@ -133,11 +143,17 @@ The system uses **Poseidon2**, the algebraic hash function native to Noir's stan
 - Symmetric encryption: $$\tilde{v} = v + \text{Poseidon2}(\delta\_{\text{transfer\\\_amount}}, s, \sigma)$$
 - Domain separation: each invocation includes a leading constant $$\delta$$ to prevent cross-context collisions
 
-**Sponge mode for auditor channels.** The per-transfer auditor ciphertexts (Section 8) use Poseidon2 in sponge mode. A single absorb of $$(\delta\_{\text{channel}}, s, \sigma)$$ -- where $$s$$ is the ECDH shared scalar of Section 2.4 -- is followed by $$n$$ sequential squeezes producing $$(m\_1, \ldots, m\_n) \in \mathbb{F}\_r^n$$, denoted $$\text{SpongeSqueeze}\_n(\delta\_{\text{channel}}, s, \sigma)$$. Two channel tags are used: $$\delta\_{\text{aud\\\_s}}$$ for the sender-auditor channel keyed by $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$, and $$\delta\_{\text{aud\\\_r}}$$ for the recipient-auditor channel keyed by $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$.
+**Two-mask mode for auditor channels.** The per-transfer auditor ciphertexts (Section 8) need two masks from one absorb. Since $$(\delta\_{\text{channel}}, s, \sigma)$$ is exactly one rate-3 block, the two masks are taken as **two lanes of a single permutation output**, not as two sequential squeezes:
 
-Squeeze order is canonical. The first squeezed mask is always an amount mask and the second is always a balance, allowance, or randomness mask, fixed per operation by the formulas in Sections 7 and 8. Single-ciphertext channels (the Withdraw balance checkpoint, W\_a3) take the *second* squeeze and leave the amount slot unused, so a checkpoint pad can never coincide with an amount pad.
+$$\text{SpongeSqueeze}\_2(\delta\_{\text{channel}}, s, \sigma) = \bigl(\text{state}[0], \\, \text{state}[1]\bigr), \qquad \text{state} = \text{permute}\bigl([\delta\_{\text{channel}}, \\, s, \\, \sigma, \\, 3 \cdot 2^{64}]\bigr)$$
 
-A $$(r\_e, \sigma)$$ pair MUST be unique per proof. The sponge masks are deterministic in $$(S.x, \sigma)$$, so reusing the pair across two operations reuses every pad slot they share, and a slot whose plaintext is known in one operation (e.g. a transfer amount known to its recipient) decrypts the other operation's ciphertext in that slot. The canonical slot assignment above limits the blast radius of such reuse to same-slot pairs, but does not eliminate it; provers and wallets MUST sample a fresh $$(r\_e, \sigma)$$ for every proof (Section 9.6 already guarantees $$\sigma$$ freshness on retry).
+where $$s$$ is the ECDH shared scalar of Section 2.4. Two channel tags are used: $$\delta\_{\text{aud\\\_s}}$$ for the sender-auditor channel keyed by $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$, and $$\delta\_{\text{aud\\\_r}}$$ for the recipient-auditor channel keyed by $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$. No other arity is instantiated; $$n = 2$$ everywhere this notation appears.
+
+Squeeze order is canonical. Lane 0 is always an amount mask and lane 1 is always a balance, allowance, or randomness mask, fixed per operation by the formulas in Sections 7 and 8. Single-ciphertext channels (the Withdraw balance checkpoint, W\_a3) take **lane 1** and leave the amount lane unused, so a checkpoint pad can never coincide with an amount pad.
+
+**Mode exclusivity.** Because the absorb occupies a single block, $$\text{SpongeSqueeze}\_2(\delta, s, \sigma)[0]$$ is the same field element as $$\text{Poseidon2}(\delta, s, \sigma)$$. Distinct domain tags (Section 13) are therefore not sufficient on their own: each tag MUST additionally be used in exactly one of the two modes, or the same $$(\delta, s, \sigma)$$ would yield one mode's mask as the other's output. $$\delta\_{\text{aud\\\_s}}$$ and $$\delta\_{\text{aud\\\_r}}$$ are the two-mask tags; every other tag in Section 13 is used only with the single-output form above.
+
+A $$(r\_e, \sigma)$$ pair MUST be unique per proof. The sponge masks are deterministic in $$(s, \sigma)$$, where $$s$$ is the ECDH shared scalar of Section 2.4, so reusing the pair across two operations reuses every pad slot they share, and a slot whose plaintext is known in one operation (e.g. a transfer amount known to its recipient) decrypts the other operation's ciphertext in that slot. The canonical slot assignment above limits the blast radius of such reuse to same-slot pairs, but does not eliminate it; provers and wallets MUST sample a fresh $$(r\_e, \sigma)$$ for every proof (Section 9.6 already guarantees $$\sigma$$ freshness on retry).
 
 All references to "Poseidon" in this document denote this Poseidon2 instantiation.
 

@@ -390,11 +390,11 @@ trait ConfidentialToken {
     fn revoke_spender(e: Env, account: Address, spender: Address,
                        data: Bytes);
 
-    fn confidential_balance(e: Env, account: Address) -> Bytes;
+    fn confidential_balance(e: Env, account: Address) -> ConfidentialAccount;
 
     fn is_spender(e: Env, account: Address, spender: Address) -> bool;
 
-    fn get_spender(e: Env, account: Address, spender: Address) -> Bytes;
+    fn get_spender_delegation(e: Env, account: Address, spender: Address) -> SpenderDelegation;
 }
 ```
 
@@ -425,7 +425,7 @@ Soroban `address.require_auth()` proves that the named principal authorized the 
 | `confidential_transfer_from(spender, from, to, data)` | `spender` (not `from`) |
 | `set_spender(account, spender, live_until_ledger, data)` | `account` |
 | `revoke_spender(account, spender, data)` | `account` |
-| `confidential_balance`, `is_spender`, `get_spender` | none (read-only) |
+| `confidential_balance`, `is_spender`, `get_spender_delegation` | none (read-only) |
 
 **`register` is single-use.** It reverts if `account` is already registered. Combined with `account.require_auth()`, this prevents a third party from binding attacker-controlled $$(Y, \text{PVK})$$ to `account`'s `ConfidentialAccount` storage entry.
 
@@ -458,7 +458,7 @@ Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
 
 ### 11.3 Read Methods
 
-**`confidential_balance(account) -> Bytes`.** Returns the XDR-serialized `ConfidentialAccount` struct for the given account (§6.1), i.e. the tuple `(spending_public_key, viewing_public_key, spendable_commitment, receiving_commitment, auditor_id)`. Reverts if `account` is not registered. Wallets bootstrap from this call (single round-trip to obtain both Pedersen commitments plus the keys needed to identify the account and its bound auditor); indexers use it to verify consistency between their replayed accumulators and on-chain state (§5.2 "Consistency check").
+**`confidential_balance(account) -> ConfidentialAccount`.** Returns the `ConfidentialAccount` struct for the given account (§6.1), i.e. the tuple `(spending_public_key, viewing_public_key, spendable_commitment, receiving_commitment, auditor_id)`. Reverts if `account` is not registered. Wallets bootstrap from this call (single round-trip to obtain both Pedersen commitments plus the keys needed to identify the account and its bound auditor); indexers use it to verify consistency between their replayed accumulators and on-chain state (§5.2 "Consistency check").
 
 **`is_spender(account, spender) -> bool`.** Returns `true` iff a delegation entry exists for `(account, spender)` **and** `ledger.sequence() <= live_until_ledger`. Returns `false` for:
 
@@ -466,9 +466,9 @@ Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
 - pairs whose entry has `ledger.sequence() > live_until_ledger` (expired-but-not-yet-revoked: the escrowed value still resides on-chain in $$C\_a$$ until `revoke_spender` reclaims it, but the spender can no longer spend),
 - pairs whose entry was revoked (deleted) by `revoke_spender`.
 
-The function returns the *spending-authority* state, not the *escrow-existence* state. Consumers that need to distinguish "no delegation" from "expired delegation" inspect `get_spender` (below) or replay `SetSpender` / `RevokeSpender` events.
+The function returns the *spending-authority* state, not the *escrow-existence* state. Consumers that need to distinguish "no delegation" from "expired delegation" inspect `get_spender_delegation` (below) or replay `SetSpender` / `RevokeSpender` events.
 
-**`get_spender(account, spender) -> Bytes`.** Returns the XDR-serialized `SpenderDelegation` struct (§6.2) for the `(account, spender)` pair, i.e. `(allowance_commitment, a_tilde, escrowed_dvk, allowance_salt, live_until_ledger)`. Reverts if no delegation entry exists for the pair. Unlike `is_spender`, this surfaces the raw on-chain delegation state without applying the expiry filter, so callers can distinguish "no delegation" (revert) from "active delegation" (`ledger.sequence() <= live_until_ledger`) from "expired-but-not-yet-revoked delegation" (`ledger.sequence() > live_until_ledger`, escrowed value still pending reclaim). Primary consumers:
+**`get_spender_delegation(account, spender) -> SpenderDelegation`.** Returns the `SpenderDelegation` struct (§6.2) for the `(account, spender)` pair, i.e. `(allowance_commitment, a_tilde, escrowed_dvk, allowance_salt, live_until_ledger)`. Reverts if no delegation entry exists for the pair. Unlike `is_spender`, this surfaces the raw on-chain delegation state without applying the expiry filter, so callers can distinguish "no delegation" (revert) from "active delegation" (`ledger.sequence() <= live_until_ledger`) from "expired-but-not-yet-revoked delegation" (`ledger.sequence() > live_until_ledger`, escrowed value still pending reclaim). Primary consumers:
 
 - **Spender wallet:** fetches `allowance_commitment`, `a_tilde`, `escrowed_dvk`, and `allowance_salt` to recover $$dvk\_i$$ via §7.11 decryption, then reads the current allowance via $$\tilde{a} = v\_a + \text{Poseidon}(\delta\_{\text{enc\\\_allow}}, dvk\_i, \sigma\_a)$$ to construct the next `confidential_transfer_from` witness.
 - **Owner wallet:** reads the same fields after losing local state, or before calling `revoke_spender`, to confirm the on-chain entry matches its records.
@@ -498,6 +498,6 @@ Each $$\delta$$ is a small positive integer in $$\mathbb{F}\_r$$, fixed for the 
 | $$\delta\_{\text{aud\\\_r}}$$ | 12 | Recipient-auditor channel sponge (§2.5, §8.1) |
 | $$\delta\_{\text{ecdh}}$$ | 13 | ECDH shared-secret scalar extraction (§2.4) |
 
-**Provenance.** Sequential small integers are the simplest assignment that satisfies the requirement of *distinctness* across all Poseidon2 invocations in this protocol -- Poseidon2 is collision-resistant under the assumption of §3.2, so any two distinct leading inputs (independent of size) produce independent outputs. The values themselves carry no semantic meaning; the binding is purely positional and the table is the only authoritative source. Implementations MUST hardcode these exact numeric values; deviations break cross-implementation derivation of $$vk$$, $$dvk\_i$$, the ECDH shared scalar $$s$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\tilde{a}$$, $$r\_{\text{transfer}}$$, $$r\_a$$, and all auditor masks.
+**Provenance.** Sequential small integers are the simplest assignment that satisfies the requirement of *distinctness* across all Poseidon2 invocations in this protocol -- Poseidon2 is collision-resistant under the assumption of §3.2, so any two distinct leading inputs (independent of size) produce independent outputs. Distinctness alone is not sufficient: each tag must also be confined to a single sponge mode, since the two-mask form of §2.5 shares its first lane with the single-output form on the same inputs. The values themselves carry no semantic meaning; the binding is purely positional and the table is the only authoritative source. Implementations MUST hardcode these exact numeric values.
 
 **Cross-protocol collision.** Future protocols that share Grumpkin / BN254 / Poseidon2 with this protocol -- e.g. an unrelated payments protocol that uses small-integer Poseidon2 domains -- could in principle pick the same numeric values for unrelated purposes. The protocol assumes that the surrounding inputs to Poseidon2 (key material, structural witnesses) sufficiently disambiguate even in such a case; no Poseidon2 invocation in this protocol is keyed solely on a $$\delta$$ value. If stronger isolation is desired, implementers may instead use the alternate scheme $$\delta\_X = \text{Poseidon2}(0, \text{ASCII}(\text{"openzeppelin/confidential-token/v1:X"}))$$, but this is a deployment-time choice that must be applied uniformly and disclosed in the deployment's circuit-binding documentation.
