@@ -180,19 +180,22 @@ The derivation is a single function (§5.1) over a **root**. For an account cont
 
 ### 5.1 Derivation
 
-$$sk = \text{RS}\Big(\text{HKDF-SHA-512}\big(\text{ikm} = \text{root}, \\;\\; \text{salt} = \texttt{"openzeppelin/confidential-token/v1/sk"}, \\;\\; \text{info} = \text{be}_{32}(\text{addr\\\_f}) \\,\\|\\, \text{be}_{32}(\text{acct\\\_f}) \\,\\|\\, \text{le}_{4}(j)\big)\Big)$$
+$$sk = \text{RS}\Big(\text{HKDF-SHA-512}\big(\text{IKM} = \text{root}, \\;\\; \text{salt} = \texttt{"openzeppelin/confidential-token/v1/sk"}, \\;\\; \text{info} = \text{be}_{32}(\text{addr\\\_f}) \\,\\|\\, \text{be}_{32}(\text{acct\\\_f}) \\,\\|\\, \text{le}_{4}(j)\big)\Big)$$
 
 where:
 
 | Input | Definition |
 |:--|:--|
-| $$\text{root}$$ | The account's root, per its class: a 64-byte BIP-39 seed (§5.3), a 64-byte signer signature (§5.4), or a raw 32-byte value (§5.5) |
+| $$\text{IKM}$$ | RFC 5869's input keying material: the byte string HKDF-Extract consumes, here the account's root |
+| $$\text{root}$$ | Exactly one of — the 64-byte BIP-39 seed (§5.3), the 64-byte ed25519 signature (§5.4), or a raw 32-byte value (§5.5) |
 | $$\text{addr\\\_f}$$ | $$\text{address\\\_to\\\_field}$$ of the confidential token contract (§4.9) |
 | $$\text{acct\\\_f}$$ | $$\text{address\\\_to\\\_field}$$ of the address being registered |
 | $$j$$ | Rejection counter, starting at 0 |
 | $$\text{RS}$$ | The §4.7 procedure applied to the 32-byte HKDF output: clear the top 2 bits, accept iff the result is in $$[1, r)$$, otherwise increment $$j$$ and re-derive |
 
 The candidate MUST also be rejected if the resulting $$vk = \text{poseidon\\\_with\\\_domain}(\delta_{\text{vk}}, [sk, \text{addr\\\_f}])$$ is zero, since registration constraint R5 requires $$vk \neq 0$$.
+
+**The IKM is the root's bytes, verbatim.** HKDF-Extract accepts input keying material of any length, so no class hashes, truncates, pads, or re-encodes its root: the 64 seed bytes, the 64 signature bytes, or the 32 raw bytes go in as they are. It is the one §5.1 input whose length varies, and the one a text rendering can be mistaken for — a client passing a root's hex or base32 form rather than its bytes derives a different $$sk$$ from the same backup material, and §6.3's vector is what catches it.
 
 Why each element is present:
 
@@ -202,19 +205,17 @@ Why each element is present:
 
 **Bound to $$\text{acct\\\_f}$$.** $$vk$$ depends only on $$(sk, \text{addr\\\_f})$$, so the same $$sk$$ registered under two addresses yields the same $$vk$$, hence identical $$Y$$ and identical $$\text{PVK}$$ published under both accounts and readable by any observer through the account read method, linking two addresses that are otherwise unlinkable. Implementations MUST derive a distinct $$sk$$ per address.
 
-**No account-index input.** Binding $$\text{acct\\\_f}$$ makes a separate SEP-0005 index redundant: the address determines the account, and the index is merely the path that produced the address. Implementations MUST NOT introduce one.
-
-**One salt across all root classes.** The classes differ in their ikm, and a signer root's domain separation lives in the message it signs (§5.4) rather than in the salt, so a per-class salt would separate nothing the ikm does not already separate. The class is recorded per account (§5.5) because the classes differ in what regenerates the key, not because the derivation needs to tell them apart.
+**No account-index input.** Binding $$\text{acct\\\_f}$$ makes a separate SEP-0005 index redundant: the address determines the account, and the index is merely the path that produced the address.
 
 ### 5.2 Choosing a root class
 
 For an account whose key came from a mnemonic, both classes reproduce $$sk$$ from that mnemonic, so neither forfeits seed recovery; a signer root additionally covers accounts with no mnemonic behind them. The classes differ in what the confidential client must hold and in whether the ed25519 signing key becomes a single point of failure for confidential funds.
 
-**The rule.** An implementation that already holds the mnemonic for an account SHOULD use a seed root: a signer root buys nothing there, because the seed is in the process either way, and it costs the coupling described below. An implementation that does not hold the mnemonic, and should not — an account fronted by a hardware wallet, or one that exists only as an exported `S…` secret with no mnemonic behind it — SHOULD use a signer root. An implementation MAY support both, and MUST record which produced each account (§5.5).
+**The rule.** An implementation that already holds the mnemonic for an account SHOULD use a seed root: a signer root buys nothing there, because the seed is in the process either way, and it costs the coupling described below. An implementation that does not hold the mnemonic, and should not (e.g. an account fronted by a hardware wallet) SHOULD use a signer root.
 
 | | Seed root (§5.3) | Signer root (§5.4) |
 |:--|:--|:--|
-| ikm | 64-byte BIP-39 seed | 64-byte SEP-0053 signature |
+| IKM | the 64-byte BIP-39 seed | the 64-byte ed25519 signature over a SEP-0053 payload |
 | Requires of the custody stack | mnemonic or seed export | SEP-0053 message signing |
 | What the confidential client holds | authority over every account and asset under the mnemonic | authority over one confidential account on one deployment |
 | If the ed25519 secret leaks | confidential balances unaffected | view and spend of the confidential account, unrecoverably |
@@ -231,9 +232,9 @@ For an account whose key came from a mnemonic, both classes reproduce $$sk$$ fro
 
 ### 5.3 Seed roots
 
-A seed root is the 64-byte BIP-39 seed produced from a mnemonic and optional passphrase — the same seed SEP-0005 derives account keys from. Implementations SHOULD accept 24-word mnemonics (256-bit entropy) and MAY accept 12-word.
+A seed root is the 64-byte BIP-39 seed produced from a mnemonic and optional passphrase — the PBKDF2-HMAC-SHA-512 output BIP-39 specifies, and the same seed SEP-0005 derives account keys from. Implementations SHOULD accept 24-word mnemonics (256-bit entropy) and MAY accept 12-word.
 
-The seed itself is the ikm, never a SLIP-0010 child of it. Deriving $$sk$$ beneath `m/44'/148'/i'` would place it under the ed25519 account key rather than beside it, since SLIP-0010 hardened children are derivable from the parent *private* key. That reproduces §5.2's coupling without the SEP-0053 envelope that bounds a harvested signature to one account, and without the enrolment record that makes the coupling visible to recovery. Implementations MUST NOT derive a seed root from any node of the SEP-0005 path.
+Those 64 bytes are the IKM, never a SLIP-0010 child of them. Deriving $$sk$$ beneath `m/44'/148'/i'` would place it under the ed25519 account key rather than beside it, since SLIP-0010 hardened children are derivable from the parent *private* key. That reproduces §5.2's coupling without the SEP-0053 envelope that bounds a harvested signature to one account, and without the enrolment record that makes the coupling visible to recovery. Implementations MUST NOT derive a seed root from any node of the SEP-0005 path.
 
 ### 5.4 Signer roots
 
@@ -243,11 +244,11 @@ $$\text{msg} = \texttt{"openzeppelin/confidential-token/v1/sk"} \\,\\|\\, \textt
 
 $$\text{root} = \text{Ed25519-Sign}\big(sk_{\text{ed}}, \\;\\; \text{SHA-256}(\text{prefix} \\,\\|\\, \text{msg})\big)$$
 
-where `prefix` is SEP-0053's 24 ASCII bytes `Stellar Signed Message:\n`, $$\text{enc}$$ is the 56-character strkey of §4.9, and $$sk_{\text{ed}}$$ is the ed25519 secret of a signer on the account. The message is 151 bytes, printable ASCII apart from its two separators, and carries the strkeys rather than their §4.9 compressions so that a wallet rendering SEP-0053 messages as text shows the user addresses they can compare against the deployment they intend to register on. The 64-byte signature is HKDF input material unchanged.
+where `prefix` is SEP-0053's 24 ASCII bytes `Stellar Signed Message:\n`, $$\text{enc}$$ is the 56-character strkey of §4.9, and $$sk_{\text{ed}}$$ is the ed25519 secret of a signer on the account. The message is 151 bytes, printable ASCII apart from its two separators, and carries the strkeys rather than their §4.9 compressions so that a wallet rendering SEP-0053 messages as text shows the user addresses they can compare against the deployment they intend to register on. The signature is the 64-byte RFC 8032 encoding $$R \\,\\|\\, S$$ that every Stellar SDK and SEP-0053 wallet already returns, and those 64 bytes are the IKM.
 
 Binding both addresses into the *message* rather than relying on §5.1's `info` alone is what bounds a harvested signature: a dapp that tricks a user into signing once obtains the root for that account on that deployment, not for every account the key controls on every deployment.
 
-**The SEP-0053 envelope is mandatory even where the secret is extractable.** A client holding the raw ed25519 secret MUST compute this signature itself rather than use the secret as ikm directly. One form then covers both custody shapes: an account enrolled through a wallet prompt is reproducible by a client that later imports the secret, and the reverse.
+**The SEP-0053 envelope is mandatory even where the secret is extractable.** A client holding the raw ed25519 secret MUST compute this signature itself rather than use the secret's 32 bytes as the IKM directly. One form then covers both custody shapes: an account enrolled through a wallet prompt is reproducible by a client that later imports the secret, and the reverse.
 
 **Availability is not guaranteed.** A signer root exists only where the custody stack implements SEP-0053 message signing, and support across Stellar wallets and hardware apps is uneven. An implementation MUST treat its absence as an expected outcome and fall back to §5.3 or §5.5, not fail enrolment.
 
@@ -255,7 +256,7 @@ Binding both addresses into the *message* rather than relying on §5.1's `info` 
 
 **Determinism is a precondition.** RFC 8032 ed25519 derives its nonce from the secret and the message, so a conforming signer returns the same 64 bytes forever. Signers that randomise the nonce do not, and threshold and MPC ed25519 are in that category — the nonce is generated per signing session, so a signature does not reproduce in the next one. An implementation MUST obtain the signature twice from independent invocations and MUST abort if they differ. That detects the common case and not every case, since a signer can be deterministic within a session and not across sessions, so an implementation MUST additionally offer $$sk$$ export as a direct-import backup (§5.5) and SHOULD prompt for it before the account first receives funds.
 
-**The ikm MUST NOT be persisted.** The 64-byte signature is equivalent to $$sk$$ for this account and deployment. Implementations MUST derive on demand; where $$sk$$ itself is cached, §13's storage-at-rest rules govern it.
+**The IKM MUST NOT be persisted.** The 64-byte signature is equivalent to $$sk$$ for this account and deployment. Implementations MUST derive on demand; where $$sk$$ itself is cached, §13's storage-at-rest rules govern it.
 
 **Record the enrolled signer.** A Stellar address may have signers besides its master key, and $$sk$$ is keyed to the *address* through $$\text{acct\\\_f}$$ rather than to the key that signed for it, so which signer enrolled is not recoverable from the address or from chain state. Implementations MUST record the enrolled ed25519 public key and MUST NOT assume it is the master key. A second client enrolling the same address with a different signer derives a different $$sk$$ whose $$Y$$ does not match the registered spending public key; §5.6's comparison detects that and cannot repair it.
 
@@ -265,7 +266,7 @@ Binding both addresses into the *message* rather than relying on §5.1's `info` 
 
 ### 5.5 Raw roots and imported keys
 
-Implementations MUST also accept a raw 32-byte `root`, used unchanged as HKDF input material. Two cases require it:
+Implementations MUST also accept a raw 32-byte `root`, those 32 bytes being the IKM. Two cases require it:
 
 - **Contract addresses.** A confidential account registered by a smart account or other contract address has no mnemonic and no ed25519 signer of its own, and its root comes from whatever custody mechanism controls the contract.
 - **Imported keys.** Deployments predating this specification hold $$sk$$ values sampled directly from a CSPRNG with no root behind them. Such a key MUST remain usable as a first-class account secret via direct import, bypassing §5.1 entirely.
