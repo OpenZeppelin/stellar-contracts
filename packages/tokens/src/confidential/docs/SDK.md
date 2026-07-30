@@ -1,6 +1,6 @@
 # Confidential Token: SDK
 
-Companion specification to [DESIGN.md](./DESIGN.md) §4 (Key Hierarchy) and §5.2 (Off-Chain Opening Maintenance), [DESIGN_cont.md](./DESIGN_cont.md) §9.5 (State Recovery) and §11 (Interface), [INDEXER.md](./INDEXER.md), and [SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §15. It specifies the client layer those documents assume: the crypto core that mirrors the Noir circuits off-chain, the key derivation the protocol leaves open, the witness and payload construction, the wallet state machine, and the auditor, disclosure, and indexer clients.
+Companion specification to [DESIGN.md](./DESIGN.md) §4 (Key Hierarchy) and §5.2 (Off-Chain Opening Maintenance), [DESIGN_cont.md](./DESIGN_cont.md) §9.5 (State Recovery) and §11 (Interface), [INDEXER.md](./INDEXER.md), and [SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §5 and §15. It specifies the client layer those documents assume: the crypto core that mirrors the Noir circuits off-chain, the key derivation the protocol leaves open, the witness and payload construction, the wallet state machine, and the auditor, disclosure, and indexer clients.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are to be interpreted as in RFC 2119. The normative audience is threefold:
 
@@ -20,7 +20,7 @@ Four properties of the protocol place correctness and confidentiality in the cli
 
 **Every amount a user sees is client-decrypted.** The contract performs homomorphic point arithmetic and never learns a value. Balances, transfer amounts, allowances, and audit figures are all produced by client-side decryption of event ciphertexts, so a decryption defect yields a plausible wrong number rather than a visible failure.
 
-**The client is the only enforcement point for canonicality.** The Soroban host's `bn254_fr_from_u256val` silently reduces any 32-byte representative $$x \geq r$$ modulo $$r$$ rather than rejecting it (DESIGN.md §2.2, *Host deserialiser caveat*). Two distinct byte strings therefore deserialise to the same field element, and a verifier alone cannot tell canonical from non-canonical input. The contract enforces canonicality at its boundary, but the client is where the bytes are produced.
+**The client is the only enforcement point for canonicality.** Neither the Soroban host nor the verifier distinguishes a canonical $$\mathbb{F}_r$$ representative from a non-canonical one (DESIGN.md §2.2, *Host deserialiser caveat*); the contract enforces canonicality at its boundary, but the client is where the bytes are produced.
 
 **The client is where all secrets live and all randomness is sampled.** The spending key, the viewing key, every blinding factor, and every per-operation salt originate client-side, so the protocol's confidentiality reduces to the client's key handling and CSPRNG quality. DESIGN.md §2.5 makes salt uniqueness a soundness requirement.
 
@@ -32,7 +32,7 @@ Four properties of the protocol place correctness and confidentiality in the cli
 
 - **Root** — the secret an implementation feeds to §5.1's derivation: a SEP-0053 signature by a signer on the account, or a raw 32-byte value for an address with no ed25519 signer of its own (§5).
 - **Opening** — the pair $$(v, r)$$ such that $$C = v \cdot G + r \cdot H$$ for an on-chain commitment $$C$$.
-- **Checkpoint** — an owner-initiated proof-carrying event publishing $$(\tilde{b}, \sigma)$$ for the owner's spendable balance: `Withdraw`, sender-side `Transfer`, `SetSpender`, `RevokeSpender` (DESIGN_cont.md §9.5). Defined identically in INDEXER.md §2.
+- **Checkpoint** — an owner-initiated proof-carrying event publishing $$(\tilde{b}, \sigma)$$ for the owner's spendable balance (DESIGN.md §5.2 *Recovery*, which enumerates the qualifying events).
 - **Witness material** — any value that appears as a private witness in any circuit: $$sk$$, $$vk$$, $$dvk_i$$, $$v$$, $$r$$, $$r_e$$, $$v_{\text{transfer}}$$, and every intermediate derived from them.
 - **Trust boundary** — the process and storage under the account holder's exclusive control. Witness material inside it is secret; witness material that crosses it is disclosed.
 - **In-flight operation** — a submitted operation whose event has not yet been observed. Its projected post-operation opening is known locally but not yet confirmed against chain state.
@@ -88,7 +88,7 @@ $$r < q$$, so every $$\mathbb{F}_r$$ element is already a valid Grumpkin scalar 
 A value is a **canonical** $$\mathbb{F}_r$$ representative iff it is a 32-byte big-endian encoding of an integer in $$[0, r)$$.
 
 - Every $$\mathbb{F}_r$$ value the SDK emits — into a payload, an event assertion, a proof input, or persisted state — MUST be canonical.
-- The SDK MUST reject a non-canonical value at its own boundary rather than relying on the contract's check. The contract does check, but a client that produces non-canonical bytes has already lost byte-uniqueness in the local state that recovery reads from.
+- The SDK MUST reject a non-canonical value at its own boundary rather than relying on the contract's check (DESIGN.md §2.2). A client that produces non-canonical bytes has already lost byte-uniqueness in the local state that recovery reads from.
 - Points are encoded as `BytesN<64>` = $$\text{be}(x) \\| \text{be}(y)$$, a **flat** 64-byte value. The identity $$\mathcal{O}$$ is all 64 bytes zero, and decodes back to the identity.
 
 ### 4.3 Poseidon2 sponge
@@ -158,7 +158,7 @@ Secret scalars — $$sk$$, $$\sigma$$, $$\sigma_a$$ — MUST be produced by the 
 | $$\delta_{\text{disc\\\_bind}}$$ | 15 | No — off-chain disclosure only |
 | $$\delta_{\text{disc}}$$ | 16 | No — off-chain disclosure only |
 
-Values 1–14 are protocol tags defined in DESIGN_cont.md §13. $$\delta_{\text{disc\\\_bind}}$$ and $$\delta_{\text{disc}}$$ belong to the off-chain disclosure layer and carry the values 15 and 16 assigned here and in SELECTIVE_DISCLOSURE.md §2.2. None of 14–16 is absorbed inside a core circuit, so none is part of the on-chain wire contract, but all three are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
+DESIGN_cont.md §13 assigns all sixteen values and is their only source; the right-hand column is this document's addition. $$\delta_{\text{disc\\\_bind}}$$ and $$\delta_{\text{disc}}$$ belong to the off-chain disclosure layer (SELECTIVE_DISCLOSURE.md §2.2). None of 14–16 is absorbed inside a core circuit, so none is part of the on-chain wire contract, but all three are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
 
 All sixteen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tags 11 and 12 are the two-mask tags; the remaining fourteen, including 14–16, are single-output tags.
 
@@ -331,7 +331,7 @@ Proving MUST sit behind an interface that admits multiple backends — in-proces
 
 ### 9.1 Reads
 
-The adapter MUST expose the account record and the spender delegation record (DESIGN_cont.md §11.3), and MUST treat the contract crate's types as authoritative for their shape. It MUST distinguish the three delegation states that DESIGN_cont.md §11.3 separates — absent, active, and expired-but-not-yet-revoked — and MUST NOT collapse the latter two, since an expired delegation still holds escrowed funds that only revocation reclaims.
+The adapter MUST expose the account record and the spender delegation record (DESIGN_cont.md §11.3), and MUST treat the contract crate's types as authoritative for their shape. It MUST distinguish the three delegation states that DESIGN_cont.md §11.3 separates — absent, active, and expired-but-not-yet-revoked — and MUST NOT collapse the latter two.
 
 Auditor keys MUST be read from the auditor contract by the account's bound `auditor_id`, never supplied by the caller.
 
@@ -384,7 +384,7 @@ Event application MUST be ordered, deduplicated, and idempotent in combination, 
 
 Application rules are DESIGN.md §5.2's update table and are not restated here. Two properties worth making explicit:
 
-- Sender-side `Withdraw` and `Transfer` **overwrite** $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$ rather than adjusting it, so a wallet that missed intervening events still converges on the spendable side.
+- `Withdraw`, sender-side `Transfer`, `SetSpender`, and `RevokeSpender` **overwrite** $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$ rather than adjusting it, so a wallet that missed intervening events still converges on the spendable side.
 - A self-transfer touches both accumulators in one event; the ordering within the rule matters.
 
 ### 10.3 In-flight operations
@@ -407,9 +407,9 @@ An implementation MUST derive the ephemeral scalar of every operation the holder
 
 $$r_e = \text{poseidon\\\_with\\\_domain}(\delta_{\text{eph}}, [vk, \sigma_E])$$
 
-where $$vk$$ is the originator's viewing key and $$\sigma_E$$ the operation's salt. DESIGN.md §5.3 is the normative source. The derivation MUST be re-attempted with a fresh salt in the negligible case that it yields zero, which the circuits forbid.
+where $$vk$$ is the originator's viewing key and $$\sigma_E$$ the operation's salt. DESIGN.md §5.3 is the normative source: it fixes which viewing key and salt each operation derives from, and the retry rule for the negligible case that the derivation yields zero.
 
-**Scope.** `Transfer`, `Withdraw`, `SetSpender`, and `RevokeSpender` take the owner's $$(vk, \sigma)$$; `SpenderTransfer` takes the *spender's* own $$(vk_{\text{op}}, \sigma_a)$$. The clawback circuit of COMPLIANCE.md §5.3 lies outside the rule, its ephemeral belonging to the auditor: an implementation that constructs clawback witnesses obtains that scalar by the §4.7 procedure, no viewing key being available there.
+**Scope.** The clawback circuit is the one operation outside the rule, its ephemeral belonging to the auditor: an implementation that constructs clawback witnesses obtains that scalar by the §4.7 procedure, no viewing key being available there (COMPLIANCE.md §5.3).
 
 **Three consequences an implementation MUST handle.**
 
@@ -427,23 +427,23 @@ Implementations MUST report which accumulator diverged, since the two have diffe
 
 ### 10.7 The unspendable-blinding case
 
-After a merge the spendable blinding is $$r_s + r_r$$ over $$\mathbb{F}_q$$. With probability approximately $$2^{-127}$$ per merge its canonical representative lands in $$[r, q)$$, where it remains a valid Grumpkin scalar — so on-chain state is well-formed and §10.6's check still passes — but is not encodable as a Noir `Field`, so no proof can be constructed against the affected commitment (DESIGN_cont.md §10.4).
+A post-merge spendable blinding can land outside the range a Noir `Field` encodes, leaving no constructible proof against the affected commitment while on-chain state stays well-formed and §10.6's check still passes (DESIGN_cont.md §10.4 *Post-merge witness availability*).
 
 An implementation MUST detect this condition and surface it as a distinct, named state rather than as a generic proof-construction failure.
 
-It MUST also surface the recovery path: every subsequent inbound confidential transfer contributes a fresh $$\mathbb{F}_r$$ blinding, so the next merge resolves the condition with overwhelming probability. An account whose only inflows are deposits stays affected until a confidential transfer arrives.
+It MUST also surface the recovery path: the condition resolves at the next merge that folds in an inbound confidential transfer, and an account whose only inflows are deposits stays affected until one arrives (DESIGN_cont.md §10.4 *Soft recovery*).
 
 ### 10.8 Merge policy
 
 Received funds are spendable only after a merge (DESIGN.md §7.4). A wallet SHOULD merge automatically, or prompt, ahead of a spend that the spendable balance alone cannot cover.
 
-Merge is proof-less and owner-authorized. Incoming transfers touch only the receiving balance, so they cannot invalidate an in-flight spend proof, and no third party can front-run a merge (DESIGN_cont.md §9.1).
+Merge is proof-less and owner-authorized, and neither a merge nor an in-flight spend proof can be disrupted by a third party (DESIGN_cont.md §9.1, §9.2).
 
 ### 10.9 Recovery
 
-Recovery follows DESIGN.md §5.2 and DESIGN_cont.md §9.5: locate the latest checkpoint, recover $$W_{\text{spend}}$$ from its $$(\tilde{b}, \sigma)$$ and $$vk$$, then replay subsequent crediting and merge events to rebuild $$W_{\text{receive}}$$, and verify per §10.6.
+Recovery follows the procedure of DESIGN.md §5.2 *Recovery*, with the reconstructed state verified per §10.6.
 
-Two obligations follow from data availability:
+Two further obligations follow from data availability:
 
 - Recovery from a root alone depends on a conforming indexer (INDEXER.md). Without one, a client can see that funds exist but cannot reconstruct the opening needed to spend them.
 - **With RPC-only event access, a client MUST sync at least once per RPC retention window**, and MUST warn when it has not. The spendable side is robust, since each checkpoint is self-contained, but the receiving side is a running sum, so a crediting event that ages out before it is applied takes its opening with it permanently.
@@ -452,7 +452,7 @@ Two obligations follow from data availability:
 
 A spender reconstructs its allowance state from the on-chain delegation entry rather than from event replay: it recovers $$dvk_i$$ from the escrowed value by ECDH (DESIGN.md §7.11), then reads the current allowance from the entry's encrypted allowance and salt (DESIGN_cont.md §11.3).
 
-Implementations MUST surface the delegation's expiry ledger and SHOULD warn ahead of it, since a spender transfer after expiry is rejected. They MUST represent expired-but-unrevoked delegations as still holding escrowed value, since deleting the entry would destroy the escrow and only the owner's revocation reclaims it.
+Implementations MUST surface the delegation's expiry ledger and SHOULD warn ahead of it. They MUST represent expired-but-unrevoked delegations as still holding escrowed value (DESIGN.md §6.2).
 
 A spender MUST NOT be able to reach the owner's spendable balance through any interface (§3).
 
@@ -473,7 +473,7 @@ The two channels differ in what they yield (DESIGN_cont.md §8.1):
 
 **Cross-channel agreement.** Where an auditor holds the key for both parties, the amount decrypts independently on each channel and the circuit constrains both to the same value, so the two MUST agree. An implementation SHOULD perform this comparison and treat disagreement as evidence that $$k$$ is not the auditor key for both parties of that event.
 
-**Scope MUST be represented, not implied.** The recipient-channel capability is forward-only, receiving-side only, and reset by merge (DESIGN_cont.md §8.2). Rotation itself needs no replay on the sender side: the next owner-initiated proof operation publishes a fresh balance checkpoint under the new key.
+**Scope MUST be represented, not implied.** The recipient-channel capability is forward-only, receiving-side only, and reset by merge (DESIGN_cont.md §8.1). Rotation itself needs no replay on the sender side: the next owner-initiated proof operation publishes a fresh balance checkpoint under the new key.
 
 An auditor facade MUST NOT be able to construct a spending witness, and MUST NOT be able to open a post-merge spendable balance, since merge folds the receiving randomness into a blinding that depends on $$vk$$.
 

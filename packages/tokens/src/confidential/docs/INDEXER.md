@@ -9,7 +9,7 @@ The key words MUST, MUST NOT, SHOULD, and MAY are to be interpreted as in RFC 21
 
 ## 1. Why the Indexer Is Load-Bearing
 
-Confidential balances are Pedersen commitments; the on-chain entry alone does not reveal the opening `(v, r)` needed to spend. A wallet that loses its local cache reconstructs the opening deterministically from the master secret plus the account's event history: the latest *checkpoint* event supplies `(b_tilde, sigma)` from which the spendable opening is derived (DESIGN_cont §9.5), while the receiving-side opening is rebuilt by replaying deposits and incoming transfers back to the account's last `Merge`, or to registration if it has never merged (§2).
+Confidential balances are Pedersen commitments; the on-chain entry alone does not reveal the opening `(v, r)` needed to spend. A wallet that loses its local cache reconstructs the opening deterministically from the master secret plus the account's event history: the latest *checkpoint* event supplies `(b_tilde, sigma)` from which the spendable opening is derived (DESIGN §5.2), while the receiving-side opening is rebuilt by replaying deposits and incoming transfers back to the account's last `Merge`, or to registration if it has never merged (§2).
 
 Stellar RPC retains events for a **7-day window** only. A wallet that loses local state after that window can still see that its funds exist (the commitment remains on-chain) but cannot reconstruct the opening required to spend them — unless a durable archive holds the missing events. That archive is this document's subject. Without a conforming indexer, recovery from seed is not guaranteed, and deployments MUST treat wallet-local state as unrecoverable after the RPC window.
 
@@ -17,7 +17,7 @@ Stellar RPC retains events for a **7-day window** only. A wallet that loses loca
 
 ## 2. Terminology
 
-- **Checkpoint** — an owner-initiated proof-carrying event (`Withdraw`, sender-side `Transfer`, `SetSpender`, `RevokeSpender`) that publishes `(b_tilde, sigma)` for the owner's spendable balance (DESIGN_cont §9.5).
+- **Checkpoint** — an owner-initiated proof-carrying event that publishes `(b_tilde, sigma)` for the owner's spendable balance (DESIGN §5.2; §3.2 lists the qualifying event types in ingestion scope).
 - **Replay window** — for the spendable side, the range from an account's latest checkpoint to the current ledger; for the receiving side, the range from the last `Merge` (or registration, if never merged) to the current ledger.
 - **Event id** — the triple `(ledger_seq, tx_hash, event_index)`, unique per emitted event: `tx_hash` is globally unique, and `event_index` is unambiguous because a Soroban transaction carries a single operation. The same event MUST carry the same id whether served from the archive or from RPC, so a hybrid client can deduplicate across the seam. The id does not by itself encode position within a ledger — `tx_hash` conveys no ordering — so the canonical total order is instead `(ledger_seq, tx_application_order, event_index)`, where `tx_application_order` is persisted as its own field (§3.1) and drives §3.4.
 - **Seam** — in a hybrid client (§1) that reads the recent tail from Stellar RPC and older history from the archive, the ledger at which it switches sources. A client sets the seam at or below the RPC retention floor (`getHealth().oldestLedger`) so the RPC side is always served from live retention, and requires the archive's ingested-through ledger (§6 C4) to reach the seam.
@@ -51,7 +51,7 @@ All events emitted by the confidential token (DESIGN_cont §11.2) with the follo
 | `Transfer` (recipient side) | Receiving-side replay: carries the recipient-channel ciphertexts for `(v_transfer, r_transfer)`. |
 | `SpenderTransfer` (recipient side) | Receiving-side replay, as above. |
 | `Merge` | Folds the receiving opening into the spendable opening; resets the receiving side. |
-| `Withdraw`, `Transfer` (sender side), `SetSpender`, `RevokeSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the owner's spendable balance. `SetSpender`/`RevokeSpender` are in scope as owner checkpoints only — a spender recovers allowance state from the on-chain delegation entry (`allowance_commitment`, `encrypted_allowance`, `escrowed_dvk`, `allowance_salt`), not from the archive. The auditor-channel ciphertexts these events also carry are out of scope for wallet recovery. |
+| `Withdraw`, `Transfer` (sender side), `SetSpender`, `RevokeSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the owner's spendable balance. `SetSpender`/`RevokeSpender` are in scope as owner checkpoints only — a spender recovers allowance state from the on-chain delegation entry (`allowance_commitment`, `a_tilde`, `escrowed_dvk`, `allowance_salt`), not from the archive. The auditor-channel ciphertexts these events also carry are out of scope for wallet recovery. |
 
 Configuration events (`UnderlyingAssetSet`, `VerifierSet`, `AuditorSet`, `AddressAsFieldSet`, verification-key events) are not needed for balance recovery; indexers SHOULD archive them anyway — they are low-volume and useful for deployment forensics.
 
@@ -113,7 +113,7 @@ GET /v1/tokens/{contract_id}/accounts/{account}/events
 The indexer is trusted for **availability and completeness only** — never for confidentiality or integrity:
 
 - **Confidentiality.** Everything the indexer holds is public chain data: commitments, masked ciphertexts, and ECDH ephemerals. A curious indexer learns nothing beyond what any chain observer sees (DESIGN_cont §9).
-- **Integrity fails closed.** Recovery ends with the wallet checking its reconstructed openings against the **on-chain** commitments (`C_spend =? v·G + r·H`, DESIGN_cont §9.5 step 3). A tampered or incomplete history cannot produce a wrong balance that verifies; it produces a detectable mismatch.
+- **Integrity fails closed.** Recovery ends with the wallet checking its reconstructed openings against the **on-chain** commitments (`C_spend =? v·G + r·H`, DESIGN §5.2 step 6). A tampered or incomplete history cannot produce a wrong balance that verifies; it produces a detectable mismatch.
 - **Withholding is the residual risk.** A malicious or broken indexer can deny recovery (a liveness failure, not a soundness one). Two structural mitigations: for the recent window the RPC is an independent source of the same events (the hybrid split of §1), so archive withholding bites only the pre-window history; and for that older history wallets SHOULD support multiple independent archive endpoints, with deployments running or contracting at least two.
 
 ## 8. Conformance and Versioning

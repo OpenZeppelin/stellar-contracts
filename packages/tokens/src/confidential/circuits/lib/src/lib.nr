@@ -240,7 +240,7 @@ pub fn poseidon_with_domain<let N: u32>(d: Field, inputs: [Field; N]) -> Field {
 
 /// Viewing key. Section 4.2. `vk = Poseidon2(VK, sk, addr_f)`.
 ///
-/// The `addr_f` parameter (the contract contract's address as a `Field`) binds the
+/// The `addr_f` parameter (the contract's address as a `Field`) binds the
 /// viewing key -- and therefore every proof that constrains `vk` (R2/W2/T2/S2/V2)
 /// -- to a specific deployed contract. Dropping `addr_f` here would let a proof for
 /// one contract verify against another's verifier.

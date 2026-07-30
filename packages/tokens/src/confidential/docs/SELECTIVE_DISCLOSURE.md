@@ -85,14 +85,9 @@ For each disclosure request, the recipient supplies a fresh nonce $$\nu \in \mat
 
 ### 2.2 Domain Separators
 
-Two domain separators are specific to this layer. Neither is absorbed in a core circuit, and both are assigned values in SDK.md §4.8, continuing DESIGN_cont.md §13's sequence:
+Two domain separators are specific to this layer: $$\delta\_{\text{disc\\\_bind}}$$, the disclosure-ciphertext domain for aggregate disclosures (§10), and $$\delta\_{\text{disc}}$$, which keys the disclosure ciphertext to the recipient (§4). Neither is absorbed in a core circuit. Both take their values from DESIGN_cont.md §13, which assigns them as a continuation of its own sequence.
 
-| Symbol | Value | Use |
-|:---|:--:|:---|
-| $$\delta\_{\text{disc\\\_bind}}$$ | 15 | Nonce binding for aggregate disclosures |
-| $$\delta\_{\text{disc}}$$ | 16 | Disclosure ciphertext to recipient |
-
-A wallet producing a D-sender proof also uses $$\delta\_{\text{eph}}$$ (value 14, DESIGN_cont.md §13) to recover the event's ephemeral scalar before proving (§7). That use is off-circuit: no disclosure circuit absorbs the tag.
+A wallet producing a D-sender proof also uses $$\delta\_{\text{eph}}$$ (DESIGN_cont.md §13) to recover the event's ephemeral scalar before proving (§7). That use is off-circuit: no disclosure circuit absorbs the tag.
 
 ---
 
@@ -266,7 +261,7 @@ $$v\_{\text{transfer}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{transfer\\\_
 
 with $$\text{PVK}\_B$$ read from the event's `to` address. Both quantities come from the wallet's $$vk$$ and an on-chain read of the event, so D-sender needs **no** per-transfer wallet state, matching the storage-free posture of D-recipient (§6). Recovery happens off-circuit: $$r\_e$$ enters the proof as a witness pinned by DS3, and no disclosure circuit absorbs $$\delta\_{\text{eph}}$$.
 
-**What this implies for $$vk$$.** Since $$r\_e$$ is recoverable from $$vk$$, so is a full Pedersen opening of every transfer the account originated. DESIGN_cont.md §9.4 states the capability a compromised $$vk$$ therefore carries, and §8.2 records that per-transfer openings are not exclusive to the recipient's auditor. The operative consequence for this layer is that a counterparty needing outbound visibility is served with D-sender proofs, which are bound to that counterparty and to a nonce (§13.2) — never by handing over $$vk$$ (SDK.md §13).
+**What this implies for $$vk$$.** Since $$r\_e$$ is recoverable from $$vk$$, so is a full Pedersen opening of every transfer the account originated. DESIGN_cont.md §9.4 states the capability a compromised $$vk$$ therefore carries, and DESIGN_cont.md §8.2 records that per-transfer openings are not exclusive to the recipient's auditor. The operative consequence for this layer is that a counterparty needing outbound visibility is served with D-sender proofs, which are bound to that counterparty and to a nonce (§13.2) — never by handing over $$vk$$ (SDK.md §13).
 
 In the symbols below, $$A$$ denotes the **originating** address — the holder's address for `Transfer` and the spender's address for `SpenderTransfer`. $$sk\_A$$ is the originator's spending key, $$\text{PVK}\_A$$ is the originator's stored public viewing key, and $$\sigma\_E = \sigma$$ for `Transfer`, $$\sigma\_E = \sigma\_a$$ for `SpenderTransfer`.
 

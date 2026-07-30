@@ -67,7 +67,7 @@ Anyone can deposit into any registered account; the depositor itself does not ne
 | 1 | Account holder | Authorizes a merge via the wallet. |
 | 2 | Contract | Adds the receiving balance commitment to the spendable balance commitment (homomorphic point addition) and resets the receiving balance to the identity point. No proof required. |
 
-Merge is the gate between received funds and spendable funds. It is deliberately lightweight (a single on-chain point addition) so account holders are never blocked by malicious senders who spam the account with incoming transfers and prevent them from constructing a valid proof.
+Merge is the gate between received funds and spendable funds.
 
 ---
 
@@ -139,7 +139,7 @@ Each auditor decrypts its ciphertexts by running the channel sponge (recipient-a
 - **Per-account auditor selection.** Each account selects an auditor at registration. The `auditor_id` is immutable and determines which auditor receives ciphertexts for the account's activity.
 - **Dual-auditor ciphertexts.** The ciphertexts each operation produces are enforced by its zero-knowledge proof, so they cannot be omitted or malformed, and no extra action is needed from users.
 - **Per-account scope.** Auditing one account reveals nothing about any other account.
-- **Recipient-side opening capability.** The recipient's auditor holds the per-transfer Pedersen blinding $r_{\text{transfer}}$ on every inbound transfer and spender-transfer. Combined with the transfer amount this is the full Pedersen opening of every received transfer commitment, and by summation of the recipient's receiving-balance commitment between merges. The capability is forward-only (only events while the auditor key was active are decryptable), receiving-side only (it does not extend to the recipient's spendable balance after merge), and reset by merge. This is what enables the seizure/clawback flow specified in `COMPLIANCE.md` §5 without an on-chain accumulator or per-transfer contract hook. The sender's auditor remains restricted to amounts and balance checkpoints; it does not see openings.
+- **Recipient-side opening capability.** The recipient's auditor holds the per-transfer Pedersen blinding $r_{\text{transfer}}$, hence the full Pedersen opening of the recipient's receiving balance between merges, which is what enables the seizure/clawback flow specified in `COMPLIANCE.md` §5; the capability and its bounds are specified in `DESIGN_cont.md` §8.1.
 - **Seamless auditor rotation.** When an auditor key is rotated, the new key immediately receives ciphertexts on subsequent operations. For the sender's auditor, the balance checkpoint at the next owner-initiated proof operation (transfer, withdrawal, set spender, or revoke spender) provides the current balance with no event replay or bootstrapping.
 - **Spender visibility.** The owner's auditor sees spender transfer amounts and post-transfer allowances via the same dual-auditor mechanism, and additionally sees escrowed and reclaimed amounts at `set_spender` and `revoke_spender`.
 - **Viewing vs. spending separation.** Even with the viewing key, an auditor or anyone who obtains it **cannot move or spend funds**. Spending requires the separate spending key, which is never shared.
@@ -206,6 +206,6 @@ The recovery process is fully deterministic given the master secret and access t
 
 ### Edge Cases the Wallet Handles
 
-- **Spam resistance.** Incoming transfers cannot block or delay spending. They modify only the receiving balance; spend proofs reference only the spendable balance, so in-flight proofs remain valid regardless of incoming activity.
+- **Spam resistance.** Incoming transfers cannot block or delay spending. They modify only the receiving balance; spend proofs reference only the spendable balance, so in-flight proofs remain valid regardless of incoming activity (`DESIGN_cont.md` §9.1).
 - **Failed transactions.** If a transaction reverts, the wallet uses a fresh random salt on retry, producing different deterministic randomness. This prevents an observer who saw the reverted transaction from correlating the retried commitment. The salt is a public input so the auditor can still reconstruct state.
-- **Spender expiry.** Delegations carry a `live_until_ledger` after which spender transfers are rejected. The wallet should surface upcoming expirations and facilitate renewal or revocation. Expired delegations persist in storage until explicitly revoked by the owner, since automatic cleanup would destroy escrowed funds.
+- **Spender expiry.** Delegations carry a `live_until_ledger` after which spender transfers are rejected, and an expired delegation still holds its escrow until the owner revokes it (`DESIGN.md` §6.2), so the wallet should surface upcoming expirations and facilitate renewal or revocation.
