@@ -131,7 +131,7 @@ Committed **values** accumulate as exact integers and MUST NOT be reduced by eit
 
 ### 4.7 Scalar sampling
 
-Secret scalars — $$sk$$, $$r_e$$ when sampled, $$\sigma$$, $$\sigma_a$$ — MUST be produced by the rejection procedure of DESIGN.md §2.2:
+Secret scalars — $$sk$$, $$\sigma$$, $$\sigma_a$$ — MUST be produced by the rejection procedure of DESIGN.md §2.2:
 
 1. Draw 32 bytes from a CSPRNG.
 2. Clear the top **2** bits, yielding a 254-bit candidate.
@@ -154,11 +154,11 @@ Secret scalars — $$sk$$, $$r_e$$ when sampled, $$\sigma$$, $$\sigma_a$$ — MU
 | $$\delta_{\text{aud\\\_s}}$$ | 11 | Yes |
 | $$\delta_{\text{aud\\\_r}}$$ | 12 | Yes |
 | $$\delta_{\text{ecdh}}$$ | 13 | Yes |
-| $$\delta_{\text{disc\\\_bind}}$$ | 14 | No — off-chain disclosure only |
-| $$\delta_{\text{eph}}$$ | 15 | No — client convention (§10.5) |
+| $$\delta_{\text{eph}}$$ | 14 | No — derived off-circuit (DESIGN.md §5.3) |
+| $$\delta_{\text{disc\\\_bind}}$$ | 15 | No — off-chain disclosure only |
 | $$\delta_{\text{disc}}$$ | 16 | No — off-chain disclosure only |
 
-Values 1–13 are defined in DESIGN_cont.md §13., SELECTIVE_DISCLOSURE.md §2.2 introduces the remaining three without assigning numbers, and this document assigns them 14–16. Tags 14–16 are never absorbed inside a core circuit, so they are not part of the on-chain wire contract, but they are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
+Values 1–14 are protocol tags defined in DESIGN_cont.md §13. $$\delta_{\text{disc\\\_bind}}$$ and $$\delta_{\text{disc}}$$ belong to the off-chain disclosure layer and carry the values 15 and 16 assigned here and in SELECTIVE_DISCLOSURE.md §2.2. None of 14–16 is absorbed inside a core circuit, so none is part of the on-chain wire contract, but all three are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
 
 All sixteen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tags 11 and 12 are the two-mask tags; the remaining fourteen, including 14–16, are single-output tags.
 
@@ -283,7 +283,7 @@ An implementation MUST therefore additionally, for every circuit it supports:
 Three derivations this document specifies or relies on have no fixture in `circuits/lib/testdata/`, because none of them is computed inside a core circuit. Each requires one:
 
 - **$$\text{address\\\_to\\\_field}$$** (§4.9). The circuits receive $$\text{addr\\\_f}$$ as an opaque public input, so this derivation is implemented twice — by the contract on-chain and by every client — and the existing fixtures pin $$\text{addr\\\_f}$$ only as a fixed constant. It is the sole primitive with two independent implementations, and §4.9's bootstrap check detects a divergence only against an already-deployed contract.
-- **$$\delta_{\text{eph}}$$ derivation** (§10.5). Nothing in any circuit constrains $$r_e$$, so a fixture is the only mechanism keeping a user's clients in agreement; where they disagree, transfers sent from one are not disclosable from another.
+- **$$\delta_{\text{eph}}$$ derivation** (DESIGN.md §5.3, restated in §10.5). No circuit constrains $$r_e$$, so a fixture is the only mechanism keeping a user's clients in agreement; where two disagree, transfers sent from one are not disclosable from the other.
 - **The §5.1 $$sk$$ chain**, from a fixed root, $$\text{addr\\\_f}$$, and $$\text{acct\\\_f}$$ through to $$sk$$, $$vk$$, $$Y$$, and $$\text{PVK}$$, without which recovery from backup material is untestable across implementations. The vector MUST start from a fixed ed25519 secret and run through §5.2's message, its SEP-0053 preimage, and the resulting signature, since the signature is where two clients most plausibly diverge — the only step in the chain whose format is set outside this document. A second vector from a fixed raw root covers §5.3.
 
 ---
@@ -397,27 +397,27 @@ The projection MUST still be reconciled against the event, and MUST NOT be treat
 
 A fresh $$\sigma$$ MUST be sampled for every **attempt**, including retries after a reverted or dropped transaction.
 
-DESIGN_cont.md §9.6 motivates this as unlinkability: a fresh $$\sigma$$ prevents an observer correlating a reverted attempt with its retry. Under §10.5 it also becomes a confidentiality requirement, because $$\sigma$$ is then the sole freshness input to every derived pad in the operation. DESIGN.md §2.5 already requires the pair $$(r_e, \sigma)$$ to be unique per proof; with $$r_e$$ derived from $$\sigma$$ that reduces to $$\sigma$$ alone, and reuse repeats the ephemeral key and every channel mask that depends on it.
+DESIGN_cont.md §9.6 motivates this as unlinkability: a fresh $$\sigma$$ prevents an observer correlating a reverted attempt with its retry. It is equally a confidentiality requirement, because the salt is the sole freshness input to every derived pad in the operation, the ephemeral scalar included (DESIGN.md §2.5, §5.3). Reuse therefore repeats the ephemeral key and every channel mask that depends on it.
 
 An implementation MUST NOT cache or reuse a salt across attempts, and MUST NOT derive it from anything an observer can predict.
 
 ### 10.5 Deterministic ephemeral scalars
 
-The ephemeral scalar for an outgoing transfer SHOULD be derived rather than sampled:
+An implementation MUST derive the ephemeral scalar of every operation the holder or spender originates:
 
 $$r_e = \text{poseidon\\\_with\\\_domain}(\delta_{\text{eph}}, [vk, \sigma_E])$$
 
-where $$vk$$ is the originator's viewing key and $$\sigma_E$$ the operation's salt (SELECTIVE_DISCLOSURE.md §7, §15.2). The derivation MUST be re-attempted with a fresh salt in the negligible case that it yields zero, which the circuits forbid.
+where $$vk$$ is the originator's viewing key and $$\sigma_E$$ the operation's salt. DESIGN.md §5.3 is the normative source. The derivation MUST be re-attempted with a fresh salt in the negligible case that it yields zero, which the circuits forbid.
 
-**Why.** No circuit constrains $$r_e$$ beyond $$R_e = r_e \cdot H$$ and $$r_e \neq 0$$, so deriving it changes nothing on-chain. It lets the originator recompute $$r_e$$ for any past outgoing transfer from $$vk$$ and the event's public salt, so sender-side disclosure needs no per-transfer state. The alternative is retaining $$(r_e, v_{\text{transfer}})$$ for every outbound transfer indefinitely, and a transfer whose randomly-sampled $$r_e$$ was not retained is permanently undisclosable.
+**Scope.** `Transfer`, `Withdraw`, `SetSpender`, and `RevokeSpender` take the owner's $$(vk, \sigma)$$; `SpenderTransfer` takes the *spender's* own $$(vk_{\text{op}}, \sigma_a)$$. The clawback circuit of COMPLIANCE.md §5.3 lies outside the rule, its ephemeral belonging to the auditor: an implementation that constructs clawback witnesses obtains that scalar by the §4.7 procedure, no viewing key being available there.
 
 **Three consequences an implementation MUST handle.**
 
-First, **it widens the viewing-key blast radius, retroactively.** DESIGN_cont.md §9.4 states that a $$vk$$ holder cannot construct openings of any commitment. Under this convention a $$vk$$ holder recomputes $$r_e$$, hence the recipient shared scalar, hence $$r_{\text{transfer}}$$ — a full opening of every transfer commitment the account ever created, including transfers predating the compromise, and those commitments sit inside recipients' receiving balances. The *amounts* were already inferable by differencing checkpoints and netting merges, so that capability is not new; the openings are, and they extend a capability DESIGN_cont.md §8.2 otherwise scopes to the recipient's auditor (§16.1). An implementation MUST treat $$vk$$ accordingly in §13 and MUST NOT export it as a read-only credential without stating this.
+First, **$$vk$$ carries more authority than balance decryption.** Recomputing $$r_e$$ yields the recipient shared scalar, hence $$r_{\text{transfer}}$$, hence a full Pedersen opening of every transfer commitment the account created — retroactively, and reaching commitments that sit inside recipients' receiving balances (DESIGN_cont.md §9.4, §8.2). An implementation MUST treat $$vk$$ accordingly in §13 and MUST NOT export it as a read-only credential without stating this.
 
-Second, **the salt requirement of §10.4 is promoted from unlinkability to confidentiality.**
+Second, **the salt requirement of §10.4 is a confidentiality requirement**, not only an unlinkability one, the salt being the operation's sole freshness input.
 
-Third, **disclosability is unverifiable on-chain.** Nothing distinguishes a derived $$r_e$$ from a sampled one, so a client cannot determine whether a given historical transfer is disclosable without attempting it, and a user moving between clients can accumulate a mixed history. An implementation offering a sampled $$r_e$$ path MUST either retain $$(r_e, v_{\text{transfer}})$$ per outbound transfer or state that those transfers are permanently undisclosable.
+Third, **disclosability is unverifiable from chain data.** No on-chain value distinguishes an ephemeral this derivation produced from one it did not, so an implementation MUST NOT infer disclosability from a stored per-transfer flag and MUST determine it by test (§12.2). Transfers predating this specification may not be disclosable by their sender.
 
 ### 10.6 Consistency checking
 
@@ -493,7 +493,7 @@ The verifier MUST be distributable independently of any wallet, since its purpos
 
 Verification MUST include comparing the circuit's verification key against the pinned key for that disclosure circuit, without which the proof attests to an unknown statement.
 
-Where §10.5's epoch record shows a transfer predates the derived $$r_e$$ convention, an implementation MUST report it as not disclosable rather than attempting and reporting a failure.
+Not every historical transfer is disclosable by its sender: one predating §10.5's requirement may carry an ephemeral scalar that does not reproduce. An implementation MUST report that as *not disclosable* rather than as a verification failure, and MUST establish it by test: derive the candidate $$r_e$$ from $$(vk, \sigma_E)$$ and compare $$r_e \cdot H$$ against the event's $$R_e$$. The comparison costs one Poseidon2 call and one scalar multiplication and is authoritative, where a stored per-transfer flag is not (§10.5).
 
 ### 12.3 Indexer client
 
@@ -513,9 +513,9 @@ RPC and archive compose: the RPC serves the recent tail, the archive everything 
 
 ## 13. Security Requirements
 
-**Secret handling.** The root, $$sk$$, $$vk$$, $$dvk_i$$, and every cached opening are secrets. Implementations MUST keep them within the trust boundary (§2.1), SHOULD zeroize buffers holding them once no longer needed, and MUST NOT transmit them to any remote service except under §8.3's explicit opt-in.
+**Secret handling.** The root, $$sk$$, $$vk$$, $$dvk_i$$, every derived $$r_e$$, and every cached opening are secrets. Implementations MUST keep them within the trust boundary (§2.1), SHOULD zeroize buffers holding them once no longer needed, and MUST NOT transmit them to any remote service except under §8.3's explicit opt-in.
 
-$$vk$$ MUST NOT be presented as a safely-shareable read-only credential. It exposes every historical balance checkpoint, every incoming amount, every delegation allowance, and — under §10.5 — the opening of every transfer the account originated. Its only guarantee is that it cannot authorize spending.
+$$vk$$ MUST NOT be presented as a safely-shareable read-only credential. It exposes every historical balance checkpoint, every incoming amount, every delegation allowance, and — through the ephemeral-scalar derivation of DESIGN.md §5.3 — the opening of every transfer the account originated. Its only guarantee is that it cannot authorize spending. A party that needs outbound visibility is served with D-sender proofs, which are bound to that party and to a nonce (SELECTIVE_DISCLOSURE.md §13.2), never by handing over the key.
 
 **Storage at rest.** Persisted openings are as sensitive as the amounts they represent, and a persisted root is equivalent to the funds. Implementations MUST document what they persist and where, and SHOULD encrypt both at rest under a key that is not itself derived from persisted material. A signer root (§5.2) MUST NOT be persisted at all, since it is reproducible on demand from the signer.
 
@@ -556,14 +556,4 @@ Partial role coverage is conformant and MUST be declared: an implementation supp
 
 **The portable surface is §4–§7.** The crypto core, key derivation, and witness assembly are what two implementations must agree on byte-for-byte. The facades of §10–§12 are deployment-shaped, and this document constrains their obligations rather than their structure.
 
-This document is versioned with the protocol documentation set. A change to any primitive in §4, to the derivation in §5, or to the domain separators in §4.8 breaks the cross-implementation contract: it MUST bump the protocol documentation version, MUST be called out in release notes, and MUST be accompanied by updated fixtures in `circuits/lib/testdata/`. A change to the numeric value of a domain separator, or to the sponge convention, invalidates every previously derived key and every previously emitted ciphertext, and is a new deployment rather than an upgrade.
-
----
-
-## 16. Open Protocol Questions
-
-Each item below is a place where the protocol documents are silent, mutually inconsistent, or behind the circuits. This document states the assumption it makes so that implementations agree in the interim; each still needs a decision in the document that owns it.
-
-**16.1 — Deterministic $$r_e$$ contradicts DESIGN.md §7.6 and revises DESIGN_cont.md §9.4.** DESIGN.md §7.6 step 1 instructs the sender to sample $$r_e$$; SELECTIVE_DISCLOSURE.md §7 and §15.2 instruct deriving it. These are opposite, and a client built to §7.6 alone permanently forecloses sender-side disclosure. §10.5 adopts derivation. Adopting it protocol-wide also requires amending DESIGN_cont.md §9.4, whose claim that a $$vk$$ holder "cannot construct openings of any commitment" no longer holds, and DESIGN_cont.md §8.2, whose scoping of receiving-side opening capability to the recipient's auditor becomes incomplete.
-
-**16.2 — Optional hardening: bind $$\text{acct\\\_f}$$ into $$vk$$.** §5.1's $$\text{acct\\\_f}$$ binding prevents the identical-$$Y$$-and-$$\text{PVK}$$ linkage by client convention. Binding the registering address into $$vk$$ at DESIGN.md §4.2 would make it impossible by construction, at the cost of changing constraint R2 and every verification key.
+This document is versioned with the protocol documentation set. A change to any primitive in §4, to the derivation in §5, to the ephemeral-scalar derivation (DESIGN.md §5.3, restated in §10.5), or to the domain separators in §4.8 breaks the cross-implementation contract: it MUST bump the protocol documentation version, MUST be called out in release notes, and MUST be accompanied by updated fixtures in `circuits/lib/testdata/`. A change to the numeric value of a domain separator, or to the sponge convention, invalidates every previously derived key and every previously emitted ciphertext, and is a new deployment rather than an upgrade.

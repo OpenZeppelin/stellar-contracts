@@ -77,7 +77,7 @@ $$\text{base}(\mathbb{G}) = \mathbb{F}\_r^{\text{BN254}}, \qquad \text{scalar}(\
 
 A Grumpkin point is a pair $$(x, y) \in \mathbb{F}\_r^2$$. Noir's native `Field` type is $$\mathbb{F}\_r$$, so Grumpkin point arithmetic inside UltraHonk circuits incurs no non-native field emulation. On-chain, the Soroban host provides BN254 $$\mathbb{F}\_r$$ arithmetic (`bn254_fr_{add, sub, mul, inv}` via CAP-80), which suffices for Grumpkin affine point operations.
 
-**Scalar sampling.** Grumpkin scalars live in $$\mathbb{F}\_q$$, which is slightly larger than $$\mathbb{F}\_r$$. All secret scalars in this design ($$sk$$, $$r\_e$$, $$\sigma$$, $$\sigma\_a$$) are sampled by the **rejection sampling** procedure, which produces a uniform draw from $$\mathbb{F}\_r$$:
+**Scalar sampling.** Grumpkin scalars live in $$\mathbb{F}\_q$$, which is slightly larger than $$\mathbb{F}\_r$$. Every secret scalar in this design that is drawn rather than derived ($$\sigma$$, $$\sigma\_a$$) is produced by the **rejection sampling** procedure, which yields a uniform draw from $$\mathbb{F}\_r$$.
 
 1. Draw 32 bytes (256 bits) from a CSPRNG.
 2. Mask the top 2 bits to zero, yielding a 254-bit candidate $$x \in [0, 2^{254})$$.
@@ -153,7 +153,7 @@ Squeeze order is canonical. Lane 0 is always an amount mask and lane 1 is always
 
 **Mode exclusivity.** Because the absorb occupies a single block, $$\text{SpongeSqueeze}\_2(\delta, s, \sigma)[0]$$ is the same field element as $$\text{Poseidon2}(\delta, s, \sigma)$$. Distinct domain tags (Section 13) are therefore not sufficient on their own: each tag MUST additionally be used in exactly one of the two modes, or the same $$(\delta, s, \sigma)$$ would yield one mode's mask as the other's output. $$\delta\_{\text{aud\\\_s}}$$ and $$\delta\_{\text{aud\\\_r}}$$ are the two-mask tags; every other tag in Section 13 is used only with the single-output form above.
 
-A $$(r\_e, \sigma)$$ pair MUST be unique per proof. The sponge masks are deterministic in $$(s, \sigma)$$, where $$s$$ is the ECDH shared scalar of Section 2.4, so reusing the pair across two operations reuses every pad slot they share, and a slot whose plaintext is known in one operation (e.g. a transfer amount known to its recipient) decrypts the other operation's ciphertext in that slot. The canonical slot assignment above limits the blast radius of such reuse to same-slot pairs, but does not eliminate it; provers and wallets MUST sample a fresh $$(r\_e, \sigma)$$ for every proof (Section 9.6 already guarantees $$\sigma$$ freshness on retry).
+The sponge masks are deterministic in $$(s, \sigma)$$, where $$s$$ is the ECDH shared scalar of Section 2.4, so reusing the pair across two operations reuses every pad slot they share, and a slot whose plaintext is known in one operation (e.g. a transfer amount known to its recipient) decrypts the other operation's ciphertext in that slot. The canonical slot assignment above limits the blast radius of such reuse to same-slot pairs, but does not eliminate it; provers and wallets MUST use a fresh $$(r\_e, \sigma)$$ for every proof. Because $$r\_e$$ is derived from the originator's viewing key and the salt rather than drawn independently (§5.3), a fresh salt is the only thing that makes the pair fresh: the salt carries the entire requirement, and Section 9.6's retry rule is what discharges it.
 
 All references to "Poseidon" in this document denote this Poseidon2 instantiation.
 
@@ -290,7 +290,7 @@ The spending public key is stored on-chain at registration. Knowledge of $$sk$$ 
 
 $$vk = \text{Poseidon}(\delta\_{\text{vk}}, sk, \text{addr\\\_f})$$
 
-A scalar in $$\mathbb{F}\_r$$, unique per $$(sk, \text{addr\\\_f})$$ pair. Enables balance decryption without spending authority. Cannot recover $$sk$$ (Poseidon preimage resistance). Because $$\text{addr\\\_f}$$ is bound into the derivation, proofs that constrain $$vk$$ (R2, W2, T2, S2, V2) are inherently bound to the contract contract, eliminating the need for explicit per-circuit context binding.
+A scalar in $$\mathbb{F}\_r$$, unique per $$(sk, \text{addr\\\_f})$$ pair. Enables balance decryption without spending authority, and — through the ephemeral-scalar derivation of §5.3 — reconstruction of the Pedersen openings of transfers the account originated; §9.4 states the full capability of a compromised $$vk$$. Cannot recover $$sk$$ (Poseidon preimage resistance). Because $$\text{addr\\\_f}$$ is bound into the derivation, proofs that constrain $$vk$$ (R2, W2, T2, S2, V2) are inherently bound to the contract contract, eliminating the need for explicit per-circuit context binding.
 
 ### 4.3 Public Viewing Key
 
@@ -326,7 +326,7 @@ The following symbols are used throughout this section:
 | $$v\_{\text{transfer}}$$ | Transfer amount (private) |
 | $$r\_{\text{transfer}}$$ | ECDH-derived blinding factor for $$C\_{\text{transfer}}$$ |
 | $$W\_{\text{spend}}, W\_{\text{receive}}$$ | Wallet-side accumulators: $$(v, r)$$ pairs tracking commitment openings |
-| $$r\_e$$ | Ephemeral scalar sampled per transfer |
+| $$r\_e$$ | Ephemeral scalar, derived per operation from the $$vk$$ and the operation salt (§5.3) |
 | $$R\_e$$ | Ephemeral public key $$r\_e \cdot H$$ (published in event data) |
 | $$S$$ | ECDH shared secret point $$r\_e \cdot \text{PVK}\_B$$ |
 | $$s$$ | Scalar shared secret $$\text{ECDH}(r\_e, \text{PVK}\_B) = \text{Poseidon}(\delta\_{\text{ecdh}}, S.x, S.y)$$ (§2.4) |
@@ -388,8 +388,9 @@ Steps 1-3 require $$(\tilde{b}, \sigma)$$ from the latest owner event and $$vk$$
 
 When a sender (spending key $$sk\_A$$) transfers to a recipient with public viewing key $$\text{PVK}\_B$$, the transfer commitment uses blinding derived from an ephemeral ECDH exchange.
 
-**Definition 1** (Transfer blinding derivation). The sender samples $$r\_e, \sigma \in \mathbb{F}\_r$$ via the rejection sampling procedure (§2.2), then computes:
+**Definition 1** (Transfer blinding derivation). The sender samples $$\sigma \in \mathbb{F}\_r$$ via the rejection sampling procedure (§2.2), then computes:
 
+$$r\_e = \text{Poseidon}(\delta\_{\text{eph}}, vk\_A, \sigma)$$
 $$R\_e = r\_e \cdot H$$
 $$S = r\_e \cdot \text{PVK}\_B$$
 $$s = \text{Poseidon}(\delta\_{\text{ecdh}}, S.x, S.y) \in \mathbb{F}\_r \qquad \text{(§2.4)}$$
@@ -399,6 +400,8 @@ $$\tilde{v} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{transfer\\\_
 where $$v\_{\text{transfer}}$$ is the transfer amount. The transfer commitment is $$C\_{\text{transfer}} = \text{Com}(v\_{\text{transfer}}, r\_{\text{transfer}})$$. The ephemeral public key $$R\_e$$, encrypted amount $$\tilde{v}$$, and $$\sigma$$ are published in the transaction event data so recipients can derive both $$v\_{\text{transfer}}$$ and $$r\_{\text{transfer}}$$ during replay.
 
 Since $$vk\_B \cdot R\_e = r\_e \cdot \text{PVK}\_B = S$$ by ECDH commutativity, both sender and recipient can independently derive $$r\_{\text{transfer}}$$ and decrypt $$v\_{\text{transfer}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s, \sigma)$$, provided they know $$\sigma$$ emitted with the event. The auditor decrypts the transfer amount via a separate ECDH channel (Section 8.1).
+
+**Deterministic ephemeral scalar.** $$r\_e$$ is derived from the originator's own viewing key and the operation salt. Because $$\sigma$$ is published in the event and $$vk$$ is held by the originator, this lets the originator recompute $$r\_e$$ for any past transfer from the event alone, which is what makes sender-side selective disclosure possible with no per-transfer wallet state ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §7). A transfer whose $$r\_e$$ was sampled and not retained is permanently undisclosable by its sender. No circuit constrains $$r\_e$$ beyond $$R\_e = r\_e \cdot H$$ and $$r\_e \neq 0$$. 
 
 **Note.** Each transfer involves two auditor ECDH exchanges: one with the recipient's auditor key ($$S\_{a,r} = r\_e \cdot K\_{\text{aud,r}}$$) and one with the sender's auditor key ($$S\_{a,s} = r\_e \cdot K\_{\text{aud,s}}$$). Both reuse the ephemeral scalar $$r\_e$$, as does the $$dvk\_i$$ escrow ECDH in `set_spender` (§7.11) when one is present. Neither auditor recovers any account's viewing key.
 
@@ -619,7 +622,7 @@ The sender (account $$A$$, spending key $$sk\_A$$) transfers a hidden amount $$v
 
 **Sender computation:**
 
-1. Sample ephemeral scalar $$r\_e \in \mathbb{F}\_r$$ via the rejection sampling procedure (§2.2); sample $$\sigma \in \mathbb{F}\_r$$ via the same procedure
+1. Sample $$\sigma \in \mathbb{F}\_r$$ via the rejection sampling procedure (§2.2), then derive the ephemeral scalar $$r\_e = \text{Poseidon}(\delta\_{\text{eph}}, vk\_A, \sigma)$$ (§5.3), re-sampling $$\sigma$$ in the negligible case that $$r\_e = 0$$
 2. Compute $$R\_e = r\_e \cdot H$$
 3. Compute $$S = r\_e \cdot \text{PVK}\_B$$, derive $$s = \text{Poseidon}(\delta\_{\text{ecdh}}, S.x, S.y)$$ (§2.4)
 4. Derive transfer blinding: $$r\_{\text{transfer}} = \text{Poseidon}(\delta\_{\text{transfer\\\_blind}}, s, \sigma)$$
@@ -771,6 +774,8 @@ The spender transfers from the owner's escrowed allowance to a recipient.
 
 **Post-verification:** The contract checks `ledger.sequence() <= live_until_ledger`, updates `allowance_commitment`, `a_tilde`, stores `new_allowance_salt`, and adds $$C\_{\text{transfer}}$$ to the recipient's `receiving_commitment`. Emits event with $$(R\_e, \tilde{v}, \sigma\_a, \tilde{v}\_{\text{aud,r}}, \tilde{r}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}, \tilde{a}\_{\text{aud,s}})$$.
 
+**Ephemeral scalar.** The spender derives $$r\_e = \text{Poseidon}(\delta\_{\text{eph}}, vk\_{\text{op}}, \sigma\_a)$$ (§5.3) from its *own* viewing key rather than the owner's, so that the spender can later disclose it ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §7). The circuit does not constrain the derivation; it does not constrain $$vk\_{\text{op}}$$ at all, per *Contract binding* below. One consequence follows for the owner: since the owner does not hold $$vk\_{\text{op}}$$, the owner cannot recompute $$r\_e$$ for a spender transfer and cannot disclose it without the spender's cooperation ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §7, *Coverage asymmetry*).
+
 **Recipient uniformity.** The recipient processes the incoming transfer identically to a direct transfer: compute $$s = \text{ECDH}(vk, R\_e)$$, derive amount and blinding. The decryption flow is independent of whether the sender was the owner or an spender.
 
 **Contract binding.** Unlike owner-initiated circuits, the SpenderTransfer circuit does not constrain the $$vk$$ derivation (the spender has no access to the owner's $$sk$$). Contract binding is instead inherited indirectly through the allowance commitment chain: the SetSpender circuit derives $$dvk\_i$$ from the contract-specific $$vk$$ (S2, S5), which determines $$r\_a$$ (S6) and thus $$C\_a$$ (S7). The SpenderTransfer circuit verifies $$dvk\_i$$ against $$C\_a$$ via $$\sigma\_a$$ (O3). Since $$C\_a$$ is a public input and was constructed with contract-specific randomness, a proof generated against one contract's $$C\_a$$ cannot verify against another's.
@@ -823,7 +828,7 @@ Owner transfers, withdrawals, and merges proceed identically to the no-spender c
 
 At `set_spender`, the owner escrows $$dvk\_i$$ to the spender on-chain via ECDH, eliminating off-chain key sharing:
 
-1. Owner picks ephemeral $$r\_e$$ (reused from the `set_spender` proof's outer ECDH; see §5.3, "Why reusing $$r\_e$$ is safe") and computes $$R = r\_e \cdot H$$.
+1. Owner derives ephemeral $$r\_e$$ per §5.3 — the same scalar as the `set_spender` proof's outer ECDH; see §5.3, "Why reusing $$r\_e$$ is safe" — and computes $$R = r\_e \cdot H$$.
 2. Shared secret: $$s = \text{ECDH}(r\_e, Y\_{\text{op}})$$ (§2.4)
 3. Escrowed key: $$\text{escrowed\\\_dvk} = (R.x, \\; \text{Poseidon}(\delta\_{\text{esc\\\_dvk}}, s, \text{op}\_i) + dvk\_i)$$
 

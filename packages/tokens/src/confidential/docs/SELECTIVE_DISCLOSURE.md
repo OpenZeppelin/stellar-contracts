@@ -85,13 +85,14 @@ For each disclosure request, the recipient supplies a fresh nonce $$\nu \in \mat
 
 ### 2.2 Domain Separators
 
-Three new domain separators are added to the list in DESIGN_cont.md §13:
+Two domain separators are specific to this layer. Neither is absorbed in a core circuit, and both are assigned values in SDK.md §4.8, continuing DESIGN_cont.md §13's sequence:
 
-| Symbol | Use |
-|:---|:---|
-| $$\delta\_{\text{disc}}$$ | Disclosure ciphertext to recipient |
-| $$\delta\_{\text{disc\\\_bind}}$$ | Nonce binding for aggregate disclosures |
-| $$\delta\_{\text{eph}}$$ | Deterministic ephemeral-scalar ($$r\_e$$) derivation for outgoing transfers (§7, §15.2) |
+| Symbol | Value | Use |
+|:---|:--:|:---|
+| $$\delta\_{\text{disc\\\_bind}}$$ | 15 | Nonce binding for aggregate disclosures |
+| $$\delta\_{\text{disc}}$$ | 16 | Disclosure ciphertext to recipient |
+
+A wallet producing a D-sender proof also uses $$\delta\_{\text{eph}}$$ (value 14, DESIGN_cont.md §13) to recover the event's ephemeral scalar before proving (§7). That use is off-circuit: no disclosure circuit absorbs the tag.
 
 ---
 
@@ -255,15 +256,17 @@ The party that **originated** an on-chain confidential transfer proves to a thir
 
 In both cases the prover must supply the ephemeral scalar $$r\_e$$ as a witness: the sender has no ECDH path through their own $$vk$$ into the event ciphertext $$\tilde{v}$$ (that ciphertext is keyed to the recipient's $$\text{PVK}\_B$$), so $$r\_e$$ is necessary to reconstruct the recipient-side decryption from the sender's side.
 
-**Deterministic $$r\_e$$ (no per-transfer storage).** Rather than sample $$r\_e$$ from fresh randomness and persist it for every outgoing transfer, a wallet derives it from material it already recovers — the originator's viewing key and the event nonce:
+**Recovering $$r\_e$$.** The originator recomputes the ephemeral scalar from its own viewing key and the event nonce (DESIGN.md §5.3):
 
 $$r\_e = \text{Poseidon2}(\delta\_{\text{eph}}, vk, \sigma\_E)$$
 
-where $$\delta\_{\text{eph}}$$ is a dedicated domain separator (the `EPHEMERAL_KEY` tag, §2.2), $$vk$$ is the originator's viewing key ($$vk\_A$$ for `Transfer`, $$vk\_{\text{op}}$$ for `SpenderTransfer`), and $$\sigma\_E$$ is the event nonce ($$\sigma$$ or $$\sigma\_a$$). This is the same construction the protocol already uses for the normalized spend randomness $$r' = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk, \sigma)$$ and the encrypted-balance mask $$\text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk, \sigma)$$ (DESIGN.md §5.2, §5.5): $$r\_e$$ joins the family of per-operation secrets recoverable from $$(vk, \sigma\_E)$$ alone. Because $$vk$$ is secret, $$r\_e$$ stays secret to everyone but the originator's wallet; because $$\sigma\_E$$ is published in the event, the wallet recomputes $$r\_e$$ at disclosure time having stored nothing.
+where $$vk$$ is the originator's viewing key ($$vk\_A$$ for `Transfer`, $$vk\_{\text{op}}$$ for `SpenderTransfer`) and $$\sigma\_E$$ is the event nonce ($$\sigma$$ or $$\sigma\_a$$). The disclosed amount then follows:
 
-Once $$r\_e$$ is recovered the disclosed amount follows, $$v\_{\text{transfer}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, \text{ECDH}(r\_e, \text{PVK}\_B), \sigma\_E)$$ (DESIGN.md §2.4) with $$\text{PVK}\_B$$ read from the event's `to` address, so D-sender needs **no** per-transfer wallet state — only the wallet's $$vk$$ and an on-chain read of the event, matching the storage-free posture of D-recipient (§6). This is a wallet-side convention applied when *constructing* outgoing transfers; the contract and the six circuits are untouched (T5/T6 hold for any $$r\_e$$), and it is forward-looking — a transfer whose $$r\_e$$ was sampled randomly and not retained remains undiscloseable.
+$$v\_{\text{transfer}} = \tilde{v} - \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, \text{ECDH}(r\_e, \text{PVK}\_B), \sigma\_E) \qquad \text{(DESIGN.md §2.4)}$$
 
-**Security note.** Deriving $$r\_e$$ from $$\sigma\_E$$ makes $$\sigma\_E$$ the sole freshness input for the whole transfer, including the recipient and auditor channels that otherwise draw independent freshness from a separately sampled $$r\_e$$. This is safe under the protocol's existing requirement that $$\sigma$$ be unique per operation: the balance channel $$\tilde{b} = v + \text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk, \sigma)$$ and the normalized $$r'$$ already depend on $$\sigma$$ alone, so a $$\sigma$$ collision is already disallowed and is negligible under the rejection sampling of DESIGN.md §2.2. The cost is the loss of $$r\_e$$ as an independent second freshness source; a deployment that wants defense-in-depth against $$\sigma$$ misuse on the recipient and auditor channels should keep sampling $$r\_e$$ and storing it instead.
+with $$\text{PVK}\_B$$ read from the event's `to` address. Both quantities come from the wallet's $$vk$$ and an on-chain read of the event, so D-sender needs **no** per-transfer wallet state, matching the storage-free posture of D-recipient (§6). Recovery happens off-circuit: $$r\_e$$ enters the proof as a witness pinned by DS3, and no disclosure circuit absorbs $$\delta\_{\text{eph}}$$.
+
+**What this implies for $$vk$$.** Since $$r\_e$$ is recoverable from $$vk$$, so is a full Pedersen opening of every transfer the account originated. DESIGN_cont.md §9.4 states the capability a compromised $$vk$$ therefore carries, and §8.2 records that per-transfer openings are not exclusive to the recipient's auditor. The operative consequence for this layer is that a counterparty needing outbound visibility is served with D-sender proofs, which are bound to that counterparty and to a nonce (§13.2) — never by handing over $$vk$$ (SDK.md §13).
 
 In the symbols below, $$A$$ denotes the **originating** address — the holder's address for `Transfer` and the spender's address for `SpenderTransfer`. $$sk\_A$$ is the originator's spending key, $$\text{PVK}\_A$$ is the originator's stored public viewing key, and $$\sigma\_E = \sigma$$ for `Transfer`, $$\sigma\_E = \sigma\_a$$ for `SpenderTransfer`.
 
@@ -294,7 +297,7 @@ In the symbols below, $$A$$ denotes the **originating** address — the holder's
 
 DS3 anchors $$R\_e$$ to the originator by forcing them to know $$r\_e$$. Combined with D1/D2, this proves the prover is the same party that produced the transfer's ephemeral key — the holder for `Transfer`, the spender for `SpenderTransfer`. DS4 and DS5 reconstruct the recipient-side decryption from the originator's perspective.
 
-**Coverage asymmetry: owner cannot D-sender a `SpenderTransfer`.** The owner whose allowance was spent does not hold $$r\_e$$ for the spender-originated event and has no ECDH path into $$\tilde{v}$$ (the recipient channel is keyed to $$\text{PVK}\_B$$, not to anything the owner controls). The owner therefore cannot independently produce a D-sender disclosure for a `SpenderTransfer`. The owner's cryptographic paths for that event are:
+**Coverage asymmetry: owner cannot D-sender a `SpenderTransfer`.** A spender transfer's ephemeral scalar derives from the spender's $$vk\_{\text{op}}$$ (DESIGN.md §7.8), which the owner does not hold, so the owner cannot recover $$r\_e$$ for the event; nor does the owner have any other ECDH path into $$\tilde{v}$$, which is keyed to $$\text{PVK}\_B$$. The owner therefore cannot independently produce a D-sender disclosure for a `SpenderTransfer`. The owner's cryptographic paths for that event are:
 
 1. **D-auditor (§8)** routed through the owner's auditor key $$K\_{\text{aud,s}}$$, which decrypts $$\tilde{v}\_{\text{aud,s}}$$ for every `SpenderTransfer` from the owner's account (DESIGN_cont.md §8.4). This is the canonical owner-side path.
 2. **D-sender by the cooperating spender.** If the spender is willing, they construct a D-sender proof against the spender's own $$(sk\_{\text{op}}, \text{PVK}\_{\text{op}})$$ and deliver it to the owner, who forwards it (or the owner asks the disclosure recipient to accept proofs originated by the spender). The proof's $$\text{PVK}\_A$$ is the spender's PVK; the verifier looks it up at the event's `spender` address.
@@ -486,13 +489,13 @@ For the D-recipient circuit, soundness reduces to two facts:
 
 Therefore, a soundness break would require either a key-derivation collision (Poseidon2 preimage break, DESIGN.md §2.5, §3.2) or a discrete-log break on Grumpkin. Both are out of scope.
 
-D-sender soundness is symmetric: DS3 forces the prover to know $$r\_e$$ with $$R\_e = r\_e \cdot H$$, which by the transfer circuit's constraint T6 (DESIGN.md §7.6) was the same $$r\_e$$ used to derive the auditor and recipient ciphertexts. DS4, DS5 reconstruct the decryption from the sender side. Soundness is independent of how $$r\_e$$ was produced: whether sampled or derived as $$\text{Poseidon2}(\delta\_{\text{eph}}, vk, \sigma\_E)$$ (§7), DS3 binds the proof through the event's $$R\_e$$, so the deterministic derivation affects only wallet recovery, not the soundness of the disclosed amount.
+D-sender soundness is symmetric: DS3 forces the prover to know $$r\_e$$ with $$R\_e = r\_e \cdot H$$, which by the transfer circuit's constraint T6 (DESIGN.md §7.6) was the same $$r\_e$$ used to derive the auditor and recipient ciphertexts. DS4, DS5 reconstruct the decryption from the sender side. Soundness rests on DS3's binding through the event's $$R\_e$$ rather than on how the prover came to hold $$r\_e$$; §7's recovery step bears on wallet state, not on the soundness of the disclosed amount.
 
 D-auditor soundness is direct: A1 forces auditor-key ownership; A2–A4 reconstruct the standard auditor sponge decryption (DESIGN_cont.md §8.1).
 
 D-balance soundness reduces to Pedersen binding (DESIGN.md §2.3): given the on-chain $$C\_{\text{spend}}$$, the prover's witnesses $$(v\_s, r\_s)$$ satisfying DB3 uniquely determine $$v\_s$$ up to negligible probability. D1, D2 anchor the proof to the disclosing account as in D-recipient. The "current state" framing is established by the verifier's read protocol, not the circuit: a proof against a stale $$C\_{\text{spend}}$$ simply fails to verify against the current public-input vector, so the recipient only ever accepts proofs about the on-chain state at the moment of verification.
 
-**Event binding.** None of the soundness arguments above pin the proof to a *specific* on-chain event by themselves — they only force consistency with whatever $$(\text{PVK}\_A, R\_e, \sigma\_E, \tilde{v})$$ tuple the public-input vector commits to. The binding to the on-chain event is established off-chain by the §5.3 verifier protocol: the verifier MUST resolve $$\text{ref}\_E$$ from the bundle to a specific event, MUST take all event-derived public inputs verbatim from that event, and MUST take all account-derived inputs from the on-chain account record at the address the *event* names. Skipping any of these steps voids the binding. Because $$R\_e$$ is sampled fresh per transfer (DESIGN.md §5.3, §9.6), no two distinct on-chain events share an $$R\_e$$ except with negligible probability, so a proof that verifies against the vector built from event $$E$$ cannot also verify against the vector built from any $$E' \neq E$$. This is the soundness role the trust-boundary rule (§5.2) plays for the disclosure layer; it is the analogue of DESIGN.md §7.1's on-chain trust-boundary rule.
+**Event binding.** None of the soundness arguments above pin the proof to a *specific* on-chain event by themselves — they only force consistency with whatever $$(\text{PVK}\_A, R\_e, \sigma\_E, \tilde{v})$$ tuple the public-input vector commits to. The binding to the on-chain event is established off-chain by the §5.3 verifier protocol: the verifier MUST resolve $$\text{ref}\_E$$ from the bundle to a specific event, MUST take all event-derived public inputs verbatim from that event, and MUST take all account-derived inputs from the on-chain account record at the address the *event* names. Skipping any of these steps voids the binding. Because $$R\_e$$ is unique per operation (DESIGN.md §2.5, §5.3), no two distinct on-chain events share an $$R\_e$$ except with negligible probability, so a proof that verifies against the vector built from event $$E$$ cannot also verify against the vector built from any $$E' \neq E$$. Event binding therefore inherits DESIGN.md §2.5's salt-uniqueness requirement: a repeated nonce within one account would collapse it alongside the channel masks. This is the soundness role the trust-boundary rule (§5.2) plays for the disclosure layer; it is the analogue of DESIGN.md §7.1's on-chain trust-boundary rule.
 
 ### 13.2 Recipient Binding
 
@@ -547,7 +550,7 @@ These circuits do *not* register with the on-chain verifier set (DESIGN_cont.md 
 
 A wallet that supports holder-side disclosures must:
 
-1. Derive the transfer ephemeral scalar deterministically as $$r\_e = \text{Poseidon2}(\delta\_{\text{eph}}, vk, \sigma\_E)$$ when constructing each outgoing transfer (§7). D-sender then requires **no** per-transfer storage — both $$r\_e$$ and $$v\_{\text{transfer}}$$ are recomputed at disclosure time from the wallet's $$vk$$ and the on-chain event. A wallet that instead samples $$r\_e$$ from fresh randomness must retain $$(r\_e, v\_{\text{transfer}})$$ per outbound transfer (tens of bytes each) to keep those transfers disclosable.
+1. Recover the event's ephemeral scalar $$r\_e$$ per DESIGN.md §5.3 when constructing a D-sender proof (§7). No per-transfer storage is required: both $$r\_e$$ and $$v\_{\text{transfer}}$$ are recomputed at disclosure time from the wallet's $$vk$$ and the on-chain event.
 2. Retain the latest opening $$(v\_s, r\_s)$$ of $$C\_{\text{spend}}$$ to support D-balance. This is part of the wallet's normal spend state.
 3. Index event references (transaction hash, log index) per account event to enable selecting events by user-facing criteria (date, counterparty).
 4. Expose a UI flow that takes a disclosure request $$(P\_R, \nu)$$ and a target event (or set), produces the disclosure proof, and delivers the result over the requested channel.
