@@ -9,7 +9,7 @@ The key words MUST, MUST NOT, SHOULD, and MAY are to be interpreted as in RFC 21
 
 ## 1. Why the Indexer Is Load-Bearing
 
-Confidential balances are Pedersen commitments; the on-chain entry alone does not reveal the opening `(v, r)` needed to spend. A wallet that loses its local cache reconstructs the opening deterministically from the master secret plus the account's event history: the latest *checkpoint* event supplies `(b_tilde, sigma)` from which the spendable opening is derived (DESIGN §5.2), while the receiving-side opening is rebuilt by replaying deposits and incoming transfers back to the account's last `Merge`, or to registration if it has never merged (§2).
+Confidential balances are Pedersen commitments; the on-chain entry alone does not reveal the opening `(v, r)` needed to spend. A wallet that loses its local cache reconstructs the opening deterministically from the master secret plus the account's event history: the latest *checkpoint* event supplies `(b_tilde, sigma)` from which the spendable opening is derived (DESIGN §5.2), while the receiving-side opening is rebuilt by replaying deposits and incoming transfers back to the account's last `Merge` at or before that checkpoint, or to registration if it has not merged before it (§2).
 
 Stellar RPC retains events for a **7-day window** only. A wallet that loses local state after that window can still see that its funds exist (the commitment remains on-chain) but cannot reconstruct the opening required to spend them — unless a durable archive holds the missing events. That archive is this document's subject. Without a conforming indexer, recovery from seed is not guaranteed, and deployments MUST treat wallet-local state as unrecoverable after the RPC window.
 
@@ -18,7 +18,7 @@ Stellar RPC retains events for a **7-day window** only. A wallet that loses loca
 ## 2. Terminology
 
 - **Checkpoint** — an owner-initiated proof-carrying event that publishes `(b_tilde, sigma)` for the owner's spendable balance (DESIGN §5.2; §3.2 lists the qualifying event types in ingestion scope).
-- **Replay window** — for the spendable side, the range from an account's latest checkpoint to the current ledger; for the receiving side, the range from the last `Merge` (or registration, if never merged) to the current ledger.
+- **Replay window** — the range from `T_0` to the current ledger, where `T_0` is the account's most recent `Merge` at or before its latest checkpoint, or its `Register` event if it has not merged before that checkpoint (DESIGN §5.2 *Recovery*). One window serves both sides: the checkpoint supplies the spendable opening directly, and the receiving opening is rebuilt across the window. Anchoring the receiving side at the account's last `Merge` overall is not sufficient — a `Merge` after the checkpoint reconstructs the current receiving opening correctly but leaves the spendable opening short by the amount that merge folded in, the checkpoint predating it.
 - **Event id** — the triple `(ledger_seq, tx_hash, event_index)`, unique per emitted event: `tx_hash` is globally unique, and `event_index` is unambiguous because a Soroban transaction carries a single operation. The same event MUST carry the same id whether served from the archive or from RPC, so a hybrid client can deduplicate across the seam. The id does not by itself encode position within a ledger — `tx_hash` conveys no ordering — so the canonical total order is instead `(ledger_seq, tx_application_order, event_index)`, where `tx_application_order` is persisted as its own field (§3.1) and drives §3.4.
 - **Seam** — in a hybrid client (§1) that reads the recent tail from Stellar RPC and older history from the archive, the ledger at which it switches sources. A client sets the seam at or below the RPC retention floor (`getHealth().oldestLedger`) so the RPC side is always served from live retention, and requires the archive's ingested-through ledger (§6 C4) to reach the seam.
 
@@ -63,7 +63,7 @@ The indexer MAY apply this attribution server-side (per-account queries, §6 C2)
 
 ### 3.4 Ordering
 
-The indexer MUST preserve and expose the total order `(ledger_seq, tx_application_order, event_index)` — all three components are persisted per §3.1. Replay correctness depends on it: interleaved deposits, transfers, and merges only reconstruct the right openings when applied in emission order (DESIGN §5.2 step 5).
+The indexer MUST preserve and expose the total order `(ledger_seq, tx_application_order, event_index)` — all three components are persisted per §3.1. Replay correctness depends on it: interleaved deposits, transfers, and merges only reconstruct the right openings when applied in emission order (DESIGN §5.2 step 6).
 
 ## 4. Ingestion Contract
 
@@ -77,8 +77,8 @@ The indexer MUST preserve and expose the total order `(ledger_seq, tx_applicatio
 
 The indexer MUST retain the full per-account history of every in-scope event **indefinitely**. No pruning horizon is safe in general:
 
-- The spendable-side window reaches back to the account's latest checkpoint, which is arbitrarily old for a dormant account.
-- The receiving-side window reaches back to the last `Merge`, which for an account that receives but never spends is its registration.
+- The spendable opening is taken from the account's latest checkpoint, which is arbitrarily old for a dormant account.
+- The receiving side is replayed from the last `Merge` at or before that checkpoint, which for an account that receives but never merges is its registration.
 
 Incoming-transfer spam makes per-account storage linear in the number of inbound events; operators SHOULD provision for this and MAY rate-limit *serving* (never retention) per DESIGN_cont §9.5.
 
@@ -86,7 +86,7 @@ Incoming-transfer spam makes per-account storage linear in the number of inbound
 
 C2–C4 below are normative; C1 is RECOMMENDED. The REST shape is RECOMMENDED — any transport exposing the same capabilities conforms.
 
-- **C1 — Latest checkpoint (RECOMMENDED).** Return the most recent checkpoint event for `(contract_id, account)` at or before a given ledger. This is an optimization, not a correctness requirement: each checkpoint carries a self-contained `(b_tilde, sigma)` that fully re-derives the spendable opening, so a client can also obtain the latest checkpoint by scanning the ordered history (C2). Exposing C1 lets a dormant account with a long history skip transferring that history.
+- **C1 — Latest checkpoint (RECOMMENDED).** Return the most recent checkpoint event for `(contract_id, account)` at or before a given ledger. This is an optimization, not a correctness requirement: each checkpoint carries a self-contained `(b_tilde, sigma)` that fully re-derives the spendable opening, so a client can also obtain the latest checkpoint by scanning the ordered history (C2). Exposing C1 lets a dormant account with a long history skip transferring that history. A client additionally needs `T_0`, the last `Merge` at or before that checkpoint (§2), which C1 does not return and which is obtainable from C2's ordered history.
 - **C2 — Ordered history.** Return all in-scope events for `(contract_id, account)` within a ledger range, in the total order of §3.4, paginated, each carrying its event id and payload (§3.1). An indexer that serves only the per-contract stream (§3.3) satisfies C2 by delivering that stream in order for client-side attribution.
 - **C3 — Completeness signal.** Every response MUST state whether the served range is complete (`complete: true` only when the indexer holds a gap-free history for the whole requested range).
 - **C4 — Ingestion status.** Expose the latest fully-ingested ledger so clients can bound staleness. A hybrid client (§1) compares it against the seam it derives from the RPC retention floor; if the archive has not ingested through the seam, the client MUST treat the crossing range as incomplete (C3).
@@ -113,7 +113,7 @@ GET /v1/tokens/{contract_id}/accounts/{account}/events
 The indexer is trusted for **availability and completeness only** — never for confidentiality or integrity:
 
 - **Confidentiality.** Everything the indexer holds is public chain data: commitments, masked ciphertexts, and ECDH ephemerals. A curious indexer learns nothing beyond what any chain observer sees (DESIGN_cont §9).
-- **Integrity fails closed.** Recovery ends with the wallet checking its reconstructed openings against the **on-chain** commitments (`C_spend =? v·G + r·H`, DESIGN §5.2 step 6). A tampered or incomplete history cannot produce a wrong balance that verifies; it produces a detectable mismatch.
+- **Integrity fails closed.** Recovery ends with the wallet checking its reconstructed openings against the **on-chain** commitments (`C_spend =? v·G + r·H`, DESIGN §5.2 step 7). A tampered or incomplete history cannot produce a wrong balance that verifies; it produces a detectable mismatch.
 - **Withholding is the residual risk.** A malicious or broken indexer can deny recovery (a liveness failure, not a soundness one). Two structural mitigations: for the recent window the RPC is an independent source of the same events (the hybrid split of §1), so archive withholding bites only the pre-window history; and for that older history wallets SHOULD support multiple independent archive endpoints, with deployments running or contracting at least two.
 
 ## 8. Conformance and Versioning

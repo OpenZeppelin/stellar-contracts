@@ -435,18 +435,18 @@ It MUST also surface the recovery path: the condition resolves at the next merge
 
 ### 10.8 Merge policy
 
-Received funds are spendable only after a merge (DESIGN.md §7.4). A wallet SHOULD merge automatically, or prompt, ahead of a spend that the spendable balance alone cannot cover.
+Received funds are spendable only after a merge (DESIGN.md §7.4). A wallet SHOULD merge automatically, or prompt, ahead of a spend that the spendable balance alone cannot cover. Merging ahead of a spend also bounds the recovery replay window, which starts at the last merge at or before the latest checkpoint (§10.9).
 
 Merge is proof-less and owner-authorized, and neither a merge nor an in-flight spend proof can be disrupted by a third party (DESIGN_cont.md §9.1, §9.2).
 
 ### 10.9 Recovery
 
-Recovery follows the procedure of DESIGN.md §5.2 *Recovery*, with the reconstructed state verified per §10.6.
+Recovery follows the procedure of DESIGN.md §5.2 *Recovery*, with the reconstructed state verified per §10.6. Its two anchors differ: the latest checkpoint event pins $$W_{\text{spend}}$$ in one lookup, while $$W_{\text{receive}}$$ restarts at $$T_0$$ — the account's last `Merge` at or before that checkpoint — from which the replay window runs.
 
 Two further obligations follow from data availability:
 
 - Recovery from a root alone depends on a conforming indexer (INDEXER.md). Without one, a client can see that funds exist but cannot reconstruct the opening needed to spend them.
-- **With RPC-only event access, a client MUST sync at least once per RPC retention window**, and MUST warn when it has not. The spendable side is robust, since each checkpoint is self-contained, but the receiving side is a running sum, so a crediting event that ages out before it is applied takes its opening with it permanently.
+- **With RPC-only event access, a client MUST sync at least once per RPC retention window**, and MUST warn when it has not. The spendable side is robust, since each checkpoint is self-contained, but the receiving side is a running sum from $$T_0$$, so a crediting event that ages out before it is applied takes its opening with it permanently.
 
 ### 10.10 Spender-side wallet
 
@@ -533,7 +533,7 @@ $$vk$$ MUST NOT be presented as a safely-shareable read-only credential. It expo
 
 **Proving latency.** Single-digit seconds on contemporary hardware is the design target (OVERVIEW.md). Implementations MUST treat it as user-visible.
 
-**Sync and replay bounds.** The replay window runs from the account's latest checkpoint, or from registration for an account that has received but never spent, which is unbounded in age. Implementations MUST NOT assume a bounded window, and SHOULD use the archive's checkpoint lookup where available (INDEXER.md §6, C1) so that a dormant account is not obliged to transfer its entire history.
+**Sync and replay bounds.** The replay window runs from the account's last `Merge` at or before its latest checkpoint, or from registration for an account that has not merged before that checkpoint (DESIGN.md §5.2 *Recovery*), which is unbounded in age. Implementations MUST NOT assume a bounded window, and SHOULD use the archive's checkpoint lookup where available (INDEXER.md §6, C1) so that a dormant account is not obliged to transfer its entire history.
 
 **Storage growth.** Per-account event volume is linear in inbound transfers and unbounded by design, since incoming-transfer spam is rate-limited only by transaction fees (DESIGN_cont.md §9.5). Implementations MUST NOT size local storage on the assumption that inbound volume tracks the user's own activity.
 
