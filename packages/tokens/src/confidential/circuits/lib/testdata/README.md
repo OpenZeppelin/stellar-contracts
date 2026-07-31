@@ -20,6 +20,8 @@ nargo test print_fixtures --package stellar_confidential_lib --show-output
 
 That test (in `lib/src/tests.nr`) feeds a fixed input set through every primitive and prints `name = 0x...` for each. The JSON files in this directory mirror those outputs, one file per primitive — they are not generated automatically; if a primitive's behavior is changed, one must (a) re-run `print_fixtures`, (b) update the matching `*.json`, and (c) update the hard-coded expected values inside the `fixtures_match_testdata` test so it stays in lockstep.
 
+**Exception: `address_to_field.json`.** That derivation is not implemented in Noir at all — the circuits receive `addr_f` as an opaque public input — so `print_fixtures` does not emit it and `fixtures_match_testdata` does not cover it. It exists in the contract (`storage.rs::address_to_field`, over `soroban-poseidon`) and in every client, which makes it the one primitive with two independent implementations. Its guard is the Rust test `address_to_field_matches_testdata_vectors` in `../../../test.rs`; that test and the JSON must be updated together. Its inputs are 56-character strkeys rather than field elements.
+
 `fixtures_match_testdata` is the in-Noir guard: it asserts that every value documented here is still what the lib produces. If one changes a primitive without updating both this directory *and* that test, CI fails. If a primitive is intentionally changed, the cross-language contract is broken — every downstream consumer must be updated and the change should bump a version (see `Cargo.toml` once the SDK lands).
 
 ## Inputs (shared across fixtures)

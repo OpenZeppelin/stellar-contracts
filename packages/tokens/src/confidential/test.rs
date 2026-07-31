@@ -834,3 +834,52 @@ fn delegation_type_export_compiles() {
         live_until_ledger: 0,
     });
 }
+
+// ################## ADDRESS-TO-FIELD PARITY ##################
+
+/// Pins `address_to_field` against
+/// `circuits/lib/testdata/address_to_field.json`.
+///
+/// This derivation is the only Poseidon2 primitive in the protocol with two
+/// independent implementations: the circuits take `addr_f` as an opaque public
+/// input, so it lives in the contract (here) and in every client, with no Noir
+/// version to hold them together. DESIGN.md §2.7 asserts that all of them
+/// reproduce the same Field from the same Address; this test is what makes that
+/// assertion executable on the contract side. The expected values are the
+/// committed vectors -- update both together or not at all.
+#[test]
+fn address_to_field_matches_testdata_vectors() {
+    let e = Env::default();
+
+    // (strkey, expected address_to_field) from testdata/address_to_field.json.
+    // All-zero ed25519 public key and all-zero contract id: both version bytes
+    // the host accepts, reproducible without reference to any deployment.
+    let vectors: [(&str, [u8; 32]); 2] = [
+        (
+            "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+            hex32("1d3b0901201ea22ad61ed4600b49dee57bb73369bf07bdeab17cbf0e54debd4f"),
+        ),
+        (
+            "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+            hex32("1997b0390a25f684e91575771f4c3ca72ac8f20f45a462838ea918bbe8c4e19c"),
+        ),
+    ];
+
+    for (strkey, expected) in vectors {
+        let got = token_storage::address_to_field(&e, &Address::from_str(&e, strkey));
+        assert_eq!(got, BytesN::from_array(&e, &expected), "address_to_field({strkey})");
+    }
+}
+
+/// Decodes a 64-character hex string into 32 bytes.
+fn hex32(s: &str) -> [u8; 32] {
+    let b = s.as_bytes();
+    assert_eq!(b.len(), 64, "expected 64 hex chars");
+    let mut out = [0u8; 32];
+    for (i, byte) in out.iter_mut().enumerate() {
+        let hi = (b[i * 2] as char).to_digit(16).expect("hex digit");
+        let lo = (b[i * 2 + 1] as char).to_digit(16).expect("hex digit");
+        *byte = (hi * 16 + lo) as u8;
+    }
+    out
+}

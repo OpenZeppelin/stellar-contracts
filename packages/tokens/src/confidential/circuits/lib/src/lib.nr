@@ -240,7 +240,7 @@ pub fn poseidon_with_domain<let N: u32>(d: Field, inputs: [Field; N]) -> Field {
 
 /// Viewing key. Section 4.2. `vk = Poseidon2(VK, sk, addr_f)`.
 ///
-/// The `addr_f` parameter (the contract contract's address as a `Field`) binds the
+/// The `addr_f` parameter (the contract's address as a `Field`) binds the
 /// viewing key -- and therefore every proof that constrains `vk` (R2/W2/T2/S2/V2)
 /// -- to a specific deployed contract. Dropping `addr_f` here would let a proof for
 /// one contract verify against another's verifier.
@@ -306,8 +306,8 @@ pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
 
 // ################## AUDITOR-CHANNEL SPONGE ##################
 
-/// Poseidon2 sponge with two squeezes. Absorbs `(d, s_x, sigma)` -- where
-/// `s_x` is the ECDH shared-secret scalar produced by [`ecdh`] -- and returns
+/// Poseidon2 sponge with two squeezes. Absorbs `(d, s, sigma)` -- where
+/// `s` is the ECDH shared-secret scalar produced by [`ecdh`] -- and returns
 /// the first two rate-elements of the post-permutation state in order.
 ///
 /// Implements `SpongeSqueeze_2(delta, s, sigma)` from Section 2.5. The canonical
@@ -318,17 +318,17 @@ pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
 ///
 /// Used by: Transfer (T_a2 recipient-auditor amount + randomness, T_a6
 /// sender-auditor amount + balance) and SpenderTransfer (O_a2, O_a6).
-pub fn sponge_squeeze_2(d: Field, s_x: Field, sigma: Field) -> [Field; 2] {
+pub fn sponge_squeeze_2(d: Field, s: Field, sigma: Field) -> [Field; 2] {
     let iv: Field = 3 * POSEIDON2_IV_BASE;
-    let state = poseidon2_permutation([d, s_x, sigma, iv], 4);
+    let state = poseidon2_permutation([d, s, sigma, iv], 4);
     [state[0], state[1]]
 }
 
 /// Sender-auditor encrypted balance checkpoint for circuits whose auditor
 /// block emits a single ciphertext (Withdraw W_a3/W_a4).
 ///
-/// `b_tilde_aud_s = v_new + sponge_squeeze_2(AUDITOR_SENDER, s_a_s_x, sigma)[1]`,
-/// where `s_a_s_x` is the sender-auditor ECDH shared-secret scalar produced by
+/// `b_tilde_aud_s = v_new + sponge_squeeze_2(AUDITOR_SENDER, s_a_s, sigma)[1]`,
+/// where `s_a_s` is the sender-auditor ECDH shared-secret scalar produced by
 /// [`ecdh`].
 /// The pad is the sponge's *second* squeeze -- the slot every two-ciphertext
 /// sender channel (Transfer T_a6-T_a8, SetSpender S_a3-S_a5, RevokeSpender
@@ -337,6 +337,6 @@ pub fn sponge_squeeze_2(d: Field, s_x: Field, sigma: Field) -> [Field; 2] {
 /// never shares a pad with an amount ciphertext even if a `(r_e, sigma)` pair
 /// is mistakenly reused across operations (the pair must be unique per proof;
 /// DESIGN Section 2.5).
-pub fn encrypt_auditor_sender_balance(v_new: Field, s_a_s_x: Field, sigma: Field) -> Field {
-    v_new + sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, sigma)[1]
+pub fn encrypt_auditor_sender_balance(v_new: Field, s_a_s: Field, sigma: Field) -> Field {
+    v_new + sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, sigma)[1]
 }

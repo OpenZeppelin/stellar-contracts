@@ -1347,7 +1347,7 @@ fn append_amount(pi: &mut Bytes, e: &Env, amount: i128) {
 /// Compresses an address into a canonical 32-byte big-endian `Bn254Fr`
 /// representative via `Poseidon2(δ_addr, lo, hi)` over its 56-byte stellar
 /// strkey.
-fn address_to_field(e: &Env, addr: &Address) -> BytesN<32> {
+pub(crate) fn address_to_field(e: &Env, addr: &Address) -> BytesN<32> {
     let strkey = addr.to_string();
     let mut buf = [0u8; STRKEY_LEN];
     strkey.copy_into_slice(&mut buf);

@@ -67,7 +67,7 @@ Anyone can deposit into any registered account; the depositor itself does not ne
 | 1 | Account holder | Authorizes a merge via the wallet. |
 | 2 | Contract | Adds the receiving balance commitment to the spendable balance commitment (homomorphic point addition) and resets the receiving balance to the identity point. No proof required. |
 
-Merge is the gate between received funds and spendable funds. It is deliberately lightweight (a single on-chain point addition) so account holders are never blocked by malicious senders who spam the account with incoming transfers and prevent them from constructing a valid proof.
+Merge is the gate between received funds and spendable funds.
 
 ---
 
@@ -139,10 +139,10 @@ Each auditor decrypts its ciphertexts by running the channel sponge (recipient-a
 - **Per-account auditor selection.** Each account selects an auditor at registration. The `auditor_id` is immutable and determines which auditor receives ciphertexts for the account's activity.
 - **Dual-auditor ciphertexts.** The ciphertexts each operation produces are enforced by its zero-knowledge proof, so they cannot be omitted or malformed, and no extra action is needed from users.
 - **Per-account scope.** Auditing one account reveals nothing about any other account.
-- **Recipient-side opening capability.** The recipient's auditor holds the per-transfer Pedersen blinding $r_{\text{transfer}}$ on every inbound transfer and spender-transfer. Combined with the transfer amount this is the full Pedersen opening of every received transfer commitment, and by summation of the recipient's receiving-balance commitment between merges. The capability is forward-only (only events while the auditor key was active are decryptable), receiving-side only (it does not extend to the recipient's spendable balance after merge), and reset by merge. This is what enables the seizure/clawback flow specified in `COMPLIANCE.md` §5 without an on-chain accumulator or per-transfer contract hook. The sender's auditor remains restricted to amounts and balance checkpoints; it does not see openings.
+- **Recipient-side opening capability.** The recipient's auditor holds the per-transfer Pedersen blinding $r_{\text{transfer}}$, hence the full Pedersen opening of the recipient's receiving balance between merges, which is what enables the seizure/clawback flow specified in `COMPLIANCE.md` §5; the capability and its bounds are specified in `DESIGN_cont.md` §8.1.
 - **Seamless auditor rotation.** When an auditor key is rotated, the new key immediately receives ciphertexts on subsequent operations. For the sender's auditor, the balance checkpoint at the next owner-initiated proof operation (transfer, withdrawal, set spender, or revoke spender) provides the current balance with no event replay or bootstrapping.
 - **Spender visibility.** The owner's auditor sees spender transfer amounts and post-transfer allowances via the same dual-auditor mechanism, and additionally sees escrowed and reclaimed amounts at `set_spender` and `revoke_spender`.
-- **Viewing vs. spending separation.** Even with the viewing key, an auditor or anyone who obtains it **cannot move or spend funds**. Spending requires the separate spending key, which is never shared.
+- **Viewing vs. spending separation.** A viewing key cannot move or spend funds. Spending requires the separate spending key, which is never shared.
 
 ### Auditor Configuration
 
@@ -163,9 +163,9 @@ The wallet abstracts all cryptographic operations. Account holders interact with
 The wallet must:
 
 - **Generate and store keys** - derive the full key hierarchy (spending key, viewing key, public viewing key, delegation viewing keys) from a single master secret.
-- **Produce zero-knowledge proofs** - the heaviest client-side computation. Proof generation time depends on the circuit complexity but targets single-digit seconds on modern hardware. The Transfer circuit involves approximately 7 elliptic-curve scalar multiplications (including two auditor ECDH exchanges); the Register circuit is lighter.
+- **Produce zero-knowledge proofs** - the heaviest client-side computation. Proof generation time depends on the circuit complexity but targets single-digit seconds on modern hardware. The Transfer circuit involves 8 elliptic-curve scalar multiplications (including two auditor ECDH exchanges); the Register circuit needs 2. `DESIGN_cont.md` §10.3 lists the per-circuit totals.
 - **Track local state** - maintain running commitment openings (value and blinding factor pairs) for the spendable and receiving balances by processing on-chain events. This is comparable to wallet sync in UTXO-based privacy systems (Zcash, Monero).
-- **Handle recovery** - if local state is lost, reconstruct balances from on-chain data using the viewing key: fetch the encrypted balance scalar and salt from the most recent spend-boundary event, derive the deterministic blinding factor, and replay subsequent incoming transfer events. Recovery requires the master secret plus access to a durable event archive (Stellar RPC retains only 7 days of history); the indexer this archive must satisfy is specified in the companion [Indexing and Off-Chain State Recovery](./INDEXER.md) document.
+- **Handle recovery** - if local state is lost, reconstruct balances from on-chain data using the viewing key: fetch the encrypted balance scalar and salt from the most recent spend-boundary event, derive the deterministic blinding factor, and replay the events emitted after the last merge preceding that spend boundary, since only a merge clears the receiving balance. Recovery requires the master secret plus access to a durable event archive (Stellar RPC retains only 7 days of history); the indexer this archive must satisfy is specified in the companion [Indexing and Off-Chain State Recovery](./INDEXER.md) document.
 
 ### For Developers (Integration)
 
@@ -175,7 +175,7 @@ The wallet must:
 | **Verifier contract** | Validates zero-knowledge proofs on-chain. Stores one verification key per operation type. |
 | **Auditor contract** | Manages auditor public keys. Shared across tokens. |
 | **Noir circuits** | Six proof circuits (register, withdraw, transfer, spender transfer, set spender, revoke spender). Written in Noir, compiled to UltraHonk. |
-| **Client library** | SDK for wallets: key management, proof generation, event processing, balance tracking, encryption/decryption. |
+| **Client library** | SDK for wallets: key management, proof generation, event processing, balance tracking, encryption/decryption. Specified in [SDK.md](./SDK.md). |
 
 ---
 
@@ -200,12 +200,12 @@ If the wallet is lost or reinstalled on a new device:
 
 1. The account holder restores from the master secret (seed phrase or equivalent).
 2. The wallet re-derives the full key hierarchy.
-3. The wallet fetches the latest spend-boundary event for the account, reads the encrypted balance scalar and salt from it, recovers the spendable balance opening using the viewing key, then replays subsequent incoming transfer events to reconstruct the receiving balance.
+3. The wallet fetches the latest spend-boundary event for the account, reads the encrypted balance scalar and salt from it, recovers the spendable balance opening using the viewing key, then reconstructs the receiving balance by replaying the deposits, incoming transfers, and merges emitted after the last merge preceding that spend boundary. A spend boundary does not clear the receiving balance — only a merge does — so the replay starts at that merge rather than at the spend boundary.
 
-The recovery process is fully deterministic given the master secret and access to the account's full event history since the last spend boundary. Because Stellar RPC retains only the last 7 days of events, recovery from seed alone depends on a durable indexer ([INDEXER.md](./INDEXER.md)) that retains the per-account event log; without one, the on-chain commitments remain visible but their openings cannot be reconstructed.
+The recovery process is fully deterministic given the master secret and access to the account's event history from that merge onward. Because Stellar RPC retains only the last 7 days of events, recovery from seed alone depends on a durable indexer ([INDEXER.md](./INDEXER.md)) that retains the per-account event log; without one, the on-chain commitments remain visible but their openings cannot be reconstructed.
 
 ### Edge Cases the Wallet Handles
 
-- **Spam resistance.** Incoming transfers cannot block or delay spending. They modify only the receiving balance; spend proofs reference only the spendable balance, so in-flight proofs remain valid regardless of incoming activity.
+- **Spam resistance.** Incoming transfers cannot block or delay spending. They modify only the receiving balance; spend proofs reference only the spendable balance, so in-flight proofs remain valid regardless of incoming activity (`DESIGN_cont.md` §9.1).
 - **Failed transactions.** If a transaction reverts, the wallet uses a fresh random salt on retry, producing different deterministic randomness. This prevents an observer who saw the reverted transaction from correlating the retried commitment. The salt is a public input so the auditor can still reconstruct state.
-- **Spender expiry.** Delegations carry a `live_until_ledger` after which spender transfers are rejected. The wallet should surface upcoming expirations and facilitate renewal or revocation. Expired delegations persist in storage until explicitly revoked by the owner, since automatic cleanup would destroy escrowed funds.
+- **Spender expiry.** Delegations carry a `live_until_ledger` after which spender transfers are rejected, and an expired delegation still holds its escrow until the owner revokes it (`DESIGN.md` §6.2), so the wallet should surface upcoming expirations and facilitate renewal or revocation.

@@ -96,7 +96,7 @@ The policy address is rotatable via `set_compliance_config` (§6) under admin au
 
 ## 4. Customizing the Hooks Trait
 
-The compliance surface in §§2–3 is delivered as `ComplianceHooks`, a turnkey implementation of the contract's `Hooks` trait (see [DESIGN.md](DESIGN.md) for the lifecycle hooks the contract exposes at each entry point). Deployments that need behaviour beyond the default gating — for example, the deposit-side policies sketched below — replace `ComplianceHooks` with a bespoke `Hooks` impl. The custom impl typically delegates to the same primitives the default uses (`storage::gate_account`, `storage::check_policy`, `storage::check_sac`) and only overrides the callbacks that require non-default semantics.
+The compliance surface in §§2–3 is delivered as `ComplianceHooks`, a turnkey implementation of the contract's `Hooks` trait. Deployments that need behaviour beyond the default gating — for example, the deposit-side policies sketched below — replace `ComplianceHooks` with a bespoke `Hooks` impl. The custom impl typically delegates to the same primitives the default uses (`storage::gate_account`, `storage::check_policy`, `storage::check_sac`) and only overrides the callbacks that require non-default semantics.
 
 `deposit` is the canonical entry point for customization because it is the only operation where `from` may legitimately be an address that has never registered with the contract (the depositor only needs to hold the underlying SEP-41). The default `ComplianceHooks::on_deposit` gates both `from` and `to` unconditionally, which means every depositor must first register and pass the policy gate. Deployments that need other semantics override `on_deposit`.
 
@@ -198,6 +198,8 @@ The seize itself is carried out by the token admin and the auditor together. The
 
 Neither party can act alone: the admin cannot produce the proof, and the auditor cannot freeze the account or move funds. This is the same trust separation present in the core protocol (admin governs state transitions, auditor governs visibility) extended to a write surface.
 
+**The auditor is not the sole holder of the inbound openings.** Each inbound transfer's originator can reconstruct the opening of the transfer it sent, by recomputing $$r\_e$$ from its own viewing key and the salt published in the event (`DESIGN.md` §5.3, `DESIGN_cont.md` §8.2). This does not weaken the flow below, which sources $$(v\_r, r\_r)$$ from the auditor, and no single sender can open the target's $$C\_{\text{receive}}$$ as a whole — that needs every contributing transfer plus the deposits. It does mean the receiving-side half of the seize witness could in principle be assembled from cooperating senders, so the two-party separation above is a property of how this flow is constructed rather than a cryptographic impossibility.
+
 The admin role here is the same access-control surface introduced in §1.1; deployments typically place it under a dedicated `clawback` role in RBAC, separate from the freeze role.
 
 **Auditor routing.** The recipient-auditor and the sender-auditor roles for a single account are served by the same key: each account binds a single `auditor_id` at registration (`DESIGN.md` §6.1) which the contract uses for both the sender-channel ciphertexts on the account's outgoing operations and the recipient-channel ciphertexts on the account's incoming transfers (the two channels are separated by domain tags $$\delta\_{\text{aud\\\_s}}$$ and $$\delta\_{\text{aud\\\_r}}$$, not by distinct keys). Deployments that intend to use clawback therefore need only ensure the off-chain custodian of that key is operationally capable of producing both halves of the witness — the spendable-balance checkpoint decryption and the per-transfer $$r\_{\text{transfer},i}$$ replay — when the admin initiates a seizure.
@@ -213,9 +215,9 @@ The clawback proof is a constant-size circuit deployed through the existing Veri
 **Constraints (sketch).**
 
 1. **Receiving-balance opening.** $$C\_{\text{receive}} = v\_r \cdot G + r\_r \cdot H$$. The recipient-auditor reconstructs $$(v\_r, r\_r)$$ off-chain from per-transfer events; the proof asserts knowledge of this opening.
-2. **Spendable-balance decryption.** $$(m\_{v,s}^{\text{old}}, m\_{b,s}^{\text{old}}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, (k\_{\text{aud,s}} \cdot R\_e^{\text{old}}).x, \sigma^{\text{old}})$$ and $$v\_s = \tilde{b}\_{\text{aud,s}}^{\text{old}} - m\_{b,s}^{\text{old}}$$. The spendable-balance opening $$(v\_s, r\_s)$$ is consistent with $$C\_{\text{spend}} = v\_s \cdot G + r\_s \cdot H$$ where $$r\_s$$ is recovered via the same path the wallet uses for checkpoint recovery (`DESIGN.md` §5.2): $$r\_s = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk\_A, \sigma^{\text{old}})$$. Because the clawback circuit does not have access to $$vk\_A$$, the spendable-balance side of the proof binds via the consistency of $$\tilde{b}\_{\text{aud,s}}^{\text{old}}$$ with $$C\_{\text{spend}}$$ at the time of the last owner-initiated proof. The follow-up revision will pin down whether $$r\_s$$ is supplied as a private witness with an auxiliary opening proof or derived in-circuit from a separately escrowed value.
+2. **Spendable-balance decryption.** $$(m\_{v,s}^{\text{old}}, m\_{b,s}^{\text{old}}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, \text{ECDH}(k\_{\text{aud,s}}, R\_e^{\text{old}}), \sigma^{\text{old}})$$ and $$v\_s = \tilde{b}\_{\text{aud,s}}^{\text{old}} - m\_{b,s}^{\text{old}}$$. The spendable-balance opening $$(v\_s, r\_s)$$ is consistent with $$C\_{\text{spend}} = v\_s \cdot G + r\_s \cdot H$$ where $$r\_s$$ is recovered via the same path the wallet uses for checkpoint recovery (`DESIGN.md` §5.2): $$r\_s = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk\_A, \sigma^{\text{old}})$$. Because the clawback circuit does not have access to $$vk\_A$$, the spendable-balance side of the proof binds via the consistency of $$\tilde{b}\_{\text{aud,s}}^{\text{old}}$$ with $$C\_{\text{spend}}$$ at the time of the last owner-initiated proof. The follow-up revision will pin down whether $$r\_s$$ is supplied as a private witness with an auxiliary opening proof or derived in-circuit from a separately escrowed value.
 3. **Range and bound.** $$\alpha, v\_s, v\_r \in [0, 2^{127})$$ and $$\alpha \le v\_s + v\_r$$.
-4. **Refreshed checkpoint.** $$R\_e^{\text{new}} = r\_e^{\text{new}} \cdot H$$, $$r\_e^{\text{new}} \neq 0$$, and $$\tilde{b}\_{\text{aud,s}}^{\text{new}} = (v\_s + v\_r - \alpha) + m\_{b,s}^{\text{new}}$$ where $$(m\_{v,s}^{\text{new}}, m\_{b,s}^{\text{new}}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, (k\_{\text{aud,s}} \cdot R\_e^{\text{new}}).x, \sigma^{\text{new}})$$.
+4. **Refreshed checkpoint.** $$r\_e^{\text{new}}$$ is **sampled** by the auditor per `DESIGN.md` §2.2, not derived. This is the one operation in the protocol that samples its ephemeral scalar: `DESIGN.md` §5.3 derives $$r\_e$$ from the originator's viewing key, and the originator here is the auditor, which holds no account's viewing key. Then $$R\_e^{\text{new}} = r\_e^{\text{new}} \cdot H$$, $$r\_e^{\text{new}} \neq 0$$, and $$\tilde{b}\_{\text{aud,s}}^{\text{new}} = (v\_s + v\_r - \alpha) + m\_{b,s}^{\text{new}}$$ where $$(m\_{v,s}^{\text{new}}, m\_{b,s}^{\text{new}}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, \text{ECDH}(k\_{\text{aud,s}}, R\_e^{\text{new}}), \sigma^{\text{new}})$$.
 
 **Post-verification.** The contract sets $$C\_{\text{spend}} \leftarrow (v\_s + v\_r - \alpha) \cdot G + r\_s' \cdot H$$ under fresh deterministic randomness $$r\_s'$$ (admin-derived, since $$vk\_A$$ is unavailable), zeroes $$C\_{\text{receive}}$$, transfers $$\alpha$$ of the underlying SEP-41 token to the issuer, and emits an event carrying $$(\tilde{b}\_{\text{aud,s}}^{\text{new}}, R\_e^{\text{new}}, \sigma^{\text{new}})$$ so the sender-auditor sees the new checkpoint.
 
@@ -231,7 +233,9 @@ Detailed encoding, the precise treatment of $$r\_s$$, and the two-phase isolate-
 
 ```rust
 impl Token {
-    fn __constructor(e: Env, /* core args */, compliance: Option<ComplianceConfig>);
+    // Core arguments as declared in DESIGN_cont.md §11, plus the compliance entry.
+    fn __constructor(e: Env, admin: Address, token: Address, verifier: Address,
+                     auditor: Address, compliance: Option<ComplianceConfig>);
 
     // Freeze (§2)
     fn freeze(e: Env, account: Address, admin: Address);
@@ -246,8 +250,6 @@ impl Token {
     fn compliance_config(e: Env) -> Option<ComplianceConfig>;
 }
 ```
-
-`set_compliance_config` overwrites all three fields atomically. Callers that want to toggle a single field read the current config, modify the relevant field, and pass the updated struct back. This keeps the admin-gated surface to one entry point and avoids per-field rotation helpers.
 
 ### 6.1 Events
 

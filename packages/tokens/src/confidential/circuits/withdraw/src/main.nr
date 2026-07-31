@@ -166,9 +166,9 @@ fn main(
     assert_on_curve_non_identity(k_aud_s);
 
     // W_a2 (shared-secret scalar)
-    let s_a_s_x = ecdh(r_e, k_aud_s);
+    let s_a_s = ecdh(r_e, k_aud_s);
 
     // W_a3 + W_a4
-    let b_tilde_aud_s_derived = encrypt_auditor_sender_balance(v_new, s_a_s_x, sigma);
+    let b_tilde_aud_s_derived = encrypt_auditor_sender_balance(v_new, s_a_s, sigma);
     assert(b_tilde_aud_s_derived == b_tilde_aud_s);
 }
