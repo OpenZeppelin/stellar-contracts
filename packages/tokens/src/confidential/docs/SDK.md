@@ -16,11 +16,11 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are to be interpreted 
 
 Four properties of the protocol place correctness and confidentiality in the client rather than in the contract.
 
-**The opening exists only off-chain.** A balance is a Pedersen commitment $$C = v \cdot G + r \cdot H$$. The chain stores the point; the opening $$(v, r)$$ that authorizes the next spend lives exclusively in client state (DESIGN.md §5.2). A client that loses, mis-derives, or mis-accumulates the opening makes the funds unspendable, and the contract cannot help because it never knew the value.
+**The opening exists only off-chain.** A balance is a Pedersen commitment $$C = v \cdot G + r \cdot H$$. The chain stores the point; the opening $$(v, r)$$ that authorizes the next spend lives exclusively in client state (DESIGN.md §5.2). A client that loses, misderives, or misaccumulates the opening makes the funds unspendable, and the contract cannot help because it never knew the value.
 
 **Every amount a user sees is client-decrypted.** The contract performs homomorphic point arithmetic and never learns a value. Balances, transfer amounts, allowances, and audit figures are all produced by client-side decryption of event ciphertexts, so a decryption defect yields a plausible wrong number rather than a visible failure.
 
-**The client is the only enforcement point for canonicality.** Neither the Soroban host nor the verifier distinguishes a canonical $$\mathbb{F}_r$$ representative from a non-canonical one (DESIGN.md §2.2, *Host deserialiser caveat*); the contract enforces canonicality at its boundary, but the client is where the bytes are produced.
+**The client is an enforcement point for canonicality.** Neither the Soroban host nor the verifier distinguishes a canonical $$\mathbb{F}_r$$ representative from a non-canonical one (DESIGN.md §2.2, *Host deserialiser caveat*); the contract enforces canonicality at its boundary, but the client is where the bytes are produced.
 
 **The client is where all secrets live and all randomness is sampled.** The spending key, the viewing key, every blinding factor, and every per-operation salt originate client-side, so the protocol's confidentiality reduces to the client's key handling and CSPRNG quality. DESIGN.md §2.5 makes salt uniqueness a soundness requirement.
 
@@ -131,7 +131,7 @@ Committed **values** accumulate as exact integers and MUST NOT be reduced by eit
 
 ### 4.7 Scalar sampling
 
-Secret scalars — $$sk$$, $$\sigma$$, $$\sigma_a$$ — MUST be produced by the rejection procedure of DESIGN.md §2.2:
+Secret scalars — $$\sigma$$, $$\sigma_a$$ — MUST be produced by the rejection procedure of DESIGN.md §2.2:
 
 1. Draw 32 bytes from a CSPRNG.
 2. Clear the top **2** bits, yielding a 254-bit candidate.

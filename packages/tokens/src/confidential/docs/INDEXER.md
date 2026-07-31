@@ -20,7 +20,7 @@ Stellar RPC retains events for a **7-day window** only. A wallet that loses loca
 - **Checkpoint** — an owner-initiated proof-carrying event that publishes `(b_tilde, sigma)` for the owner's spendable balance (DESIGN §5.2; §3.2 lists the qualifying event types in ingestion scope).
 - **Replay window** — the range from `T_0` to the current ledger, where `T_0` is the account's most recent `Merge` at or before its latest checkpoint, or its `Register` event if it has not merged before that checkpoint (DESIGN §5.2 *Recovery*). One window serves both sides: the checkpoint supplies the spendable opening directly, and the receiving opening is rebuilt across the window. Anchoring the receiving side at the account's last `Merge` overall is not sufficient — a `Merge` after the checkpoint reconstructs the current receiving opening correctly but leaves the spendable opening short by the amount that merge folded in, the checkpoint predating it.
 - **Event id** — the triple `(ledger_seq, tx_hash, event_index)`, unique per emitted event: `tx_hash` is globally unique, and `event_index` is unambiguous because a Soroban transaction carries a single operation. The same event MUST carry the same id whether served from the archive or from RPC, so a hybrid client can deduplicate across the seam. The id does not by itself encode position within a ledger — `tx_hash` conveys no ordering — so the canonical total order is instead `(ledger_seq, tx_application_order, event_index)`, where `tx_application_order` is persisted as its own field (§3.1) and drives §3.4.
-- **Seam** — in a hybrid client (§1) that reads the recent tail from Stellar RPC and older history from the archive, the ledger at which it switches sources. A client sets the seam at or below the RPC retention floor (`getHealth().oldestLedger`) so the RPC side is always served from live retention, and requires the archive's ingested-through ledger (§6 C4) to reach the seam.
+- **Seam** — in a hybrid client (§1) that reads the recent tail from Stellar RPC and older history from the archive, the ledger at which it switches sources. A client sets the seam above the RPC retention floor (`getHealth().oldestLedger`) so the RPC side is always served from live retention, and requires the archive's ingested-through ledger (§6 C4) to reach the seam.
 
 ## 3. Data Model
 
@@ -79,8 +79,6 @@ The indexer MUST retain the full per-account history of every in-scope event **i
 
 - The spendable opening is taken from the account's latest checkpoint, which is arbitrarily old for a dormant account.
 - The receiving side is replayed from the last `Merge` at or before that checkpoint, which for an account that receives but never merges is its registration.
-
-Incoming-transfer spam makes per-account storage linear in the number of inbound events; operators SHOULD provision for this and MAY rate-limit *serving* (never retention) per DESIGN_cont §9.5.
 
 ## 6. API Surface
 

@@ -142,7 +142,7 @@ Each auditor decrypts its ciphertexts by running the channel sponge (recipient-a
 - **Recipient-side opening capability.** The recipient's auditor holds the per-transfer Pedersen blinding $r_{\text{transfer}}$, hence the full Pedersen opening of the recipient's receiving balance between merges, which is what enables the seizure/clawback flow specified in `COMPLIANCE.md` §5; the capability and its bounds are specified in `DESIGN_cont.md` §8.1.
 - **Seamless auditor rotation.** When an auditor key is rotated, the new key immediately receives ciphertexts on subsequent operations. For the sender's auditor, the balance checkpoint at the next owner-initiated proof operation (transfer, withdrawal, set spender, or revoke spender) provides the current balance with no event replay or bootstrapping.
 - **Spender visibility.** The owner's auditor sees spender transfer amounts and post-transfer allowances via the same dual-auditor mechanism, and additionally sees escrowed and reclaimed amounts at `set_spender` and `revoke_spender`.
-- **Viewing vs. spending separation.** Even with the viewing key, an auditor or anyone who obtains it **cannot move or spend funds**. Spending requires the separate spending key, which is never shared.
+- **Viewing vs. spending separation.** A viewing key cannot move or spend funds. Spending requires the separate spending key, which is never shared.
 
 ### Auditor Configuration
 
