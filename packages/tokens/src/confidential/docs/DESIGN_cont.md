@@ -486,6 +486,10 @@ The auditor's allowance tracking does **not** use this method: per-event allowan
 
 ---
 
+## 12. Void
+
+---
+
 ## 13. Domain Separation Constants
 
 Each $$\delta$$ is a small positive integer in $$\mathbb{F}\_r$$, fixed for the protocol version and used as a Poseidon2 leading-input domain tag. Numeric values are assigned sequentially from 1; the protocol version is implicit in the deployment, and any change to a circuit's constraint that uses these tags requires a new deployment with a fresh verification key (§3.5, §10.6).

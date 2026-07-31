@@ -840,4 +840,4 @@ Allowance randomness includes `allowance_salt` to prevent deterministic-randomne
      budget when adding content. -->
 
 *The specification continues in [DESIGN_cont.md](./DESIGN_cont.md) with Sections 8-13:*
-*Auditing, Security Analysis, Proof System, Interface, Dependencies, and Domain Separation Constants.*
+*Auditing, Security Analysis, Proof System, Interface, and Domain Separation Constants.*
