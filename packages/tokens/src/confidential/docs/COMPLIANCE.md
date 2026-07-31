@@ -233,7 +233,9 @@ Detailed encoding, the precise treatment of $$r\_s$$, and the two-phase isolate-
 
 ```rust
 impl Token {
-    fn __constructor(e: Env, /* core args */, compliance: Option<ComplianceConfig>);
+    // Core arguments as declared in DESIGN_cont.md §11, plus the compliance entry.
+    fn __constructor(e: Env, admin: Address, token: Address, verifier: Address,
+                     auditor: Address, compliance: Option<ComplianceConfig>);
 
     // Freeze (§2)
     fn freeze(e: Env, account: Address, admin: Address);
@@ -248,8 +250,6 @@ impl Token {
     fn compliance_config(e: Env) -> Option<ComplianceConfig>;
 }
 ```
-
-`set_compliance_config` overwrites all three fields atomically. Callers that want to toggle a single field read the current config, modify the relevant field, and pass the updated struct back. This keeps the admin-gated surface to one entry point and avoids per-field rotation helpers.
 
 ### 6.1 Events
 

@@ -110,12 +110,12 @@ All variants below share a common output stage that encrypts the disclosed value
 The prover samples an ephemeral scalar $$r\_{\text{disc}} \in \mathbb{F}\_r$$ and computes:
 
 $$R\_{\text{disc}} = r\_{\text{disc}} \cdot H$$
-$$S\_{\text{disc}} = r\_{\text{disc}} \cdot P\_R, \qquad s\_{\text{disc}} = S\_{\text{disc}}.x$$
+$$s\_{\text{disc}} = \text{ECDH}(r\_{\text{disc}}, P\_R) \qquad \text{(DESIGN.md §2.4)}$$
 $$\tilde{v}\_{\text{disc}} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{disc}}, s\_{\text{disc}}, \nu)$$
 
 The recipient decrypts:
 
-$$S\_{\text{disc}} = r\_R \cdot R\_{\text{disc}}, \qquad v\_{\text{transfer}} = \tilde{v}\_{\text{disc}} - \text{Poseidon}(\delta\_{\text{disc}}, S\_{\text{disc}}.x, \nu)$$
+$$s\_{\text{disc}} = \text{ECDH}(r\_R, R\_{\text{disc}}), \qquad v\_{\text{transfer}} = \tilde{v}\_{\text{disc}} - \text{Poseidon}(\delta\_{\text{disc}}, s\_{\text{disc}}, \nu)$$
 
 The pair $$(R\_{\text{disc}}, \tilde{v}\_{\text{disc}})$$ is part of the proof's public inputs. The disclosed amount is therefore confidential to any party other than the recipient even if the proof itself is archived in the clear.
 
@@ -124,8 +124,8 @@ This block is constraints **U1–U3**:
 | # | Constraint |
 |:--|:---|
 | U1 | $$R\_{\text{disc}} = r\_{\text{disc}} \cdot H$$ |
-| U2 | $$S\_{\text{disc}} = r\_{\text{disc}} \cdot P\_R$$ |
-| U3 | $$\tilde{v}\_{\text{disc}} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{disc}}, S\_{\text{disc}}.x, \nu)$$ |
+| U2 | $$s\_{\text{disc}} = \text{ECDH}(r\_{\text{disc}}, P\_R)$$ |
+| U3 | $$\tilde{v}\_{\text{disc}} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{disc}}, s\_{\text{disc}}, \nu)$$ |
 
 Subsequent variants reference this block by name.
 
@@ -190,7 +190,7 @@ Given a bundle for $$(P\_R, \nu)$$ that this verifier previously issued, the rec
 
 5. **Verify the proof.** Run UltraHonk verification with the verification key for `circuit_id` against the constructed public inputs and $$\pi$$. Reject on failure.
 
-6. **Decrypt.** Compute $$S\_{\text{disc}} = r\_R \cdot R\_{\text{disc}}$$ and $$v\_{\text{transfer}} = \tilde{v}\_{\text{disc}} - \text{Poseidon}(\delta\_{\text{disc}}, S\_{\text{disc}}.x, \nu)$$ as in §4.
+6. **Decrypt.** Compute $$s\_{\text{disc}} = \text{ECDH}(r\_R, R\_{\text{disc}})$$ and $$v\_{\text{transfer}} = \tilde{v}\_{\text{disc}} - \text{Poseidon}(\delta\_{\text{disc}}, s\_{\text{disc}}, \nu)$$ as in §4.
 
 ### 5.4 On-Chain Verification
 
@@ -345,7 +345,7 @@ D-auditor does not bind to an account record; the auditor key already binds the 
 
 The account holder proves a property of their **current** confidential balance to a third party. Unlike the transfer-event variants (§6–§8), D-balance attests to present state, not a past event: the proof opens the on-chain Pedersen commitment $$C\_{\text{spend}}$$ that records the holder's latest spend-side balance (DESIGN.md §5.1, §5.2) using the holder's retained opening $$(v\_s, r\_s)$$. Typical uses are reporting-threshold attestations — "balance is at most $$V\_{\text{threshold}}$$" for non-reportability, "balance is at least $$V\_{\text{threshold}}$$" for solvency.
 
-The holder maintains $$(v\_s, r\_s)$$ as normal wallet state — every successful transfer settles a fresh opening (DESIGN.md §5.2) and the wallet retains the latest pair. Loss of the opening disables D-balance until the next inbound transfer reseeds the wallet's spend view; this is the same liveness property that governs ordinary transfer construction.
+The holder maintains $$(v\_s, r\_s)$$ as normal wallet state — every successful transfer settles a fresh opening (DESIGN.md §5.2) and the wallet retains the latest pair. D-balance therefore needs the current spendable opening, which the wallet either holds locally or reconstructs from the latest checkpoint per DESIGN.md §5.2 *Recovery*; ordinary spend-proof construction is under the same condition.
 
 **Public inputs**
 
@@ -430,7 +430,7 @@ The confidential-token contract requires no new state-modifying entry points to 
 
 | Read | Purpose | Notes |
 |:---|:---|:---|
-| `confidential_balance(account) -> Bytes` | Verifier extracts $$\text{PVK}\_A$$ (and $$\text{PVK}\_B$$ for D-sender, $$C\_{\text{spend}}$$ for D-balance) from the returned `ConfidentialAccount` tuple | Already exposed (DESIGN_cont.md §11.3); an additional trivial `viewing_public_key(account)` accessor would save the surrounding XDR-decode but is not required |
+| `confidential_balance(account) -> ConfidentialAccount` | Verifier extracts $$\text{PVK}\_A$$ (and $$\text{PVK}\_B$$ for D-sender, $$C\_{\text{spend}}$$ for D-balance) from the returned `ConfidentialAccount` tuple | Already exposed (DESIGN_cont.md §11.3); the struct carries every field this layer reads, so no narrower accessor is required |
 | Auditor contract's key lookup for `auditor_id` | Verifier looks up $$K\_{\text{aud,r}}$$ or $$K\_{\text{aud,s}}$$ | Already exposed (DESIGN_cont.md §8.3). The auditor contract MAY maintain a sequence of versioned keys per `auditor_id` with activation ledgers; the verifier MUST select the version whose activation ledger is the largest value not exceeding the disclosed event's ledger (DESIGN_cont.md §8.3, *Auditor's off-chain obligation*). |
 | Transfer-family events | Verifier reads the per-event fields ($$R\_e$$, $$\sigma$$ or $$\sigma\_a$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ / $$\tilde{a}\_{\text{aud,s}}$$) | Already emitted (DESIGN_cont.md §11.2). `SpenderTransfer` uses $$\sigma\_a$$ in place of $$\sigma$$ and $$\tilde{a}\_{\text{aud,s}}$$ in place of $$\tilde{b}\_{\text{aud,s}}$$. |
 | Instance storage: $$\text{addr\\\_f}$$ | D-recipient, D-sender, and D-balance bind $$vk$$ derivation to the contract via $$\text{addr\\\_f}$$ | Computed once at construction (DESIGN.md §3.5); the verifier reproduces it from the contract address using the encoding in DESIGN.md §2.7 |
@@ -494,7 +494,7 @@ D-balance soundness reduces to Pedersen binding (DESIGN.md §2.3): given the on-
 
 ### 13.2 Recipient Binding
 
-The disclosed value $$v\_{\text{transfer}}$$ is delivered only through $$\tilde{v}\_{\text{disc}} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{disc}}, s\_{\text{disc}}, \nu)$$, where $$s\_{\text{disc}} = r\_{\text{disc}} \cdot P\_R$$ is recoverable only by the holder of $$r\_R$$.
+The disclosed value $$v\_{\text{transfer}}$$ is delivered only through $$\tilde{v}\_{\text{disc}} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{disc}}, s\_{\text{disc}}, \nu)$$, where $$s\_{\text{disc}} = \text{ECDH}(r\_{\text{disc}}, P\_R)$$ is recoverable only by the holder of $$r\_R$$.
 
 A party other than the intended recipient who obtains $$(\pi, R\_{\text{disc}}, \tilde{v}\_{\text{disc}})$$ can verify $$\pi$$ but cannot decrypt $$\tilde{v}\_{\text{disc}}$$. They learn that *some* value was disclosed but not the value itself.
 

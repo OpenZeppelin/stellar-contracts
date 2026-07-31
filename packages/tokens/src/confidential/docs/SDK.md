@@ -141,7 +141,7 @@ Secret scalars — $$sk$$, $$\sigma$$, $$\sigma_a$$ — MUST be produced by the 
 
 | Tag | Value | Absorbed in a core circuit? |
 |:--|:--:|:--|
-| $$\delta_{\text{addr}}$$ | 1 | Yes |
+| $$\delta_{\text{addr}}$$ | 1 | No — absorbed on-chain by the contract (DESIGN.md §2.7) |
 | $$\delta_{\text{vk}}$$ | 2 | Yes |
 | $$\delta_{\text{dvk}}$$ | 3 | Yes |
 | $$\delta_{\text{spend\\\_r}}$$ | 4 | Yes |
@@ -158,9 +158,9 @@ Secret scalars — $$sk$$, $$\sigma$$, $$\sigma_a$$ — MUST be produced by the 
 | $$\delta_{\text{disc\\\_bind}}$$ | 15 | No — off-chain disclosure only |
 | $$\delta_{\text{disc}}$$ | 16 | No — off-chain disclosure only |
 
-DESIGN_cont.md §13 assigns all sixteen values and is their only source; the right-hand column is this document's addition. $$\delta_{\text{disc\\\_bind}}$$ and $$\delta_{\text{disc}}$$ belong to the off-chain disclosure layer (SELECTIVE_DISCLOSURE.md §2.2). None of 14–16 is absorbed inside a core circuit, so none is part of the on-chain wire contract, but all three are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
+DESIGN_cont.md §13 assigns all sixteen values and is their only source; the right-hand column is this document's addition. $$\delta_{\text{disc\\\_bind}}$$ and $$\delta_{\text{disc}}$$ belong to the off-chain disclosure layer (SELECTIVE_DISCLOSURE.md §2.2). Tag 1 is absorbed by the contract rather than by a circuit — the contract derives $$\text{addr\\\_f}$$ and $$\text{op}_i$$ on-chain and the circuits receive them as opaque public inputs (DESIGN.md §2.7 *Usage sites*) — so it is part of the on-chain wire contract all the same. None of 14–16 is absorbed either in a circuit or on-chain, so none is part of the on-chain wire contract, but all three are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
 
-All sixteen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tags 11 and 12 are the two-mask tags; the remaining fourteen, including 14–16, are single-output tags.
+All sixteen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tags 11 and 12 are the two-mask tags; the remaining fourteen, including 1 and 14–16, are single-output tags.
 
 ### 4.9 Address compression
 
@@ -280,9 +280,9 @@ An implementation MUST therefore additionally, for every circuit it supports:
 
 ### 6.3 Vectors this specification requires
 
-Three derivations this document specifies or relies on have no fixture in `circuits/lib/testdata/`, because none of them is computed inside a core circuit. Each requires one:
+Three derivations this document specifies or relies on are computed outside the core circuits, so the Noir library's `print_fixtures` does not emit them. The first already has a fixture; the other two require one:
 
-- **$$\text{address\\\_to\\\_field}$$** (§4.9). The circuits receive $$\text{addr\\\_f}$$ as an opaque public input, so this derivation is implemented twice — by the contract on-chain and by every client — and the existing fixtures pin $$\text{addr\\\_f}$$ only as a fixed constant. It is the sole primitive with two independent implementations, and §4.9's bootstrap check detects a divergence only against an already-deployed contract.
+- **$$\text{address\\\_to\\\_field}$$** (§4.9) is pinned by `circuits/lib/testdata/address_to_field.json`, which §6.1's obligation already covers. The circuits receive $$\text{addr\\\_f}$$ as an opaque public input, so this derivation is implemented twice — by the contract on-chain and by every client — making it the sole primitive with two independent implementations and no Noir version, and §4.9's bootstrap check detects a divergence only against an already-deployed contract. Being outside `print_fixtures`, it is also outside the in-Noir `fixtures_match_testdata` guard; the Rust test `address_to_field_matches_testdata_vectors` guards it instead (`circuits/lib/testdata/README.md`).
 - **$$\delta_{\text{eph}}$$ derivation** (DESIGN.md §5.3, restated in §10.5). No circuit constrains $$r_e$$, so a fixture is the only mechanism keeping a user's clients in agreement; where two disagree, transfers sent from one are not disclosable from the other.
 - **The §5.1 $$sk$$ chain**, from a fixed root, $$\text{addr\\\_f}$$, and $$\text{acct\\\_f}$$ through to $$sk$$, $$vk$$, $$Y$$, and $$\text{PVK}$$, without which recovery from backup material is untestable across implementations. The vector MUST start from a fixed ed25519 secret and run through §5.2's message, its SEP-0053 preimage, and the resulting signature, since the signature is where two clients most plausibly diverge — the only step in the chain whose format is set outside this document. A second vector from a fixed raw root covers §5.3.
 
@@ -466,10 +466,10 @@ The two channels differ in what they yield (DESIGN_cont.md §8.1):
 
 | Channel | Lane 0 | Lane 1 |
 |:--|:--|:--|
-| Sender / owner ($$\delta_{\text{aud\\\_s}}$$) | Transfer amount | Sender's post-operation balance, or post-operation allowance for a spender transfer |
+| Sender / owner ($$\delta_{\text{aud\\\_s}}$$) | Transfer amount, or the escrowed amount for `SetSpender` and the reclaimed amount for `RevokeSpender` | Sender's post-operation balance, or post-operation allowance for a spender transfer |
 | Recipient ($$\delta_{\text{aud\\\_r}}$$) | Transfer amount | Per-transfer Pedersen randomness $$r_{\text{transfer}}$$ |
 
-`Withdraw`, `SetSpender`, and `RevokeSpender` carry a sender-channel checkpoint whose pad is lane **1**; lane 0 is unused because the amount is public or separately carried (§4.3).
+`Withdraw`, `SetSpender`, and `RevokeSpender` carry a sender-channel balance checkpoint whose pad is lane **1**. Only `Withdraw` leaves lane 0 unused, its amount being public (DESIGN.md W_a3, §4.3); `SetSpender` and `RevokeSpender` read lane 0 as well, for the escrowed and reclaimed amounts respectively (DESIGN.md S_a4, V_a4).
 
 **Cross-channel agreement.** Where an auditor holds the key for both parties, the amount decrypts independently on each channel and the circuit constrains both to the same value, so the two MUST agree. An implementation SHOULD perform this comparison and treat disagreement as evidence that $$k$$ is not the auditor key for both parties of that event.
 

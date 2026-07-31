@@ -391,6 +391,8 @@ trait ConfidentialToken {
 }
 ```
 
+A deployment that enables the optional compliance extension adds `compliance: Option<ComplianceConfig>` to this constructor and the freeze, configuration-rotation, and read entry points of [COMPLIANCE.md](./COMPLIANCE.md) §6 to this interface; the admin-gated ones are authorized by the deployment's own access-control module.
+
 This table is authoritative: every entry is exactly the set of prover-supplied public inputs from the corresponding Section 7 operation (the contract loads the remaining public inputs from trusted state per §7.1), plus the `proof` blob. Names map directly to the Section 7 symbols.
 
 | Operation | `data` contents |
