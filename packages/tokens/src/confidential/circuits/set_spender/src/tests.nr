@@ -967,14 +967,15 @@ fn rejects_wrong_y_op() {
 
 #[test(should_fail)]
 fn rejects_r_e_zero() {
-    // S13 fires: r_e = 0 would force R_e = O (identity), collapse S_{a,s} to
-    // O, and collapse the escrow shared secret s_esc to 0 -- making every
-    // mask a knowable constant function of sigma / op_i. Every r_e-dependent
-    // public (R_e = (0, 0) identity-encoding, escrowed_dvk_cipher derived
-    // against s_esc = 0, and the auditor channel ciphertexts derived against
-    // s_a_s = 0) is recomputed so the `assert(r_e != 0)` check is the only
-    // constraint that can catch this -- removing S13 would let the proof
-    // verify.
+    // S13 fires: r_e = 0 would force R_e = O (identity) and collapse the
+    // auditor and escrow shared points to O, so each ecdh(0, .) returns the
+    // ECDH-domain hash of the identity point: s_a_s_zero and s_esc_zero are
+    // identity-derived constants, making every mask a knowable constant
+    // function of sigma / op_i. Every r_e-dependent public (R_e = (0, 0)
+    // identity-encoding, escrowed_dvk_cipher derived against s_esc_zero, and
+    // the auditor channel ciphertexts derived against s_a_s_zero) is
+    // recomputed so the `assert(r_e != 0)` check is the only constraint that
+    // can catch this -- removing S13 would let the proof verify.
     let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
     let y_op = EmbeddedCurvePoint { x: Y_OP_X, y: Y_OP_Y, is_infinite: false };

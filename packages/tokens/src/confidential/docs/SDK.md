@@ -22,7 +22,7 @@ Four properties of the protocol place correctness and confidentiality in the cli
 
 **The client is an enforcement point for canonicality.** Neither the Soroban host nor the verifier distinguishes a canonical $$\mathbb{F}_r$$ representative from a non-canonical one (DESIGN.md §2.2, *Host deserialiser caveat*); the contract enforces canonicality at its boundary, but the client is where the bytes are produced.
 
-**The client is where all secrets live and all randomness is sampled.** The spending key, the viewing key, every blinding factor, and every per-operation salt originate client-side, so the protocol's confidentiality reduces to the client's key handling and CSPRNG quality. DESIGN.md §2.5 makes salt uniqueness a soundness requirement.
+**The client is where all secrets live and all randomness is sampled.** The spending key, the viewing key, every blinding factor, and every per-operation salt originate client-side, so the protocol's confidentiality reduces to the client's key handling and CSPRNG quality. DESIGN.md §2.5 makes salt uniqueness a confidentiality requirement: a reused salt repeats the deterministic ephemeral scalar and every sponge mask keyed by it.
 
 ---
 
@@ -385,7 +385,7 @@ Event application MUST be ordered, deduplicated, and idempotent in combination, 
 Application rules are DESIGN.md §5.2's update table and are not restated here. Two properties worth making explicit:
 
 - `Withdraw`, sender-side `Transfer`, `SetSpender`, and `RevokeSpender` **overwrite** $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$ rather than adjusting it, so a wallet that missed intervening events still converges on the spendable side.
-- A self-transfer touches both accumulators in one event; the ordering within the rule matters.
+- A self-transfer — a `Transfer` whose `from` and `to` are the same account — MUST be applied in both roles: the sender side overwrites $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$, and the recipient side credits $$W_{\text{receive}}$$ from the same event's recipient-channel ciphertexts. The two roles act on different accumulators, so their relative order does not affect the result; applying only one loses the other accumulator's update.
 
 ### 10.3 In-flight operations
 

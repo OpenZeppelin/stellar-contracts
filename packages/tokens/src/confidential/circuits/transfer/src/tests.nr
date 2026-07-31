@@ -844,12 +844,15 @@ fn rejects_tampered_c_spend_new() {
 #[test(should_fail)]
 fn rejects_r_e_zero() {
     // T13 fires: r_e = 0 would force R_e = O (identity) and collapse every
-    // ECDH in this transfer (S, S_{a,r}, S_{a,s} all become O), making every
-    // mask a knowable constant function of sigma. Every r_e-dependent public
-    // (R_e = (0, 0) identity-encoding, C_transfer / v_tilde derived against s = 0,
-    // and both auditor channels' ciphertexts derived against s_a_{r,s}.x = 0)
-    // is recomputed so the `assert(r_e != 0)` check is the only constraint
-    // that can catch this -- removing T13 would let the proof verify.
+    // shared point in this transfer (S, S_{a,r}, S_{a,s} all become O), so
+    // each ecdh(0, .) returns the ECDH-domain hash of the identity point:
+    // s_zero, s_a_r_zero, and s_a_s_zero are identity-derived constants,
+    // making every mask a knowable constant function of sigma. Every
+    // r_e-dependent public (R_e = (0, 0) identity-encoding, C_transfer /
+    // v_tilde derived against s_zero, and both auditor channels' ciphertexts
+    // derived against s_a_r_zero / s_a_s_zero) is recomputed so the
+    // `assert(r_e != 0)` check is the only constraint that can catch this --
+    // removing T13 would let the proof verify.
     let pvk_b = EmbeddedCurvePoint { x: PVK_B_X, y: PVK_B_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };

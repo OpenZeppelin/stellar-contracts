@@ -53,6 +53,8 @@ All events emitted by the confidential token (DESIGN_cont §11.2) with the follo
 | `Merge` | Folds the receiving opening into the spendable opening; resets the receiving side. |
 | `Withdraw`, `Transfer` (sender side), `SetSpender`, `RevokeSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the owner's spendable balance. `SetSpender`/`RevokeSpender` are in scope as owner checkpoints only — a spender recovers allowance state from the on-chain delegation entry (`allowance_commitment`, `a_tilde`, `escrowed_dvk`, `allowance_salt`), not from the archive. The auditor-channel ciphertexts these events also carry are out of scope for wallet recovery. |
 
+A self-transfer — a `Transfer` whose `from` and `to` are the same account — carries both roles at once: it is a sender-side checkpoint and a recipient-side replay event, and recovery applies both (DESIGN §5.2).
+
 Configuration events (`UnderlyingAssetSet`, `VerifierSet`, `AuditorSet`, `AddressAsFieldSet`, verification-key events) are not needed for balance recovery; indexers SHOULD archive them anyway — they are low-volume and useful for deployment forensics.
 
 ### 3.3 Account attribution

@@ -33,9 +33,9 @@ confidential/
     ├── DESIGN_cont.md             # protocol specification, §8–§13
     ├── COMPLIANCE.md              # compliance-extension specification
     ├── SELECTIVE_DISCLOSURE.md    # off-chain selective-disclosure layer
-    └── OVERVIEW.md                # user-flows overview
-    └── INDEXER.md                 # indexer specs
-    └── SDK.md                     # client sdk specs
+    ├── OVERVIEW.md                # user-flows overview
+    ├── INDEXER.md                 # indexer specs
+    └── SDK.md                     # client SDK specs
 ```
 
 A single deployment is **three contracts** wired together:
