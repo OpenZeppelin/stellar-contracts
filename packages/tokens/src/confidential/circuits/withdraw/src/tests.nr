@@ -71,8 +71,8 @@ fn print_fixtures() {
     let b_tilde = encrypt_balance(V_NEW, vk, SIGMA);
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let b_tilde_aud_s = encrypt_auditor_sender_balance(V_NEW, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let b_tilde_aud_s = encrypt_auditor_sender_balance(V_NEW, s_a_s, SIGMA);
     let cx = c_new.x;
     let cy = c_new.y;
     let kx = k_aud_s.x;
@@ -111,8 +111,8 @@ fn withdraw_fixtures_match_lib() {
 fn withdraw_auditor_fixtures_match_lib() {
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let b_tilde_aud_s = encrypt_auditor_sender_balance(V_NEW, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let b_tilde_aud_s = encrypt_auditor_sender_balance(V_NEW, s_a_s, SIGMA);
     assert(k_aud_s.x == K_AUD_S_X);
     assert(k_aud_s.y == K_AUD_S_Y);
     assert(r_e_pt.x == R_E_X);
@@ -155,8 +155,8 @@ fn full_withdrawal() {
     let c_new = commit(0, r_new);
     let b_tilde = encrypt_balance(0, vk, SIGMA);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let b_tilde_aud_s = encrypt_auditor_sender_balance(0, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let b_tilde_aud_s = encrypt_auditor_sender_balance(0, s_a_s, SIGMA);
     main(
         SK,
         V,
@@ -189,8 +189,8 @@ fn rejects_under_funded_withdrawal() {
     let c_new_invalid = commit(V - a_too_large, r_new);
     let b_tilde_invalid = encrypt_balance(V - a_too_large, vk, SIGMA);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let b_tilde_aud_s_invalid = encrypt_auditor_sender_balance(V - a_too_large, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let b_tilde_aud_s_invalid = encrypt_auditor_sender_balance(V - a_too_large, s_a_s, SIGMA);
     main(
         SK,
         V,

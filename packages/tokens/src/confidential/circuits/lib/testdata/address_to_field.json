@@ -1,0 +1,15 @@
+{
+  "primitive": "address_to_field",
+  "design_doc_refs": ["Section 2.7", "Section 13 (delta_addr = 1)"],
+  "description": "Soroban Address compressed into one F_r element: address_to_field(a) = Poseidon2(ADDRESS, lo, hi), where the input is the 56-character ASCII strkey (SEP-23) and lo / hi interpret its lower and upper 28 bytes respectively in LITTLE-endian byte order. Unlike every other primitive here this one is not implemented in Noir: the circuits receive addr_f as an opaque public input, so the derivation exists only in the contract (soroban-poseidon, via storage.rs::address_to_field) and in each client. That makes it the one primitive with two independent implementations and therefore the one most in need of a pinned vector. Inputs are strkeys rather than field elements; consumers must encode the string as ASCII before decomposing it. The two vectors below use the all-zero ed25519 public key and the all-zero contract id, so they are reproducible without reference to any deployment and cover both version bytes the host accepts (G = 0x30, C = 0x10).",
+  "vectors": [
+    {
+      "inputs": { "strkey": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" },
+      "output": "0x1d3b0901201ea22ad61ed4600b49dee57bb73369bf07bdeab17cbf0e54debd4f"
+    },
+    {
+      "inputs": { "strkey": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4" },
+      "output": "0x1997b0390a25f684e91575771f4c3ca72ac8f20f45a462838ea918bbe8c4e19c"
+    }
+  ]
+}

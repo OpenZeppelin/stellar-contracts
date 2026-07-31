@@ -84,22 +84,22 @@ fn print_fixtures() {
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
 
-    let s_x = ecdh(R_E, pvk_b);
-    let r_transfer = derive_transfer_blind(s_x, SIGMA);
+    let s = ecdh(R_E, pvk_b);
+    let r_transfer = derive_transfer_blind(s, SIGMA);
     let c_transfer = commit(V_TRANSFER, r_transfer);
-    let v_tilde = encrypt_amount(V_TRANSFER, s_x, SIGMA);
+    let v_tilde = encrypt_amount(V_TRANSFER, s, SIGMA);
 
     let r_new = derive_spend_r(vk, SIGMA);
     let c_spend_new = commit(V_NEW, r_new);
     let b_tilde = encrypt_balance(V_NEW, vk, SIGMA);
 
-    let s_a_r_x = ecdh(R_E, k_aud_r);
-    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x, SIGMA);
+    let s_a_r = ecdh(R_E, k_aud_r);
+    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, SIGMA);
     let v_tilde_aud_r = V_TRANSFER + m_r[0];
     let r_tilde_aud_r = r_transfer + m_r[1];
 
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     let v_tilde_aud_s = V_TRANSFER + m_s[0];
     let b_tilde_aud_s = V_NEW + m_s[1];
 
@@ -144,10 +144,10 @@ fn transfer_fixtures_match_lib() {
     let y = scalar_mul(SK, H);
     let c_spend = commit(V, R);
     let pvk_b = scalar_mul(VK_B, H);
-    let s_x = ecdh(R_E, pvk_b);
-    let r_transfer = derive_transfer_blind(s_x, SIGMA);
+    let s = ecdh(R_E, pvk_b);
+    let r_transfer = derive_transfer_blind(s, SIGMA);
     let c_transfer = commit(V_TRANSFER, r_transfer);
-    let v_tilde = encrypt_amount(V_TRANSFER, s_x, SIGMA);
+    let v_tilde = encrypt_amount(V_TRANSFER, s, SIGMA);
 
     assert(y.x == Y_X);
     assert(y.y == Y_Y);
@@ -169,12 +169,12 @@ fn transfer_auditor_fixtures_match_lib() {
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
     let pvk_b = scalar_mul(VK_B, H);
-    let s_x = ecdh(R_E, pvk_b);
-    let r_transfer = derive_transfer_blind(s_x, SIGMA);
-    let s_a_r_x = ecdh(R_E, k_aud_r);
-    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x, SIGMA);
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s = ecdh(R_E, pvk_b);
+    let r_transfer = derive_transfer_blind(s, SIGMA);
+    let s_a_r = ecdh(R_E, k_aud_r);
+    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
 
     assert(k_aud_r.x == K_AUD_R_X);
     assert(k_aud_r.y == K_AUD_R_Y);
@@ -306,17 +306,17 @@ fn full_balance_transfer() {
     let pvk_b = EmbeddedCurvePoint { x: PVK_B_X, y: PVK_B_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_x = ecdh(R_E, pvk_b);
-    let r_transfer = derive_transfer_blind(s_x, SIGMA);
+    let s = ecdh(R_E, pvk_b);
+    let r_transfer = derive_transfer_blind(s, SIGMA);
     let c_transfer = commit(V, r_transfer);
-    let v_tilde = encrypt_amount(V, s_x, SIGMA);
+    let v_tilde = encrypt_amount(V, s, SIGMA);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new = commit(0, r_new);
     let b_tilde = encrypt_balance(0, vk, SIGMA);
-    let s_a_r_x = ecdh(R_E, k_aud_r);
-    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x, SIGMA);
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_r = ecdh(R_E, k_aud_r);
+    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         V,
@@ -360,17 +360,17 @@ fn rejects_under_funded_transfer() {
     let pvk_b = EmbeddedCurvePoint { x: PVK_B_X, y: PVK_B_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_x = ecdh(R_E, pvk_b);
-    let r_transfer = derive_transfer_blind(s_x, SIGMA);
+    let s = ecdh(R_E, pvk_b);
+    let r_transfer = derive_transfer_blind(s, SIGMA);
     let c_transfer = commit(v_transfer_too_large, r_transfer);
-    let v_tilde = encrypt_amount(v_transfer_too_large, s_x, SIGMA);
+    let v_tilde = encrypt_amount(v_transfer_too_large, s, SIGMA);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new_invalid = commit(V - v_transfer_too_large, r_new);
     let b_tilde_invalid = encrypt_balance(V - v_transfer_too_large, vk, SIGMA);
-    let s_a_r_x = ecdh(R_E, k_aud_r);
-    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x, SIGMA);
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_r = ecdh(R_E, k_aud_r);
+    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         V,
@@ -421,8 +421,8 @@ fn rejects_v_out_of_range() {
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new = commit(v_new_huge, r_new);
     let b_tilde = encrypt_balance(v_new_huge, vk, SIGMA);
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         v_huge,
@@ -470,17 +470,17 @@ fn rejects_v_transfer_out_of_range() {
     let pvk_b = EmbeddedCurvePoint { x: PVK_B_X, y: PVK_B_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_x = ecdh(R_E, pvk_b);
-    let r_transfer = derive_transfer_blind(s_x, SIGMA);
+    let s = ecdh(R_E, pvk_b);
+    let r_transfer = derive_transfer_blind(s, SIGMA);
     let c_transfer = commit(v_transfer_huge, r_transfer);
-    let v_tilde = encrypt_amount(v_transfer_huge, s_x, SIGMA);
+    let v_tilde = encrypt_amount(v_transfer_huge, s, SIGMA);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new = commit(v_new_huge, r_new);
     let b_tilde = encrypt_balance(v_new_huge, vk, SIGMA);
-    let s_a_r_x = ecdh(R_E, k_aud_r);
-    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x, SIGMA);
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_r = ecdh(R_E, k_aud_r);
+    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         V,
@@ -570,8 +570,8 @@ fn rejects_wrong_balance_opening() {
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new_bad = commit(v_new_bad, r_new);
     let b_tilde_bad = encrypt_balance(v_new_bad, vk, SIGMA);
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         v_bad,
@@ -697,8 +697,8 @@ fn rejects_poisoned_c_transfer() {
     // r_transfer is uniquely determined by Poseidon2(delta_transfer_blind, s, sigma),
     // so any C_transfer not built from that exact r_transfer fails T8.
     let pvk_b = EmbeddedCurvePoint { x: PVK_B_X, y: PVK_B_Y, is_infinite: false };
-    let s_x = ecdh(R_E, pvk_b);
-    let r_transfer_poisoned = derive_transfer_blind(s_x, SIGMA) + 1;
+    let s = ecdh(R_E, pvk_b);
+    let r_transfer_poisoned = derive_transfer_blind(s, SIGMA) + 1;
     let c_transfer_poisoned = commit(V_TRANSFER, r_transfer_poisoned);
     run_main(
         SK,
@@ -844,23 +844,26 @@ fn rejects_tampered_c_spend_new() {
 #[test(should_fail)]
 fn rejects_r_e_zero() {
     // T13 fires: r_e = 0 would force R_e = O (identity) and collapse every
-    // ECDH in this transfer (S, S_{a,r}, S_{a,s} all become O), making every
-    // mask a knowable constant function of sigma. Every r_e-dependent public
-    // (R_e = (0, 0) identity-encoding, C_transfer / v_tilde derived against s_x = 0,
-    // and both auditor channels' ciphertexts derived against s_a_{r,s}.x = 0)
-    // is recomputed so the `assert(r_e != 0)` check is the only constraint
-    // that can catch this -- removing T13 would let the proof verify.
+    // shared point in this transfer (S, S_{a,r}, S_{a,s} all become O), so
+    // each ecdh(0, .) returns the ECDH-domain hash of the identity point:
+    // s_zero, s_a_r_zero, and s_a_s_zero are identity-derived constants,
+    // making every mask a knowable constant function of sigma. Every
+    // r_e-dependent public (R_e = (0, 0) identity-encoding, C_transfer /
+    // v_tilde derived against s_zero, and both auditor channels' ciphertexts
+    // derived against s_a_r_zero / s_a_s_zero) is recomputed so the
+    // `assert(r_e != 0)` check is the only constraint that can catch this --
+    // removing T13 would let the proof verify.
     let pvk_b = EmbeddedCurvePoint { x: PVK_B_X, y: PVK_B_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_x_zero = ecdh(0, pvk_b);
-    let r_transfer_zero = derive_transfer_blind(s_x_zero, SIGMA);
+    let s_zero = ecdh(0, pvk_b);
+    let r_transfer_zero = derive_transfer_blind(s_zero, SIGMA);
     let c_transfer_zero = commit(V_TRANSFER, r_transfer_zero);
-    let v_tilde_zero = encrypt_amount(V_TRANSFER, s_x_zero, SIGMA);
-    let s_a_r_x_zero = ecdh(0, k_aud_r);
-    let m_r_zero = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x_zero, SIGMA);
-    let s_a_s_x_zero = ecdh(0, k_aud_s);
-    let m_s_zero = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x_zero, SIGMA);
+    let v_tilde_zero = encrypt_amount(V_TRANSFER, s_zero, SIGMA);
+    let s_a_r_zero = ecdh(0, k_aud_r);
+    let m_r_zero = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_zero, SIGMA);
+    let s_a_s_zero = ecdh(0, k_aud_s);
+    let m_s_zero = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_zero, SIGMA);
     run_main(
         SK,
         V,
@@ -905,14 +908,14 @@ fn rejects_wrong_r_e() {
     let pvk_b = EmbeddedCurvePoint { x: PVK_B_X, y: PVK_B_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_x_bad = ecdh(r_e_bad, pvk_b);
-    let r_transfer_bad = derive_transfer_blind(s_x_bad, SIGMA);
+    let s_bad = ecdh(r_e_bad, pvk_b);
+    let r_transfer_bad = derive_transfer_blind(s_bad, SIGMA);
     let c_transfer_bad = commit(V_TRANSFER, r_transfer_bad);
-    let v_tilde_bad = encrypt_amount(V_TRANSFER, s_x_bad, SIGMA);
-    let s_a_r_x_bad = ecdh(r_e_bad, k_aud_r);
-    let m_r_bad = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x_bad, SIGMA);
-    let s_a_s_x_bad = ecdh(r_e_bad, k_aud_s);
-    let m_s_bad = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x_bad, SIGMA);
+    let v_tilde_bad = encrypt_amount(V_TRANSFER, s_bad, SIGMA);
+    let s_a_r_bad = ecdh(r_e_bad, k_aud_r);
+    let m_r_bad = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_bad, SIGMA);
+    let s_a_s_bad = ecdh(r_e_bad, k_aud_s);
+    let m_s_bad = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_bad, SIGMA);
     run_main(
         SK,
         V,

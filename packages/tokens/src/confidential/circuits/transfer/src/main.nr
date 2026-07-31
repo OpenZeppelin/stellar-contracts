@@ -201,10 +201,10 @@ fn main(
     // T5 -- PVK_B is path (2) of Section 10.8 (proof-constrained at the
     // recipient's registration, trusted on read).
     let pvk_b = EmbeddedCurvePoint { x: pvk_b_x, y: pvk_b_y, is_infinite: false };
-    let s_x = ecdh(r_e, pvk_b);
+    let s = ecdh(r_e, pvk_b);
 
     // T7 (anti-poisoning, Section 5.4)
-    let r_transfer = derive_transfer_blind(s_x, sigma);
+    let r_transfer = derive_transfer_blind(s, sigma);
 
     // T8
     let c_transfer_derived = commit(v_transfer, r_transfer);
@@ -212,7 +212,7 @@ fn main(
     assert(c_transfer_derived.y == c_transfer_y);
 
     // T9
-    let v_tilde_derived = encrypt_amount(v_transfer, s_x, sigma);
+    let v_tilde_derived = encrypt_amount(v_transfer, s, sigma);
     assert(v_tilde_derived == v_tilde);
 
     // T10
@@ -234,10 +234,10 @@ fn main(
     assert_on_curve_non_identity(k_aud_s);
 
     // T_a1 (recipient-auditor shared-secret scalar)
-    let s_a_r_x = ecdh(r_e, k_aud_r);
+    let s_a_r = ecdh(r_e, k_aud_r);
 
     // T_a2 (recipient-channel masks: amount, then r_transfer)
-    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x, sigma);
+    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, sigma);
 
     // T_a3
     assert(v_transfer + m_r[0] == v_tilde_aud_r);
@@ -246,10 +246,10 @@ fn main(
     assert(r_transfer + m_r[1] == r_tilde_aud_r);
 
     // T_a5 (sender-auditor shared-secret scalar)
-    let s_a_s_x = ecdh(r_e, k_aud_s);
+    let s_a_s = ecdh(r_e, k_aud_s);
 
     // T_a6 (sender-channel masks: amount, then balance)
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, sigma);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, sigma);
 
     // T_a7
     assert(v_transfer + m_s[0] == v_tilde_aud_s);

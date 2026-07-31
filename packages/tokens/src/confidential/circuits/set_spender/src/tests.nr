@@ -108,8 +108,8 @@ fn print_fixtures() {
 
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     let v_tilde_aud_s = V_A + m_s[0];
     let b_tilde_aud_s = V_NEW + m_s[1];
 
@@ -177,8 +177,8 @@ fn set_spender_auditor_fixtures_match_lib() {
     let escrowed_dvk_cipher = encrypt_esc_dvk(dvk, s_esc, OP_I);
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
 
     assert(k_aud_s.x == K_AUD_S_X);
     assert(k_aud_s.y == K_AUD_S_Y);
@@ -315,8 +315,8 @@ fn full_allowance_escrow() {
     let s_esc = ecdh(R_E, y_op);
     let escrowed_dvk_cipher = encrypt_esc_dvk(dvk, s_esc, OP_I);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         V,
@@ -368,8 +368,8 @@ fn rejects_under_funded_escrow() {
     let s_esc = ecdh(R_E, y_op);
     let escrowed_dvk_cipher = encrypt_esc_dvk(dvk, s_esc, OP_I);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         V,
@@ -420,8 +420,8 @@ fn rejects_v_out_of_range() {
     let c_new = commit(v_new_huge, r_new);
     let b_tilde = encrypt_balance(v_new_huge, vk, SIGMA);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         v_huge,
@@ -477,8 +477,8 @@ fn rejects_v_a_out_of_range() {
     let s_esc = ecdh(R_E, y_op);
     let escrowed_dvk_cipher = encrypt_esc_dvk(dvk, s_esc, OP_I);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         V,
@@ -577,8 +577,8 @@ fn rejects_wrong_balance_opening() {
     let c_new_bad = commit(v_new_bad, r_new);
     let b_tilde_bad = encrypt_balance(v_new_bad, vk, SIGMA);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         v_bad,
@@ -967,22 +967,23 @@ fn rejects_wrong_y_op() {
 
 #[test(should_fail)]
 fn rejects_r_e_zero() {
-    // S13 fires: r_e = 0 would force R_e = O (identity), collapse S_{a,s} to
-    // O, and collapse the escrow shared secret s_esc to 0 -- making every
-    // mask a knowable constant function of sigma / op_i. Every r_e-dependent
-    // public (R_e = (0, 0) identity-encoding, escrowed_dvk_cipher derived
-    // against s_esc = 0, and the auditor channel ciphertexts derived against
-    // s_a_s_x = 0) is recomputed so the `assert(r_e != 0)` check is the only
-    // constraint that can catch this -- removing S13 would let the proof
-    // verify.
+    // S13 fires: r_e = 0 would force R_e = O (identity) and collapse the
+    // auditor and escrow shared points to O, so each ecdh(0, .) returns the
+    // ECDH-domain hash of the identity point: s_a_s_zero and s_esc_zero are
+    // identity-derived constants, making every mask a knowable constant
+    // function of sigma / op_i. Every r_e-dependent public (R_e = (0, 0)
+    // identity-encoding, escrowed_dvk_cipher derived against s_esc_zero, and
+    // the auditor channel ciphertexts derived against s_a_s_zero) is
+    // recomputed so the `assert(r_e != 0)` check is the only constraint that
+    // can catch this -- removing S13 would let the proof verify.
     let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
     let y_op = EmbeddedCurvePoint { x: Y_OP_X, y: Y_OP_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_esc_zero = ecdh(0, y_op);
     let escrowed_dvk_cipher_zero = encrypt_esc_dvk(dvk, s_esc_zero, OP_I);
-    let s_a_s_x_zero = ecdh(0, k_aud_s);
-    let m_s_zero = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x_zero, SIGMA);
+    let s_a_s_zero = ecdh(0, k_aud_s);
+    let m_s_zero = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_zero, SIGMA);
     run_main(
         SK,
         V,
@@ -1033,8 +1034,8 @@ fn rejects_wrong_r_e() {
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_esc_bad = ecdh(r_e_bad, y_op);
     let escrowed_dvk_cipher_bad = encrypt_esc_dvk(dvk, s_esc_bad, OP_I);
-    let s_a_s_x_bad = ecdh(r_e_bad, k_aud_s);
-    let m_s_bad = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x_bad, SIGMA);
+    let s_a_s_bad = ecdh(r_e_bad, k_aud_s);
+    let m_s_bad = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_bad, SIGMA);
     run_main(
         SK,
         V,

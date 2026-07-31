@@ -88,8 +88,8 @@ fn print_fixtures() {
     let b_tilde = encrypt_balance(V_NEW, vk, SIGMA);
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     let v_tilde_aud_s = V_A + m[0];
     let b_tilde_aud_s = V_NEW + m[1];
     let ax = c_a.x;
@@ -146,8 +146,8 @@ fn revoke_spender_fixtures_match_lib() {
 fn revoke_spender_auditor_fixtures_match_lib() {
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     let v_tilde_aud_s = V_A + m[0];
     let b_tilde_aud_s = V_NEW + m[1];
     assert(k_aud_s.x == K_AUD_S_X);
@@ -211,8 +211,8 @@ fn alternate_opening() {
     let c_new = commit(v_new_alt, r_new);
     let b_tilde = encrypt_balance(v_new_alt, vk, SIGMA);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     let v_tilde_aud_s = v_a_alt + m[0];
     let b_tilde_aud_s = v_new_alt + m[1];
 
@@ -579,8 +579,8 @@ fn rejects_v_sum_overflow() {
     let c_new = commit(v_new_overflow, r_new);
     let b_tilde = encrypt_balance(v_new_overflow, vk, SIGMA);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
-    let s_a_s_x = ecdh(R_E, k_aud_s);
-    let m = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, SIGMA);
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     let v_tilde_aud_s = v_a_one + m[0];
     let b_tilde_aud_s = v_new_overflow + m[1];
     main(
