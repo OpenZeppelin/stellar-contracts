@@ -219,7 +219,20 @@ pub enum CircuitType {
 
 The dominant cost in Noir circuits is elliptic curve scalar multiplication. With Barretenberg's native Grumpkin support via `multi_scalar_mul`, each scalar multiplication costs approximately 64 UltraPlonk-equivalent constraints (with ECC VM) or 4,700–6,250 without.
 
-The Transfer circuit requires approximately 7 scalar multiplications: spending key verification, spendable balance opening, recipient ECDH shared secret, ephemeral key derivation, transfer commitment construction, recipient-auditor ECDH shared secret, and sender-auditor ECDH shared secret. The SpenderTransfer circuit requires approximately 7 scalar multiplications: spender key verification, allowance commitment opening, recipient ECDH shared secret, ephemeral key derivation, transfer commitment construction, recipient-auditor ECDH shared secret, and owner-auditor ECDH shared secret. The Withdraw, SetSpender, and RevokeSpender circuits each require 2 additional scalar multiplications for auditor ECDH (ephemeral key derivation + auditor shared secret), bringing their totals to approximately 4, 6, and 5 respectively. The ECDH computations add scalar multiplications compared to a random-blinding scheme, but the unchunked design eliminates all per-chunk constraints (which, in a chunked scheme, would involve 8+ scalar multiplications for balance chunks and per-chunk range proofs).
+**Counting unit.** The totals below count `multi_scalar_mul` *call sites*, matching how the circuits are written (`circuits/lib/src/lib.nr`): a Pedersen commitment is one call over two scalars, and each `ecdh` is one call plus a Poseidon2 absorb (§2.4). A per-scalar count is higher, since every commitment contributes two. Each row lists every site, so the constraint identifiers are the audit trail.
+
+| Circuit | Calls | Sites |
+|:---|:--:|:---|
+| `Register` | 2 | $$Y$$ (R1), $$\text{PVK}$$ (R3) |
+| `Withdraw` | 5 | $$Y$$ (W1), $$C\_{\text{spend}}$$ opening (W3), $$C\_{\text{spend}}'$$ (W6), $$R\_e$$ (W\_a1), sender-auditor ECDH (W\_a2) |
+| `Transfer` | 8 | $$Y\_A$$ (T1), $$C\_{\text{spend}}^A$$ opening (T3), recipient ECDH (T5), $$R\_e$$ (T6), $$C\_{\text{transfer}}$$ (T8), $$C\_{\text{spend}}'$$ (T11), recipient-auditor ECDH (T\_a1), sender-auditor ECDH (T\_a5) |
+| `SpenderTransfer` | 8 | $$Y\_{\text{op}}$$ (O1), $$C\_a$$ opening (O2), recipient ECDH (O5), $$R\_e$$ (O6), $$C\_{\text{transfer}}$$ (O8), $$C\_a'$$ (O11), recipient-auditor ECDH (O\_a1), owner-auditor ECDH (O\_a5) |
+| `SetSpender` | 7 | $$Y$$ (S1), $$C\_{\text{spend}}$$ opening (S3), $$C\_a$$ (S7), $$C\_{\text{spend}}'$$ (S10), $$R\_e$$ (S\_a1), $$dvk\_i$$ escrow ECDH (S12, §7.11), owner-auditor ECDH (S\_a2) |
+| `RevokeSpender` | 6 | $$Y$$ (V1), $$C\_a$$ opening (V4), $$C\_{\text{spend}}$$ opening (V5), $$C\_{\text{spend}}'$$ (V7), $$R\_e$$ (V\_a1), owner-auditor ECDH (V\_a2) |
+
+`SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of §7.11 reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`: `Register` 33, `Withdraw` 94, `RevokeSpender` 123, `SetSpender` 131, `Transfer` 133, `SpenderTransfer` 135.
+
+The ECDH computations add scalar multiplications compared to a random-blinding scheme, but the unchunked design eliminates all per-chunk constraints (which, in a chunked scheme, would involve 8+ scalar multiplications for balance chunks and per-chunk range proofs).
 
 ### 10.4 Noir Primitives
 
