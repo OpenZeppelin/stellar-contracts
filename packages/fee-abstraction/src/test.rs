@@ -71,11 +71,12 @@ fn collect_fee_with_eager_approval_overwrites_allowance() {
     });
 
     let events = e.events().all();
-    // approval, transfer and collect fee
-    assert_eq!(events.events().len(), 3);
+    // approval, fee transfer, residual refund and collect fee
+    assert_eq!(events.events().len(), 4);
 
+    // the unspent allowance is consumed back to the user in eager mode
     let allowance = token_client.allowance(&user, &contract_address);
-    assert_eq!(allowance, 30);
+    assert_eq!(allowance, 0);
 
     let balance = token_client.balance(&recipient);
     assert_eq!(balance, 20);

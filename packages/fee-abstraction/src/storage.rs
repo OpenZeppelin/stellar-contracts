@@ -204,6 +204,17 @@ pub fn collect_fee(
 
     token_client.transfer_from(&e.current_contract_address(), user, fee_recipient, &fee_amount);
 
+    // In `Eager` mode the approval is scoped to this single collection, so the
+    // unspent `max_fee_amount - fee_amount` is consumed back to the user to
+    // leave no residual allowance for the target invocation to abuse. In `Lazy`
+    // mode the remaining allowance is intentional and left untouched.
+    if let FeeAbstractionApproval::Eager = approval {
+        let remaining = max_fee_amount - fee_amount;
+        if remaining > 0 {
+            token_client.transfer_from(&e.current_contract_address(), user, user, &remaining);
+        }
+    }
+
     emit_fee_collected(e, user, fee_recipient, fee_token, fee_amount);
 }
 
