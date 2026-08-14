@@ -1013,6 +1013,26 @@ fn get_voting_period_fails_when_not_set() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #5023)")]
+fn set_voting_period_rejects_zero() {
+    let (e, contract_address) = setup_env();
+
+    e.as_contract(&contract_address, || {
+        storage::set_voting_period(&e, 0);
+    });
+}
+
+#[test]
+fn set_voting_period_accepts_minimum() {
+    let (e, contract_address) = setup_env();
+
+    e.as_contract(&contract_address, || {
+        storage::set_voting_period(&e, 1);
+        assert_eq!(storage::get_voting_period(&e), 1);
+    });
+}
+
+#[test]
 fn update_config_values() {
     let (e, contract_address) = setup_env();
 
@@ -1501,6 +1521,76 @@ fn check_proposal_state_fails_when_defeated() {
 
     e.as_contract(&contract_address, || {
         storage::check_proposal_state(&e, &pid, get_quorum(&e, e.ledger().sequence()));
+    });
+}
+
+/// A zero voting delay is valid: the snapshot lands on the creation ledger,
+/// which is still `Pending`, and voting opens on the very next ledger with
+/// the full voting period intact.
+#[test]
+fn zero_voting_delay_opens_voting_on_the_next_ledger() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, description) = simple_proposal(&e);
+    let created_at = e.ledger().sequence();
+
+    let pid = e.as_contract(&contract_address, || {
+        storage::set_voting_delay(&e, 0);
+        propose(&e, targets, functions, args, description, &proposer)
+    });
+
+    e.as_contract(&contract_address, || {
+        let quorum = get_quorum(&e, e.ledger().sequence());
+
+        assert_eq!(storage::get_proposal_snapshot(&e, &pid), created_at);
+        assert_eq!(storage::get_proposal_deadline(&e, &pid), created_at + 100);
+        assert_eq!(storage::get_proposal_state(&e, &pid, quorum), ProposalState::Pending);
+
+        e.ledger().set_sequence_number(created_at + 1);
+        assert_eq!(storage::get_proposal_state(&e, &pid, quorum), ProposalState::Active);
+
+        let voter = Address::generate(&e);
+        cast_vote(&e, &pid, VOTE_FOR, &String::from_str(&e, "yes"), &voter, quorum);
+
+        e.ledger().set_sequence_number(created_at + 101);
+        assert_eq!(storage::get_proposal_state(&e, &pid, quorum), ProposalState::Succeeded);
+    });
+}
+
+/// Regression guard for the deadlock that [`storage::set_voting_period`]
+/// rejects. The zero is written straight to storage to bypass that check,
+/// showing why the check has to exist: `vote_end` collapses onto
+/// `vote_snapshot`, so no ledger can satisfy the `Active` branch and no vote
+/// can ever be cast.
+#[test]
+fn zero_voting_period_leaves_proposal_unvotable() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, description) = simple_proposal(&e);
+
+    let pid = e.as_contract(&contract_address, || {
+        e.storage().instance().set(&GovernorStorageKey::VotingPeriod, &0u32);
+        propose(&e, targets, functions, args, description, &proposer)
+    });
+
+    e.as_contract(&contract_address, || {
+        let quorum = get_quorum(&e, e.ledger().sequence());
+        let snapshot = storage::get_proposal_snapshot(&e, &pid);
+        assert_eq!(storage::get_proposal_deadline(&e, &pid), snapshot);
+
+        for offset in 0..30 {
+            e.ledger().set_sequence_number(snapshot - 10 + offset);
+            assert_ne!(storage::get_proposal_state(&e, &pid, quorum), ProposalState::Active);
+        }
+
+        e.ledger().set_sequence_number(snapshot + 1);
+        assert_eq!(storage::get_proposal_state(&e, &pid, quorum), ProposalState::Defeated);
     });
 }
 

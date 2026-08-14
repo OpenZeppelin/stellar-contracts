@@ -382,15 +382,27 @@ pub fn set_voting_delay(e: &Env, delay: u32) {
 
 /// Sets the voting period.
 ///
-/// The period value is not validated here. It is the responsibility of
-/// the implementer to ensure that the period is appropriate (e.g., enough
-/// time for voters to participate, but not so long that urgent actions
-/// cannot be taken).
+/// A zero period is rejected. It would make `vote_end` equal the vote
+/// snapshot, leaving a voting window that no ledger falls inside, so every
+/// proposal would move straight from [`ProposalState::Pending`] to
+/// [`ProposalState::Defeated`] without ever accepting a vote. Since this
+/// setter is typically reachable only through a passing proposal, or only
+/// from the constructor, such a governor would in practice be beyond
+/// recovery.
+///
+/// Any non-zero value is accepted, and it remains the responsibility of the
+/// implementer to ensure that the period is appropriate (e.g., enough time
+/// for voters to participate, but not so long that urgent actions cannot be
+/// taken).
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `period` - The voting period in ledgers.
+///
+/// # Errors
+///
+/// * [`GovernorError::InvalidVotingPeriod`] - Occurs if `period` is zero.
 ///
 /// # Security Warning
 ///
@@ -400,6 +412,9 @@ pub fn set_voting_delay(e: &Env, delay: u32) {
 /// access controls to ensure that only authorized accounts can call this
 /// function.
 pub fn set_voting_period(e: &Env, period: u32) {
+    if period == 0 {
+        panic_with_error!(e, GovernorError::InvalidVotingPeriod);
+    }
     e.storage().instance().set(&GovernorStorageKey::VotingPeriod, &period);
 }
 
