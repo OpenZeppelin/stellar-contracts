@@ -154,7 +154,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// * [`RWAError::InsufficientBalance`] - When the sender has insufficient
     ///   balance.
-    /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`crate::fungible::FungibleTokenError::LessThanZero`] - When the
+    ///   amount is negative.
     /// * [`RWAError::IdentityVerificationFailed`] - When the identity of the
     ///   `to` address cannot be verified.
     ///
@@ -221,7 +222,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// * [`RWAError::InsufficientBalance`] - When the amount to burn exceeds
     ///   the balance.
-    /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`crate::fungible::FungibleTokenError::LessThanZero`] - When the
+    ///   amount is negative.
     ///
     /// # Events
     ///
