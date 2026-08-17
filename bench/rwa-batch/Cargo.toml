@@ -1,0 +1,22 @@
+[package]
+name = "rwa-batch-bench"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/OpenZeppelin/stellar-contracts"
+publish = false
+authors = ["OpenZeppelin"]
+version = "0.7.1"
+
+# Deliberately excluded from the root workspace (see its `workspace.exclude`):
+# the harness measures cost curves rather than asserting behaviour, takes ~2
+# minutes to run, and would otherwise be pulled into `cargo test --workspace`
+# and counted by `cargo llvm-cov --workspace --fail-under-lines 90`.
+
+[dependencies]
+soroban-sdk = { version = "27.0.2", features = [
+    "testutils",
+    "experimental_spec_shaking_v2",
+] }
+stellar-contract-utils = { path = "../../packages/contract-utils", version = "0.7.1" }
+stellar-tokens = { path = "../../packages/tokens", version = "0.7.1" }
+ed25519-dalek = "2.1.1"
