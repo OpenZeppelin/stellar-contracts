@@ -183,6 +183,18 @@ impl BenchToken {
         }
     }
 
+    /// The shipped `RWA::batch_transfer`: hoists only the sender's identity
+    /// verification (the cheap `paused` and `is_frozen(from)` checks stay in the
+    /// loop) and re-verifies the sender after the last item.
+    pub fn batch_transfer_shipped(
+        e: &Env,
+        from: Address,
+        to_list: Vec<Address>,
+        amounts: Vec<i128>,
+    ) {
+        RWA::batch_transfer(e, &from, &to_list, &amounts);
+    }
+
     // ---------- freeze family (no invariants; measured for the ceiling) ----------
 
     pub fn batch_freeze_naive(e: &Env, user_addresses: Vec<Address>, amounts: Vec<i128>) {
@@ -456,6 +468,16 @@ impl IdentityRegistryStorage for BenchIrs {
             IdentityType::Individual,
             &vec![e, data],
         );
+    }
+
+    fn batch_add_identity(
+        _e: &Env,
+        _accounts: Vec<Address>,
+        _identities: Vec<Address>,
+        _country_data_lists: Vec<Vec<soroban_sdk::Val>>,
+        _operator: Address,
+    ) {
+        unreachable!("the bench registers identities through the inherent helper");
     }
 
     fn remove_identity(e: &Env, account: Address, _operator: Address) {
@@ -778,7 +800,7 @@ fn bench_transfer_naive_vs_hoisted() {
     for topics in [1u32, 2] {
         println!("\n--- batch_transfer: naive vs hoisted ({topics} claim topic(s)) ---");
         for n in [1usize, 2, 5, 10, 20] {
-            for variant in 0..3 {
+            for variant in 0..4 {
                 let s = setup(topics, n as u32 + 1);
                 let from = s.investors[0].clone();
                 s.token.batch_mint_naive(&vec![&s.e, from.clone()], &vec![&s.e, 1_000_000i128]);
@@ -793,9 +815,13 @@ fn bench_transfer_naive_vs_hoisted() {
                         s.token.batch_transfer_hoisted(&from, &tos, &amounts);
                         report(&s.e, "transfer hoisted", n);
                     }
-                    _ => {
+                    2 => {
                         s.token.batch_transfer_recheck(&from, &tos, &amounts);
                         report(&s.e, "transfer hoisted+recheck", n);
+                    }
+                    _ => {
+                        s.token.batch_transfer_shipped(&from, &tos, &amounts);
+                        report(&s.e, "transfer SHIPPED", n);
                     }
                 }
             }
