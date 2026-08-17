@@ -27,6 +27,13 @@
 //! would require a custom `I512` type. Overflowing two large `I256` values is
 //! considered rare enough in practice that this trade-off is acceptable.
 //!
+//! Phantom overflow handling covers the free functions in
+//! [`i128_fixed_point`] and the `checked_*` methods on [`wad::Wad`]. It does
+//! **not** cover `Wad`'s operator implementations (`+`, `-`, `*`, `/`), which
+//! work directly on `i128` and panic on overflow, because an operator cannot
+//! reach an `Env` to construct the `I256` intermediate. The resulting bounds
+//! are tabulated in the `# Overflow` section on [`wad::Wad`].
+//!
 //! ## Structure
 //!
 //! - [`i128_fixed_point`]: Module containing free functions for `i128`

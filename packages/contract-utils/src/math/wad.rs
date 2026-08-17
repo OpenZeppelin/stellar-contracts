@@ -41,6 +41,36 @@ use crate::math::{
 /// **Typical precision loss:** ~10^-15 to 10^-16 in relative terms, which is
 /// negligible when converting to typical token precision (6-8 decimals).
 ///
+/// # Overflow
+///
+/// The operator implementations (`+`, `-`, `*`, `/`, unary `-`) work directly
+/// on the raw `i128` and panic on arithmetic overflow. They do **not** apply
+/// the phantom overflow handling described in the [module
+/// docs](crate::math#phantom-overflow-handling), because an operator cannot
+/// reach an [`Env`] to promote the intermediate to `I256`. Their domains are
+/// therefore narrower than those of the `checked_*` methods:
+///
+/// | expression | panics once |
+/// |------------|-------------|
+/// | `a + b`, `a - b` | the result's magnitude passes `i128::MAX / WAD_SCALE` ~= `1.7014 * 10^20` |
+/// | `a * b` | the **product** `a * b` passes `i128::MAX / WAD_SCALE^2` ~= `170.1412` |
+/// | `a / b` | **`a`** alone passes `i128::MAX / WAD_SCALE^2` ~= `170.1412`, whatever `b` is |
+/// | `a * n`, `n * a` (`i128`) | `a.raw() * n` leaves `i128` |
+/// | `a / n` (`i128`) | `n == 0`, or `a.raw() == i128::MIN && n == -1` |
+/// | `-a` | `a.raw() == i128::MIN` |
+///
+/// Two properties of the `*` bound are worth noting. It constrains the
+/// product rather than either operand, so `Wad(1) * Wad(170)` and
+/// `Wad(17) * Wad(10)` both succeed while `Wad(171) * Wad(1)` does not. And
+/// because it constrains the product, values below 1 carry roughly 20 decimal
+/// orders of headroom, which is the range `Wad` is primarily intended for.
+/// The bound bites when a large magnitude meets a small one, for example a
+/// price of `2000` scaled by a quantity, since `2000 > 170.1412`.
+///
+/// [`Wad::checked_mul`] and [`Wad::checked_div`] succeed over the full range
+/// in which the result is representable, and should be preferred wherever an
+/// operand can plausibly exceed these bounds.
+///
 /// # Examples
 ///
 /// ```ignore
@@ -688,6 +718,18 @@ impl Wad {
 impl Add for Wad {
     type Output = Wad;
 
+    /// Addition.
+    ///
+    /// # Errors
+    ///
+    /// * Panics with a native arithmetic overflow when `self.raw() + rhs.raw()`
+    ///   leaves `i128`, i.e. once the result's magnitude passes `i128::MAX /
+    ///   WAD_SCALE` ~= `1.7014 * 10^20`.
+    ///
+    /// # Notes
+    ///
+    /// [`Wad::checked_add`] returns `None` instead of panicking. The i128
+    /// range is the hard limit for both, so no wider intermediate applies.
     fn add(self, rhs: Wad) -> Wad {
         Wad(self.0 + rhs.0)
     }
@@ -697,26 +739,68 @@ impl Add for Wad {
 impl Sub for Wad {
     type Output = Wad;
 
+    /// Subtraction.
+    ///
+    /// # Errors
+    ///
+    /// * Panics with a native arithmetic overflow when `self.raw() - rhs.raw()`
+    ///   leaves `i128`, i.e. once the result's magnitude passes `i128::MAX /
+    ///   WAD_SCALE` ~= `1.7014 * 10^20`.
+    ///
+    /// # Notes
+    ///
+    /// refer to the notes of [`Wad::add`].
     fn sub(self, rhs: Wad) -> Wad {
         Wad(self.0 - rhs.0)
     }
 }
 
 // Wad * Wad: fixed-point multiplication (a * b) / WAD_SCALE
-// Result is truncated toward zero.
 impl Mul for Wad {
     type Output = Wad;
 
+    /// Fixed-point multiplication `(a * b) / WAD_SCALE`, truncated toward
+    /// zero.
+    ///
+    /// # Errors
+    ///
+    /// * Panics with a native arithmetic overflow when the raw product
+    ///   `self.raw() * rhs.raw()` leaves `i128`, i.e. once the product `self *
+    ///   rhs` passes `i128::MAX / WAD_SCALE^2` ~= `170.1412`. The bound
+    ///   constrains the product and not either operand, so operands below 1
+    ///   carry roughly 20 decimal orders of headroom.
+    ///
+    /// # Notes
+    ///
+    /// No phantom overflow handling is applied here, because an operator
+    /// cannot reach an [`Env`] to promote the intermediate to `I256`.
+    /// [`Wad::checked_mul`] succeeds over the full range in which the result
+    /// is representable and should be preferred wherever the product can
+    /// plausibly exceed the bound above. See also the `# Overflow` section on
+    /// [`Wad`].
     fn mul(self, rhs: Wad) -> Wad {
         Wad((self.0 * rhs.0) / WAD_SCALE)
     }
 }
 
 // Wad / Wad: fixed-point division (a * WAD_SCALE) / b
-// Result is truncated toward zero.
 impl Div for Wad {
     type Output = Wad;
 
+    /// Fixed-point division `(a * WAD_SCALE) / b`, truncated toward zero.
+    ///
+    /// # Errors
+    ///
+    /// * Panics with a native arithmetic overflow when the raw numerator
+    ///   `self.raw() * WAD_SCALE` leaves `i128`, i.e. once `self` alone passes
+    ///   `i128::MAX / WAD_SCALE^2` ~= `170.1412`. The divisor plays no part in
+    ///   this bound: `Wad(171) / Wad(1)` overflows.
+    /// * Panics with a native division by zero when `rhs` is zero.
+    ///
+    /// # Notes
+    ///
+    /// refer to the notes of [`Wad::mul`], substituting
+    /// [`Wad::checked_div`].
     fn div(self, rhs: Wad) -> Wad {
         Wad((self.0 * WAD_SCALE) / rhs.0)
     }
@@ -726,6 +810,12 @@ impl Div for Wad {
 impl Neg for Wad {
     type Output = Wad;
 
+    /// Negation.
+    ///
+    /// # Errors
+    ///
+    /// * Panics with a native arithmetic overflow when `self.raw() ==
+    ///   i128::MIN`, whose negation is not representable.
     fn neg(self) -> Wad {
         Wad(-self.0)
     }
@@ -735,6 +825,17 @@ impl Neg for Wad {
 impl Mul<i128> for Wad {
     type Output = Wad;
 
+    /// Multiplication by an integer. No WAD scaling is applied, so the raw
+    /// value is scaled directly.
+    ///
+    /// # Errors
+    ///
+    /// * Panics with a native arithmetic overflow when `self.raw() * rhs`
+    ///   leaves `i128`.
+    ///
+    /// # Notes
+    ///
+    /// [`Wad::checked_mul_int`] returns `None` instead of panicking.
     fn mul(self, rhs: i128) -> Wad {
         Wad(self.0 * rhs)
     }
@@ -744,6 +845,11 @@ impl Mul<i128> for Wad {
 impl Mul<Wad> for i128 {
     type Output = Wad;
 
+    /// Multiplication by an integer, with the operands reversed.
+    ///
+    /// # Errors
+    ///
+    /// * refer to the errors of [`Wad::mul`] for `Mul<i128>`.
     fn mul(self, rhs: Wad) -> Wad {
         Wad(self * rhs.0)
     }
@@ -753,6 +859,18 @@ impl Mul<Wad> for i128 {
 impl Div<i128> for Wad {
     type Output = Wad;
 
+    /// Division by an integer. No WAD scaling is applied, so the raw value is
+    /// divided directly.
+    ///
+    /// # Errors
+    ///
+    /// * Panics with a native division by zero when `rhs` is zero.
+    /// * Panics with a native arithmetic overflow when `self.raw() ==
+    ///   i128::MIN` and `rhs == -1`.
+    ///
+    /// # Notes
+    ///
+    /// [`Wad::checked_div_int`] returns `None` instead of panicking.
     fn div(self, rhs: i128) -> Wad {
         Wad(self.0 / rhs)
     }

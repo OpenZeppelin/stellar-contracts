@@ -205,6 +205,57 @@ fn test_mul_overflow() {
     let _ = a * b;
 }
 
+/// The `*` operator's limit is on the *product* of the two values, not on
+/// either operand. Products at or below 170 survive regardless of how they
+/// are split between the operands.
+#[test]
+fn test_mul_operator_product_bound() {
+    let e = Env::default();
+    for (a, b) in [(170, 1), (85, 2), (34, 5), (17, 10), (1, 170), (4, 4)] {
+        let product = Wad::from_integer(&e, a) * Wad::from_integer(&e, b);
+        assert_eq!(product, Wad::from_integer(&e, a * b), "{a} * {b}");
+    }
+}
+
+#[test]
+#[should_panic]
+fn test_mul_operator_product_bound_exceeded() {
+    let e = Env::default();
+    // Product 171 exceeds `i128::MAX / WAD_SCALE^2` ~= 170.1411, even though
+    // both operands are tiny.
+    let _ = Wad::from_integer(&e, 171) * Wad::from_integer(&e, 1);
+}
+
+/// The `/` operator's limit is on the dividend alone; the divisor never
+/// affects it.
+#[test]
+fn test_div_operator_dividend_bound() {
+    let e = Env::default();
+    for divisor in [1, 2, 1000] {
+        let quotient = Wad::from_integer(&e, 170) / Wad::from_integer(&e, divisor);
+        assert_eq!(quotient, Wad::from_ratio(&e, 170, divisor), "170 / {divisor}");
+    }
+}
+
+#[test]
+#[should_panic]
+fn test_div_operator_dividend_bound_exceeded() {
+    let e = Env::default();
+    // A dividend above `i128::MAX / WAD_SCALE` ~= 170.1411 overflows even when
+    // dividing by one.
+    let _ = Wad::from_integer(&e, 171) / Wad::from_integer(&e, 1);
+}
+
+/// `checked_mul` promotes to `I256`, so it succeeds well past the point where
+/// the `*` operator overflows.
+#[test]
+fn test_checked_mul_exceeds_operator_bound() {
+    let e = Env::default();
+    let a = Wad::from_integer(&e, 171);
+    let b = Wad::from_integer(&e, 1);
+    assert_eq!(a.checked_mul(&e, b), Some(Wad::from_integer(&e, 171)));
+}
+
 #[test]
 #[should_panic]
 fn test_div_by_zero() {
