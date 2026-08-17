@@ -45,7 +45,7 @@ use stellar_tokens::{
         },
         identity_verifier::{storage as identity_verifier, IdentityVerifier},
         utils::token_binder::{self as binder, TokenBinder},
-        IdentityVerifierClient, RWAError, RWA,
+        IdentityVerifierClient, RWAError, SenderVerification, RWA,
     },
 };
 
@@ -102,7 +102,13 @@ impl BenchToken {
         for (to, amount) in to_list.iter().zip(amounts.iter()) {
             let from_snapshot = RWA::account_snapshot(e, &from);
             let to_snapshot = RWA::account_snapshot(e, &to);
-            RWA::validate_transfer(e, &from_snapshot, &to_snapshot, amount);
+            RWA::validate_transfer(
+                e,
+                &from_snapshot,
+                &to_snapshot,
+                amount,
+                SenderVerification::Required,
+            );
             Base::update(e, Some(&from), Some(&to), amount);
             ComplianceClient::new(e, &RWA::compliance(e)).transferred(
                 &from_snapshot,
@@ -125,7 +131,9 @@ impl BenchToken {
         Self::batch_transfer_hoisted_inner(e, from, to_list, amounts, false);
     }
 
-    /// Hoisted plus the end-of-batch sender re-verification (option b).
+    /// Hoisted plus an end-of-batch sender re-verification, the variant that
+    /// was considered and dropped: it would have made a mid-batch revocation
+    /// revert the whole call, at the cost of one extra verification.
     pub fn batch_transfer_recheck(
         e: &Env,
         from: Address,
@@ -184,8 +192,8 @@ impl BenchToken {
     }
 
     /// The shipped `RWA::batch_transfer`: hoists only the sender's identity
-    /// verification (the cheap `paused` and `is_frozen(from)` checks stay in the
-    /// loop) and re-verifies the sender after the last item.
+    /// verification, leaving the cheap `paused` and `is_frozen(from)` checks in
+    /// the loop.
     pub fn batch_transfer_shipped(
         e: &Env,
         from: Address,

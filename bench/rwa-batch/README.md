@@ -34,7 +34,6 @@ Hoisting loop-invariant work out of the per-item body:
 | --- | --- | --- |
 | `mint` | `paused` + two instance address reads | 0.8% |
 | `transfer` | sender identity verification | 28% (32% with two claim topics) |
-| `transfer` | same, plus an end-of-batch sender re-check | 21% to 30% |
 
 That is why `batch_mint` ships as a plain loop and `batch_transfer` hoists.
 
@@ -44,17 +43,16 @@ only the sender's identity verification: the cheap `paused` and
 under 1% and keeps the set of assumptions the hoist rests on as small as
 possible.
 
-| n | naive | shipped | one claim topic | two claim topics |
+| n | naive (1 topic) | shipped (1 topic) | saving | saving, 2 topics |
 | --- | --- | --- | --- | --- |
-| 1 | 1,960,401 | 2,624,879 | +34% | +39% |
-| 2 | 3,883,461 | 3,882,550 | 0% | 0% |
-| 5 | 10,077,882 | 8,042,480 | -20% | -23% |
-| 10 | 21,600,751 | 16,111,142 | -25% | -29% |
-| 20 | 49,029,314 | 36,395,249 | -26% | -30% |
+| 1 | 1,960,401 | 1,958,594 | 0% | 0% |
+| 2 | 3,883,461 | 3,206,725 | -17% | -20% |
+| 5 | 10,077,882 | 7,334,647 | -27% | -31% |
+| 10 | 21,600,751 | 15,359,087 | -29% | -33% |
+| 20 | 49,029,314 | 35,559,852 | -27% | -31% |
 
-A batch of one costs more than a single transfer, because the trailing re-check
-verifies the sender twice for one recipient. Break-even is two, and everything
-above that wins.
+A batch of one costs the same as a single transfer, since the one sender
+verification happens either way.
 
 Isolated probes explaining the mint result: an instance read costs ~4,900 CPU
 and a repeated write to an already-written key ~12,900 CPU, against a per-item

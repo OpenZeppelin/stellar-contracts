@@ -1455,8 +1455,8 @@ fn batch_transfer_credits_every_recipient() {
     });
 }
 
-/// The sender's identity is verified once before the loop and once after it,
-/// whatever the batch size, while each recipient is verified exactly once.
+/// The sender's identity is verified once for the whole batch, whatever its
+/// size, while each recipient is verified exactly once.
 #[test]
 fn batch_transfer_verifies_sender_independently_of_size() {
     fn sender_verifications(recipient_count: u32) -> u32 {
@@ -1488,9 +1488,9 @@ fn batch_transfer_verifies_sender_independently_of_size() {
         verification_count(&e, &verifier, &from) - 1
     }
 
-    assert_eq!(sender_verifications(1), 2);
-    assert_eq!(sender_verifications(2), 2);
-    assert_eq!(sender_verifications(8), 2);
+    assert_eq!(sender_verifications(1), 1);
+    assert_eq!(sender_verifications(2), 1);
+    assert_eq!(sender_verifications(8), 1);
 }
 
 #[test]

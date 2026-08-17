@@ -129,7 +129,7 @@ mod test;
 
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, String, Vec};
 use stellar_contract_utils::pausable::Pausable;
-pub use storage::{RWAStorageKey, RWA};
+pub use storage::{RWAStorageKey, SenderVerification, RWA};
 
 use crate::fungible::FungibleToken;
 
@@ -175,10 +175,10 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// The sender's identity is verified once for the whole batch instead of
-    /// once per recipient, which is where most of the saving over repeated
-    /// single transfers comes from. Refer to [`RWA::batch_transfer`] for the
-    /// mechanics and to the batch operations section of the
-    /// [module documentation](crate::rwa) for how to size a batch.
+    /// once per recipient, which is where the saving over repeated single
+    /// transfers comes from. Refer to [`RWA::batch_transfer`] for the mechanics
+    /// and the assumption that rests on, and to the batch operations section of
+    /// the [module documentation](crate::rwa) for how to size a batch.
     fn batch_transfer(e: &Env, from: Address, recipients: Vec<Address>, amounts: Vec<i128>) {
         RWA::batch_transfer(e, &from, &recipients, &amounts);
     }
