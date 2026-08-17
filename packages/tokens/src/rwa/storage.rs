@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, MuxedAddress, String};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, MuxedAddress, String, Vec};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{
@@ -30,6 +30,23 @@ pub enum RWAStorageKey {
 }
 
 pub struct RWA;
+
+/// Who is responsible for verifying the sender's identity in
+/// [`RWA::transfer_item`].
+///
+/// Every item of a batch transfer shares one sender, so verifying it per item
+/// repeats the same walk through the identity stack. This enum lets the single
+/// and batch paths run the exact same item body while the sender check is
+/// lifted out of the loop only for the batch.
+enum SenderVerification {
+    /// Verify the sender as part of this item. Used by the single-transfer
+    /// path.
+    PerItem,
+    /// Skip the sender check because the caller has already verified the
+    /// sender for the whole batch. Only [`RWA::batch_transfer`] may ask for
+    /// this, and it re-verifies the sender after the last item.
+    HoistedByCaller,
+}
 
 impl ContractOverrides for RWA {
     fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
@@ -288,6 +305,54 @@ impl RWA {
         emit_transfer(e, from, to, None, amount);
     }
 
+    /// Forces a transfer for each `(from_list[i], to_list[i], amounts[i])`
+    /// triple in one invocation.
+    ///
+    /// The batch is atomic: an item that fails reverts every item before it.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from_list` - The addresses holding the tokens.
+    /// * `to_list` - The addresses receiving the tokens.
+    /// * `amounts` - The amount to move for each pair.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::BatchSizeMismatch`] - When the three arrays do not all
+    ///   have the same length.
+    /// * refer to [`Self::forced_transfer`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each triple:
+    /// * topics - `["transfer", from: Address, to: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for sizing the batch to fit the
+    /// per-transaction network limits. Refer to the batch operations section of
+    /// the [module documentation](crate::rwa).
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization and freezing checks,
+    /// exactly like [`Self::forced_transfer`]. Refer to its security warning.
+    pub fn batch_forced_transfer(
+        e: &Env,
+        from_list: &Vec<Address>,
+        to_list: &Vec<Address>,
+        amounts: &Vec<i128>,
+    ) {
+        Self::require_equal_lengths(e, from_list.len(), to_list.len());
+        Self::require_equal_lengths(e, to_list.len(), amounts.len());
+
+        for ((from, to), amount) in from_list.iter().zip(to_list.iter()).zip(amounts.iter()) {
+            Self::forced_transfer(e, &from, &to, amount);
+        }
+    }
+
     /// Mints `amount` tokens to `to`.
     ///
     /// # Arguments
@@ -348,6 +413,47 @@ impl RWA {
         compliance_client.created(&to_snapshot, &amount, &e.current_contract_address());
 
         emit_mint(e, to, amount);
+    }
+
+    /// Mints `amounts[i]` tokens to `to_list[i]` in one invocation.
+    ///
+    /// The batch is atomic: an item that fails reverts every item before it.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to_list` - The addresses receiving the new tokens.
+    /// * `amounts` - The amount to mint to each address.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::BatchSizeMismatch`] - When `to_list` and `amounts` have
+    ///   different lengths.
+    /// * refer to [`Self::mint`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each address:
+    /// * topics - `["mint", to: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for sizing the batch to fit the
+    /// per-transaction network limits. Refer to the batch operations section of
+    /// the [module documentation](crate::rwa).
+    ///
+    /// # Security Warning
+    ///
+    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+    ///
+    /// Refer to the security warning on [`Self::mint`].
+    pub fn batch_mint(e: &Env, to_list: &Vec<Address>, amounts: &Vec<i128>) {
+        Self::require_equal_lengths(e, to_list.len(), amounts.len());
+
+        for (to, amount) in to_list.iter().zip(amounts.iter()) {
+            Self::mint(e, &to, amount);
+        }
     }
 
     /// Burns `amount` tokens from `user_address`. Updates the total supply
@@ -427,6 +533,46 @@ impl RWA {
         compliance_client.destroyed(&from_snapshot, &amount, &e.current_contract_address());
 
         emit_burn(e, user_address, amount);
+    }
+
+    /// Burns `amounts[i]` tokens from `user_addresses[i]` in one invocation.
+    ///
+    /// The batch is atomic: an item that fails reverts every item before it.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user_addresses` - The addresses to burn tokens from.
+    /// * `amounts` - The amount to burn from each address.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::BatchSizeMismatch`] - When `user_addresses` and `amounts`
+    ///   have different lengths.
+    /// * refer to [`Self::burn`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each address:
+    /// * topics - `["burn", user_address: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for sizing the batch to fit the
+    /// per-transaction network limits. Refer to the batch operations section of
+    /// the [module documentation](crate::rwa).
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks, exactly like
+    /// [`Self::burn`]. Refer to its security warning.
+    pub fn batch_burn(e: &Env, user_addresses: &Vec<Address>, amounts: &Vec<i128>) {
+        Self::require_equal_lengths(e, user_addresses.len(), amounts.len());
+
+        for (user_address, amount) in user_addresses.iter().zip(amounts.iter()) {
+            Self::burn(e, &user_address, amount);
+        }
     }
 
     /// Recovery function used to force transfer tokens from a old account to a
@@ -557,6 +703,53 @@ impl RWA {
         emit_address_frozen(e, user_address, freeze);
     }
 
+    /// Sets the frozen status of `user_addresses[i]` to `freeze_list[i]` in one
+    /// invocation.
+    ///
+    /// The batch is atomic: an item that fails reverts every item before it.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user_addresses` - The addresses to freeze or unfreeze.
+    /// * `freeze_list` - The frozen status to apply to each address.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::BatchSizeMismatch`] - When `user_addresses` and
+    ///   `freeze_list` have different lengths.
+    ///
+    /// # Events
+    ///
+    /// For each address:
+    /// * topics - `["address_frozen", user_address: Address, is_frozen: bool]`
+    /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// An address repeated in `user_addresses` ends up with the status of its
+    /// last occurrence, and each occurrence emits its own event.
+    ///
+    /// The caller is responsible for sizing the batch to fit the
+    /// per-transaction network limits. Refer to the batch operations section of
+    /// the [module documentation](crate::rwa).
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks, exactly like
+    /// [`Self::set_address_frozen`]. Refer to its security warning.
+    pub fn batch_set_address_frozen(
+        e: &Env,
+        user_addresses: &Vec<Address>,
+        freeze_list: &Vec<bool>,
+    ) {
+        Self::require_equal_lengths(e, user_addresses.len(), freeze_list.len());
+
+        for (user_address, freeze) in user_addresses.iter().zip(freeze_list.iter()) {
+            Self::set_address_frozen(e, &user_address, freeze);
+        }
+    }
+
     /// Freezes a specified amount of tokens for a given address.
     ///
     /// # Arguments
@@ -600,6 +793,53 @@ impl RWA {
         emit_tokens_frozen(e, user_address, amount);
     }
 
+    /// Freezes `amounts[i]` tokens on `user_addresses[i]` in one invocation.
+    ///
+    /// The batch is atomic: an item that fails reverts every item before it.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user_addresses` - The addresses for which to freeze tokens.
+    /// * `amounts` - The amount to freeze on each address.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::BatchSizeMismatch`] - When `user_addresses` and `amounts`
+    ///   have different lengths.
+    /// * refer to [`Self::freeze_partial_tokens`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each address:
+    /// * topics - `["tokens_frozen", user_address: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// Amounts accumulate, so an address repeated in `user_addresses` has every
+    /// occurrence added to its frozen balance.
+    ///
+    /// The caller is responsible for sizing the batch to fit the
+    /// per-transaction network limits. Refer to the batch operations section of
+    /// the [module documentation](crate::rwa).
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks, exactly like
+    /// [`Self::freeze_partial_tokens`]. Refer to its security warning.
+    pub fn batch_freeze_partial_tokens(
+        e: &Env,
+        user_addresses: &Vec<Address>,
+        amounts: &Vec<i128>,
+    ) {
+        Self::require_equal_lengths(e, user_addresses.len(), amounts.len());
+
+        for (user_address, amount) in user_addresses.iter().zip(amounts.iter()) {
+            Self::freeze_partial_tokens(e, &user_address, amount);
+        }
+    }
+
     /// Unfreezes a specified amount of tokens for a given address.
     ///
     /// # Arguments
@@ -639,6 +879,53 @@ impl RWA {
             .persistent()
             .set(&RWAStorageKey::FrozenTokens(user_address.clone()), &new_frozen);
         emit_tokens_unfrozen(e, user_address, amount);
+    }
+
+    /// Unfreezes `amounts[i]` tokens on `user_addresses[i]` in one invocation.
+    ///
+    /// The batch is atomic: an item that fails reverts every item before it.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user_addresses` - The addresses for which to unfreeze tokens.
+    /// * `amounts` - The amount to unfreeze on each address.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::BatchSizeMismatch`] - When `user_addresses` and `amounts`
+    ///   have different lengths.
+    /// * refer to [`Self::unfreeze_partial_tokens`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each address:
+    /// * topics - `["tokens_unfrozen", user_address: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// Amounts accumulate, so an address repeated in `user_addresses` has every
+    /// occurrence subtracted from its frozen balance.
+    ///
+    /// The caller is responsible for sizing the batch to fit the
+    /// per-transaction network limits. Refer to the batch operations section of
+    /// the [module documentation](crate::rwa).
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks, exactly like
+    /// [`Self::unfreeze_partial_tokens`]. Refer to its security warning.
+    pub fn batch_unfreeze_partial_tokens(
+        e: &Env,
+        user_addresses: &Vec<Address>,
+        amounts: &Vec<i128>,
+    ) {
+        Self::require_equal_lengths(e, user_addresses.len(), amounts.len());
+
+        for (user_address, amount) in user_addresses.iter().zip(amounts.iter()) {
+            Self::unfreeze_partial_tokens(e, &user_address, amount);
+        }
     }
 
     /// Sets the onchain ID of the token.
@@ -729,6 +1016,43 @@ impl RWA {
     /// * refer to [`Self::identity_verifier`] errors.
     /// * refer to [`IdentityVerifierClient::verify_identity`] errors.
     pub fn validate_transfer(e: &Env, from: &AccountSnapshot, to: &AccountSnapshot, amount: i128) {
+        Self::validate_transfer_state(e, from, to, amount);
+
+        let identity_verifier_addr = Self::identity_verifier(e);
+        let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
+        identity_verifier_client.verify_identity(&from.address);
+        identity_verifier_client.verify_identity(&to.address);
+    }
+
+    /// The token-side half of [`Self::validate_transfer`]: paused state,
+    /// freezing status of both wallets, and the sender's free balance. Unlike
+    /// the identity checks, all of it is derived from state this contract owns.
+    ///
+    /// Split out so that [`Self::transfer_item`] can run these checks on every
+    /// item of a batch while the sender's identity verification is lifted out
+    /// of the loop. [`Self::validate_transfer`] remains the composition of the
+    /// two halves, so the single-transfer paths are unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - Snapshot of the sender, as of before the transfer.
+    /// * `to` - Snapshot of the receiver, as of before the transfer.
+    /// * `amount` - The amount of tokens to transfer.
+    ///
+    /// # Errors
+    ///
+    /// * [`PausableError::EnforcedPause`] - If the contract is paused.
+    /// * [`RWAError::AddressFrozen`] - If either the sender or receiver is
+    ///   frozen.
+    /// * [`RWAError::InsufficientFreeTokens`] - If the sender does not have
+    ///   enough free tokens.
+    fn validate_transfer_state(
+        e: &Env,
+        from: &AccountSnapshot,
+        to: &AccountSnapshot,
+        amount: i128,
+    ) {
         // Check if contract is paused
         if paused(e) {
             panic_with_error!(e, PausableError::EnforcedPause);
@@ -743,11 +1067,6 @@ impl RWA {
         if from.balance - from.frozen < amount {
             panic_with_error!(e, RWAError::InsufficientFreeTokens);
         }
-
-        let identity_verifier_addr = Self::identity_verifier(e);
-        let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
-        identity_verifier_client.verify_identity(&from.address);
-        identity_verifier_client.verify_identity(&to.address);
     }
 
     // ################## OVERRIDDEN FUNCTIONS ##################
@@ -773,12 +1092,52 @@ impl RWA {
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         from.require_auth();
 
+        Self::transfer_item(e, from, to, amount, SenderVerification::PerItem);
+    }
+
+    /// One standard transfer, without authorization. Shared by
+    /// [`Self::transfer`] and by every item of [`Self::batch_transfer`], so the
+    /// two paths cannot drift apart. `sender` decides whether the sender's
+    /// identity is verified here or was already verified by the caller.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The address holding the tokens.
+    /// * `to` - The address receiving the tokens.
+    /// * `amount` - The amount of tokens to transfer.
+    /// * `sender` - Whether to verify the sender's identity, refer to
+    ///   [`SenderVerification`].
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`Self::validate_transfer_state`] errors.
+    /// * refer to [`IdentityVerifierClient::verify_identity`] errors.
+    /// * refer to [`Base::update`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["transfer", from: Address, to: Address]`
+    /// * data - `[amount: i128]`
+    fn transfer_item(
+        e: &Env,
+        from: &Address,
+        to: &Address,
+        amount: i128,
+        sender: SenderVerification,
+    ) {
         // Snapshot before the update so the hook observes the pre-transfer
         // state.
         let from_snapshot = Self::account_snapshot(e, from);
         let to_snapshot = Self::account_snapshot(e, to);
 
-        Self::validate_transfer(e, &from_snapshot, &to_snapshot, amount);
+        Self::validate_transfer_state(e, &from_snapshot, &to_snapshot, amount);
+
+        let identity_verifier_client = IdentityVerifierClient::new(e, &Self::identity_verifier(e));
+        if matches!(sender, SenderVerification::PerItem) {
+            identity_verifier_client.verify_identity(from);
+        }
+        identity_verifier_client.verify_identity(to);
 
         Base::update(e, Some(from), Some(to), amount);
 
@@ -791,6 +1150,67 @@ impl RWA {
             &e.current_contract_address(),
         );
         emit_transfer(e, from, to, None, amount);
+    }
+
+    /// Transfers to several recipients in one invocation, moving
+    /// `amounts[i]` from `from` to `recipients[i]`. The sender authorizes the
+    /// whole batch once.
+    ///
+    /// The batch is atomic: an item that fails reverts every item before it.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The address holding the tokens.
+    /// * `recipients` - The addresses receiving the tokens.
+    /// * `amounts` - The amount to transfer to each recipient.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::BatchSizeMismatch`] - When `recipients` and `amounts` have
+    ///   different lengths.
+    /// * refer to [`Self::validate_transfer`] errors, which every item repeats.
+    /// * refer to [`Base::update`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each recipient:
+    /// * topics - `["transfer", from: Address, to: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// Recipients are processed in order, and the sender's free balance is
+    /// re-evaluated for every item, so a batch that overspends fails on the
+    /// item that runs out rather than up front.
+    ///
+    /// The caller is responsible for sizing the batch to fit the
+    /// per-transaction network limits. Refer to the batch operations section of
+    /// the [module documentation](crate::rwa) for measured figures.
+    pub fn batch_transfer(e: &Env, from: &Address, recipients: &Vec<Address>, amounts: &Vec<i128>) {
+        from.require_auth();
+
+        Self::require_equal_lengths(e, recipients.len(), amounts.len());
+
+        // Every item shares one sender, so the walk through the identity stack
+        // that verifies it runs once for the batch instead of once per
+        // recipient.
+        let identity_verifier_client = IdentityVerifierClient::new(e, &Self::identity_verifier(e));
+        identity_verifier_client.verify_identity(from);
+
+        for (to, amount) in recipients.iter().zip(amounts.iter()) {
+            Self::transfer_item(e, from, &to, amount, SenderVerification::HoistedByCaller);
+        }
+
+        // Compliance modules run between items and are arbitrary external
+        // contracts. None of them can invalidate the sender today: they hold no
+        // authority over the identity stack, and re-entering this token is
+        // impossible in Soroban. That is a property of the current module set
+        // rather than a guarantee, so the sender is verified once more here.
+        // Because the invocation is atomic, a sender invalidated mid-batch
+        // still reverts the whole batch, which is what verifying every item
+        // would have achieved.
+        identity_verifier_client.verify_identity(from);
     }
 
     /// `transfer_from` override with added compliance and identity verification
@@ -834,5 +1254,24 @@ impl RWA {
             &e.current_contract_address(),
         );
         emit_transfer(e, from, to, None, amount);
+    }
+
+    // ################## LOW-LEVEL HELPERS ##################
+
+    /// Rejects a batch whose parallel arrays do not line up.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `left` - Length of the first array.
+    /// * `right` - Length of the array that must match it.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::BatchSizeMismatch`] - When the two lengths differ.
+    fn require_equal_lengths(e: &Env, left: u32, right: u32) {
+        if left != right {
+            panic_with_error!(e, RWAError::BatchSizeMismatch);
+        }
     }
 }

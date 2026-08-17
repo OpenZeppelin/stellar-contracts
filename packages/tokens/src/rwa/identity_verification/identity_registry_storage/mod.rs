@@ -356,10 +356,10 @@ mod test;
 
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, IntoVal, Val, Vec};
 pub use storage::{
-    add_country_data_entries, add_identity, delete_country_data, get_country_data,
-    get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
-    recover_identity, remove_identity, stored_identity, validate_country_data, CountryData,
-    CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
+    add_country_data_entries, add_identity, batch_add_identity, delete_country_data,
+    get_country_data, get_country_data_entries, get_identity_profile, get_recovered_to,
+    modify_country_data, recover_identity, remove_identity, stored_identity, validate_country_data,
+    CountryData, CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
     OrganizationCountryRelation,
 };
 
@@ -399,6 +399,56 @@ pub trait IdentityRegistryStorage: TokenBinder {
         account: Address,
         identity: Address,
         country_data_list: Vec<Val>,
+        operator: Address,
+    );
+
+    /// Stores several identities in one invocation, associating `accounts[i]`
+    /// with `identities[i]` and `country_data_lists[i]`. The batched form of
+    /// [`IdentityRegistryStorage::add_identity`], and the counterpart of
+    /// ERC-3643's `batchRegisterIdentity`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `accounts` - The account addresses to associate with the identities.
+    /// * `identities` - The identity addresses to store.
+    /// * `country_data_lists` - The initial country data entries for each
+    ///   account.
+    /// * `operator` - The address authorizing the invocation.
+    ///
+    /// The identity type is not part of the interface, exactly as in
+    /// [`IdentityRegistryStorage::add_identity`]: the implementation decides it.
+    ///
+    /// # Errors
+    ///
+    /// * [`IRSError::BatchSizeMismatch`] - When the three arrays do not all
+    ///   have the same length.
+    /// * refer to [`batch_add_identity`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each registration:
+    /// * topics - `["identity_stored", account: Address, identity: Address]`
+    /// * data - `[]`
+    ///
+    /// And for each of its country data entries:
+    /// * topics - `["country_data_added", account: Address]`
+    /// * data - `[country_data: Val]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`batch_add_identity`] for the
+    /// implementation, which validates that the three arrays line up.
+    ///
+    /// Refer to the batch operations section of the
+    /// [RWA module documentation](crate::rwa) for how to size a batch.
+    fn batch_add_identity(
+        e: &Env,
+        accounts: Vec<Address>,
+        identities: Vec<Address>,
+        country_data_lists: Vec<Vec<Val>>,
         operator: Address,
     );
 
@@ -619,6 +669,8 @@ pub enum IRSError {
     MetadataStringTooLong = 327,
     /// The account still holds a balance in a linked token.
     AccountHasBalance = 328,
+    /// The parallel arrays of a batch call have different lengths.
+    BatchSizeMismatch = 329,
 }
 
 // ################## CONSTANTS ##################
