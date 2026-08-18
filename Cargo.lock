@@ -965,6 +965,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fungible-allowlist-votes-example"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-governance",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "fungible-blocklist-example"
 version = "0.7.1"
 dependencies = [
