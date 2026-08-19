@@ -1,5 +1,5 @@
 mod storage;
-use crate::non_fungible::{Base, NonFungibleToken};
+use crate::non_fungible::{Base, ContractOverrides, NonFungibleToken};
 
 #[cfg(test)]
 mod test;
@@ -142,7 +142,13 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// * [`crate::non_fungible::NonFungibleTokenError::NonExistentToken`] - If
     ///   the token does not exist.
     fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128) {
-        Base::royalty_info(e, token_id, sale_price)
+        // Establish existence through the contract's own ownership model.
+        // `Base::owner_of` only resolves tokens that have a materialised
+        // `Owner` entry, so calling it directly would reject every token that
+        // `Consecutive` resolves by walking back through its bucket.
+        let _ = Self::ContractType::owner_of(e, token_id);
+
+        Base::royalty_info_unchecked(e, token_id, sale_price)
     }
 }
 

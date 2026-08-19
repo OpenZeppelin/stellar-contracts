@@ -159,6 +159,29 @@ impl Base {
         // Verify token exists by checking owner
         let _ = Base::owner_of(e, token_id);
 
+        Self::royalty_info_unchecked(e, token_id, sale_price)
+    }
+
+    /// Returns the royalty information for a token **without** verifying that
+    /// the token exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `token_id` - The identifier of the token.
+    /// * `sale_price` - The sale price for which royalties are being
+    ///   calculated.
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function does not verify that the token exists.
+    /// Callers must establish existence first, using the ownership model that
+    /// applies to their contract. [`Base::royalty_info`] does so with
+    /// [`Base::owner_of`]; a contract whose `ContractType` stores ownership
+    /// differently, such as
+    /// [`crate::non_fungible::consecutive::Consecutive`], must use its own
+    /// `owner_of` instead.
+    pub fn royalty_info_unchecked(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128) {
         // Check if there's a specific royalty for this token
         let token_key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
         if let Some(royalty_info) = e.storage().persistent().get::<_, RoyaltyInfo>(&token_key) {
