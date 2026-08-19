@@ -208,10 +208,18 @@ pub fn collect_fee(
     // unspent `max_fee_amount - fee_amount` is consumed back to the user to
     // leave no residual allowance for the target invocation to abuse. In `Lazy`
     // mode the remaining allowance is intentional and left untouched.
+    //
+    // The self transfer still moves the amount out of and back into the same
+    // balance, so the token rejects it when the user cannot cover it. Only what
+    // the balance allows is consumed, and the allowance left over is by
+    // definition not spendable by the user's current balance.
     if let FeeAbstractionApproval::Eager = approval {
-        let remaining = max_fee_amount - fee_amount;
-        if remaining > 0 {
-            token_client.transfer_from(&e.current_contract_address(), user, user, &remaining);
+        let residual = max_fee_amount - fee_amount;
+        if residual > 0 {
+            let consumable = residual.min(token_client.balance(user));
+            if consumable > 0 {
+                token_client.transfer_from(&e.current_contract_address(), user, user, &consumable);
+            }
         }
     }
 
