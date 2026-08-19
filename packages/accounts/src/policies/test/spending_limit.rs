@@ -905,3 +905,63 @@ fn enforce_create_contract_context_with_signers_errors() {
         enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
     });
 }
+
+/// The number of `SpendingEntry` items that fit in one ledger entry under the
+/// mainnet `contractDataEntrySizeBytes` limit of 65,536. Measured: 816 entries
+/// serialize to 65,592 bytes.
+const MEASURED_ENTRY_CEILING: u32 = 815;
+
+/// Fill `spending_history` with `count` entries, one per ledger, through the
+/// real `enforce` path and with resource limits left at their mainnet
+/// defaults.
+fn fill_history(e: &Env, address: &Address, smart_account: &Address, count: u32) {
+    let context_rule = create_context_rule(e);
+    let context = create_transfer_context(e, 1);
+
+    e.as_contract(address, || {
+        let params =
+            SpendingLimitAccountParams { spending_limit: i128::MAX, period_ledgers: 1_000_000 };
+        install(e, &params, &context_rule, smart_account);
+    });
+
+    for i in 0..count {
+        e.ledger().with_mut(|li| {
+            li.sequence_number = 1000 + i;
+        });
+        e.as_contract(address, || {
+            enforce(e, &context, &context_rule.signers, &context_rule, smart_account);
+        });
+    }
+}
+
+#[test]
+fn spending_history_ledger_entry_ceiling() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    // Filling to the measured ceiling succeeds. This is well below
+    // MAX_HISTORY_ENTRIES, so the capacity guard never participates.
+    fill_history(&e, &address, &smart_account, MEASURED_ENTRY_CEILING);
+
+    let data = e.as_contract(&address, || get_spending_limit_data(&e, 1, &smart_account));
+    assert_eq!(data.spending_history.len(), MEASURED_ENTRY_CEILING);
+}
+
+#[test]
+#[should_panic(expected = "Error(Budget, ExceededLimit)")]
+fn spending_history_one_past_the_ceiling_exceeds_the_ledger_entry_limit() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    // One entry past the ceiling, the write of the whole SpendingLimitData
+    // exceeds contractDataEntrySizeBytes and the host rejects it. This is the
+    // reason MAX_HISTORY_ENTRIES is unreachable: the failure arrives as an
+    // untyped budget error rather than HistoryCapacityExceeded.
+    fill_history(&e, &address, &smart_account, MEASURED_ENTRY_CEILING + 1);
+}

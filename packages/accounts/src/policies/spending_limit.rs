@@ -155,6 +155,16 @@ pub const SPENDING_LIMIT_TTL_THRESHOLD: u32 = SPENDING_LIMIT_EXTEND_AMOUNT - DAY
 
 /// Maximum number of spending entries to keep in history.
 /// This prevents storage DoS by capping the vector size.
+///
+/// # Notes
+///
+/// This cap is currently **unreachable**. A `SpendingLimitData` holding 816
+/// entries serializes to 65,592 bytes, past the mainnet
+/// `contractDataEntrySizeBytes` limit of 65,536, so [`enforce`] fails with a
+/// host budget error at 816 and [`SpendingLimitError::HistoryCapacityExceeded`]
+/// is never returned. The measured ceiling is 815 entries.
+/// `spending_history_ledger_entry_ceiling` in the test module pins both
+/// boundaries.
 pub const MAX_HISTORY_ENTRIES: u32 = 1000;
 
 // ################## QUERY STATE ##################
