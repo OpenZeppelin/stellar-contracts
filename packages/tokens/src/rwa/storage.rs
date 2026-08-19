@@ -33,7 +33,7 @@ pub struct RWA;
 
 impl ContractOverrides for RWA {
     fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
-        RWA::transfer(e, from, &to.address(), amount);
+        RWA::transfer_with_muxed_id(e, from, &to.address(), to.id(), amount);
     }
 
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
@@ -771,6 +771,32 @@ impl RWA {
     /// Please refer to [`Base::update`] and [`Self::validate_transfer`] for the
     /// inline documentation.
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+        Self::transfer_with_muxed_id(e, from, to, None, amount);
+    }
+
+    /// `transfer` override that additionally carries the SEP-41 multiplexing
+    /// identifier of the destination into the emitted event.
+    ///
+    /// Identity verification, compliance and balance updates all operate on
+    /// the base `to` address; `to_muxed_id` only reaches the event, so that
+    /// off-chain consumers can attribute the transfer to the correct
+    /// sub-account.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The address holding the tokens.
+    /// * `to` - The base address receiving the tokens.
+    /// * `to_muxed_id` - The multiplexing identifier of the destination, if the
+    ///   caller supplied a muxed address.
+    /// * `amount` - The amount of tokens to be transferred.
+    fn transfer_with_muxed_id(
+        e: &Env,
+        from: &Address,
+        to: &Address,
+        to_muxed_id: Option<u64>,
+        amount: i128,
+    ) {
         from.require_auth();
 
         // Snapshot before the update so the hook observes the pre-transfer
@@ -790,7 +816,7 @@ impl RWA {
             &TransferKind::Standard,
             &e.current_contract_address(),
         );
-        emit_transfer(e, from, to, None, amount);
+        emit_transfer(e, from, to, to_muxed_id, amount);
     }
 
     /// `transfer_from` override with added compliance and identity verification

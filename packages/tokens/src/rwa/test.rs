@@ -2,13 +2,13 @@ extern crate std;
 
 use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short,
-    testutils::{Address as _, Events},
-    Address, Env, Event, String,
+    testutils::{Address as _, Events, MuxedAddress as _},
+    Address, Env, Event, MuxedAddress, String,
 };
 use stellar_contract_utils::pausable;
 
 use crate::{
-    fungible::{ContractOverrides, Transfer},
+    fungible::{ContractOverrides, MuxedTransfer, Transfer},
     rwa::{
         compliance::{AccountSnapshot, TransferKind},
         storage::RWAStorageKey,
@@ -633,6 +633,48 @@ fn contract_overrides_transfer() {
 
         assert_eq!(RWA::balance(&e, &from), 70);
         assert_eq!(RWA::balance(&e, &to), 30);
+    });
+}
+
+#[test]
+fn contract_overrides_transfer_preserves_muxed_id() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to_muxed_base = MuxedAddress::generate(&e);
+    let to = to_muxed_base.address();
+    let to_muxed = MuxedAddress::new(to_muxed_base.clone(), 42u64);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        RWA::mint(&e, &from, 100);
+
+        <RWA as ContractOverrides>::transfer(&e, &from, &to_muxed, 30);
+
+        // Balances settle on the base address, exactly as for a plain
+        // transfer.
+        assert_eq!(RWA::balance(&e, &from), 70);
+        assert_eq!(RWA::balance(&e, &to), 30);
+
+        // The multiplexing identifier must survive into the event, so that
+        // off-chain consumers can attribute the transfer to the correct
+        // sub-account. `Base` already does this; RWA used to drop it.
+        //
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 MuxedTransfer
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 4);
+        assert_eq!(
+            events.events().get(3).unwrap(),
+            &MuxedTransfer {
+                from: from.clone(),
+                to: to.clone(),
+                to_muxed_id: Some(42),
+                amount: 30,
+            }
+            .to_xdr(&e, &address)
+        );
     });
 }
 
