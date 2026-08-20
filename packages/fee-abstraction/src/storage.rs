@@ -194,11 +194,13 @@ pub fn collect_fee(
                     &max_fee_amount,
                     &expiration_ledger,
                 );
-            } else {
-                // assuming that in the other cases the expiration ledger is validated in
-                // `token.approve()`
-                validate_expiration_ledger(e, expiration_ledger);
             }
+            // Else: the existing allowance already covers max_fee_amount, so
+            // no approve() call is issued here, and `expiration_ledger` is
+            // never applied to anything. The real allowance's expiration was
+            // already set by whichever prior approve() call established it,
+            // and the SAC enforces that on `transfer_from` below — there is
+            // nothing left to validate `expiration_ledger` against.
         }
     }
 

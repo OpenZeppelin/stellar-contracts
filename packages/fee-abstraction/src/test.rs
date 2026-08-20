@@ -195,9 +195,20 @@ fn collect_fee_with_lazy_approval_lower_previous() {
     assert_eq!(balance, 20);
 }
 
+// Regression test for #840. The `expiration_ledger` parameter has no
+// relationship to the real, on-chain allowance's actual expiration — that
+// expiration was already fixed by whichever prior approve() call set it, and
+// TokenClient doesn't even expose it as a readable value, only the amount via
+// `allowance()`. Before the fix, this exact scenario (a genuinely valid,
+// non-expired allowance of 100 until ledger 200, current ledger 101) panicked
+// with `Error(Contract, #5006)` purely because the *unrelated* parameter
+// (100) happened to be less than the current ledger sequence (101) — a false
+// rejection against a real allowance that still had 99 ledgers of validity
+// left. After the fix, the call succeeds: the SAC's own `transfer_from`
+// expiry enforcement is what actually protects the real allowance, and it's
+// not fooled by this parameter either way.
 #[test]
-#[should_panic(expected = "Error(Contract, #5006)")]
-fn collect_fee_with_lazy_approval_expired_ledger_panics() {
+fn collect_fee_with_lazy_approval_succeeds_regardless_of_expiration_ledger_param() {
     let e = Env::default();
     e.mock_all_auths_allowing_non_root_auth();
 
@@ -209,7 +220,7 @@ fn collect_fee_with_lazy_approval_expired_ledger_panics() {
     let max_fee_amount = 50;
 
     let token_client = TokenClient::new(&e, &token_address);
-    // approve enough (100 > max_fee_amount) till ledger 200
+    // approve enough (100 > max_fee_amount) till ledger 200 — genuinely valid
     token_client.approve(&user, &contract_address, &100, &200);
 
     e.ledger().set_sequence_number(101);
@@ -220,12 +231,62 @@ fn collect_fee_with_lazy_approval_expired_ledger_panics() {
             &token_address,
             20,
             max_fee_amount,
-            100, // expiration_ledger < 101
+            100, // < current ledger 101, previously caused a false #5006 panic
             &user,
             &recipient,
             FeeAbstractionApproval::Lazy,
         );
     });
+
+    // The real allowance moved only by the fee actually spent (100 - 20 =
+    // 80) — no re-approve happened, and the unrelated expiration_ledger
+    // param neither blocked the call nor changed anything about the real
+    // allowance's own expiration.
+    let allowance = token_client.allowance(&user, &contract_address);
+    assert_eq!(allowance, 80);
+
+    let balance = token_client.balance(&recipient);
+    assert_eq!(balance, 20);
+}
+
+// Second half of #840: proves the parameter is inert in the other
+// direction too. An arbitrary, disconnected expiration_ledger — one that
+// isn't even close to the real allowance's actual expiration of 200 —
+// changes nothing about whether the call succeeds. There was never a
+// tightening or loosening effect to preserve; the parameter simply doesn't
+// reach the real allowance in the Lazy/sufficient-allowance branch.
+#[test]
+fn collect_fee_with_lazy_approval_ignores_unrelated_expiration_ledger_param() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+
+    let max_fee_amount = 50;
+    let token_client = TokenClient::new(&e, &token_address);
+
+    // Real, on-chain allowance: 100 units, valid until ledger 200.
+    token_client.approve(&user, &contract_address, &100, &200);
+    e.ledger().set_sequence_number(101);
+
+    e.as_contract(&contract_address, || {
+        collect_fee(
+            &e,
+            &token_address,
+            10,
+            max_fee_amount,
+            9999, // arbitrary, unrelated to the real allowance's expiration of 200
+            &user,
+            &recipient,
+            FeeAbstractionApproval::Lazy,
+        );
+    });
+
+    let remaining = token_client.allowance(&user, &contract_address);
+    assert_eq!(remaining, 90, "only the transfer_from spend (10) should move the real allowance");
 }
 
 #[test]
