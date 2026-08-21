@@ -6,26 +6,30 @@
 //! transfer, approve or burn while it holds more than
 //! [`WHALE_THRESHOLD`] tokens.
 //!
-//! The contract type is `Compose<(FungibleVotes,)>`, and the custom policy is
-//! layered on with method-level overrides: the bodies of `transfer`,
-//! `transfer_from`, `approve`, `burn` and `burn_from` run the whale check and
-//! then delegate to the votes-aware flow. This keeps `FungibleTotalSupply`
-//! (served from the voting checkpoints), `Votes` and `FungibleBurnable` as
-//! regular trait implementations.
+//! The contract type is the curated `Compose<(BlockList, FungibleVotes)>`,
+//! whose `BlockListContractType` marker makes `FungibleBlockList` a regular
+//! trait implementation, alongside `FungibleTotalSupply` (served from the
+//! voting checkpoints), `Votes` and `FungibleBurnable`.
 //!
-//! The `FungibleBlockList` trait is not implementable here — its bound
-//! requires the `ContractType` to carry `BlockListContractType`, which
-//! `FungibleVotes` does not. The blocklist state is managed instead through
-//! the [`BlockList`] storage helpers, exposed as inherent entry points with
-//! the same signatures.
+//! The curated combination enforces the *strict* blocklist, so the whale
+//! exemption still has to displace it with method-level overrides: the
+//! bodies of `transfer`, `transfer_from`, `approve`, `burn` and `burn_from`
+//! run the whale check and then delegate to the votes-aware flow. The
+//! contract type's own policy code never executes on those paths — it
+//! provides the marker, the total supply routing, and a fail-closed backstop:
+//! removing one of the overrides reverts that path to strict blocking rather
+//! than to no blocking.
 
 use soroban_sdk::{contract, contractimpl, panic_with_error, Address, Env, MuxedAddress, String};
 use stellar_access::ownable::{set_owner, Ownable};
 use stellar_governance::votes::Votes;
 use stellar_macros::only_owner;
 use stellar_tokens::fungible::{
-    blocklist::BlockList, burnable::FungibleBurnable, total_supply::FungibleTotalSupply,
-    votes::FungibleVotes, Base, Compose, FungibleToken, FungibleTokenError,
+    blocklist::{BlockList, FungibleBlockList},
+    burnable::FungibleBurnable,
+    total_supply::FungibleTotalSupply,
+    votes::FungibleVotes,
+    Base, Compose, FungibleToken, FungibleTokenError,
 };
 
 /// Balance above which a blocked account is exempt from the blocklist.
@@ -65,36 +69,11 @@ impl ExampleContract {
     pub fn mint(e: &Env, to: Address, amount: i128) {
         FungibleVotes::mint(e, &to, amount);
     }
-
-    // `FungibleBlockList` is not implementable for this contract. Its bound
-    // is `FungibleToken<ContractType: BlockListContractType>`, and the marker
-    // certifies contract *types* whose dispatch itself enforces the blocklist
-    // (`BlockList`, `TotalSupplyBlockList`) — `FungibleVotes` rightly does not
-    // carry it. The marker cannot be granted from here either: implementing a
-    // stellar-tokens trait for a stellar-tokens type violates the orphan rule
-    // (E0117), and the library adding it would falsely certify every votes
-    // token as blocklist-enforcing. This contract's policy lives in its method
-    // overrides, which the type-level certification cannot see, so the same
-    // interface is exposed through the storage helpers instead.
-
-    pub fn blocked(e: &Env, account: Address) -> bool {
-        !passes(e, &account)
-    }
-
-    #[only_owner]
-    pub fn block_user(e: &Env, user: Address) {
-        BlockList::block_user(e, &user);
-    }
-
-    #[only_owner]
-    pub fn unblock_user(e: &Env, user: Address) {
-        BlockList::unblock_user(e, &user);
-    }
 }
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
-    type ContractType = Compose<(FungibleVotes,)>;
+    type ContractType = Compose<(BlockList, FungibleVotes)>;
 
     fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
         enforce_whale_check(e, &[&from, &to.address()]);
@@ -109,6 +88,25 @@ impl FungibleToken for ExampleContract {
     fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32) {
         enforce_whale_check(e, &[&owner]);
         Base::approve(e, &owner, &spender, amount, live_until_ledger);
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl FungibleBlockList for ExampleContract {
+    // The query reports the effective policy rather than raw list
+    // membership: a listed whale is not blocked.
+    fn blocked(e: &Env, account: Address) -> bool {
+        !passes(e, &account)
+    }
+
+    #[only_owner]
+    fn block_user(e: &Env, user: Address, _operator: Address) {
+        BlockList::block_user(e, &user);
+    }
+
+    #[only_owner]
+    fn unblock_user(e: &Env, user: Address, _operator: Address) {
+        BlockList::unblock_user(e, &user);
     }
 }
 

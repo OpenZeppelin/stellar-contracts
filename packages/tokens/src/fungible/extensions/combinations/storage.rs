@@ -1,13 +1,14 @@
-use soroban_sdk::{Address, Env, MuxedAddress};
+use soroban_sdk::{panic_with_error, Address, Env, MuxedAddress};
 
 use crate::fungible::{
     extensions::{
         allowlist::{AllowList, AllowListContractType},
         blocklist::{BlockList, BlockListContractType},
         total_supply::{decrease_total_supply, mint, total_supply, TotalSupplyOverrides},
+        votes::FungibleVotes,
     },
     overrides::BurnableOverrides,
-    ContractOverrides,
+    ContractOverrides, FungibleTokenError,
 };
 
 /// Contract type combining the [`AllowList`] transfer policy with total
@@ -148,5 +149,98 @@ impl TotalSupplyBlockList {
     pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         BlockList::burn_from(e, spender, from, amount);
         decrease_total_supply(e, amount);
+    }
+}
+
+/// Contract type combining the [`BlockList`] transfer policy with the voting
+/// checkpoints of [`FungibleVotes`].
+pub struct BlockListVotes;
+
+// The voting checkpoints already track the total supply; the query is served
+// from them instead of a separate supply entry.
+impl TotalSupplyOverrides for BlockListVotes {
+    fn total_supply(e: &Env) -> i128 {
+        <FungibleVotes as TotalSupplyOverrides>::total_supply(e)
+    }
+}
+
+// The combined contract type keeps enforcing the blocklist policy.
+impl BlockListContractType for BlockListVotes {}
+
+// The blocklist checks are replicated from [`BlockList`] rather than reused:
+// `BlockList::transfer` already performs the balance update, so routing
+// through it and `FungibleVotes::transfer` would double-transfer. The policy
+// check runs first, then the votes-aware flow.
+impl ContractOverrides for BlockListVotes {
+    fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
+        if BlockList::blocked(e, from) || BlockList::blocked(e, &to.address()) {
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
+        }
+        FungibleVotes::transfer(e, from, to, amount);
+    }
+
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        if BlockList::blocked(e, from) || BlockList::blocked(e, to) {
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
+        }
+        FungibleVotes::transfer_from(e, spender, from, to, amount);
+    }
+
+    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+        BlockList::approve(e, owner, spender, amount, live_until_ledger);
+    }
+}
+
+impl BurnableOverrides for BlockListVotes {
+    fn burn(e: &Env, from: &Address, amount: i128) {
+        BlockListVotes::burn(e, from, amount);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        BlockListVotes::burn_from(e, spender, from, amount);
+    }
+}
+
+impl BlockListVotes {
+    /// Returns the total amount of tokens in circulation, served from the
+    /// voting checkpoints.
+    ///
+    /// refer to [`stellar_governance::votes::get_total_supply`] for the
+    /// inline documentation.
+    pub fn total_supply(e: &Env) -> i128 {
+        <FungibleVotes as TotalSupplyOverrides>::total_supply(e)
+    }
+
+    /// Creates `amount` of tokens and assigns them to `to`, updating the
+    /// voting units of the recipient\'s delegate.
+    ///
+    /// refer to [`FungibleVotes::mint`] for the inline documentation.
+    pub fn mint(e: &Env, to: &Address, amount: i128) {
+        FungibleVotes::mint(e, to, amount);
+    }
+
+    /// Destroys `amount` of tokens from `from` through the blocklist burn
+    /// policy, updating the voting units of the owner\'s delegate.
+    ///
+    /// refer to [`BlockList::burn`] and [`FungibleVotes::burn`] for the
+    /// inline documentation.
+    pub fn burn(e: &Env, from: &Address, amount: i128) {
+        if BlockList::blocked(e, from) {
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
+        }
+        FungibleVotes::burn(e, from, amount);
+    }
+
+    /// Destroys `amount` of tokens from `from` using the allowance mechanism,
+    /// through the blocklist burn policy, updating the voting units of the
+    /// owner\'s delegate.
+    ///
+    /// refer to [`BlockList::burn_from`] and [`FungibleVotes::burn_from`] for
+    /// the inline documentation.
+    pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        if BlockList::blocked(e, from) {
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
+        }
+        FungibleVotes::burn_from(e, spender, from, amount);
     }
 }
