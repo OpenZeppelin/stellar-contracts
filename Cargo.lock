@@ -983,6 +983,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fungible-custom-contract-type-example"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-governance",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "fungible-governor-contract"
 version = "0.7.1"
 dependencies = [

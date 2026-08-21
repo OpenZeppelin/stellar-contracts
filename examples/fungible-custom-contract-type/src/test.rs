@@ -39,7 +39,7 @@ fn blocked_small_holder_cannot_transfer() {
     e.mock_all_auths();
 
     client.mint(&user, &100);
-    client.block_user(&user);
+    client.block_user(&user, &owner);
     client.transfer(&user, &owner, &10);
 }
 
@@ -53,7 +53,7 @@ fn blocked_whale_is_exempt_until_drained() {
     e.mock_all_auths();
 
     client.mint(&user, &500);
-    client.block_user(&user);
+    client.block_user(&user, &owner);
     // The query reports the effective policy: a listed whale is not blocked.
     assert!(!client.blocked(&user));
 
@@ -76,7 +76,7 @@ fn blocked_whale_frozen_after_dropping_below_threshold() {
     e.mock_all_auths();
 
     client.mint(&user, &500);
-    client.block_user(&user);
+    client.block_user(&user, &owner);
     client.transfer(&user, &owner, &450);
 
     // Now at 50 (<= threshold), the block applies.
@@ -94,7 +94,7 @@ fn blocked_empty_recipient_cannot_receive() {
     e.mock_all_auths();
 
     client.mint(&owner, &500);
-    client.block_user(&user);
+    client.block_user(&user, &owner);
     client.transfer(&owner, &user, &50);
 }
 
@@ -109,7 +109,7 @@ fn blocked_whale_recipient_can_receive() {
 
     client.mint(&owner, &500);
     client.mint(&user, &200);
-    client.block_user(&user);
+    client.block_user(&user, &owner);
 
     client.transfer(&owner, &user, &50);
     assert_eq!(client.balance(&user), 250);
@@ -127,7 +127,7 @@ fn burn_respects_whale_rule_and_updates_supply_and_votes() {
 
     client.mint(&user, &500);
     client.delegate(&user, &delegate);
-    client.block_user(&user);
+    client.block_user(&user, &owner);
 
     client.burn(&user, &200);
     assert_eq!(client.balance(&user), 300);
@@ -146,7 +146,7 @@ fn blocked_small_holder_cannot_burn() {
     e.mock_all_auths();
 
     client.mint(&user, &50);
-    client.block_user(&user);
+    client.block_user(&user, &owner);
     client.burn(&user, &10);
 }
 
@@ -162,7 +162,7 @@ fn blocked_small_holder_cannot_approve() {
     e.mock_all_auths();
 
     client.mint(&user, &50);
-    client.block_user(&user);
+    client.block_user(&user, &owner);
     client.approve(&user, &spender, &10, &100);
 }
 
@@ -194,8 +194,8 @@ fn unblock_restores_small_holder() {
     e.mock_all_auths();
 
     client.mint(&user, &50);
-    client.block_user(&user);
-    client.unblock_user(&user);
+    client.block_user(&user, &owner);
+    client.unblock_user(&user, &owner);
     assert!(!client.blocked(&user));
 
     client.transfer(&user, &owner, &10);

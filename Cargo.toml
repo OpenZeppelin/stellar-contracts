@@ -3,9 +3,10 @@ resolver = "2"
 members = [
     "examples/confidential/*",
     "examples/fungible-allowlist",
-    "examples/fungible-whale-blocklist-votes",
     "examples/fungible-blocklist",
     "examples/fungible-capped",
+    "examples/fungible-custom-contract-type",
+    "examples/fungible-whale-blocklist-votes",
     "examples/fungible-merkle-airdrop",
     "examples/fungible-governor/*",
     "examples/fungible-governor-timelock/*",

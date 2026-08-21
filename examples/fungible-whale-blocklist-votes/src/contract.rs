@@ -78,7 +78,7 @@ impl ExampleContract {
     // interface is exposed through the storage helpers instead.
 
     pub fn blocked(e: &Env, account: Address) -> bool {
-        BlockList::blocked(e, &account)
+        !passes(e, &account)
     }
 
     #[only_owner]
