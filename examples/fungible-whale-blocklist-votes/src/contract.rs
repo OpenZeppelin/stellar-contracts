@@ -66,8 +66,16 @@ impl ExampleContract {
         FungibleVotes::mint(e, &to, amount);
     }
 
-    // `FungibleBlockList` cannot be implemented with this contract type;
-    // the same interface is exposed through the storage helpers instead.
+    // `FungibleBlockList` is not implementable for this contract. Its bound
+    // is `FungibleToken<ContractType: BlockListContractType>`, and the marker
+    // certifies contract *types* whose dispatch itself enforces the blocklist
+    // (`BlockList`, `TotalSupplyBlockList`) — `FungibleVotes` rightly does not
+    // carry it. The marker cannot be granted from here either: implementing a
+    // stellar-tokens trait for a stellar-tokens type violates the orphan rule
+    // (E0117), and the library adding it would falsely certify every votes
+    // token as blocklist-enforcing. This contract's policy lives in its method
+    // overrides, which the type-level certification cannot see, so the same
+    // interface is exposed through the storage helpers instead.
 
     pub fn blocked(e: &Env, account: Address) -> bool {
         BlockList::blocked(e, &account)
