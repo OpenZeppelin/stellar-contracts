@@ -44,7 +44,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use storage::{AllowListVotes, TotalSupplyAllowList, TotalSupplyBlockList};
+use storage::{TotalSupplyAllowList, TotalSupplyBlockList};
 
 use crate::{
     fungible::{
@@ -77,8 +77,7 @@ pub type Compose<L> = <L as Composable>::Out;
     message = "`{Self}` is not a valid contract type combination",
     note = "valid single contract types: `Base`, `AllowList`, `BlockList`, `TotalSupply`, `RWA`, \
             `Vault`, `FungibleVotes`",
-    note = "valid combinations: `(AllowList, TotalSupply)`, `(BlockList, TotalSupply)`, \
-            `(AllowList, FungibleVotes)`",
+    note = "valid combinations: `(AllowList, TotalSupply)`, `(BlockList, TotalSupply)`",
     note = "`AllowList` and `BlockList` are mutually exclusive"
 )]
 pub trait Composable {
@@ -144,10 +143,4 @@ impl Composable for (BlockList, TotalSupply) {
 }
 impl Composable for (TotalSupply, BlockList) {
     type Out = TotalSupplyBlockList;
-}
-impl Composable for (AllowList, FungibleVotes) {
-    type Out = AllowListVotes;
-}
-impl Composable for (FungibleVotes, AllowList) {
-    type Out = AllowListVotes;
 }

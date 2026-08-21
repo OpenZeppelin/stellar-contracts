@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "examples/confidential/*",
     "examples/fungible-allowlist",
-    "examples/fungible-allowlist-votes",
+    "examples/fungible-whale-blocklist-votes",
     "examples/fungible-blocklist",
     "examples/fungible-capped",
     "examples/fungible-merkle-airdrop",

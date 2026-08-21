@@ -1,5 +1,5 @@
 [package]
-name = "fungible-allowlist-votes-example"
+name = "fungible-whale-blocklist-votes-example"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
