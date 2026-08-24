@@ -9,12 +9,18 @@
 //! multiplication and division, in both panicking and checked variants:
 //!
 //! - **Panicking variants** (e.g. [`i128_fixed_point::mul_div_with_rounding`]):
-//!   panic with [`SorobanFixedPointError::Overflow`] when the result overflows,
-//!   and with a native arithmetic panic when dividing by zero.
+//!   panic with [`SorobanFixedPointError::Overflow`] when the result overflows.
 //! - **Checked variants** (e.g.
 //!   [`i128_fixed_point::checked_mul_div_with_rounding`]): return `None` on
 //!   error for graceful handling, including when the intermediate `x * y`
-//!   multiplication overflows.
+//!   multiplication overflows and the result cannot be recovered.
+//!
+//! These are plain arithmetic operations, so domain errors are left to the
+//! platform rather than mapped to contract errors: a zero `denominator`, and
+//! `MIN / -1`, fail with a native or host arithmetic error. The checked
+//! variants return `None` for both. [`SorobanFixedPointError::DivisionByZero`]
+//! is reserved for the higher-level helpers where a zero argument is a semantic
+//! mistake rather than an arithmetic one, such as [`wad::Wad::from_ratio`].
 //!
 //! ### Phantom Overflow Handling
 //!
@@ -23,9 +29,25 @@
 //! using `I256` as an intermediate type and scaled back to `i128` if the final
 //! result fits. This is called *phantom overflow handling*.
 //!
-//! `I256` operations do **not** apply phantom overflow handling — doing so
-//! would require a custom `I512` type. Overflowing two large `I256` values is
-//! considered rare enough in practice that this trade-off is acceptable.
+//! `I256` operations apply it too, without a wider intermediate type. When
+//! `x * y` overflows `I256`, both operands are split by the denominator and the
+//! division is distributed, which is an exact identity:
+//!
+//! ```text
+//! x = q1*D + r1     y = q2*D + r2     (0 <= r1, r2 < D)
+//! floor(x*y/D) = q1*q2*D + q1*r2 + r1*q2 + floor(r1*r2/D)
+//! ```
+//!
+//! Three of the four terms are bounded by the answer or by an input, so they
+//! fit whenever the inputs and the result do. Only `r1*r2` is bounded by `D`
+//! alone, which gives the single condition `|denominator| <= 2^128` (roughly
+//! `3.4e38`, far above every fixed-point scale in practical use: `10^18`,
+//! `10^27`, `2^96`, `10^38`). Within that domain the result is bit-for-bit what
+//! a 512-bit intermediate would produce.
+//!
+//! Beyond it the operation rejects rather than returning an incorrect value,
+//! and the rejection is permitted rather than guaranteed: a large denominator
+//! whose remainders happen to be small still succeeds.
 //!
 //! Phantom overflow handling covers the free functions in
 //! [`i128_fixed_point`] and the `checked_*` methods on [`wad::Wad`]. It does

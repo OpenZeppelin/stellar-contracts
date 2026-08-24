@@ -91,16 +91,21 @@ fn test_mul_div_floor_large_number() {
 }
 
 #[test]
-#[should_panic(expected = "overflow")]
-fn test_mul_div_floor_phantom_overflow() {
+fn test_mul_div_floor_phantom_overflow_resolves() {
     let env = Env::default();
     let x: I256 = I256::from_i128(&env, i128::MAX);
-    // 256 bit max ~= 5.8e76, 128 bit max ~= 1.7e38, need to multiply by at
-    // least 10^39
-    let y: I256 = I256::from_i128(&env, 10i128.pow(39));
+    // x * 10^39 overflows the I256 intermediate (max ~5.8e76), so this exercises
+    // the fallback. The quotient is 10^21 * x, which fits, so it is recovered
+    // rather than failing.
+    //
+    // 10^39 is the multiplier we need, but it exceeds i128::MAX (~1.7e38), so it
+    // cannot be written as `10i128.pow(39)`. It is built in I256 space instead.
+    let y: I256 = I256::from_i128(&env, 10i128.pow(20)).mul(&I256::from_i128(&env, 10i128.pow(19)));
     let denominator: I256 = I256::from_i128(&env, 10i128.pow(18));
 
-    mul_div_floor(&x, &y, &denominator);
+    let result = mul_div_floor(&x, &y, &denominator);
+
+    assert_eq!(result, x.mul(&I256::from_i128(&env, 10i128.pow(21))));
 }
 
 #[test]
@@ -141,16 +146,20 @@ fn test_mul_div_ceil_large_number() {
 }
 
 #[test]
-#[should_panic(expected = "overflow")]
-fn test_mul_div_ceil_phantom_overflow() {
+fn test_mul_div_ceil_phantom_overflow_resolves() {
     let env = Env::default();
     let x: I256 = I256::from_i128(&env, i128::MAX);
-    // 256 bit max ~= 5.8e76, 128 bit max ~= 1.7e38, need to multiply by at
-    // least 10^39
-    let y: I256 = I256::from_i128(&env, 10i128.pow(39));
+    // Same input as the floor case. The division is exact, so ceil returns the same
+    // value.
+    //
+    // 10^39 exceeds i128::MAX (~1.7e38), so it is built in I256 space rather than
+    // as `10i128.pow(39)`.
+    let y: I256 = I256::from_i128(&env, 10i128.pow(20)).mul(&I256::from_i128(&env, 10i128.pow(19)));
     let denominator: I256 = I256::from_i128(&env, 10i128.pow(18));
 
-    mul_div_ceil(&x, &y, &denominator);
+    let result = mul_div_ceil(&x, &y, &denominator);
+
+    assert_eq!(result, x.mul(&I256::from_i128(&env, 10i128.pow(21))));
 }
 
 #[test]
@@ -538,26 +547,63 @@ fn test_checked_mul_div_floor_negative_with_remainder() {
 }
 
 #[test]
-fn test_checked_mul_div_mul_overflow_returns_none() {
+fn test_checked_mul_div_mul_overflow_resolves() {
     let env = Env::default();
-    // x * y = I256::MAX * 2 overflows I256, so the checked variants must return
-    // None rather than panicking like their unchecked counterparts.
+    // x * y = I256::MAX * 2 overflows I256, but the quotient is exactly I256::MAX.
+    // The remainders are both zero, so the decomposition recovers the answer
+    // and the checked variants return `Some` where they used to return `None`.
     let x: I256 = I256::max_value(&env);
     let y: I256 = I256::from_i128(&env, 2);
     let denominator: I256 = I256::from_i128(&env, 2);
+    let expected: I256 = I256::max_value(&env);
 
-    assert_eq!(checked_mul_div(&x, &y, &denominator), None);
-    assert_eq!(checked_mul_div_floor(&x, &y, &denominator), None);
-    assert_eq!(checked_mul_div_ceil(&x, &y, &denominator), None);
+    assert_eq!(checked_mul_div(&x, &y, &denominator), Some(expected.clone()));
+    assert_eq!(checked_mul_div_floor(&x, &y, &denominator), Some(expected.clone()));
+    assert_eq!(checked_mul_div_ceil(&x, &y, &denominator), Some(expected.clone()));
     assert_eq!(
         checked_mul_div_with_rounding(x.clone(), y.clone(), denominator.clone(), Rounding::Floor),
-        None
+        Some(expected.clone())
     );
     assert_eq!(
         checked_mul_div_with_rounding(x.clone(), y.clone(), denominator.clone(), Rounding::Ceil),
-        None
+        Some(expected.clone())
     );
-    assert_eq!(checked_mul_div_with_rounding(x, y, denominator, Rounding::Truncate), None);
+    assert_eq!(
+        checked_mul_div_with_rounding(x, y, denominator, Rounding::Truncate),
+        Some(expected)
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_mul_div_min_by_negative_one_panics_untyped() {
+    let env = Env::default();
+    // `I256::MIN / -1` is `2^255`, which has no `I256` representation.
+    // `checked_mul` succeeds and the overflow happens inside the unchecked
+    // division, so this is the one failure the module reports as a native
+    // arithmetic panic rather than a contract error code. Pinned deliberately
+    // rather than fixed: the i128 sibling has the identical trap, and routing
+    // the fast path through the checked helper would re-price every non-overflowing
+    // call.
+    let x: I256 = I256::min_value(&env);
+    let y: I256 = I256::from_i128(&env, 1);
+    let denominator: I256 = I256::from_i128(&env, -1);
+
+    mul_div_floor(&x, &y, &denominator);
+}
+
+#[test]
+fn test_checked_mul_div_min_by_negative_one_returns_none() {
+    let env = Env::default();
+    // The checked counterpart of the case above. Both fail, which is what keeps the
+    // two families in agreement on their domain; only the reporting differs.
+    let x: I256 = I256::min_value(&env);
+    let y: I256 = I256::from_i128(&env, 1);
+    let denominator: I256 = I256::from_i128(&env, -1);
+
+    assert_eq!(checked_mul_div_floor(&x, &y, &denominator), None);
+    assert_eq!(checked_mul_div_ceil(&x, &y, &denominator), None);
+    assert_eq!(checked_mul_div(&x, &y, &denominator), None);
 }
 
 // ################## MULDIV TESTS ##################
