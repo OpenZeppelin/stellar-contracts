@@ -516,7 +516,7 @@ fn validate_expiration_ledger_past() {
 #[test]
 fn sweep_token_success() {
     let e = Env::default();
-    e.mock_all_auths_allowing_non_root_auth();
+    e.mock_all_auths();
 
     let contract_address = e.register(MockContract, ());
     let recipient = Address::generate(&e);
