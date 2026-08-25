@@ -8,13 +8,6 @@
 //
 //     x = q1*D + r1     y = q2*D + r2     (0 <= r1, r2 < D)
 //     floor(x*y/D) = q1*q2*D + q1*r2 + r1*q2 + floor(r1*r2/D)
-//
-// Three of the four terms are bounded by the answer or by an input, so they fit
-// whenever the inputs and the result do. Only `r1*r2` is bounded by D alone,
-// which yields the single condition `|denominator| <= 2^128`. Inside that
-// domain the fallback returns bit-for-bit what a 512-bit intermediate would;
-// outside it the `r1 * r2` multiplication is checked, so the operation rejects
-// rather than returning an incorrect value.
 
 use soroban_sdk::{panic_with_error, Env, I256, U256};
 
@@ -204,27 +197,33 @@ pub fn checked_mul_div(x: &I256, y: &I256, denominator: &I256) -> Option<I256> {
 
 /// Returns the absolute value of `v` as an unsigned `U256` magnitude.
 ///
-/// # Notes
-///
-/// [`checked_mul_div_decomposed`] explains why the decomposition needs absolute
-/// values at all. What forces them to be *unsigned* is narrower: `|I256::MIN|`
-/// is `2^255` while `I256::MAX` stops one short of it, so a signed absolute
-/// value does not always exist, and `I256::MIN` does reach the fallback, for
-/// example `mul_div(I256::MIN, 3, 3)`.
-///
-/// The conversion goes through the big-endian byte encoding because the SDK
-/// offers no other bridge between `I256` and `U256`: there is no `to_parts`, no
-/// bitwise operations and no wrapping arithmetic. `exp_ln.rs` already relies on
-/// the same round-trip for the same kind of reason, a value that fits unsigned
-/// but not signed.
+/// [`checked_mul_div_decomposed`] holds the reasoning: why the decomposition
+/// works on absolute values, why they have to be unsigned, and why the
+/// conversion goes through bytes.
 fn to_magnitude(v: &I256) -> U256 {
     let e = v.env();
     let u = U256::from_be_bytes(e, &v.to_be_bytes());
     if *v < I256::from_i32(e, 0) {
-        // Two's-complement negation without bitwise operations, since the SDK exposes
-        // none: `!u + 1 == (U256::MAX - u) + 1`. A negative `v` reinterprets to
-        // `u >= 2^255`, so `U256::MAX - u <= 2^255 - 1` and neither step can
-        // leave the type.
+        // Two's-complement negation, normally `!u + 1`, done without bitwise operations
+        // because the SDK has none.
+        //
+        // Inverting every bit is the same as subtracting from all-ones. Every bit of
+        // `U256::MAX` is 1, and at each position `1 - bit` yields the flipped bit, so
+        // no position ever borrows from its neighbour and the subtraction is a
+        // bit-for-bit inversion: `U256::MAX - u == !u` exactly. Therefore `-u
+        // == (U256::MAX - u) + 1`.
+        //
+        // In an 8-bit analogue, negating 5: `255 - 5 + 1 == 251 == 0xFB`, and 0xFB read
+        // as an i8 is -5.
+        // Negating 128, which is `|i8::MIN|` and has no positive i8
+        // form, gives `255 - 128 + 1 == 128 == 0x80`, which read as an i8 is
+        // -128.
+        // The same arithmetic at 256 bits is how `|I256::MIN|`, which is `2^255`,
+        // survives the round trip.
+        //
+        // Neither the subtraction nor the addition can leave `U256` here: `v < 0`
+        // reinterprets to `u >= 2^255`, so `U256::MAX - u <= 2^255 - 1`, and adding one
+        // to that stays below `2^256`.
         U256::max_value(e).sub(&u).add(&U256::from_u32(e, 1))
     } else {
         u
@@ -234,37 +233,49 @@ fn to_magnitude(v: &I256) -> U256 {
 /// Converts a `U256` magnitude back to a signed `I256`, applying `negative`,
 /// and returns `None` when the signed value does not fit.
 ///
-/// This is the inverse of [`to_magnitude`] and the point where leaving `I256`'s
-/// range is detected. Magnitude arithmetic ranges over the whole of `U256`, but
-/// only magnitudes up to `2^255` are representable when the result is negative,
-/// and one less than that when it is non-negative.
-///
-/// The bound is compared explicitly against the type's documented range rather
-/// than inferred from a sign mismatch after reinterpretation. Both detect the
-/// same condition and the sign-mismatch form is one operation cheaper, but the
-/// explicit bound is what an auditor can check without reasoning about two's
-/// complement.
-///
-/// # Notes
-///
-/// This helper returns `None`, not `Some(0)`, for a zero magnitude with
-/// `negative` set, because negating zero would carry past `2^256`. That is
-/// sound only because the sole caller cannot produce a zero magnitude: entering
-/// the fallback requires `|x * y| >= 2^255`, and `|denominator| <= 2^255` holds
-/// for every `I256`, so the quotient magnitude is at least one. A future caller
-/// that can reach zero must handle the sign itself.
+/// The inverse of [`to_magnitude`], and the point where leaving `I256`'s range
+/// is caught. Also returns `None`, rather than `Some(0)`, for a zero magnitude
+/// with `negative` set; [`checked_mul_div_decomposed`] covers why that cannot
+/// arise from the fallback and what it means for a test that calls the fallback
+/// directly.
 fn from_magnitude(e: &Env, mag: &U256, negative: bool) -> Option<I256> {
     if negative {
-        // `-I256::MIN` is `2^255`, so a negative result may use the full magnitude.
+        // The largest magnitude any `I256` has is `2^255`, which sits well inside
+        // `U256`. Coming back is different. `U256` reaches `2^256 - 1`, while `I256`
+        // stops at `2^255 - 1` going up and `-2^255` going down, so most of the upper
+        // half of `U256` has no signed counterpart. The magnitude arriving here was
+        // produced by the summation, which is free to exceed the signed range, so it
+        // has to be bounds-checked before it is reinterpreted.
+        //
+        // The limit differs by sign, because the signed range is not symmetric. A
+        // negative result may use the whole `2^255`, since `I256::MIN` is `-2^255`.
+        //
+        // `from_parts` takes four 64-bit limbs, most significant first, so the constant
+        // below is `0x8000_0000_0000_0000 * 2^192`, which is `2^63 * 2^192`, which is
+        // `2^255`.
+        //
+        // The bound is compared explicitly rather than inferred from a sign mismatch
+        // after reinterpretation. An explicit bound and a sign-mismatch check detect
+        // the same condition, and sign-mismatch is one operation cheaper, but
+        // the bound is what an auditor can
+        // check against the type's documented range without reasoning about two's
+        // complement.
         if *mag > U256::from_parts(e, 0x8000_0000_0000_0000, 0, 0, 0) {
             return None;
         }
-        // `checked_add` rather than `add`: negating a zero magnitude would carry past
-        // `2^256`. The note above explains why a zero magnitude cannot reach here.
+        // The same `(U256::MAX - v) + 1` negation as in `to_magnitude`, run the other
+        // way. `checked_add` rather than `add` is what handles a zero magnitude; see
+        // the note on this function for why that case cannot arrive from the
+        // fallback.
         let negated = U256::max_value(e).sub(mag).checked_add(&U256::from_u32(e, 1))?;
+        // The bytes are unchanged; only their interpretation goes from unsigned to
+        // signed.
         Some(I256::from_be_bytes(e, &negated.to_be_bytes()))
     } else {
-        // `I256::MAX` is `2^255 - 1`.
+        // The positive end stops one short of the negative end, at
+        // `I256::MAX == 2^255 - 1`, so this bound is one lower than the one above. In
+        // limbs, `(2^63 - 1) * 2^192` plus all-ones in the remaining three sums to
+        // exactly `2^255 - 1`.
         if *mag > U256::from_parts(e, 0x7fff_ffff_ffff_ffff, u64::MAX, u64::MAX, u64::MAX) {
             return None;
         }
@@ -280,37 +291,70 @@ fn from_magnitude(e: &Env, mag: &U256, negative: bool) -> Option<I256> {
 ///
 /// # Notes
 ///
-/// Everything below works on absolute values (`abs_x`, `abs_y`, `abs_d`), with
-/// the sign reapplied at the end; [`to_magnitude`] explains why absolute values
-/// are needed. Dividing each operand by the denominator gives a quotient and a
-/// remainder:
+/// The fast path in each entry point multiplies first and divides second, so it
+/// gives up whenever `x * y` leaves `I256`, even when `x * y / denominator`
+/// would fit easily. This reaches the same answer without ever forming that
+/// product.
+///
+/// The long path (phantom overflow path) is to divide before multiplying.
+/// Splitting a value by the denominator gives a whole part and a leftover,
+/// and every value has exactly one such split:
 ///
 /// ```text
 /// abs_x = q1 * abs_d + r1        with 0 <= r1 < abs_d
 /// abs_y = q2 * abs_d + r2        with 0 <= r2 < abs_d
 /// ```
 ///
-/// Substituting both into `abs_x * abs_y / abs_d` and expanding gives an exact
-/// identity, writing `rem_product` for `r1 * r2`:
+/// The operands here are absolute values (not positive nor negative), with the
+/// sign reapplied at the very end. Why they must be absolute is explained
+/// further down, just after the identity; take it as given for a moment.
+///
+/// Substituting both splits into the product and expanding gives four terms:
+///
+/// ```text
+/// abs_x * abs_y == (q1*abs_d + r1) * (q2*abs_d + r2)
+///               == q1*q2*abs_d*abs_d + q1*r2*abs_d + r1*q2*abs_d + r1*r2
+/// ```
+///
+/// Every term except `r1*r2` carries a factor of `abs_d`, so dividing the whole
+/// line by `abs_d` cancels that factor exactly and leaves `r1*r2` as the only
+/// term still under a division:
 ///
 /// ```text
 /// abs_x * abs_y / abs_d
 ///     == q1*q2*abs_d + q1*r2 + r1*q2 + rem_product / abs_d
 /// ```
 ///
-/// Both of those substitutions have to be exactly true, or the identity is
-/// derived from a false premise, and that is what forces absolute values. The
-/// two halves of each split come from separate SDK calls:
+/// where `rem_product` is `r1 * r2`. That last line is the identity the
+/// function computes, and its point is that the right-hand side never mentions
+/// `abs_x * abs_y`. All four terms are built only from `q1`, `r1`, `q2`, `r2`
+/// and `abs_d`.
+///
+/// A small case to fix the shape, `7 * 5 / 3`, whose answer is `11`:
+///
+/// ```text
+/// 7 = 2*3 + 1   ->  q1 = 2, r1 = 1
+/// 5 = 1*3 + 2   ->  q2 = 1, r2 = 2
+///
+/// q1*q2*3  +  q1*r2  +  r1*q2  +  (r1*r2)/3
+///    6     +    4    +    1    +      0      == 11
+/// ```
+///
+/// The two split equations, `abs_x = q1 * abs_d + r1` and `abs_y = q2 * abs_d +
+/// r2`, have to hold exactly. If either is off, the expansion above starts from
+/// a false premise and the four terms add up to the wrong number. That
+/// requirement is what forces absolute values, because `q1` and `r1` come from
+/// two separate SDK calls:
 ///
 /// ```text
 /// q1 = abs_x.div(abs_d)           truncates toward zero
 /// r1 = abs_x.rem_euclid(abs_d)    never negative, always in 0 .. abs_d
 /// ```
 ///
-/// On non-negative input those agree, because truncating and rounding down are
-/// the same thing there. On a negative numerator they do not. Splitting `-7` by
-/// `3` is the smallest case that shows it, and there are two ways to do it,
-/// both correct arithmetic:
+/// On a non-negative numerator `div` and `rem_euclid` agree, because truncating
+/// and rounding down are the same thing there. On a negative numerator they do
+/// not. Splitting `-7` by `3` is the smallest case that shows it, and there are
+/// two ways to do it, both correct arithmetic:
 ///
 /// ```text
 /// truncate toward zero:  -7 / 3 = -2.33 -> -2      -7 = (-2 * 3) + (-1)
@@ -323,10 +367,11 @@ fn from_magnitude(e: &Env, mag: &U256, negative: bool) -> Option<I256> {
 /// `div` truncates, so it drops the fraction of `-2.33` and returns the first
 /// row's quotient, `-2`. `rem_euclid` is defined never to return a negative
 /// value, whatever the signs of its operands, so it reports the second row's
-/// remainder, `2`. Each call is right on its own. They just describe different
-/// divisions, and the SDK offers no truncating `rem` that would return the `-1`
-/// belonging to `-2`. Calling both therefore pairs a quotient from one row with
-/// a remainder from the other:
+/// remainder, `2`. Both calls are right on their own; they simply describe
+/// different divisions, and the SDK offers no truncating `rem` that would
+/// return the `-1` belonging to `-2`. Calling `div` and `rem_euclid` together
+/// therefore pairs the truncating row's quotient with the rounding-down row's
+/// remainder:
 ///
 /// ```text
 /// q1 * abs_d + r1  ==  (-2 * 3) + 2  ==  -4        but the numerator was -7
@@ -347,12 +392,24 @@ fn from_magnitude(e: &Env, mag: &U256, negative: bool) -> Option<I256> {
 /// Signed operands are not impossible here, but they would have to derive the
 /// remainder themselves as `x - q * d` rather than call `rem_euclid`.
 ///
-/// The first three terms are whole integers, so the entire fractional part of
-/// the quotient sits in the last one. That is why the truncated magnitude,
+/// The magnitudes are unsigned rather than a signed `abs`, because a signed
+/// absolute value does not always exist. `I256::MIN` is `-2^255` while
+/// `I256::MAX` stops one short of `2^255`, so `|I256::MIN|` is larger than
+/// anything the type holds, and `I256::MIN` does reach this function, for
+/// example through `mul_div(I256::MIN, 3, 3)`. Converting in and
+/// out goes through the big-endian byte encoding because the SDK offers no
+/// other bridge between `I256` and `U256`: there is no `to_parts`, no bitwise
+/// operations and no wrapping arithmetic. `exp_ln.rs` already relies on the
+/// same round-trip, for the same kind of reason.
+///
+/// The terms `q1*q2*abs_d`, `q1*r2` and `r1*q2` are whole integers, so the
+/// entire fractional part of the quotient sits in `rem_product / abs_d`. That
+/// is why the truncated magnitude,
 /// `mag`, is just those three terms plus `floor(rem_product / abs_d)`, and why
 /// `rem_product % abs_d` alone decides whether the result is exact.
 ///
-/// The point of the rearrangement is what bounds each term. `q1*q2*abs_d` is at
+/// What the identity buys, beyond avoiding the product, is what bounds each of
+/// its four terms. `q1*q2*abs_d` is at
 /// most the answer itself, `q1*r2` is at most `abs_x`, and `r1*q2` is at most
 /// `abs_y`, so all three fit whenever the inputs and the answer do. Only
 /// `rem_product` is bounded by the denominator alone, at just under `abs_d *
@@ -363,6 +420,16 @@ fn from_magnitude(e: &Env, mag: &U256, negative: bool) -> Option<I256> {
 /// With `abs_d` at `2^128 - 1` and both remainders maximal, `rem_product`
 /// reaches `2^256 - 2^130 + 4`, twice what `I256` holds and comfortably inside
 /// `U256`.
+///
+/// One edge is worth knowing about. Reapplying a negative sign to a zero
+/// magnitude is not representable by the negation [`from_magnitude`] uses, so
+/// it answers `None` there. That cannot happen on any path a caller reaches:
+/// arriving here at all requires `x * y` to have overflowed, so `|x * y| >=
+/// 2^255`, and `|denominator| <= 2^255` for every `I256`, which
+/// puts the quotient magnitude at one or above. It does happen when this
+/// function is called directly with small operands, where the `None` reads as a
+/// bug rather than as a domain violation. A test doing that has to stay inside
+/// `|x * y| >= |denominator|`, which is the domain production actually reaches.
 ///
 /// `pub(super)` rather than private so that the differential test comparing
 /// this fallback against the fast path, on the domain where both are defined,
@@ -406,10 +473,10 @@ pub(super) fn checked_mul_div_decomposed(
     mag = mag.checked_add(&r1.checked_mul(&q2)?)?;
     mag = mag.checked_add(&rem_product.checked_div(&abs_d)?)?;
 
-    // The first three terms are integers, so the entire fractional part of
-    // `|x * y| / |abs_d|` is carried by `rem_product / abs_d`. Exactness is decided
-    // there alone, and a non-zero `rem_product` does not imply an inexact
-    // result.
+    // `q1*q2*abs_d`, `q1*r2` and `r1*q2` are integers, so the entire fractional
+    // part of `|x * y| / abs_d` is carried by `rem_product / abs_d`. Exactness
+    // is decided there alone, and a non-zero `rem_product` does not imply an
+    // inexact result.
     let exact = rem_product.checked_rem_euclid(&abs_d)? == U256::from_u32(e, 0);
 
     // The result is negative iff an odd number of the three operands are. That
