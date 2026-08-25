@@ -15,6 +15,10 @@ use crate::math::{Rounding, SorobanFixedPointError};
 
 /// Calculates `x * y / denominator` following the specified rounding direction.
 ///
+/// When the intermediate `x * y` overflows `I256`, the result is recovered by
+/// remainder decomposition instead of failing; refer to the module
+/// documentation for the domain.
+///
 /// # Arguments
 ///
 /// * `x` - The first operand.

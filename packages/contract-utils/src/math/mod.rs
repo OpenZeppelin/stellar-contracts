@@ -50,11 +50,12 @@
 //! whose remainders happen to be small still succeeds.
 //!
 //! Phantom overflow handling covers the free functions in
-//! [`i128_fixed_point`] and the `checked_*` methods on [`wad::Wad`]. It does
-//! **not** cover `Wad`'s operator implementations (`+`, `-`, `*`, `/`), which
-//! work directly on `i128` and panic on overflow, because an operator cannot
-//! reach an `Env` to construct the `I256` intermediate. The resulting bounds
-//! are tabulated in the `# Overflow` section on [`wad::Wad`].
+//! [`i128_fixed_point`] and [`i256_fixed_point`], and the `checked_*` methods
+//! on [`wad::Wad`]. It does **not** cover `Wad`'s operator implementations
+//! (`+`, `-`, `*`, `/`), which work directly on `i128` and panic on overflow,
+//! because an operator cannot reach an `Env` to construct the `I256`
+//! intermediate. The resulting bounds are tabulated in the `# Overflow`
+//! section on [`wad::Wad`].
 //!
 //! ## Structure
 //!
