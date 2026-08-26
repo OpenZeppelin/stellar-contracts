@@ -45,7 +45,7 @@ use stellar_tokens::{
         },
         identity_verifier::{storage as identity_verifier, IdentityVerifier},
         utils::token_binder::{self as binder, TokenBinder},
-        IdentityVerifierClient, RWAError, SenderVerification, RWA,
+        IdentityVerifierClient, RWAError, FromVerification, RWA,
     },
 };
 
@@ -107,7 +107,7 @@ impl BenchToken {
                 &from_snapshot,
                 &to_snapshot,
                 amount,
-                SenderVerification::Required,
+                FromVerification::Required,
             );
             Base::update(e, Some(&from), Some(&to), amount);
             ComplianceClient::new(e, &RWA::compliance(e)).transferred(

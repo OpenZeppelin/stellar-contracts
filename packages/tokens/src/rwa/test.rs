@@ -1232,9 +1232,16 @@ fn batch_burn_debits_every_account() {
         assert_eq!(RWA::balance(&e, &first), 60);
         assert_eq!(RWA::balance(&e, &second), 40);
 
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Mint and 1 Burn per
+        // account
         let events = e.events().all();
+        assert_eq!(events.events().len(), 6);
         assert_eq!(
-            events.events().last().unwrap(),
+            events.events().get(4).unwrap(),
+            &Burn { from: first.clone(), amount: 40 }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(5).unwrap(),
             &Burn { from: second.clone(), amount: 60 }.to_xdr(&e, &address)
         );
     });
@@ -1447,9 +1454,16 @@ fn batch_transfer_credits_every_recipient() {
         assert_eq!(RWA::balance(&e, &first), 20);
         assert_eq!(RWA::balance(&e, &second), 30);
 
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Mint + 1 Transfer per
+        // recipient
         let events = e.events().all();
+        assert_eq!(events.events().len(), 5);
         assert_eq!(
-            events.events().last().unwrap(),
+            events.events().get(3).unwrap(),
+            &Transfer { from: from.clone(), to: first.clone(), amount: 20 }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(4).unwrap(),
             &Transfer { from: from.clone(), to: second.clone(), amount: 30 }.to_xdr(&e, &address)
         );
     });
@@ -1525,5 +1539,49 @@ fn batch_transfer_fails_on_the_item_that_overspends() {
         RWA::mint(&e, &from, 15);
 
         RWA::batch_transfer(&e, &from, &vec![&e, first.clone(), second.clone()], &vec![&e, 10, 10]);
+    });
+}
+
+/// A paused token is rejected before any identity work, so the reported error
+/// is `EnforcedPause` and not whatever the identity stack would have said.
+#[test]
+#[should_panic(expected = "Error(Contract, #1000)")]
+fn batch_transfer_reports_pause_ahead_of_identity() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        // Mint while `from` is still verifiable, then take both its identity
+        // and the token away.
+        RWA::mint(&e, &from, 100);
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("id_deny"), &from);
+        });
+        pausable::pause(&e);
+
+        RWA::batch_transfer(&e, &from, &vec![&e, to.clone()], &vec![&e, 10]);
+    });
+}
+
+/// An empty batch is not a way around the pause either.
+#[test]
+#[should_panic(expected = "Error(Contract, #1000)")]
+fn batch_transfer_rejects_an_empty_batch_when_paused() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        pausable::pause(&e);
+
+        RWA::batch_transfer(&e, &from, &Vec::new(&e), &Vec::new(&e));
     });
 }

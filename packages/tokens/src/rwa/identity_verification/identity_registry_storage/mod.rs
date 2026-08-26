@@ -416,9 +416,6 @@ pub trait IdentityRegistryStorage: TokenBinder {
     ///   account.
     /// * `operator` - The address authorizing the invocation.
     ///
-    /// The identity type is not part of the interface, exactly as in
-    /// [`IdentityRegistryStorage::add_identity`]: the implementation decides it.
-    ///
     /// # Errors
     ///
     /// * [`IRSError::BatchSizeMismatch`] - When the three arrays do not all
@@ -441,6 +438,10 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling [`batch_add_identity`] for the
     /// implementation, which validates that the three arrays line up.
+    ///
+    /// The identity type is not part of the interface, exactly as in
+    /// [`IdentityRegistryStorage::add_identity`]: the implementation decides
+    /// it.
     ///
     /// Refer to the batch operations section of the
     /// [RWA module documentation](crate::rwa) for how to size a batch.

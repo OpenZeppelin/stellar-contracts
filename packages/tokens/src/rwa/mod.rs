@@ -129,7 +129,7 @@ mod test;
 
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, String, Vec};
 use stellar_contract_utils::pausable::Pausable;
-pub use storage::{RWAStorageKey, SenderVerification, RWA};
+pub use storage::{FromVerification, RWAStorageKey, RWA};
 
 use crate::fungible::FungibleToken;
 

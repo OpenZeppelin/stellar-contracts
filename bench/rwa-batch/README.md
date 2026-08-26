@@ -26,7 +26,14 @@ Access control is omitted from the bench contracts: an RBAC check is a
 per-call constant that a batch amortises by construction, so it cannot move
 the naive-versus-hoisted comparison.
 
-## Results (soroban-sdk 27.0.2, one required claim topic unless noted)
+## Results (one required claim topic unless noted)
+
+`bench/rwa-batch/Cargo.lock` pins `soroban-sdk` to the same 27.0.2 the
+workspace lock pins, so these figures are measured against the build the
+library ships. The crate is workspace-`exclude`d and CI never rebuilds it, so
+that pin has to be maintained by hand: re-run `cargo update -p soroban-sdk
+--precise <version>` here whenever the workspace SDK moves, and re-measure
+before trusting the numbers below.
 
 Hoisting loop-invariant work out of the per-item body:
 
@@ -45,11 +52,11 @@ possible.
 
 | n | naive (1 topic) | shipped (1 topic) | saving | saving, 2 topics |
 | --- | --- | --- | --- | --- |
-| 1 | 1,960,401 | 1,958,594 | 0% | 0% |
-| 2 | 3,883,461 | 3,206,725 | -17% | -20% |
-| 5 | 10,077,882 | 7,334,647 | -27% | -31% |
-| 10 | 21,600,751 | 15,359,087 | -29% | -33% |
-| 20 | 49,029,314 | 35,559,852 | -27% | -31% |
+| 1 | 1,960,401 | 1,960,504 | 0% | 0% |
+| 2 | 3,883,461 | 3,208,635 | -17% | -20% |
+| 5 | 10,077,882 | 7,336,557 | -27% | -31% |
+| 10 | 21,600,751 | 15,360,997 | -29% | -33% |
+| 20 | 49,029,314 | 35,561,762 | -27% | -31% |
 
 A batch of one costs the same as a single transfer, since the one sender
 verification happens either way.

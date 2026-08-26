@@ -31,18 +31,18 @@ pub enum RWAStorageKey {
 
 pub struct RWA;
 
-/// Who verifies the sender's identity in [`RWA::validate_transfer`].
+/// Who verifies the identity of `from` in [`RWA::validate_transfer`].
 ///
-/// Every item of a batch transfer shares one sender, so verifying it per item
+/// Every item of a batch transfer shares one `from`, so verifying it per item
 /// repeats the same walk through the identity stack. This lets the batch lift
 /// that one check out of its loop while every other check still runs per item,
 /// and while all three transfer entry points keep sharing one validator.
-pub enum SenderVerification {
-    /// Verify the sender as part of this call. What the single-transfer entry
+pub enum FromVerification {
+    /// Verify `from` as part of this call. What the single-transfer entry
     /// points pass.
     Required,
-    /// Skip the sender check, because the caller has already verified the
-    /// sender once for a batch of transfers that all share it.
+    /// Skip the check on `from`, because the caller has already verified it
+    /// once for a batch of transfers that all share it.
     HoistedByCaller,
 }
 
@@ -702,7 +702,7 @@ impl RWA {
             &from_snapshot,
             &to_snapshot,
             amount,
-            SenderVerification::Required,
+            FromVerification::Required,
         );
 
         Base::update(e, Some(from), Some(to), amount);
@@ -749,7 +749,7 @@ impl RWA {
             &from_snapshot,
             &to_snapshot,
             amount,
-            SenderVerification::Required,
+            FromVerification::Required,
         );
 
         Base::spend_allowance(e, from, spender, amount);
@@ -810,8 +810,10 @@ impl RWA {
     /// was just handed. A module granted write access to the identity stack
     /// would break that assumption.
     ///
-    /// The paused state and both wallets' freezing status are checked per item,
-    /// since those reads are cheap enough that hoisting them would buy nothing.
+    /// The paused state is checked once up front so that a paused token is
+    /// rejected before any identity work and regardless of batch size, and
+    /// again per item along with both wallets' freezing status, since those
+    /// reads are cheap enough that skipping them would buy nothing.
     ///
     /// The caller is responsible for sizing the batch to fit the
     /// per-transaction network limits. Refer to the batch operations section of
@@ -821,7 +823,11 @@ impl RWA {
 
         Self::require_equal_lengths(e, recipients.len(), amounts.len());
 
-        // Every item shares one sender, so the walk through the identity stack
+        if paused(e) {
+            panic_with_error!(e, PausableError::EnforcedPause);
+        }
+
+        // Every item shares one `from`, so the walk through the identity stack
         // that verifies it runs once for the batch instead of once per
         // recipient. Every other check stays inside the loop.
         IdentityVerifierClient::new(e, &Self::identity_verifier(e)).verify_identity(from);
@@ -841,7 +847,7 @@ impl RWA {
                 &from_snapshot,
                 &to_snapshot,
                 amount,
-                SenderVerification::HoistedByCaller,
+                FromVerification::HoistedByCaller,
             );
 
             Base::update(e, Some(from), Some(&to), amount);
@@ -1142,8 +1148,8 @@ impl RWA {
     /// * `from` - Snapshot of the sender, as of before the transfer.
     /// * `to` - Snapshot of the receiver, as of before the transfer.
     /// * `amount` - The amount of tokens to transfer.
-    /// * `sender` - Who verifies the sender's identity, refer to
-    ///   [`SenderVerification`].
+    /// * `from_verification` - Who verifies the identity of `from`, refer to
+    ///   [`FromVerification`].
     ///
     /// # Errors
     ///
@@ -1157,7 +1163,7 @@ impl RWA {
     ///
     /// # Security Warning
     ///
-    /// **IMPORTANT**: Passing [`SenderVerification::HoistedByCaller`] skips the
+    /// **IMPORTANT**: Passing [`FromVerification::HoistedByCaller`] skips the
     /// sender's identity check, and is only sound when the caller has verified
     /// that same sender earlier in the invocation (i.e. batched operations).
     pub fn validate_transfer(
@@ -1165,7 +1171,7 @@ impl RWA {
         from: &AccountSnapshot,
         to: &AccountSnapshot,
         amount: i128,
-        sender: SenderVerification,
+        from_verification: FromVerification,
     ) {
         // Check if contract is paused
         if paused(e) {
@@ -1184,7 +1190,7 @@ impl RWA {
 
         let identity_verifier_addr = Self::identity_verifier(e);
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
-        if matches!(sender, SenderVerification::Required) {
+        if matches!(from_verification, FromVerification::Required) {
             identity_verifier_client.verify_identity(&from.address);
         }
         identity_verifier_client.verify_identity(&to.address);
