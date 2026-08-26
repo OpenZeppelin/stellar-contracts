@@ -114,7 +114,7 @@ The indexer is trusted for **availability and completeness only** — never for 
 
 - **Confidentiality.** Everything the indexer holds is public chain data: commitments, masked ciphertexts, and ECDH ephemerals. A curious indexer learns nothing beyond what any chain observer sees (DESIGN_cont §9).
 - **Integrity fails closed.** Recovery ends with the wallet checking its reconstructed openings against the **on-chain** commitments (`C_spend =? v·G + r·H`, DESIGN §5.2 step 7). A tampered or incomplete history cannot produce a wrong balance that verifies; it produces a detectable mismatch.
-- **Withholding is the residual risk.** A malicious or broken indexer can deny recovery (a liveness failure, not a soundness one). Two structural mitigations: for the recent window the RPC is an independent source of the same events (the hybrid split of §1), so archive withholding bites only the pre-window history; and for that older history wallets SHOULD support multiple independent archive endpoints, with deployments running or contracting at least two.
+- **Withholding is the residual risk.** A malicious or broken indexer can deny recovery (a liveness failure, not a soundness one). Two structural mitigations: for the recent window the RPC is an independent source of the same events (the hybrid split of §1), so archive withholding bites only the pre-window history; and for that older history wallets SHOULD support multiple independent archive endpoints, with deployments running or contracting at least two. The auditor's forward-tracked openings (DESIGN_cont §8.1) are a second recovery source in principle, but no specification defines an auditor-to-wallet channel, so they do not relax this recommendation.
 
 ## 8. Conformance and Versioning
 

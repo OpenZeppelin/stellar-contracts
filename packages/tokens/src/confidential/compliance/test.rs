@@ -191,6 +191,7 @@ fn withdraw_payload(e: &Env) -> WithdrawPayload {
         r_e_point: pt(e),
         sigma: fr(e),
         b_tilde_aud_s: fr(e),
+        r_tilde_aud_s: fr(e),
     }
 }
 
@@ -206,6 +207,7 @@ fn transfer_payload(e: &Env) -> TransferPayload {
         r_tilde_aud_r: fr(e),
         v_tilde_aud_s: fr(e),
         b_tilde_aud_s: fr(e),
+        r_tilde_aud_s: fr(e),
     }
 }
 
@@ -221,6 +223,7 @@ fn spender_transfer_payload(e: &Env) -> SpenderTransferPayload {
         r_tilde_aud_r: fr(e),
         v_tilde_aud_s: fr(e),
         a_tilde_aud_s: fr(e),
+        dvk_cipher_aud: fr(e),
     }
 }
 
@@ -236,6 +239,8 @@ fn set_spender_payload(e: &Env) -> SetSpenderPayload {
         sigma_a: fr(e),
         v_tilde_aud_s: fr(e),
         b_tilde_aud_s: fr(e),
+        r_tilde_aud_s: fr(e),
+        dvk_cipher_aud: fr(e),
     }
 }
 

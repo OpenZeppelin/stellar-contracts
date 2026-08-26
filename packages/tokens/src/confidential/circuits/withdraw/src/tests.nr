@@ -1,7 +1,7 @@
 use crate::main;
 use stellar_confidential_lib::{
-    commit, derive_spend_r, ecdh, encrypt_auditor_sender_balance, encrypt_balance, H, scalar_mul,
-    vk_from_sk,
+    commit, derive_spend_r, domain, ecdh, encrypt_auditor_sender_balance, encrypt_balance, H,
+    scalar_mul, sponge_squeeze_3, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 
@@ -58,6 +58,9 @@ global R_E_X: Field = 0x114ed4fcf2c57014eb678c577aa02f30ef590b713d7a6a5e87702d1c
 global R_E_Y: Field = 0x07a70cf826350d4f438c7a3c5e8761b0ae6cb63de757f0c96815f4057b9205f4;
 global B_TILDE_AUD_S: Field =
     0x288ff48898f218dbba2a5c9546d0986af3257a4a539e23e4f35c404d6720c07c;
+// Lane-2 secret-escrow slot: r_tilde_aud_s = r' + m_r, over W5's r'.
+global R_TILDE_AUD_S: Field =
+    0x12bae1b1e1b12493e37d427d3ee28b481c37f7f456c4ab0c022b8ba6262ca57f;
 
 #[test]
 fn print_fixtures() {
@@ -73,6 +76,7 @@ fn print_fixtures() {
     let r_e_pt = scalar_mul(R_E, H);
     let s_a_s = ecdh(R_E, k_aud_s);
     let b_tilde_aud_s = encrypt_auditor_sender_balance(V_NEW, s_a_s, SIGMA);
+    let r_tilde_aud_s = r_new + sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA)[2];
     let cx = c_new.x;
     let cy = c_new.y;
     let kx = k_aud_s.x;
@@ -87,6 +91,7 @@ fn print_fixtures() {
     println(f"R_E_X = {rx}");
     println(f"R_E_Y = {ry}");
     println(f"B_TILDE_AUD_S = {b_tilde_aud_s}");
+    println(f"R_TILDE_AUD_S = {r_tilde_aud_s}");
 }
 
 #[test]
@@ -113,11 +118,15 @@ fn withdraw_auditor_fixtures_match_lib() {
     let r_e_pt = scalar_mul(R_E, H);
     let s_a_s = ecdh(R_E, k_aud_s);
     let b_tilde_aud_s = encrypt_auditor_sender_balance(V_NEW, s_a_s, SIGMA);
+    let vk = vk_from_sk(SK, ADDR_F);
+    let r_new = derive_spend_r(vk, SIGMA);
+    let r_tilde_aud_s = r_new + sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA)[2];
     assert(k_aud_s.x == K_AUD_S_X);
     assert(k_aud_s.y == K_AUD_S_Y);
     assert(r_e_pt.x == R_E_X);
     assert(r_e_pt.y == R_E_Y);
     assert(b_tilde_aud_s == B_TILDE_AUD_S);
+    assert(r_tilde_aud_s == R_TILDE_AUD_S);
 }
 
 #[test]
@@ -142,6 +151,7 @@ fn matches_fixture() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -157,6 +167,7 @@ fn full_withdrawal() {
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
     let b_tilde_aud_s = encrypt_auditor_sender_balance(0, s_a_s, SIGMA);
+    let r_tilde_aud_s = r_new + sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA)[2];
     main(
         SK,
         V,
@@ -177,6 +188,7 @@ fn full_withdrawal() {
         R_E_X,
         R_E_Y,
         b_tilde_aud_s,
+        r_tilde_aud_s,
     );
 }
 
@@ -191,6 +203,8 @@ fn rejects_under_funded_withdrawal() {
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
     let b_tilde_aud_s_invalid = encrypt_auditor_sender_balance(V - a_too_large, s_a_s, SIGMA);
+    let r_tilde_aud_s_invalid =
+        r_new + sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA)[2];
     main(
         SK,
         V,
@@ -211,6 +225,7 @@ fn rejects_under_funded_withdrawal() {
         R_E_X,
         R_E_Y,
         b_tilde_aud_s_invalid,
+        r_tilde_aud_s_invalid,
     );
 }
 
@@ -243,6 +258,7 @@ fn rejects_v_out_of_range() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -270,6 +286,7 @@ fn rejects_a_out_of_range() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -295,6 +312,7 @@ fn rejects_wrong_sk() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -320,6 +338,7 @@ fn rejects_wrong_balance_opening() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -345,6 +364,7 @@ fn rejects_wrong_addr_f() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -370,6 +390,7 @@ fn rejects_tampered_b_tilde() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -395,6 +416,7 @@ fn rejects_tampered_c_spend_new() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -422,6 +444,7 @@ fn rejects_r_e_zero() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -449,6 +472,7 @@ fn rejects_wrong_r_e() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -476,6 +500,7 @@ fn rejects_off_curve_k_aud_s() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -503,6 +528,7 @@ fn rejects_identity_k_aud_s() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -532,6 +558,7 @@ fn rejects_tampered_b_tilde_aud_s() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S + 1,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -560,5 +587,6 @@ fn rejects_wrong_k_aud_s() {
         R_E_X,
         R_E_Y,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
     );
 }

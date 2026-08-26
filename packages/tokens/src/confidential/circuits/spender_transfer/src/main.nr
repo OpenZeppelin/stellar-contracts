@@ -1,6 +1,6 @@
 use stellar_confidential_lib::{
     H, assert_on_curve_non_identity, commit, derive_allow_r, derive_transfer_blind, domain, ecdh,
-    encrypt_allowance, encrypt_amount, scalar_mul, sponge_squeeze_2,
+    encrypt_allowance, encrypt_amount, scalar_mul, sponge_squeeze_2, sponge_squeeze_3,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 
@@ -86,16 +86,36 @@ mod tests;
 //                                                           OWNER, not the
 //                                                           spender (Section
 //                                                           8.4).
-//   O_a6 (m_v_s, m_a_s)
-//                  = SpongeSqueeze_2(delta_aud_s,
+//   O_a6 (m_v_s, m_a_s, m_r_s)
+//                  = SpongeSqueeze_3(delta_aud_s,
 //                                    s_{a,s}, sigma_a)      Owner-channel
-//                                                           sponge: two masks.
+//                                                           sponge: three masks.
 //   O_a7 v_tilde_aud_s = v_transfer + m_v_s                       Owner-auditor
 //                                                           encrypted amount.
 //   O_a8 a_tilde_aud_s = (v_a - v_transfer) + m_a_s               Owner-auditor
 //                                                           encrypted
 //                                                           post-transfer
 //                                                           allowance.
+//   O_a9 dvk_cipher_aud = dvk_i + m_r_s                     Owner-auditor
+//                                                           re-escrow of the
+//                                                           delegation viewing
+//                                                           key. dvk_i is
+//                                                           already a witness
+//                                                           (O2), so this is
+//                                                           one field addition.
+//                                                           Buys one-operation
+//                                                           convergence for a
+//                                                           live delegation
+//                                                           whose auditor key
+//                                                           rotated after
+//                                                           set_spender -- the
+//                                                           same property every
+//                                                           other auditor
+//                                                           ciphertext has. It
+//                                                           does nothing for a
+//                                                           frozen account,
+//                                                           which emits no
+//                                                           ciphertext at all.
 //
 // Contract binding (Section 7.8 final paragraph)
 // ---------------------------------------------
@@ -132,7 +152,7 @@ mod tests;
 // explicitly validates both on-curve AND non-identity before the
 // corresponding ECDH consumes them.
 //
-// Public inputs (24 fields, in design-doc canonical order)
+// Public inputs (25 fields, in design-doc canonical order)
 // --------------------------------------------------------
 //   Idx  Param                Symbol            Source / Note
 //   ---  -----                ------            -------------------------------
@@ -177,6 +197,8 @@ mod tests;
 //   23   a_tilde_aud_s        a_tilde_aud_s     Prover-supplied owner-auditor
 //                                                 encrypted post-transfer
 //                                                 allowance; emitted.
+//   24   dvk_cipher_aud       dvk_cipher_aud    Prover-supplied owner-auditor
+//                                                 re-escrow of dvk_i; emitted.
 //
 // Private witnesses
 // -----------------
@@ -220,6 +242,7 @@ fn main(
     r_tilde_aud_r: pub Field,
     v_tilde_aud_s: pub Field,
     a_tilde_aud_s: pub Field,
+    dvk_cipher_aud: pub Field,
 ) {
     // O13 -- runs first so the r_e = 0 attack is rejected before any
     // scalar mul against it could quietly produce the identity.
@@ -308,12 +331,17 @@ fn main(
     // O_a5 (owner-auditor shared-secret scalar)
     let s_a_s = ecdh(r_e, k_aud_s);
 
-    // O_a6 (owner-channel masks: amount, then post-transfer allowance)
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, sigma_a);
+    // O_a6 (owner-channel masks: amount, post-transfer allowance, then the
+    // secret-escrow slot)
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, sigma_a);
 
     // O_a7
     assert(v_transfer + m_s[0] == v_tilde_aud_s);
 
     // O_a8
     assert(v_a_new + m_s[1] == a_tilde_aud_s);
+
+    // O_a9 -- dvk_i is already a private witness (O2), so this is one field
+    // addition: zero scalar muls, no new domain tag.
+    assert(dvk_i + m_s[2] == dvk_cipher_aud);
 }

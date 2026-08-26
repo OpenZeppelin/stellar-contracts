@@ -1,7 +1,7 @@
 use crate::main;
 use stellar_confidential_lib::{
     commit, derive_allow_r, derive_transfer_blind, domain, ecdh, encrypt_allowance, encrypt_amount, H,
-    scalar_mul, sponge_squeeze_2,
+    scalar_mul, sponge_squeeze_2, sponge_squeeze_3,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 
@@ -70,6 +70,10 @@ global R_TILDE_AUD_R: Field =
     0x16cb31d142cf3005f8bd95ab3f59c3bda0da0de7e1d2ac16b4d038548a02b364;
 global V_TILDE_AUD_S: Field =
     0x0d0a3aa77960977737f4355093d4672ea9f95556fabf63bda0913ebef52c42cf;
+// Lane-2 secret-escrow slot (O_a9): the delegation viewing key, re-escrowed
+// to the owner's auditor on every spender transfer.
+global DVK_CIPHER_AUD: Field =
+    0x10a1e8766310b1369a48b22e12f01b8610041bf25bc1807d01812491f9702f57;
 global A_TILDE_AUD_S: Field =
     0x288ff48898f218dbba2a5c9546d0986af3257a4a539e23e4f35c404d6720c144;
 
@@ -103,9 +107,10 @@ fn print_fixtures() {
     let r_tilde_aud_r = r_transfer + m_r[1];
 
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
     let v_tilde_aud_s = V_TRANSFER + m_s[0];
     let a_tilde_aud_s = V_A_NEW + m_s[1];
+    let dvk_cipher_aud = DVK_I + m_s[2];
 
     let yopx = y_op.x;
     let yopy = y_op.y;
@@ -146,6 +151,7 @@ fn print_fixtures() {
     println(f"R_TILDE_AUD_R = {r_tilde_aud_r}");
     println(f"V_TILDE_AUD_S = {v_tilde_aud_s}");
     println(f"A_TILDE_AUD_S = {a_tilde_aud_s}");
+    println(f"DVK_CIPHER_AUD = {dvk_cipher_aud}");
 }
 
 #[test]
@@ -188,7 +194,7 @@ fn spender_transfer_auditor_fixtures_match_lib() {
     let s_a_r = ecdh(R_E, k_aud_r);
     let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, SIGMA_A);
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
 
     assert(k_aud_r.x == K_AUD_R_X);
     assert(k_aud_r.y == K_AUD_R_Y);
@@ -200,6 +206,7 @@ fn spender_transfer_auditor_fixtures_match_lib() {
     assert(r_transfer + m_r[1] == R_TILDE_AUD_R);
     assert(V_TRANSFER + m_s[0] == V_TILDE_AUD_S);
     assert(V_A_NEW + m_s[1] == A_TILDE_AUD_S);
+    assert(DVK_I + m_s[2] == DVK_CIPHER_AUD);
 }
 
 // `run_main` accepts every public input as a parameter -- nothing baked in.
@@ -238,6 +245,7 @@ fn run_main(
     r_tilde_aud_r_in: Field,
     v_tilde_aud_s_in: Field,
     a_tilde_aud_s_in: Field,
+    dvk_cipher_aud_in: Field,
 ) {
     main(
         sk_op_in,
@@ -270,6 +278,7 @@ fn run_main(
         r_tilde_aud_r_in,
         v_tilde_aud_s_in,
         a_tilde_aud_s_in,
+        dvk_cipher_aud_in,
     );
 }
 
@@ -305,6 +314,7 @@ fn run_fixture() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -342,7 +352,7 @@ fn second_transfer_against_same_allowance() {
     let s_a_r = ecdh(r_e_2, k_aud_r);
     let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, SIGMA_A);
     let s_a_s = ecdh(r_e_2, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
 
     run_main(
         SK_OP,
@@ -375,6 +385,7 @@ fn second_transfer_against_same_allowance() {
         r_transfer + m_r[1],
         v_transfer_2 + m_s[0],
         v_a_new_2 + m_s[1],
+        DVK_I + m_s[2],
     );
 }
 
@@ -399,7 +410,7 @@ fn full_allowance_transfer() {
     let s_a_r = ecdh(R_E, k_aud_r);
     let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, SIGMA_A);
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
 
     run_main(
         SK_OP,
@@ -432,6 +443,7 @@ fn full_allowance_transfer() {
         r_transfer + m_r[1],
         V_A + m_s[0],
         0 + m_s[1],
+        DVK_I + m_s[2],
     );
 }
 
@@ -469,6 +481,7 @@ fn rejects_wrong_sk_op() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -542,6 +555,7 @@ fn rejects_wrong_dvk_against_contract() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -557,7 +571,7 @@ fn rejects_wrong_allowance_opening() {
     let c_a_new_bad = commit(v_a_new_bad, r_a_new);
     let a_tilde_new_bad = encrypt_allowance(v_a_new_bad, DVK_I, SIGMA_A_NEW);
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
 
     run_main(
         SK_OP,
@@ -590,6 +604,7 @@ fn rejects_wrong_allowance_opening() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         v_a_new_bad + m_s[1],
+        DVK_I + m_s[2],
     );
 }
 
@@ -615,7 +630,7 @@ fn rejects_v_a_new_out_of_range() {
     let s_a_r = ecdh(R_E, k_aud_r);
     let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, SIGMA_A);
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
 
     run_main(
         SK_OP,
@@ -648,6 +663,7 @@ fn rejects_v_a_new_out_of_range() {
         r_transfer + m_r[1],
         v_transfer_too_large + m_s[0],
         (V_A - v_transfer_too_large) + m_s[1],
+        DVK_I + m_s[2],
     );
 }
 
@@ -669,7 +685,7 @@ fn rejects_v_a_out_of_range() {
     let c_a_new = commit(v_a_new_huge, r_a_new);
     let a_tilde_new = encrypt_allowance(v_a_new_huge, DVK_I, SIGMA_A_NEW);
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
 
     run_main(
         SK_OP,
@@ -702,6 +718,7 @@ fn rejects_v_a_out_of_range() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         v_a_new_huge + m_s[1],
+        DVK_I + m_s[2],
     );
 }
 
@@ -727,7 +744,7 @@ fn rejects_v_transfer_out_of_range() {
     let s_a_r = ecdh(R_E, k_aud_r);
     let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, SIGMA_A);
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
 
     run_main(
         SK_OP,
@@ -760,6 +777,7 @@ fn rejects_v_transfer_out_of_range() {
         r_transfer + m_r[1],
         v_transfer_huge + m_s[0],
         v_a_new_huge + m_s[1],
+        DVK_I + m_s[2],
     );
 }
 
@@ -800,6 +818,7 @@ fn rejects_wrong_recipient_pvk() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -847,6 +866,7 @@ fn rejects_poisoned_c_transfer() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -884,6 +904,7 @@ fn rejects_tampered_v_tilde() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -929,6 +950,7 @@ fn rejects_tampered_a_tilde_new() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -966,6 +988,7 @@ fn rejects_tampered_c_a_new() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1013,6 +1036,7 @@ fn rejects_sigma_a_new_equal_to_sigma_a() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1039,7 +1063,7 @@ fn rejects_r_e_zero() {
     let s_a_r_zero = ecdh(0, k_aud_r);
     let m_r_zero = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_zero, SIGMA_A);
     let s_a_s_zero = ecdh(0, k_aud_s);
-    let m_s_zero = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_zero, SIGMA_A);
+    let m_s_zero = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s_zero, SIGMA_A);
 
     run_main(
         SK_OP,
@@ -1072,6 +1096,7 @@ fn rejects_r_e_zero() {
         r_transfer_zero + m_r_zero[1],
         V_TRANSFER + m_s_zero[0],
         V_A_NEW + m_s_zero[1],
+        DVK_I + m_s_zero[2],
     );
 }
 
@@ -1095,7 +1120,7 @@ fn rejects_wrong_r_e() {
     let s_a_r_bad = ecdh(r_e_bad, k_aud_r);
     let m_r_bad = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_bad, SIGMA_A);
     let s_a_s_bad = ecdh(r_e_bad, k_aud_s);
-    let m_s_bad = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_bad, SIGMA_A);
+    let m_s_bad = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s_bad, SIGMA_A);
 
     run_main(
         SK_OP,
@@ -1128,6 +1153,7 @@ fn rejects_wrong_r_e() {
         r_transfer_bad + m_r_bad[1],
         V_TRANSFER + m_s_bad[0],
         V_A_NEW + m_s_bad[1],
+        DVK_I + m_s_bad[2],
     );
 }
 
@@ -1166,6 +1192,7 @@ fn rejects_off_curve_k_aud_r() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1204,6 +1231,7 @@ fn rejects_identity_k_aud_r() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1240,6 +1268,7 @@ fn rejects_off_curve_k_aud_s() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1276,6 +1305,7 @@ fn rejects_identity_k_aud_s() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1313,6 +1343,7 @@ fn rejects_tampered_v_tilde_aud_r() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1350,6 +1381,7 @@ fn rejects_tampered_r_tilde_aud_r() {
         R_TILDE_AUD_R + 1,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1387,6 +1419,7 @@ fn rejects_tampered_v_tilde_aud_s() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S + 1,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1424,6 +1457,7 @@ fn rejects_tampered_a_tilde_aud_s() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S + 1,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1462,6 +1496,7 @@ fn rejects_wrong_k_aud_r() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1500,5 +1535,6 @@ fn rejects_wrong_k_aud_s() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }

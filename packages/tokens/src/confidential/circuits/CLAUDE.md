@@ -26,7 +26,7 @@ It appears in all fourteen `Nargo.toml` files and looks like a mistake. Nargo re
 
 ### Do not prune unused public inputs
 
-`_acct_f` in `register/src/main.nr` is referenced by no gate and looks like dead code. It is the replay binding: UltraHonk absorbs every public input into the transcript, so a proof produced for one account fails when the contract assembles the blob for another. Removing it lets anyone replay a legitimate registration's published proof and payload to mint duplicate-key accounts. Each operation circuit declares its exact public-input count in a header comment — withdraw 15, revoke_spender 19, transfer / set_spender / spender_transfer 24 — and the count is part of the contract with the on-chain assembler.
+`_acct_f` in `register/src/main.nr` is referenced by no gate and looks like dead code. It is the replay binding: UltraHonk absorbs every public input into the transcript, so a proof produced for one account fails when the contract assembles the blob for another. Removing it lets anyone replay a legitimate registration's published proof and payload to mint duplicate-key accounts. Each operation circuit declares its exact public-input count in a header comment — withdraw 16, revoke_spender 19, transfer / spender_transfer 25, set_spender 26 — and the count is part of the contract with the on-chain assembler.
 
 ### Package names are load-bearing
 
@@ -36,7 +36,9 @@ Directory `transfer/` is package `circuit_transfer`; `gadgets/commit/` is `gadge
 
 `poseidon_with_domain` is the only Poseidon entry point in `lib/src/lib.nr`; calling the underlying hash directly is a violation of the library contract. The domain tag is always the first absorbed element. The numeric tag values are the cross-language contract with the SDK — see `../CLAUDE.md` and `docs/DESIGN_cont.md` §13, which is their only authoritative source.
 
-Sponge parameters: width 4, rate 3, capacity 1, `iv = len · 2^64`. Empty input still applies the squeeze permutation, matching the on-chain sponge. The two-lane squeeze order is fixed — **index 0 is always an amount mask, index 1 always a balance/allowance/randomness mask** — and `encrypt_auditor_sender_balance` deliberately takes the second lane so a balance checkpoint can never share a pad with an amount ciphertext under `(r_e, σ)` reuse. `sponge_squeeze_2(d,s,σ)[0]` must stay equal to `poseidon_with_domain(d,[s,σ])`.
+Sponge parameters: width 4, rate 3, capacity 1, `iv = len · 2^64`. Empty input still applies the squeeze permutation, matching the on-chain sponge. The squeeze order is fixed — **lane 0 is always an amount mask, lane 1 always a balance/allowance/randomness mask, lane 2 always the sender-auditor secret-escrow slot** — and `encrypt_auditor_sender_balance` deliberately takes lane 1 so a balance checkpoint can never share a pad with an amount ciphertext under `(r_e, σ)` reuse. `sponge_squeeze_2(d,s,σ)[0]` must stay equal to `poseidon_with_domain(d,[s,σ])`, and `sponge_squeeze_3(d,s,σ)[0..2]` must stay equal to `sponge_squeeze_2(d,s,σ)` — the absorb fits one rate-3 block, so both read the same permutation, and a divergence would silently change every existing mask.
+
+Only `AUDITOR_SENDER` (11) is squeezed three-wide; `AUDITOR_RECIPIENT` (12) stays at two lanes. Lane 2 carries a *different plaintext per operation* — the new spendable blinding on checkpoints, `dvk_i` on spender transfers — which is not pad reuse, because the pad is keyed by a per-operation-fresh `(s_{a,s}, σ)`.
 
 ECDH must absorb both `S.x` and `S.y`; x-only extraction collapses `P` and `-P`.
 
@@ -56,7 +58,7 @@ LC_ALL=C nargo info | grep '^|' | LC_ALL=C sort > constraints.baseline
 
 `LC_ALL=C` is mandatory on **both** sides of the pipe — byte order is the only ordering stable between macOS and the Ubuntu runner. The redirect overwrites the file's header comments; re-paste them, because CI's failure message asks for them.
 
-Two non-obvious consequences: adding or removing a **gadget** changes the baseline even when no circuit logic changed, and the ACIR opcode counts are quoted in prose at `../docs/DESIGN_cont.md` §10.3 (Register 33, Withdraw 94, RevokeSpender 123, SetSpender 131, Transfer 133, SpenderTransfer 135). Nothing enforces that second copy — update it in the same PR.
+Two non-obvious consequences: adding or removing a **gadget** changes the baseline even when no circuit logic changed, and the ACIR opcode counts are quoted in prose at `../docs/DESIGN_cont.md` §10.3 (Register 33, Withdraw 95, RevokeSpender 123, Transfer 134, SetSpender 135, SpenderTransfer 136). Nothing enforces that second copy — update it in the same PR.
 
 ### `vks/`
 
@@ -76,7 +78,7 @@ Fixtures are not auto-generated. Changing a primitive is a three-step lockstep:
 2. Update the matching `testdata/*.json`
 3. Update the hardcoded expected values in the `fixtures_match_testdata` test in `lib/src/tests.nr`
 
-`fixtures_match_testdata` is the in-Noir guard that fails CI. The sponge vectors are additionally hoisted into `global SPONGE_SQUEEZE_2_*` constants in the same file — a fourth site.
+`fixtures_match_testdata` is the in-Noir guard that fails CI. The sponge vectors are additionally hoisted into `global SPONGE_SQUEEZE_2_*` / `SPONGE_SQUEEZE_3_*` constants in the same file — a fourth site.
 
 `address_to_field.json` is the exception. That derivation has no Noir implementation at all (circuits take `addr_f` as an opaque public input), so it is the one primitive with two independent implementations. Its guard is the Rust test `address_to_field_matches_testdata_vectors` in `../test.rs`, which **transcribes the hex values as string literals** rather than reading the JSON — update both together or neither. Its inputs are 56-character SEP-23 strkeys, and the lo/hi 28-byte limbs are little-endian.
 

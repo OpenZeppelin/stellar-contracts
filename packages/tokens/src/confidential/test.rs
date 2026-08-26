@@ -219,6 +219,7 @@ fn withdraw_data(e: &Env) -> Bytes {
             r_e_point: fixture_point(e),
             sigma: fixture_field(e, 0xbb),
             b_tilde_aud_s: fixture_field(e, 0xcc),
+            r_tilde_aud_s: fixture_field(e, 0xdd),
         },
         proof: Bytes::new(e),
     }
@@ -238,6 +239,7 @@ fn transfer_data(e: &Env) -> Bytes {
             r_tilde_aud_r: fixture_field(e, 0x15),
             v_tilde_aud_s: fixture_field(e, 0x16),
             b_tilde_aud_s: fixture_field(e, 0x17),
+            r_tilde_aud_s: fixture_field(e, 0x18),
         },
         proof: Bytes::new(e),
     }
@@ -257,6 +259,8 @@ fn set_spender_data(e: &Env) -> Bytes {
             sigma_a: fixture_field(e, 0x24),
             v_tilde_aud_s: fixture_field(e, 0x25),
             b_tilde_aud_s: fixture_field(e, 0x26),
+            r_tilde_aud_s: fixture_field(e, 0x27),
+            dvk_cipher_aud: fixture_field(e, 0x28),
         },
         proof: Bytes::new(e),
     }
@@ -276,6 +280,7 @@ fn spender_transfer_data(e: &Env) -> Bytes {
             r_tilde_aud_r: fixture_field(e, 0x35),
             v_tilde_aud_s: fixture_field(e, 0x36),
             a_tilde_aud_s: fixture_field(e, 0x37),
+            dvk_cipher_aud: fixture_field(e, 0x38),
         },
         proof: Bytes::new(e),
     }
@@ -384,6 +389,7 @@ fn withdraw_non_canonical_scalar_panics() {
             r_e_point: fixture_point(&h.e),
             sigma: BytesN::from_array(&h.e, &[0xff; 32]),
             b_tilde_aud_s: fixture_field(&h.e, 0x12),
+            r_tilde_aud_s: fixture_field(&h.e, 0x13),
         },
         proof: Bytes::new(&h.e),
     }

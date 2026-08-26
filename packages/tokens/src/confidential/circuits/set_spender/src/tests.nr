@@ -1,7 +1,8 @@
 use crate::main;
 use stellar_confidential_lib::{
     commit, derive_allow_r, derive_spend_r, domain, dvk_from_vk_op, ecdh, encrypt_allowance,
-    encrypt_balance, encrypt_esc_dvk, H, scalar_mul, sponge_squeeze_2, vk_from_sk,
+    encrypt_balance, encrypt_esc_dvk, encrypt_esc_dvk_auditor, H, scalar_mul,
+    sponge_squeeze_3, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 
@@ -83,6 +84,11 @@ global ESCROWED_DVK_CIPHER: Field =
     0x1ef89e3bd93ec1afed649d150e9d0ff5df72002759e260cb66b06604a4d7ebe0;
 global V_TILDE_AUD_S: Field =
     0x0d0a3aa77960977737f4355093d4672ea9f95556fabf63bda0913ebef52c4397;
+// Lane-2 secret-escrow slot (S_a6) and the auditor-side dvk escrow (S14).
+global R_TILDE_AUD_S: Field =
+    0x12bae1b1e1b12493e37d427d3ee28b481c37f7f456c4ab0c022b8ba6262ca57f;
+global DVK_CIPHER_AUD: Field =
+    0x18dc4199771af4fe37c1993b95c8d3188fc0a58080185b4939d359555a6799e1;
 global B_TILDE_AUD_S: Field =
     0x288ff48898f218dbba2a5c9546d0986af3257a4a539e23e4f35c404d6720c07c;
 
@@ -109,9 +115,11 @@ fn print_fixtures() {
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     let v_tilde_aud_s = V_A + m_s[0];
     let b_tilde_aud_s = V_NEW + m_s[1];
+    let r_tilde_aud_s = r_new + m_s[2];
+    let dvk_cipher_aud = encrypt_esc_dvk_auditor(dvk, s_a_s, OP_I);
 
     let yopx = y_op.x;
     let yopy = y_op.y;
@@ -138,6 +146,8 @@ fn print_fixtures() {
     println(f"R_E_Y = {rey}");
     println(f"V_TILDE_AUD_S = {v_tilde_aud_s}");
     println(f"B_TILDE_AUD_S = {b_tilde_aud_s}");
+    println(f"R_TILDE_AUD_S = {r_tilde_aud_s}");
+    println(f"DVK_CIPHER_AUD = {dvk_cipher_aud}");
 }
 
 #[test]
@@ -178,7 +188,8 @@ fn set_spender_auditor_fixtures_match_lib() {
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let r_new = derive_spend_r(vk, SIGMA);
 
     assert(k_aud_s.x == K_AUD_S_X);
     assert(k_aud_s.y == K_AUD_S_Y);
@@ -187,6 +198,8 @@ fn set_spender_auditor_fixtures_match_lib() {
     assert(escrowed_dvk_cipher == ESCROWED_DVK_CIPHER);
     assert(V_A + m_s[0] == V_TILDE_AUD_S);
     assert(V_NEW + m_s[1] == B_TILDE_AUD_S);
+    assert(r_new + m_s[2] == R_TILDE_AUD_S);
+    assert(encrypt_esc_dvk_auditor(dvk, s_a_s, OP_I) == DVK_CIPHER_AUD);
 }
 
 // `run_main` accepts all 24 public inputs as parameters -- nothing baked in.
@@ -224,6 +237,8 @@ fn run_main(
     r_e_y_in: Field,
     v_tilde_aud_s_in: Field,
     b_tilde_aud_s_in: Field,
+    r_tilde_aud_s_in: Field,
+    dvk_cipher_aud_in: Field,
 ) {
     main(
         sk_in,
@@ -255,6 +270,8 @@ fn run_main(
         r_e_y_in,
         v_tilde_aud_s_in,
         b_tilde_aud_s_in,
+        r_tilde_aud_s_in,
+        dvk_cipher_aud_in,
     );
 }
 
@@ -289,6 +306,8 @@ fn run_fixture() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -316,7 +335,7 @@ fn full_allowance_escrow() {
     let escrowed_dvk_cipher = encrypt_esc_dvk(dvk, s_esc, OP_I);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         V,
@@ -347,6 +366,8 @@ fn full_allowance_escrow() {
         R_E_Y,
         V + m_s[0],
         0 + m_s[1],
+        r_new + m_s[2],
+        encrypt_esc_dvk_auditor(dvk, s_a_s, OP_I),
     );
 }
 
@@ -369,7 +390,7 @@ fn rejects_under_funded_escrow() {
     let escrowed_dvk_cipher = encrypt_esc_dvk(dvk, s_esc, OP_I);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         V,
@@ -400,6 +421,8 @@ fn rejects_under_funded_escrow() {
         R_E_Y,
         v_a_too_large + m_s[0],
         (V - v_a_too_large) + m_s[1],
+        r_new + m_s[2],
+        encrypt_esc_dvk_auditor(dvk, s_a_s, OP_I),
     );
 }
 
@@ -421,7 +444,7 @@ fn rejects_v_out_of_range() {
     let b_tilde = encrypt_balance(v_new_huge, vk, SIGMA);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         v_huge,
@@ -452,6 +475,8 @@ fn rejects_v_out_of_range() {
         R_E_Y,
         V_TILDE_AUD_S,
         v_new_huge + m_s[1],
+        r_new + m_s[2],
+        encrypt_esc_dvk_auditor(dvk_from_vk_op(vk, OP_I), s_a_s, OP_I),
     );
 }
 
@@ -478,7 +503,7 @@ fn rejects_v_a_out_of_range() {
     let escrowed_dvk_cipher = encrypt_esc_dvk(dvk, s_esc, OP_I);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         V,
@@ -509,6 +534,8 @@ fn rejects_v_a_out_of_range() {
         R_E_Y,
         v_a_huge + m_s[0],
         v_new_huge + m_s[1],
+        r_new + m_s[2],
+        encrypt_esc_dvk_auditor(dvk_from_vk_op(vk, OP_I), s_a_s, OP_I),
     );
 }
 
@@ -561,6 +588,8 @@ fn rejects_wrong_sk() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -578,7 +607,7 @@ fn rejects_wrong_balance_opening() {
     let b_tilde_bad = encrypt_balance(v_new_bad, vk, SIGMA);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         v_bad,
@@ -609,6 +638,8 @@ fn rejects_wrong_balance_opening() {
         R_E_Y,
         V_TILDE_AUD_S,
         v_new_bad + m_s[1],
+        r_new + m_s[2],
+        encrypt_esc_dvk_auditor(dvk_from_vk_op(vk, OP_I), s_a_s, OP_I),
     );
 }
 
@@ -659,6 +690,8 @@ fn rejects_wrong_addr_f() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -700,6 +733,8 @@ fn rejects_wrong_op_i() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -736,6 +771,8 @@ fn rejects_tampered_c_a() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -773,6 +810,8 @@ fn rejects_tampered_a_tilde() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -809,6 +848,8 @@ fn rejects_tampered_c_spend_new() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -845,6 +886,8 @@ fn rejects_tampered_b_tilde() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -884,6 +927,8 @@ fn rejects_tampered_escrowed_dvk_r_x() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -921,6 +966,8 @@ fn rejects_tampered_escrowed_dvk_cipher() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -962,6 +1009,8 @@ fn rejects_wrong_y_op() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -983,7 +1032,8 @@ fn rejects_r_e_zero() {
     let s_esc_zero = ecdh(0, y_op);
     let escrowed_dvk_cipher_zero = encrypt_esc_dvk(dvk, s_esc_zero, OP_I);
     let s_a_s_zero = ecdh(0, k_aud_s);
-    let m_s_zero = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_zero, SIGMA);
+    let m_s_zero = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s_zero, SIGMA);
+    let r_new = derive_spend_r(vk, SIGMA);
     run_main(
         SK,
         V,
@@ -1014,6 +1064,8 @@ fn rejects_r_e_zero() {
         0,
         V_A + m_s_zero[0],
         V_NEW + m_s_zero[1],
+        r_new + m_s_zero[2],
+        encrypt_esc_dvk_auditor(dvk, s_a_s_zero, OP_I),
     );
 }
 
@@ -1035,7 +1087,8 @@ fn rejects_wrong_r_e() {
     let s_esc_bad = ecdh(r_e_bad, y_op);
     let escrowed_dvk_cipher_bad = encrypt_esc_dvk(dvk, s_esc_bad, OP_I);
     let s_a_s_bad = ecdh(r_e_bad, k_aud_s);
-    let m_s_bad = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_bad, SIGMA);
+    let m_s_bad = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s_bad, SIGMA);
+    let r_new = derive_spend_r(vk, SIGMA);
     run_main(
         SK,
         V,
@@ -1066,6 +1119,8 @@ fn rejects_wrong_r_e() {
         R_E_Y,
         V_A + m_s_bad[0],
         V_NEW + m_s_bad[1],
+        r_new + m_s_bad[2],
+        encrypt_esc_dvk_auditor(dvk, s_a_s_bad, OP_I),
     );
 }
 
@@ -1103,6 +1158,8 @@ fn rejects_off_curve_k_aud_s() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1140,6 +1197,8 @@ fn rejects_identity_k_aud_s() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1177,6 +1236,8 @@ fn rejects_wrong_k_aud_s() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1213,6 +1274,8 @@ fn rejects_tampered_v_tilde_aud_s() {
         R_E_Y,
         V_TILDE_AUD_S + 1,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }
 
@@ -1249,5 +1312,7 @@ fn rejects_tampered_b_tilde_aud_s() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S + 1,
+        R_TILDE_AUD_S,
+        DVK_CIPHER_AUD,
     );
 }

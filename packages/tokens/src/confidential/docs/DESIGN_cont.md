@@ -15,7 +15,7 @@ for §8-§13.
 
 ### 8.1 Per-Transfer Auditor Ciphertexts
 
-Each confidential transfer produces ciphertexts under two auditor keys via ECDH, using the same ephemeral scalar $$r\_e$$ used for recipient ECDH. Each auditor channel runs Poseidon2 in sponge mode (Section 2.5), absorbing the channel's domain tag, the ECDH shared scalar, and $$\sigma$$, and squeezing two masks per call.
+Each confidential transfer produces ciphertexts under two auditor keys via ECDH, using the same ephemeral scalar $$r\_e$$ used for recipient ECDH. Each auditor channel runs Poseidon2 in sponge mode (Section 2.5), absorbing the channel's domain tag, the ECDH shared scalar, and $$\sigma$$; the recipient channel squeezes two masks, the sender channel three (Section 2.5 *Lane assignment*).
 
 **Recipient's auditor** ($$K\_{\text{aud,r}}$$, from the recipient's `auditor_id`) receives the transfer amount and the per-transfer Pedersen randomness:
 
@@ -230,7 +230,7 @@ The dominant cost in Noir circuits is elliptic curve scalar multiplication. With
 | `SetSpender` | 7 | $$Y$$ (S1), $$C\_{\text{spend}}$$ opening (S3), $$C\_a$$ (S7), $$C\_{\text{spend}}'$$ (S10), $$R\_e$$ (S\_a1), $$dvk\_i$$ escrow ECDH (S12, §7.11), owner-auditor ECDH (S\_a2) |
 | `RevokeSpender` | 6 | $$Y$$ (V1), $$C\_a$$ opening (V4), $$C\_{\text{spend}}$$ opening (V5), $$C\_{\text{spend}}'$$ (V7), $$R\_e$$ (V\_a1), owner-auditor ECDH (V\_a2) |
 
-`SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of §7.11 reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`: `Register` 33, `Withdraw` 94, `RevokeSpender` 123, `SetSpender` 131, `Transfer` 133, `SpenderTransfer` 135.
+`SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of §7.11 reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The auditor-side escrow of $$dvk\_i$$ (S14) reuses the S\_a2 shared scalar and adds a Poseidon evaluation, not a call. The lane-2 escrows (W\_a5, T\_a9, S\_a6, O\_a9) read a third lane of a permutation each circuit already computes and cost one field addition apiece. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`: `Register` 33, `Withdraw` 95, `RevokeSpender` 123, `Transfer` 134, `SetSpender` 135, `SpenderTransfer` 136.
 
 The ECDH computations add scalar multiplications compared to a random-blinding scheme, but the unchunked design eliminates all per-chunk constraints (which, in a chunked scheme, would involve 8+ scalar multiplications for balance chunks and per-chunk range proofs).
 
@@ -260,7 +260,8 @@ global H: EmbeddedCurvePoint = EmbeddedCurvePoint {
 /// Pedersen commitment, used uniformly for every opening witnessed in any
 /// circuit (input or output). Both scalars are encoded as single-limb F_r
 /// `Field` values: Poseidon outputs or rejection-sampled CSPRNG draws for fresh
-/// blindings, and (for the spend-side input opening of C_spend in W3/T3/S3/V5)
+/// blindings, and (for the spend-side input opening of C_spend in W3/T3/S3 and
+/// of both balance commitments in CB1/CB2)
 /// the canonical F_q reduction of the wallet's post-merge integer blinding,
 /// which lies in F_r with probability >= 1 - 2^-127 per merge. The complementary
 /// case is acknowledged below in *Post-merge witness availability*.
@@ -512,9 +513,10 @@ Each $$\delta$$ is a small positive integer in $$\mathbb{F}\_r$$, fixed for the 
 | $$\delta\_{\text{eph}}$$ | 14 | Deterministic ephemeral-scalar derivation (§5.3) |
 | $$\delta\_{\text{disc\\\_bind}}$$ | 15 | Disclosure ciphertext to the disclosure recipient, aggregate variant ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §10) |
 | $$\delta\_{\text{disc}}$$ | 16 | Disclosure ciphertext to the disclosure recipient ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §4) |
+| $$\delta\_{\text{esc\\\_dvk\\\_aud}}$$ | 17 | Delegation key escrow to the owner's auditor (S14, §7.11, §8.5) |
 
-This table assigns all sixteen values; no other document assigns them. Tags 14–16 are never absorbed inside a core circuit — 14 is derived off-circuit (DESIGN.md §5.3 makes its derivation normative for every operation whose originator holds a viewing key), and 15–16 belong to the off-chain selective-disclosure layer ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §2.2) — so they are not part of the on-chain wire contract. All sixteen values MUST still be distinct and each MUST be confined to a single sponge mode, so a deployment treats them as one namespace.
+This table assigns all seventeen values; no other document assigns them. Tags 14–16 are never absorbed inside a core circuit — 14 is derived off-circuit (DESIGN.md §5.3 makes its derivation normative for every operation whose originator holds a viewing key), and 15–16 belong to the off-chain selective-disclosure layer ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §2.2) — so they are not part of the on-chain wire contract; `circuits/lib/src/lib.nr` accordingly implements 1–13 and 17. All seventeen values MUST still be distinct and each MUST be confined to a single sponge mode, so a deployment treats them as one namespace. Tag 17 is assigned out of sequence with its neighbours because it was added after 14–16; it takes its own tag rather than reusing $$\delta\_{\text{esc\\\_dvk}}$$ across two channels so that every row of §5.3's *Why reusing $$r\_e$$ is safe* keeps a distinct tag.
 
-**Provenance.** Sequential small integers are the simplest assignment that satisfies the requirement of *distinctness* across all Poseidon2 invocations in this protocol -- §3.2 models Poseidon2 as a pseudorandom function, so evaluations whose leading input differs are computationally independent. Distinctness alone is not sufficient: each tag must also be confined to a single sponge mode, since the two-mask form of §2.5 shares its first lane with the single-output form on the same inputs. The values themselves carry no semantic meaning; the binding is purely positional and the table is the only authoritative source. Implementations MUST hardcode these exact numeric values.
+**Provenance.** Sequential small integers are the simplest assignment that satisfies the requirement of *distinctness* across all Poseidon2 invocations in this protocol -- §3.2 models Poseidon2 as a pseudorandom function, so evaluations whose leading input differs are computationally independent. Distinctness alone is not sufficient: each tag must also be confined to a single sponge mode, since the multi-lane forms of §2.5 share their first lane with the single-output form on the same inputs; $$\delta\_{\text{aud\\\_s}}$$ is the one tag squeezed three-wide, and it is squeezed three-wide everywhere it appears. The values themselves carry no semantic meaning; the binding is purely positional and the table is the only authoritative source. Implementations MUST hardcode these exact numeric values.
 
 **Cross-protocol collision.** Future protocols that share Grumpkin / BN254 / Poseidon2 with this protocol -- e.g. an unrelated payments protocol that uses small-integer Poseidon2 domains -- could in principle pick the same numeric values for unrelated purposes. The protocol assumes that the surrounding inputs to Poseidon2 (key material, structural witnesses) sufficiently disambiguate even in such a case; no Poseidon2 invocation in this protocol is keyed solely on a $$\delta$$ value. If stronger isolation is desired, implementers may instead use the alternate scheme $$\delta\_X = \text{Poseidon2}(0, \text{ASCII}(\text{"openzeppelin/confidential-token/v1:X"}))$$, but this is a deployment-time choice that must be applied uniformly and disclosed in the deployment's circuit-binding documentation.

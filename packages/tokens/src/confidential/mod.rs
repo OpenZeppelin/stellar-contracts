@@ -663,6 +663,7 @@ pub struct Withdraw {
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `Withdraw` event.
@@ -676,6 +677,7 @@ pub fn emit_withdraw(
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
     b_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
 ) {
     Withdraw {
         from: from.clone(),
@@ -685,6 +687,7 @@ pub fn emit_withdraw(
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),
         b_tilde_aud_s: b_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -705,6 +708,7 @@ pub struct Transfer {
     pub r_tilde_aud_r: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `Transfer` event.
@@ -721,6 +725,7 @@ pub fn emit_transfer(
     r_tilde_aud_r: &BytesN<32>,
     v_tilde_aud_s: &BytesN<32>,
     b_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
 ) {
     Transfer {
         from: from.clone(),
@@ -733,6 +738,7 @@ pub fn emit_transfer(
         r_tilde_aud_r: r_tilde_aud_r.clone(),
         v_tilde_aud_s: v_tilde_aud_s.clone(),
         b_tilde_aud_s: b_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -754,6 +760,7 @@ pub struct SpenderTransfer {
     pub r_tilde_aud_r: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub a_tilde_aud_s: BytesN<32>,
+    pub dvk_cipher_aud: BytesN<32>,
 }
 
 /// Emits an `SpenderTransfer` event.
@@ -770,6 +777,7 @@ pub fn emit_spender_transfer(
     r_tilde_aud_r: &BytesN<32>,
     v_tilde_aud_s: &BytesN<32>,
     a_tilde_aud_s: &BytesN<32>,
+    dvk_cipher_aud: &BytesN<32>,
 ) {
     SpenderTransfer {
         spender: spender.clone(),
@@ -782,6 +790,7 @@ pub fn emit_spender_transfer(
         r_tilde_aud_r: r_tilde_aud_r.clone(),
         v_tilde_aud_s: v_tilde_aud_s.clone(),
         a_tilde_aud_s: a_tilde_aud_s.clone(),
+        dvk_cipher_aud: dvk_cipher_aud.clone(),
     }
     .publish(e);
 }
@@ -800,6 +809,8 @@ pub struct SetSpender {
     pub b_tilde: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
+    pub dvk_cipher_aud: BytesN<32>,
 }
 
 /// Emits a `SetSpender` event.
@@ -814,6 +825,8 @@ pub fn emit_set_spender(
     b_tilde: &BytesN<32>,
     v_tilde_aud_s: &BytesN<32>,
     b_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
+    dvk_cipher_aud: &BytesN<32>,
 ) {
     SetSpender {
         account: account.clone(),
@@ -824,6 +837,8 @@ pub fn emit_set_spender(
         b_tilde: b_tilde.clone(),
         v_tilde_aud_s: v_tilde_aud_s.clone(),
         b_tilde_aud_s: b_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
+        dvk_cipher_aud: dvk_cipher_aud.clone(),
     }
     .publish(e);
 }

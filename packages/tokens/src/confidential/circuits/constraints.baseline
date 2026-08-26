@@ -29,19 +29,19 @@
 | circuit_set_spender         | decompose_hint   | N/A                  | N/A          | 30              |
 | circuit_set_spender         | directive_invert | N/A                  | N/A          | 9               |
 | circuit_set_spender         | lte_hint         | N/A                  | N/A          | 33              |
-| circuit_set_spender         | main             | Bounded { width: 4 } | 131          | 72              |
+| circuit_set_spender         | main             | Bounded { width: 4 } | 135          | 72              |
 | circuit_spender_transfer    | decompose_hint   | N/A                  | N/A          | 30              |
 | circuit_spender_transfer    | directive_invert | N/A                  | N/A          | 9               |
 | circuit_spender_transfer    | lte_hint         | N/A                  | N/A          | 33              |
-| circuit_spender_transfer    | main             | Bounded { width: 4 } | 135          | 72              |
+| circuit_spender_transfer    | main             | Bounded { width: 4 } | 136          | 72              |
 | circuit_transfer            | decompose_hint   | N/A                  | N/A          | 30              |
 | circuit_transfer            | directive_invert | N/A                  | N/A          | 9               |
 | circuit_transfer            | lte_hint         | N/A                  | N/A          | 33              |
-| circuit_transfer            | main             | Bounded { width: 4 } | 133          | 72              |
+| circuit_transfer            | main             | Bounded { width: 4 } | 134          | 72              |
 | circuit_withdraw            | decompose_hint   | N/A                  | N/A          | 30              |
 | circuit_withdraw            | directive_invert | N/A                  | N/A          | 9               |
 | circuit_withdraw            | lte_hint         | N/A                  | N/A          | 33              |
-| circuit_withdraw            | main             | Bounded { width: 4 } | 94           | 72              |
+| circuit_withdraw            | main             | Bounded { width: 4 } | 95           | 72              |
 | gadget_assert_on_curve      | main             | Bounded { width: 4 } | 2            | 0               |
 | gadget_commit               | decompose_hint   | N/A                  | N/A          | 30              |
 | gadget_commit               | lte_hint         | N/A                  | N/A          | 33              |
