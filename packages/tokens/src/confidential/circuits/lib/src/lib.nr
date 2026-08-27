@@ -159,13 +159,18 @@ pub mod domain {
     pub global ECDH_SHARED_SECRET: Field = 13;
     /// Auditor-side delegation-key escrow mask (owner-auditor ECDH):
     /// `Poseidon2(ESCROWED_DELEGATION_VIEWING_KEY_AUDITOR, s_a_s, op_i)`.
-    /// Constraint S14 (`delta_esc_dvk_aud`).
+    /// Constraint S14, Section 8.5 (`delta_esc_dvk_aud`).
     ///
     /// A separate tag from `ESCROWED_DELEGATION_VIEWING_KEY` = 10 even though
     /// reuse would be secure -- the two shared scalars differ, since `Y_op`
     /// and `K_aud_s` are independent points. Sharing the tag would drop one
     /// of the three legs of Section 5.3's "why reusing r_e is safe" argument;
     /// a fresh tag keeps that argument intact.
+    ///
+    /// Unlike the tags above it, this one shares its shared scalar with
+    /// `AUDITOR_SENDER` (both key off `s_a_s`). What separates them is Section
+    /// 2.5 mode exclusivity: this tag is single-output, tag 11 is multi-lane,
+    /// so the two never yield the same field element.
     pub global ESCROWED_DELEGATION_VIEWING_KEY_AUDITOR: Field = 17;
 }
 

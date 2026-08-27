@@ -409,7 +409,7 @@ Because $$\sigma$$ is published in the event and $$vk$$ is held by the originato
 
 **Note.** Each transfer involves two auditor ECDH exchanges: one with the recipient's auditor key ($$S\_{a,r} = r\_e \cdot K\_{\text{aud,r}}$$) and one with the sender's auditor key ($$S\_{a,s} = r\_e \cdot K\_{\text{aud,s}}$$). Both reuse the ephemeral scalar $$r\_e$$, as does the $$dvk\_i$$ escrow ECDH in `set_spender` (§7.11) when one is present. Neither auditor recovers any account's viewing key.
 
-**Why reusing $$r\_e$$ is safe.** Each ECDH channel keyed from the same $$r\_e$$ produces a distinct shared scalar because the counterparty public keys are distinct ($$\text{PVK}\_B$$, $$K\_{\text{aud,r}}$$, $$K\_{\text{aud,s}}$$, $$Y\_{\text{op}}$$ are independent Grumpkin points, none derivable from one another). Each channel further uses a distinct Poseidon domain tag ($$\delta\_{\text{transfer\\\_blind}}/\delta\_{\text{transfer\\\_amount}}$$ for the recipient channel, $$\delta\_{\text{aud\\\_r}}$$ and $$\delta\_{\text{aud\\\_s}}$$ for the two auditor channels, $$\delta\_{\text{esc\\\_dvk}}$$ for the spender escrow), so masks across channels are independent under the PRF assumption on Poseidon (§3.2). The channel masks are used as one-time pads against fresh per-transfer randomness ($$\sigma$$ or $$\sigma\_a$$), and each per-channel sponge re-absorbs that nonce, so a given mask is never reused even for the same counterparty across two operations. Together these three properties (distinct shared scalars, distinct domains, fresh per-operation nonce) close the standard ECDH key-reuse attack surface; the contract's enumeration of channels in §13 satisfies the domain-distinctness condition.
+**Why reusing $$r\_e$$ is safe.** Each ECDH channel keyed from the same $$r\_e$$ produces a distinct shared scalar because the counterparty public keys are distinct ($$\text{PVK}\_B$$, $$K\_{\text{aud,r}}$$, $$K\_{\text{aud,s}}$$, $$Y\_{\text{op}}$$ are independent Grumpkin points, none derivable from one another). Each channel further uses a distinct Poseidon domain tag ($$\delta\_{\text{transfer\\\_blind}}/\delta\_{\text{transfer\\\_amount}}$$ for the recipient channel, $$\delta\_{\text{aud\\\_r}}$$ and $$\delta\_{\text{aud\\\_s}}$$ for the two auditor channels, $$\delta\_{\text{esc\\\_dvk}}$$ for the spender escrow), so masks across channels are independent under the PRF assumption on Poseidon (§3.2). The auditor-side $$dvk\_i$$ escrow (S14, $$\delta\_{\text{esc\\\_dvk\\\_aud}}$$) is the one derivation that does *not* open a channel of its own -- it reuses the S\_a2 shared scalar -- so its separation from the sender-auditor sponge rests on §2.5 *Mode exclusivity* rather than on a distinct shared scalar; [DESIGN_cont.md](./DESIGN_cont.md) §8.5 argues it. The channel masks are used as one-time pads against fresh per-transfer randomness ($$\sigma$$ or $$\sigma\_a$$), and each per-channel sponge re-absorbs that nonce, so a given mask is never reused even for the same counterparty across two operations. Together these three properties (distinct shared scalars, distinct domains, fresh per-operation nonce) close the standard ECDH key-reuse attack surface; the contract's enumeration of channels in §13 satisfies the domain-distinctness condition.
 
 ### 5.4 Anti-Poisoning Constraint
 
@@ -696,7 +696,7 @@ The owner locks funds from their spendable balance into a per-spender escrow. Th
 | S11 | $$\tilde{b} = (v - v\_a) + \text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk, \sigma)$$ (encrypted balance) |
 | S12 | Escrowed $$dvk\_i$$ correctly encrypts under $$Y\_{\text{op}}$$ via ECDH |
 | S13 | $$r\_e \neq 0$$ (rules out $$R\_e = \mathcal{O}$$ and $$S\_{a,s} = \mathcal{O}$$; the same $$r\_e$$ is reused for the $$dvk\_i$$ escrow ECDH in Section 7.11, so this also rules out a trivial escrow shared secret) |
-| S14 | $$\text{dvk\\\_cipher\\\_aud} = \text{Poseidon}(\delta\_{\text{esc\\\_dvk\\\_aud}}, s\_{a,s}, \text{op}\_i) + dvk\_i$$ (auditor-side escrow of the delegation viewing key over the S\_a2 shared scalar, Section 7.11; one Poseidon, no new scalar multiplication) |
+| S14 | $$\text{dvk\\\_cipher\\\_aud} = \text{Poseidon}(\delta\_{\text{esc\\\_dvk\\\_aud}}, s\_{a,s}, \text{op}\_i) + dvk\_i$$ (auditor-side escrow of the delegation viewing key over the S\_a2 shared scalar, Section 8.5; one Poseidon, no new scalar multiplication) |
 | S\_a1 | $$R\_e = r\_e \cdot H$$ (ephemeral key for auditor ECDH) |
 | S\_a2 | $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$ (owner-auditor ECDH shared scalar, §2.4) |
 | S\_a3 | $$(m\_v, m\_b, m\_r) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$ (owner-auditor channel masks) |
@@ -749,7 +749,7 @@ The spender transfers from the owner's escrowed allowance to a recipient.
 | O\_a6 | $$(m\_{v,s}, m\_{a,s}, m\_{r,s}) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma\_a)$$ (owner-auditor channel masks) |
 | O\_a7 | $$\tilde{v}\_{\text{aud,s}} = v\_{\text{transfer}} + m\_{v,s}$$ (owner-auditor encrypted transfer amount) |
 | O\_a8 | $$\tilde{a}\_{\text{aud,s}} = (v\_a - v\_{\text{transfer}}) + m\_{a,s}$$ (owner-auditor encrypted post-transfer allowance) |
-| O\_a9 | $$\text{dvk\\\_cipher\\\_aud} = dvk\_i + m\_{r,s}$$ (owner-auditor re-escrow of the delegation viewing key, Section 7.11; $$dvk\_i$$ is already a witness by O2, so this is one field addition) |
+| O\_a9 | $$\text{dvk\\\_cipher\\\_aud} = dvk\_i + m\_{r,s}$$ (owner-auditor re-escrow of the delegation viewing key, Section 8.5; $$dvk\_i$$ is already a witness by O2, so this is one field addition) |
 
 **Public inputs (25 fields):**
 
@@ -833,6 +833,8 @@ The spender decrypts using $$sk\_{\text{op}}$$. The `set_spender` proof enforces
 - $$\text{dvk\\\_cipher} = \text{Poseidon}(\delta\_{\text{esc\\\_dvk}}, s\_{\text{esc}}, \text{op}\_i) + dvk\_i$$
 
 The $$r\_e$$ here is the same scalar S\_a1 commits to ($$R\_e = r\_e \cdot H$$), so the escrow's $$R\_x$$ and the auditor channel's $$R\_e.x$$ are forced equal.
+
+The same proof escrows $$dvk\_i$$ a second time, to the owner's *auditor* rather than to the spender (S14), under its own domain tag and over the auditor shared scalar. That construction, its decryption path, and why it is a single-output pad rather than a sponge lane are specified in [DESIGN_cont.md](./DESIGN_cont.md) §8.5.
 
 ### 7.12 Expiry and Revert Safety
 
