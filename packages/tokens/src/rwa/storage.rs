@@ -33,7 +33,7 @@ pub struct RWA;
 
 impl ContractOverrides for RWA {
     fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
-        RWA::transfer(e, from, &to.address(), amount);
+        RWA::transfer(e, from, to, amount);
     }
 
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
@@ -770,17 +770,42 @@ impl RWA {
     ///
     /// Please refer to [`Base::update`] and [`Self::validate_transfer`] for the
     /// inline documentation.
-    pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+    ///
+    /// # Events
+    ///
+    /// * topics - `["transfer", from: Address, to: Address]`
+    /// * data - `amount: i128` (when `to` has no muxed ID)
+    /// * data - `{to_muxed_id: Option<u64>, amount: i128}` (when `to` has a
+    ///   muxed ID)
+    ///
+    /// # Notes
+    ///
+    /// A muxed `to` is narrowed to its base address before any check runs, so
+    /// identity verification, the compliance hook and the balance update all
+    /// operate on the base address. The muxed ID reaches the event only, where
+    /// it lets a custodian attribute the transfer to one of its off-chain
+    /// sub-accounts.
+    ///
+    /// The ID is supplied by the caller and carries no on-chain verification.
+    /// A verified holder may therefore be a custodian holding on behalf of
+    /// beneficiaries who have no on-chain identity of their own. An issuer
+    /// that requires beneficial owners on the on-chain register should
+    /// override [`crate::fungible::FungibleToken::transfer`] and reject a
+    /// destination whose `id()` is `Some`; see the `rwa-token-example` for the
+    /// pattern.
+    pub fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         from.require_auth();
+
+        let (to_muxed_id, to) = (to.id(), to.address());
 
         // Snapshot before the update so the hook observes the pre-transfer
         // state.
         let from_snapshot = Self::account_snapshot(e, from);
-        let to_snapshot = Self::account_snapshot(e, to);
+        let to_snapshot = Self::account_snapshot(e, &to);
 
         Self::validate_transfer(e, &from_snapshot, &to_snapshot, amount);
 
-        Base::update(e, Some(from), Some(to), amount);
+        Base::update(e, Some(from), Some(&to), amount);
 
         let compliance_client = ComplianceClient::new(e, &Self::compliance(e));
         compliance_client.transferred(
@@ -790,7 +815,7 @@ impl RWA {
             &TransferKind::Standard,
             &e.current_contract_address(),
         );
-        emit_transfer(e, from, to, None, amount);
+        emit_transfer(e, from, &to, to_muxed_id, amount);
     }
 
     /// `transfer_from` override with added compliance and identity verification

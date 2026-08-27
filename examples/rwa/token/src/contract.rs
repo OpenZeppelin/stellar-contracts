@@ -1,14 +1,15 @@
 //! RWA Token Example Contract.
 
 use soroban_sdk::{
-    contract, contractimpl, symbol_short, Address, Env, MuxedAddress, String, Symbol, Vec,
+    contract, contractimpl, panic_with_error, symbol_short, Address, Env, MuxedAddress, String,
+    Symbol, Vec,
 };
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_macros::{only_admin, only_role};
 use stellar_tokens::{
     fungible::{Base, FungibleToken},
-    rwa::{RWAToken, RWA},
+    rwa::{RWAError, RWAToken, RWA},
 };
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
@@ -55,6 +56,28 @@ impl Pausable for RWATokenContract {
 #[contractimpl(contracttrait)]
 impl FungibleToken for RWATokenContract {
     type ContractType = RWA;
+
+    /// Opting out of custodial (muxed) destinations.
+    ///
+    /// [`RWA`] accepts a muxed destination: identity verification and
+    /// compliance run against the base address, and the muxed ID is recorded
+    /// in the transfer event so a custodian can attribute the transfer to one
+    /// of its off-chain sub-accounts. A verified holder may therefore be a
+    /// custodian holding on behalf of beneficiaries who have no on-chain
+    /// identity of their own, and the ID itself carries no on-chain
+    /// verification.
+    ///
+    /// That is the right default for an omnibus arrangement, but not for every
+    /// issuer. This issuer requires beneficial owners on the on-chain
+    /// register, so a custodial sub-account destination is refused outright.
+    /// Deleting this override restores the library default, which accepts
+    /// muxed destinations.
+    fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
+        if to.id().is_some() {
+            panic_with_error!(e, RWAError::IdentityVerificationFailed);
+        }
+        RWA::transfer(e, &from, &to, amount);
+    }
 }
 
 #[contractimpl(contracttrait)]

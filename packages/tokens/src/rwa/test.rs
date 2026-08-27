@@ -2,13 +2,13 @@ extern crate std;
 
 use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short,
-    testutils::{Address as _, Events},
-    Address, Env, Event, String,
+    testutils::{Address as _, Events, MuxedAddress as _},
+    Address, Env, Event, MuxedAddress, String,
 };
 use stellar_contract_utils::pausable;
 
 use crate::{
-    fungible::{ContractOverrides, Transfer},
+    fungible::{ContractOverrides, MuxedTransfer, Transfer},
     rwa::{
         compliance::{AccountSnapshot, TransferKind},
         storage::RWAStorageKey,
@@ -608,7 +608,7 @@ fn transfer_with_compliance_and_identity_checks() {
 
         // Mint and transfer
         RWA::mint(&e, &from, 100);
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
 
         assert_eq!(RWA::balance(&e, &from), 50);
         assert_eq!(RWA::balance(&e, &to), 50);
@@ -629,11 +629,163 @@ fn contract_overrides_transfer() {
         RWA::mint(&e, &from, 100);
 
         // Test ContractOverrides::transfer calls RWA::transfer
-        RWA::transfer(&e, &from, &to, 30);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 30);
 
         assert_eq!(RWA::balance(&e, &from), 70);
         assert_eq!(RWA::balance(&e, &to), 30);
     });
+}
+
+#[test]
+fn contract_overrides_transfer_preserves_muxed_id() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let base = MuxedAddress::generate(&e);
+    let to = base.address();
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        RWA::mint(&e, &from, 100);
+
+        <RWA as ContractOverrides>::transfer(&e, &from, &MuxedAddress::new(base.clone(), 42), 30);
+
+        // Balances settle on the base address, exactly as for a plain
+        // transfer.
+        assert_eq!(RWA::balance(&e, &from), 70);
+        assert_eq!(RWA::balance(&e, &to), 30);
+
+        // The muxed ID must survive into the event, so that a custodian can
+        // attribute the transfer to the right off-chain sub-account.
+        //
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 MuxedTransfer
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 4);
+        assert_eq!(
+            events.events().get(3).unwrap(),
+            &MuxedTransfer {
+                from: from.clone(),
+                to: to.clone(),
+                to_muxed_id: Some(42),
+                amount: 30
+            }
+            .to_xdr(&e, &address),
+        );
+    });
+}
+
+#[test]
+fn muxed_ids_do_not_fragment_balance() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let base = MuxedAddress::generate(&e);
+    let to = base.address();
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::mint(&e, &from, 100);
+        // Separate frames: `from.require_auth()` may only run once per
+        // invocation.
+        RWA::transfer(&e, &from, &MuxedAddress::new(base.clone(), 1), 30);
+    });
+    e.as_contract(&address, || {
+        RWA::transfer(&e, &from, &MuxedAddress::new(base.clone(), 999), 20);
+    });
+    e.as_contract(&address, || {
+        // Two sub-accounts of the same base, one aggregate on-chain balance.
+        assert_eq!(RWA::balance(&e, &to), 50);
+        assert_eq!(RWA::balance(&e, &from), 50);
+        assert_eq!(RWA::total_supply(&e), 100);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #302)")]
+fn muxed_destination_cannot_bypass_freeze() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let base = MuxedAddress::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::mint(&e, &from, 100);
+        // Freeze the base address, then try to route around it with a muxed
+        // ID.
+        RWA::set_address_frozen(&e, &base.address(), true);
+        RWA::transfer(&e, &from, &MuxedAddress::new(base.clone(), 42), 30);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #304)")]
+fn muxed_destination_cannot_bypass_identity_verification() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let base = MuxedAddress::generate(&e);
+
+    let verifier = e.as_contract(&address, || {
+        let verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+        verifier
+    });
+    // Deny the base address at the identity verifier.
+    e.as_contract(&verifier, || {
+        e.storage().persistent().set(&symbol_short!("id_deny"), &base.address());
+    });
+
+    e.as_contract(&address, || {
+        RWA::mint(&e, &from, 100);
+        RWA::transfer(&e, &from, &MuxedAddress::new(base.clone(), 42), 30);
+    });
+}
+
+/// An issuer that requires beneficial owners on the on-chain register, and so
+/// refuses custodial sub-account destinations. Mirrors the override in
+/// `rwa-token-example`.
+#[contract]
+struct NoOmnibusToken;
+
+#[contractimpl(contracttrait)]
+impl crate::fungible::FungibleToken for NoOmnibusToken {
+    type ContractType = RWA;
+
+    fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
+        if to.id().is_some() {
+            panic_with_error!(e, RWAError::IdentityVerificationFailed);
+        }
+        RWA::transfer(e, &from, &to, amount);
+    }
+}
+
+#[test]
+fn issuer_can_refuse_muxed_destinations() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let token = e.register(NoOmnibusToken, ());
+    let holder = Address::generate(&e);
+    e.as_contract(&token, || {
+        setup_all_contracts(&e);
+        RWA::mint(&e, &holder, 100);
+    });
+    let client = NoOmnibusTokenClient::new(&e, &token);
+
+    // A plain destination is accepted.
+    let plain = Address::generate(&e);
+    client.transfer(&holder, MuxedAddress::from(plain.clone()), &10);
+    assert_eq!(client.balance(&plain), 10);
+
+    // A custodial sub-account destination is refused.
+    let custodian = MuxedAddress::generate(&e);
+    assert!(client.try_transfer(&holder, MuxedAddress::new(custodian.clone(), 57), &10).is_err());
+    assert_eq!(client.balance(&custodian.address()), 0);
 }
 
 #[test]
@@ -1041,7 +1193,7 @@ fn transfer_fails_when_from_address_frozen() {
         RWA::set_address_frozen(&e, &from, true);
 
         // Try to transfer - should fail with AddressFrozen error
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
 
@@ -1063,7 +1215,7 @@ fn transfer_fails_when_to_address_frozen() {
         RWA::set_address_frozen(&e, &to, true);
 
         // Try to transfer - should fail with AddressFrozen error
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
 
@@ -1086,7 +1238,7 @@ fn transfer_fails_when_insufficient_free_tokens() {
         assert_eq!(RWA::get_free_tokens(&e, &from), 20);
 
         // Try to transfer 50 tokens (more than free) - should fail
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
 
@@ -1108,7 +1260,7 @@ fn transfer_fails_when_contract_paused() {
         pausable::pause(&e);
 
         // Try to transfer - should fail with EnforcedPause error
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
 
@@ -1133,6 +1285,6 @@ fn transfer_fails_when_not_compliant() {
         });
 
         // Try to transfer - should fail with TransferNotCompliant error
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
