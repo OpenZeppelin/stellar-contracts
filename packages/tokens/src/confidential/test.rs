@@ -5,7 +5,7 @@ use soroban_sdk::{
     testutils::{Address as _, Events, Ledger},
     token::StellarAssetClient,
     xdr::ToXdr,
-    Address, Bytes, BytesN, Env,
+    Address, Bytes, BytesN, Env, Event,
 };
 
 use crate::confidential::{
@@ -13,9 +13,10 @@ use crate::confidential::{
     storage as token_storage,
     verifier::{CircuitType, ConfidentialVerifier},
     ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, NoHooks, RegisterData,
-    RegisterPayload, RevokeSpenderData, RevokeSpenderPayload, SetSpenderData, SetSpenderPayload,
-    SpenderDelegation, SpenderTransferData, SpenderTransferPayload, TransferData, TransferPayload,
-    WithdrawData, WithdrawPayload,
+    RegisterPayload, RevokeSpenderData, RevokeSpenderPayload, SetSpender, SetSpenderData,
+    SetSpenderPayload, SpenderDelegation, SpenderTransfer, SpenderTransferData,
+    SpenderTransferPayload, Transfer, TransferData, TransferPayload, Withdraw, WithdrawData,
+    WithdrawPayload,
 };
 
 // ################## TEST FIXTURES ##################
@@ -542,7 +543,22 @@ fn withdraw_transfers_tokens_and_updates_spendable() {
 
     h.token.withdraw(&alice, &beneficiary, &300i128, &withdraw_data(&h.e));
     // 1 SAC transfer event + 1 Withdraw event.
-    assert_eq!(h.e.events().all().events().len(), 2);
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 2);
+    assert_eq!(
+        events.events().get(1).unwrap(),
+        &Withdraw {
+            from: alice.clone(),
+            to: beneficiary.clone(),
+            amount: 300i128,
+            r_e_point: fixture_point(&h.e),
+            sigma: fixture_field(&h.e, 0xbb),
+            b_tilde: fixture_field(&h.e, 0xaa),
+            b_tilde_aud_s: fixture_field(&h.e, 0xcc),
+            r_tilde_aud_s: fixture_field(&h.e, 0xdd),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
 
     let token_client = soroban_sdk::token::TokenClient::new(&h.e, &h.sac_addr);
     assert_eq!(token_client.balance(&beneficiary), 300);
@@ -590,7 +606,25 @@ fn confidential_transfer_updates_both_sides() {
     h.token.merge(&alice);
 
     h.token.confidential_transfer(&alice, &bob, &transfer_data(&h.e));
-    assert_eq!(h.e.events().all().events().len(), 1);
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &Transfer {
+            from: alice.clone(),
+            to: bob.clone(),
+            r_e_point: fixture_point(&h.e),
+            v_tilde: fixture_field(&h.e, 0x11),
+            sigma: fixture_field(&h.e, 0x13),
+            b_tilde: fixture_field(&h.e, 0x12),
+            v_tilde_aud_r: fixture_field(&h.e, 0x14),
+            r_tilde_aud_r: fixture_field(&h.e, 0x15),
+            v_tilde_aud_s: fixture_field(&h.e, 0x16),
+            b_tilde_aud_s: fixture_field(&h.e, 0x17),
+            r_tilde_aud_s: fixture_field(&h.e, 0x18),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
 
     // Sender's spendable balance was overwritten.
     let alice_acc = h.token.confidential_balance(&alice);
@@ -612,7 +646,25 @@ fn set_spender_stores_delegation() {
     h.token.register(&spender, &1u32, &register_data(&h.e));
 
     h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
-    assert_eq!(h.e.events().all().events().len(), 1);
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &SetSpender {
+            account: alice.clone(),
+            spender: spender.clone(),
+            live_until_ledger: 1_000u32,
+            r_e_point: fixture_point(&h.e),
+            sigma: fixture_field(&h.e, 0x23),
+            sigma_a: fixture_field(&h.e, 0x24),
+            b_tilde: fixture_field(&h.e, 0x21),
+            v_tilde_aud_s: fixture_field(&h.e, 0x25),
+            b_tilde_aud_s: fixture_field(&h.e, 0x26),
+            r_tilde_aud_s: fixture_field(&h.e, 0x27),
+            dvk_cipher_aud: fixture_field(&h.e, 0x28),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
 
     let delegation = h.token.get_spender_delegation(&alice, &spender);
     assert_eq!(delegation.live_until_ledger, 1_000);
@@ -682,7 +734,27 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
     h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
 
     h.token.confidential_transfer_from(&spender, &alice, &bob, &spender_transfer_data(&h.e));
-    assert_eq!(h.e.events().all().events().len(), 1);
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &SpenderTransfer {
+            spender: spender.clone(),
+            from: alice.clone(),
+            to: bob.clone(),
+            r_e_point: fixture_point(&h.e),
+            v_tilde: fixture_field(&h.e, 0x31),
+            // The delegation's pre-transfer salt, read from storage.
+            sigma_a: fixture_field(&h.e, 0x24),
+            sigma_a_new: fixture_field(&h.e, 0x33),
+            v_tilde_aud_r: fixture_field(&h.e, 0x34),
+            r_tilde_aud_r: fixture_field(&h.e, 0x35),
+            v_tilde_aud_s: fixture_field(&h.e, 0x36),
+            a_tilde_aud_s: fixture_field(&h.e, 0x37),
+            dvk_cipher_aud: fixture_field(&h.e, 0x38),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
 
     // Delegation allowance commitment was rotated.
     let delegation = h.token.get_spender_delegation(&alice, &spender);

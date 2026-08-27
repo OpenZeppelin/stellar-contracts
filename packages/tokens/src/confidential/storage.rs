@@ -781,8 +781,8 @@ pub fn confidential_transfer(
 ///
 /// * topics - `["spender_transfer", spender: Address, from: Address, to:
 ///   Address]`
-/// * data - `[r_e_point, v_tilde, sigma_a, v_tilde_aud_r, r_tilde_aud_r,
-///   v_tilde_aud_s, a_tilde_aud_s, dvk_cipher_aud]`
+/// * data - `[r_e_point, v_tilde, sigma_a, sigma_a_new, v_tilde_aud_r,
+///   r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s, dvk_cipher_aud]`
 ///
 /// # Security Warning
 ///
@@ -857,6 +857,7 @@ pub fn confidential_transfer_from(
         &payload.r_e_point,
         &payload.v_tilde,
         &sigma_a,
+        &payload.sigma_a_new,
         &payload.v_tilde_aud_r,
         &payload.r_tilde_aud_r,
         &payload.v_tilde_aud_s,
@@ -896,8 +897,8 @@ pub fn confidential_transfer_from(
 /// # Events
 ///
 /// * topics - `["set_spender", account: Address, spender: Address]`
-/// * data - `[live_until_ledger: u32, r_e_point, sigma, b_tilde, v_tilde_aud_s,
-///   b_tilde_aud_s, r_tilde_aud_s, dvk_cipher_aud]`
+/// * data - `[live_until_ledger: u32, r_e_point, sigma, sigma_a, b_tilde,
+///   v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s, dvk_cipher_aud]`
 ///
 /// # Security Warning
 ///
@@ -966,6 +967,7 @@ pub fn set_spender(
         live_until_ledger,
         &payload.r_e_point,
         &payload.sigma,
+        &payload.sigma_a,
         &payload.b_tilde,
         &payload.v_tilde_aud_s,
         &payload.b_tilde_aud_s,
