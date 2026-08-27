@@ -59,13 +59,13 @@ Five things exist in more than one file. Changing the normative copy means grepp
 
 | Content | Normative source | Copies live in |
 |:---|:---|:---|
-| The 17 domain-separation tags | `DESIGN_cont.md` §13 | `SDK.md` §4.8, referenced by `SELECTIVE_DISCLOSURE.md` |
-| Sponge lane assignment (lane 0 = amount mask, lane 1 = balance/allowance/randomness, lane 2 = sender-auditor secret-escrow slot) | `DESIGN.md` §2.5 | `SDK.md` §4.3 and §11 |
+| Domain-separation tag assignments | `DESIGN_cont.md` §13 | `SDK.md` §4.8, referenced by `SELECTIVE_DISCLOSURE.md` |
+| Sponge lane assignment | `DESIGN.md` §2.5 | `SDK.md` §4.3 and §11 |
 | Per-circuit scalar-multiplication counts | `DESIGN_cont.md` §10.3 | `OVERVIEW.md` |
-| Checkpoint event set (`Withdraw`, `Transfer` sender side, `SetSpender`, `RevokeSpender`) | `DESIGN.md` §5.2 | `INDEXER.md`, `SDK.md` |
+| Checkpoint event set | `DESIGN.md` §5.2 | `INDEXER.md`, `SDK.md` |
 | Replay-window anchor `T₀` | `DESIGN.md` §5.2 | `INDEXER.md`, `OVERVIEW.md` |
 
-The tags are a cross-language wire contract. `DESIGN_cont.md` §13 assigns all seventeen and no other document may; `circuits/lib/src/lib.nr` implements 1–13 and 17, because 14 is derived off-circuit and 15–16 belong to the off-chain disclosure layer. That gap is intentional. Changing any assigned value is a new deployment, not an upgrade.
+The tags are a cross-language wire contract. `DESIGN_cont.md` §13 is their only authoritative source: it assigns every value, and it states which subset `circuits/lib/src/lib.nr` implements and why the remainder are absent. Changing any assigned value is a new deployment, not an upgrade.
 
 ### Editing rules
 

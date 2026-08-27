@@ -34,11 +34,11 @@ Directory `transfer/` is package `circuit_transfer`; `gadgets/commit/` is `gadge
 
 ### Never hash raw
 
-`poseidon_with_domain` is the only Poseidon entry point in `lib/src/lib.nr`; calling the underlying hash directly is a violation of the library contract. The domain tag is always the first absorbed element. The numeric tag values are the cross-language contract with the SDK — see `../CLAUDE.md` and `docs/DESIGN_cont.md` §13, which is their only authoritative source.
+`poseidon_with_domain` is the only Poseidon entry point in `lib/src/lib.nr`; calling the underlying hash directly is a violation of the library contract. The domain tag is always the first absorbed element. The numeric tag values are the cross-language contract with the SDK — see `../CLAUDE.md` and `../docs/DESIGN_cont.md` §13, which is their only authoritative source.
 
-Sponge parameters: width 4, rate 3, capacity 1, `iv = len · 2^64`. Empty input still applies the squeeze permutation, matching the on-chain sponge. The squeeze order is fixed — **lane 0 is always an amount mask, lane 1 always a balance/allowance/randomness mask, lane 2 always the sender-auditor secret-escrow slot** — and `encrypt_auditor_sender_balance` deliberately takes lane 1 so a balance checkpoint can never share a pad with an amount ciphertext under `(r_e, σ)` reuse. `sponge_squeeze_2(d,s,σ)[0]` must stay equal to `poseidon_with_domain(d,[s,σ])`, and `sponge_squeeze_3(d,s,σ)[0..2]` must stay equal to `sponge_squeeze_2(d,s,σ)` — the absorb fits one rate-3 block, so both read the same permutation, and a divergence would silently change every existing mask.
+Sponge parameters, the canonical lane assignment, and the mode-exclusivity rule that follows from a single-block absorb are normative in `../docs/DESIGN.md` §2.5; the Noir sponge must match it exactly. The obligations that section places on this code: `sponge_squeeze_2(d,s,σ)[0]` must stay equal to `poseidon_with_domain(d,[s,σ])`, `sponge_squeeze_3(d,s,σ)[0..2]` must stay equal to `sponge_squeeze_2(d,s,σ)`, and `encrypt_auditor_sender_balance` must keep taking lane 1. A divergence in any of the three silently changes every existing mask.
 
-Only `AUDITOR_SENDER` (11) is squeezed three-wide; `AUDITOR_RECIPIENT` (12) stays at two lanes. Lane 2 carries a *different plaintext per operation* — the new spendable blinding on checkpoints, `dvk_i` on spender transfers — which is not pad reuse, because the pad is keyed by a per-operation-fresh `(s_{a,s}, σ)`.
+`AUDITOR_SENDER` is the only tag squeezed three-wide and `AUDITOR_RECIPIENT` the only one squeezed two-wide; every other tag goes through `poseidon_with_domain`. Widening or narrowing a channel is a spec change, not a refactor.
 
 ECDH must absorb both `S.x` and `S.y`; x-only extraction collapses `P` and `-P`.
 
