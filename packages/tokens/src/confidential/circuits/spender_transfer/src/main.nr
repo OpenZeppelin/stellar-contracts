@@ -96,13 +96,38 @@ mod tests;
 //                                                           encrypted
 //                                                           post-transfer
 //                                                           allowance.
-//   O_a9 dvk_cipher_aud = dvk_i + m_r_s                     Owner-auditor
-//                                                           re-escrow of the
-//                                                           delegation viewing
-//                                                           key. dvk_i is
-//                                                           already a witness
-//                                                           (O2), so this is
+//   O_a9 r_tilde_aud_s = r_a' + m_r_s                       Owner-auditor
+//                                                           escrow of the NEW
+//                                                           allowance blinding
+//                                                           -- O10's r_a',
+//                                                           which O11 commits
+//                                                           under. Already a
+//                                                           witness, so this is
 //                                                           one field addition.
+//                                                           With a_tilde_aud_s
+//                                                           (O_a8) it hands the
+//                                                           owner's auditor the
+//                                                           opening of the C_a'
+//                                                           this operation
+//                                                           writes.
+//                                                           Note the apparent
+//                                                           mismatch: the
+//                                                           lane-2 pad keys off
+//                                                           the CONSUMED salt
+//                                                           sigma_a (O_a6),
+//                                                           while the escrowed
+//                                                           value is derived
+//                                                           from the WRITTEN
+//                                                           salt sigma_a'. That
+//                                                           is sound -- the pad
+//                                                           only needs to be
+//                                                           fresh and unknown
+//                                                           to anyone but the
+//                                                           auditor, and
+//                                                           (s_{a,s}, sigma_a)
+//                                                           is both, since
+//                                                           s_{a,s} is fresh
+//                                                           per operation.
 //                                                           Buys one-operation
 //                                                           convergence for a
 //                                                           live delegation
@@ -197,8 +222,9 @@ mod tests;
 //   23   a_tilde_aud_s        a_tilde_aud_s     Prover-supplied owner-auditor
 //                                                 encrypted post-transfer
 //                                                 allowance; emitted.
-//   24   dvk_cipher_aud       dvk_cipher_aud    Prover-supplied owner-auditor
-//                                                 re-escrow of dvk_i; emitted.
+//   24   r_tilde_aud_s        r_tilde_aud_s     Prover-supplied owner-auditor
+//                                                 escrow of the new allowance
+//                                                 blinding r_a'; emitted.
 //
 // Private witnesses
 // -----------------
@@ -242,7 +268,7 @@ fn main(
     r_tilde_aud_r: pub Field,
     v_tilde_aud_s: pub Field,
     a_tilde_aud_s: pub Field,
-    dvk_cipher_aud: pub Field,
+    r_tilde_aud_s: pub Field,
 ) {
     // O13 -- runs first so the r_e = 0 attack is rejected before any
     // scalar mul against it could quietly produce the identity.
@@ -332,7 +358,7 @@ fn main(
     let s_a_s = ecdh(r_e, k_aud_s);
 
     // O_a6 (owner-channel masks: amount, post-transfer allowance, then the
-    // secret-escrow slot)
+    // blinding-escrow slot)
     let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, sigma_a);
 
     // O_a7
@@ -341,7 +367,9 @@ fn main(
     // O_a8
     assert(v_a_new + m_s[1] == a_tilde_aud_s);
 
-    // O_a9 -- dvk_i is already a private witness (O2), so this is one field
-    // addition: zero scalar muls, no new domain tag.
-    assert(dvk_i + m_s[2] == dvk_cipher_aud);
+    // O_a9 -- r_a_new is already constrained by O10 and committed by O11, so
+    // this is one field addition: zero scalar muls, no new domain tag. The
+    // escrowed blinding is the one the operation WRITES, not the one it
+    // consumes, so the auditor's opening matches the C_a' left on-chain.
+    assert(r_a_new + m_s[2] == r_tilde_aud_s);
 }

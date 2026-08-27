@@ -51,6 +51,7 @@ All events emitted by the confidential token (DESIGN_cont §11.2) with the follo
 | `Transfer` (recipient side) | Receiving-side replay: carries the recipient-channel ciphertexts for `(v_transfer, r_transfer)`. |
 | `SpenderTransfer` (recipient side) | Receiving-side replay, as above. |
 | `Merge` | Folds the receiving opening into the spendable opening; resets the receiving side. |
+| `SetSpender`, `SpenderTransfer` (owner side) | **The auditor's only route to an allowance opening.** The escrowed allowance blinding rides these two events (`r_a_tilde_aud_s` on `SetSpender`, `r_tilde_aud_s` on `SpenderTransfer`) and appears nowhere in contract storage, so an auditor that misses one has no way to reconstruct the opening of the `C_a` it wrote — see §7 *Auditor recovery*. |
 | `Withdraw`, `Transfer` (sender side), `SetSpender`, `RevokeSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the owner's spendable balance. `SetSpender`/`RevokeSpender` are in scope as owner checkpoints only — a spender recovers allowance state from the on-chain delegation entry (`allowance_commitment`, `a_tilde`, `escrowed_dvk`, `allowance_salt`), not from the archive. The auditor-channel ciphertexts these events also carry are out of scope for wallet recovery. |
 
 A self-transfer — a `Transfer` whose `from` and `to` are the same account — carries both roles at once: it is a sender-side checkpoint and a recipient-side replay event, and recovery applies both (DESIGN §5.2).
@@ -115,6 +116,15 @@ The indexer is trusted for **availability and completeness only** — never for 
 - **Confidentiality.** Everything the indexer holds is public chain data: commitments, masked ciphertexts, and ECDH ephemerals. A curious indexer learns nothing beyond what any chain observer sees (DESIGN_cont §9).
 - **Integrity fails closed.** Recovery ends with the wallet checking its reconstructed openings against the **on-chain** commitments (`C_spend =? v·G + r·H`, DESIGN §5.2 step 7). A tampered or incomplete history cannot produce a wrong balance that verifies; it produces a detectable mismatch.
 - **Withholding is the residual risk.** A malicious or broken indexer can deny recovery (a liveness failure, not a soundness one). Two structural mitigations: for the recent window the RPC is an independent source of the same events (the hybrid split of §1), so archive withholding bites only the pre-window history; and for that older history wallets SHOULD support multiple independent archive endpoints, with deployments running or contracting at least two. The auditor's forward-tracked openings (DESIGN_cont §8.1) are a second recovery source in principle, but no specification defines an auditor-to-wallet channel, so they do not relax this recommendation.
+
+### 7.1 Auditor recovery
+
+An auditor's allowance tracking is strictly event-scoped and has no state-based fallback. The opening of a delegation's `C_a` is escrowed only in the event that wrote it (DESIGN_cont §8.5), so a missed, reordered, or unarchived `SetSpender` / `SpenderTransfer` leaves the auditor holding a value it cannot open until the delegation's next state-changing operation. This is a stronger dependency on the archive than the spendable side, where the auditor's opening survives merges by homomorphic carry-forward (DESIGN_cont §8.1).
+
+Two consequences for deployments:
+
+- **Consistency checking is the practical detection mechanism.** Soroban enforces nothing about archive completeness, ordering, or availability. An auditor client SHOULD verify each reconstructed allowance opening against the stored `allowance_commitment` — `C_a =? v_a·G + r_a·H` — which is the same fails-closed check §7 states for wallets. A mismatch is evidence of a missed, reordered, or pruned event rather than of a wrong balance.
+- **Delegation TTL bounds the recovery anchor.** `live_until_ledger` governs spending authority and is independent of the delegation entry's persistent-entry TTL. If the entry itself is archived away, the commitment the auditor checks against is gone, so the consistency check above becomes unavailable exactly when it is most needed. Deployments SHOULD monitor delegation-entry TTL, not only `live_until_ledger`.
 
 ## 8. Conformance and Versioning
 

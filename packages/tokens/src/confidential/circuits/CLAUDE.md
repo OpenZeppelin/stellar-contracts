@@ -40,6 +40,8 @@ Sponge parameters, the canonical lane assignment, and the mode-exclusivity rule 
 
 `AUDITOR_SENDER` is squeezed three-wide by every circuit that escrows lane 2 and two-wide only by RevokeSpender (V_a3); `AUDITOR_RECIPIENT` is always two-wide; every other tag goes through `poseidon_with_domain`. Widening or narrowing a channel is a spec change, not a refactor.
 
+Lane 2 carries **the blinding of a commitment the operation writes, never a key** — `r'` on W_a5 / T_a9 / S_a6, `r_a'` on O_a9. Tag 17 (`ESCROWED_ALLOWANCE_BLINDING_AUDITOR`) is the same idea off-sponge: SetSpender's lane 2 is already taken, so S14 escrows `r_a` under a single-output pad. Do not escrow `dvk_i` here: it is permanent per `(owner, spender)` and survives revoke-then-re-delegate, so one leaked ciphertext would open every allowance state for that pair, past and future (`../docs/DESIGN_cont.md` §8.5).
+
 ECDH must absorb both `S.x` and `S.y`; x-only extraction collapses `P` and `-P`.
 
 The `G` and `H` generators are hardcoded but provenance-checked at runtime by the `print_generators` test; re-extract with `nargo test print_generators --show-output` rather than editing the constants by hand.

@@ -402,7 +402,7 @@ pub trait ConfidentialToken {
     /// * topics - `["spender_transfer", spender: Address, from: Address, to:
     ///   Address]`
     /// * data - `[r_e_point, v_tilde, sigma_a, sigma_a_new, v_tilde_aud_r,
-    ///   r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s, dvk_cipher_aud]`
+    ///   r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s, r_tilde_aud_s]`
     fn confidential_transfer_from(
         e: &Env,
         spender: Address,
@@ -449,7 +449,7 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["set_spender", account: Address, spender: Address]`
     /// * data - `[live_until_ledger: u32, r_e_point, sigma, sigma_a, b_tilde,
-    ///   v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s, dvk_cipher_aud]`
+    ///   v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s, r_a_tilde_aud_s]`
     fn set_spender(
         e: &Env,
         account: Address,
@@ -762,7 +762,7 @@ pub struct SpenderTransfer {
     pub r_tilde_aud_r: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub a_tilde_aud_s: BytesN<32>,
-    pub dvk_cipher_aud: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits an `SpenderTransfer` event.
@@ -780,7 +780,7 @@ pub fn emit_spender_transfer(
     r_tilde_aud_r: &BytesN<32>,
     v_tilde_aud_s: &BytesN<32>,
     a_tilde_aud_s: &BytesN<32>,
-    dvk_cipher_aud: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
 ) {
     SpenderTransfer {
         spender: spender.clone(),
@@ -794,7 +794,7 @@ pub fn emit_spender_transfer(
         r_tilde_aud_r: r_tilde_aud_r.clone(),
         v_tilde_aud_s: v_tilde_aud_s.clone(),
         a_tilde_aud_s: a_tilde_aud_s.clone(),
-        dvk_cipher_aud: dvk_cipher_aud.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -815,7 +815,7 @@ pub struct SetSpender {
     pub v_tilde_aud_s: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
     pub r_tilde_aud_s: BytesN<32>,
-    pub dvk_cipher_aud: BytesN<32>,
+    pub r_a_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `SetSpender` event.
@@ -832,7 +832,7 @@ pub fn emit_set_spender(
     v_tilde_aud_s: &BytesN<32>,
     b_tilde_aud_s: &BytesN<32>,
     r_tilde_aud_s: &BytesN<32>,
-    dvk_cipher_aud: &BytesN<32>,
+    r_a_tilde_aud_s: &BytesN<32>,
 ) {
     SetSpender {
         account: account.clone(),
@@ -845,7 +845,7 @@ pub fn emit_set_spender(
         v_tilde_aud_s: v_tilde_aud_s.clone(),
         b_tilde_aud_s: b_tilde_aud_s.clone(),
         r_tilde_aud_s: r_tilde_aud_s.clone(),
-        dvk_cipher_aud: dvk_cipher_aud.clone(),
+        r_a_tilde_aud_s: r_a_tilde_aud_s.clone(),
     }
     .publish(e);
 }

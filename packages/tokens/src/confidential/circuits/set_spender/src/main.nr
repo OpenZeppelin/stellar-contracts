@@ -1,7 +1,7 @@
 use stellar_confidential_lib::{
     H, assert_on_curve_non_identity, commit, derive_allow_r, derive_spend_r, domain,
-    dvk_from_vk_op, ecdh, encrypt_allowance, encrypt_balance, encrypt_esc_dvk,
-    encrypt_esc_dvk_auditor, scalar_mul, sponge_squeeze_3, vk_from_sk,
+    dvk_from_vk_op, ecdh, encrypt_allowance, encrypt_balance, encrypt_esc_allow_r_auditor,
+    encrypt_esc_dvk, scalar_mul, sponge_squeeze_3, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 
@@ -59,18 +59,21 @@ mod tests;
 //                              + Poseidon2(delta_esc_dvk, s_esc, op_i)
 //                                                        Masked dvk_i for the
 //                                                        spender.
-//   S14 dvk_cipher_aud = dvk_i
-//                      + Poseidon2(delta_esc_dvk_aud, s_{a,s}, op_i)
+//   S14 r_a_tilde_aud_s = r_a
+//                      + Poseidon2(delta_esc_allow_r_aud, s_{a,s}, op_i)
 //                                                        Auditor-side escrow
-//                                                        of dvk_i. Hands the
+//                                                        of the allowance
+//                                                        blinding S6 derived
+//                                                        and S7 committed to.
+//                                                        With v_tilde_aud_s
+//                                                        (S_a4) this hands the
 //                                                        owner's auditor the
-//                                                        full opening of C_a:
-//                                                        with dvk_i it derives
-//                                                        r_a and opens the
-//                                                        allowance at every
-//                                                        state transition of
-//                                                        the delegation
-//                                                        (Section 8.5).
+//                                                        opening of the C_a
+//                                                        this operation writes
+//                                                        (Section 8.5) --
+//                                                        one state, not the
+//                                                        key that generates
+//                                                        every state.
 //                                                        A separate single-
 //                                                        output Poseidon
 //                                                        rather than a sponge
@@ -78,7 +81,9 @@ mod tests;
 //                                                        of this channel is
 //                                                        taken by S_a6. Costs
 //                                                        one Poseidon and zero
-//                                                        scalar muls.
+//                                                        scalar muls; r_a is
+//                                                        already a witness
+//                                                        (S6).
 //                                                        Unconditional -- there
 //                                                        is no delegation that
 //                                                        can exist without it.
@@ -171,11 +176,15 @@ mod tests;
 //   24   r_tilde_aud_s        r_tilde_aud_s     Prover-supplied owner-auditor
 //                                                escrow of the new spendable
 //                                                blinding; emitted.
-//   25   dvk_cipher_aud       dvk_cipher_aud    Prover-supplied owner-auditor
-//                                                escrow of dvk_i; emitted.
-//                                                Distinct from
-//                                                escrowed_dvk_cipher, which is
-//                                                the spender-side escrow.
+//   25   r_a_tilde_aud_s      r_a_tilde_aud_s   Prover-supplied owner-auditor
+//                                                escrow of the new allowance
+//                                                blinding; emitted. Distinct
+//                                                from r_tilde_aud_s (index
+//                                                24), which escrows the
+//                                                spendable blinding, and from
+//                                                escrowed_dvk_cipher, which
+//                                                hands the spender the
+//                                                delegation key.
 //
 // Private witnesses
 // -----------------
@@ -217,7 +226,7 @@ fn main(
     v_tilde_aud_s: pub Field,
     b_tilde_aud_s: pub Field,
     r_tilde_aud_s: pub Field,
-    dvk_cipher_aud: pub Field,
+    r_a_tilde_aud_s: pub Field,
 ) {
     // S13 -- runs first so the r_e = 0 attack is rejected before any
     // scalar mul against it could quietly produce the identity (R_e, S_{a,s},
@@ -301,7 +310,8 @@ fn main(
     // S_a2 (owner-auditor shared-secret scalar)
     let s_a_s = ecdh(r_e, k_aud_s);
 
-    // S_a3 (owner-channel masks: amount, balance, then the secret-escrow slot)
+    // S_a3 (owner-channel masks: amount, balance, then the blinding-escrow
+    // slot)
     let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, sigma);
 
     // S_a4
@@ -314,7 +324,9 @@ fn main(
     assert(r_new + m_s[2] == r_tilde_aud_s);
 
     // S14 -- reuses s_a_s from S_a2, so no new scalar multiplication. Runs
-    // after the auditor block so the shared scalar is already in scope.
-    let dvk_cipher_aud_derived = encrypt_esc_dvk_auditor(dvk, s_a_s, op_i);
-    assert(dvk_cipher_aud_derived == dvk_cipher_aud);
+    // after the auditor block so the shared scalar is already in scope. The
+    // escrowed value is S6's r_a, the very blinding S7 committed under, so the
+    // auditor's opening matches the C_a this proof writes on-chain.
+    let r_a_tilde_aud_s_derived = encrypt_esc_allow_r_auditor(r_a, s_a_s, op_i);
+    assert(r_a_tilde_aud_s_derived == r_a_tilde_aud_s);
 }

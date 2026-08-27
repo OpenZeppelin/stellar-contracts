@@ -101,7 +101,7 @@ The sponge construction, its width and rate, the IV placement, the padding rule,
 
 $$\text{poseidon\\\_with\\\_domain}(\delta, [x_1, \ldots, x_n]) = \text{sponge}([\delta, x_1, \ldots, x_n])$$
 
-Squeeze-slot assignment is canonical and MUST be followed: lane 0 is always an amount mask, lane 1 is always a balance, allowance, or per-transfer-randomness mask, and lane 2 is always the sender-auditor secret-escrow slot — the new spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`, the delegation viewing key $$dvk_i$$ on `SpenderTransfer` (DESIGN.md §2.5). Only the sender-auditor channel ($$\delta_{\text{aud\\\_s}}$$) is squeezed three-wide; the recipient channel ($$\delta_{\text{aud\\\_r}}$$) stays at two lanes. `Withdraw`, whose amount is public, takes lanes **1** and **2** and leaves lane 0 unused (DESIGN.md W_a3–W_a5), so a checkpoint pad can never coincide with an amount pad.
+Squeeze-slot assignment is canonical and MUST be followed: lane 0 is always an amount mask, lane 1 is always a balance, allowance, or per-transfer-randomness mask, and lane 2 is always the sender-auditor blinding-escrow slot — the new spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`, the new allowance blinding $$r_a'$$ on `SpenderTransfer` (DESIGN.md §2.5). Lane 2 never carries a key. Only the sender-auditor channel ($$\delta_{\text{aud\\\_s}}$$) is squeezed three-wide; the recipient channel ($$\delta_{\text{aud\\\_r}}$$) stays at two lanes. `Withdraw`, whose amount is public, takes lanes **1** and **2** and leaves lane 0 unused (DESIGN.md W_a3–W_a5), so a checkpoint pad can never coincide with an amount pad.
 
 ### 4.4 Generators and commitments
 
@@ -157,11 +157,11 @@ Secret scalars — $$\sigma$$, $$\sigma_a$$ — MUST be produced by the rejectio
 | $$\delta_{\text{eph}}$$ | 14 | No — derived off-circuit (DESIGN.md §5.3) |
 | $$\delta_{\text{disc\\\_bind}}$$ | 15 | No — off-chain disclosure only |
 | $$\delta_{\text{disc}}$$ | 16 | No — off-chain disclosure only |
-| $$\delta_{\text{esc\\\_dvk\\\_aud}}$$ | 17 | Yes |
+| $$\delta_{\text{esc\\\_allow\\\_r\\\_aud}}$$ | 17 | Yes |
 
 DESIGN_cont.md §13 assigns all seventeen values and is their only source; the right-hand column is this document's addition. $$\delta_{\text{disc\\\_bind}}$$ and $$\delta_{\text{disc}}$$ belong to the off-chain disclosure layer (SELECTIVE_DISCLOSURE.md §2.2). Tag 1 is absorbed by the contract rather than by a circuit — the contract derives $$\text{addr\\\_f}$$ and $$\text{op}_i$$ on-chain and the circuits receive them as opaque public inputs (DESIGN.md §2.7 *Usage sites*) — so it is part of the on-chain wire contract all the same. None of 14–16 is absorbed either in a circuit or on-chain, so none is part of the on-chain wire contract, but all three are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
 
-All seventeen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tags 11 and 12 are the multi-lane tags — 11 read three-wide wherever lane 2 is escrowed and two-wide on `RevokeSpender`, 12 always two-wide; the remaining fifteen, including 1, 14–16, and 17, are single-output tags. Tag 17 is absorbed only by the `SetSpender` circuit (DESIGN.md S14), which escrows $$dvk_i$$ to the owner's auditor under a single-output pad rather than over lane 2, that lane being taken by the spendable blinding; its fixture is `circuits/lib/testdata/encrypt_esc_dvk_auditor.json`.
+All seventeen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tags 11 and 12 are the multi-lane tags — 11 read three-wide wherever lane 2 is escrowed and two-wide on `RevokeSpender`, 12 always two-wide; the remaining fifteen, including 1, 14–16, and 17, are single-output tags. Tag 17 is absorbed only by the `SetSpender` circuit (DESIGN.md S14), which escrows the allowance blinding $$r_a$$ to the owner's auditor under a single-output pad rather than over lane 2, that lane being taken by the spendable blinding; its fixture is `circuits/lib/testdata/encrypt_esc_allow_r_auditor.json`.
 
 ### 4.9 Address compression
 
@@ -461,13 +461,13 @@ A spender MUST NOT be able to reach the owner's spendable balance through any in
 
 ## 11. Auditor Client
 
-An auditor decrypts from the public event and its own secret $$k$$ alone, with no viewing key, holder cooperation, or extra on-chain read -- including the allowance salts, which the delegation events publish ($$\sigma_a$$ on `SetSpender`, $$\sigma_a'$$ on `SpenderTransfer`), so $$r_a = \text{Poseidon}(\delta_{\text{allow\\\_r}}, dvk_i, \sigma_a)$$ and the opening of $$C_a$$ follow from the event alone (DESIGN_cont.md §8.5). For each channel it computes the shared scalar against the event's ephemeral point, derives that channel's lane masks (§4.3) — three on the sender / owner channel, two on the recipient channel — and subtracts.
+An auditor decrypts from the public event and its own secret $$k$$ alone, with no viewing key, holder cooperation, or extra on-chain read. The allowance opening comes straight out of the event: the blinding of the $$C_a$$ that operation writes is escrowed in the event itself -- tag 17 on `SetSpender`, lane 2 on `SpenderTransfer` -- and the matching value is in the sender-channel ciphertext (DESIGN_cont.md §8.5). An auditor that did not observe the event holds no opening for that state and cannot derive one; there is no key from which the openings follow. For each channel it computes the shared scalar against the event's ephemeral point, derives that channel's lane masks (§4.3) — three on the sender / owner channel, two on the recipient channel — and subtracts.
 
 The two channels differ in what they yield (DESIGN_cont.md §8.1):
 
 | Channel | Lane 0 | Lane 1 | Lane 2 |
 |:--|:--|:--|:--|
-| Sender / owner ($$\delta_{\text{aud\\\_s}}$$) | Transfer amount, or the escrowed amount for `SetSpender` and the reclaimed amount for `RevokeSpender` | Sender's post-operation balance, or post-operation allowance for a spender transfer | Post-operation spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`; $$dvk_i$$ on `SpenderTransfer`; nothing on `RevokeSpender`, which stays two-lane |
+| Sender / owner ($$\delta_{\text{aud\\\_s}}$$) | Transfer amount, or the escrowed amount for `SetSpender` and the reclaimed amount for `RevokeSpender` | Sender's post-operation balance, or post-operation allowance for a spender transfer | Post-operation spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`; post-transfer allowance blinding $$r_a'$$ on `SpenderTransfer`; nothing on `RevokeSpender`, which stays two-lane |
 | Recipient ($$\delta_{\text{aud\\\_r}}$$) | Transfer amount | Per-transfer Pedersen randomness $$r_{\text{transfer}}$$ | — (channel is two-lane) |
 
 `Withdraw`, `SetSpender`, and `RevokeSpender` carry a sender-channel balance checkpoint whose pad is lane **1**. Only `Withdraw` leaves lane 0 unused, its amount being public (DESIGN.md W_a3, §4.3); `SetSpender` and `RevokeSpender` read lane 0 as well, for the escrowed and reclaimed amounts respectively (DESIGN.md S_a4, V_a4).

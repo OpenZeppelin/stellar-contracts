@@ -173,9 +173,9 @@ pub struct SpenderTransferPayload {
     pub r_tilde_aud_r: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub a_tilde_aud_s: BytesN<32>,
-    /// Owner-auditor secret-escrow slot (sponge lane 2): the delegation
-    /// viewing key re-escrowed as `dvk_i + m_r_s` (constraint O_a9).
-    pub dvk_cipher_aud: BytesN<32>,
+    /// Owner-auditor blinding-escrow slot (sponge lane 2): the blinding of
+    /// the new allowance commitment, `r_a' + m_r_s` (constraint O_a9).
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
@@ -204,10 +204,12 @@ pub struct SetSpenderPayload {
     /// Owner-auditor secret-escrow slot (sponge lane 2): the blinding of the
     /// new spendable commitment, `r' + m_r_s` (constraint S_a6).
     pub r_tilde_aud_s: BytesN<32>,
-    /// Owner-auditor escrow of the delegation viewing key,
-    /// `dvk_i + Poseidon2(delta_esc_dvk_aud, s_a_s, op_i)` (constraint S14).
-    /// Distinct from `escrowed_dvk`, which is the *spender*-side escrow.
-    pub dvk_cipher_aud: BytesN<32>,
+    /// Owner-auditor escrow of the allowance blinding,
+    /// `r_a + Poseidon2(delta_esc_allow_r_aud, s_a_s, op_i)` (constraint
+    /// S14). Distinct from `r_tilde_aud_s` above, which escrows the *spendable*
+    /// blinding, and from `escrowed_dvk`, which hands the *spender* the
+    /// delegation viewing key.
+    pub r_a_tilde_aud_s: BytesN<32>,
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
@@ -782,7 +784,7 @@ pub fn confidential_transfer(
 /// * topics - `["spender_transfer", spender: Address, from: Address, to:
 ///   Address]`
 /// * data - `[r_e_point, v_tilde, sigma_a, sigma_a_new, v_tilde_aud_r,
-///   r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s, dvk_cipher_aud]`
+///   r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s, r_tilde_aud_s]`
 ///
 /// # Security Warning
 ///
@@ -817,7 +819,7 @@ pub fn confidential_transfer_from(
     //   C_a, sigma_a, Y_op, PVK_recipient, K_aud_r, K_aud_s,
     //   C_a', C_transfer, R_e, v_tilde, a_tilde', sigma_a',
     //   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s,
-    //   dvk_cipher_aud
+    //   r_tilde_aud_s
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &delegation.allowance_commitment);
     append_field(&mut pi, &delegation.allowance_salt);
@@ -835,7 +837,7 @@ pub fn confidential_transfer_from(
     append_field(&mut pi, &payload.r_tilde_aud_r);
     append_field(&mut pi, &payload.v_tilde_aud_s);
     append_field(&mut pi, &payload.a_tilde_aud_s);
-    append_field(&mut pi, &payload.dvk_cipher_aud);
+    append_field(&mut pi, &payload.r_tilde_aud_s);
 
     verify(e, CircuitType::SpenderTransfer, &pi, proof);
 
@@ -862,7 +864,7 @@ pub fn confidential_transfer_from(
         &payload.r_tilde_aud_r,
         &payload.v_tilde_aud_s,
         &payload.a_tilde_aud_s,
-        &payload.dvk_cipher_aud,
+        &payload.r_tilde_aud_s,
     );
 }
 
@@ -898,7 +900,7 @@ pub fn confidential_transfer_from(
 ///
 /// * topics - `["set_spender", account: Address, spender: Address]`
 /// * data - `[live_until_ledger: u32, r_e_point, sigma, sigma_a, b_tilde,
-///   v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s, dvk_cipher_aud]`
+///   v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s, r_a_tilde_aud_s]`
 ///
 /// # Security Warning
 ///
@@ -923,7 +925,7 @@ pub fn set_spender(
     //   C_spend, Y, Y_op, spender_id (op_i), addr_f, K_aud_s,
     //   C_spend', C_a, escrowed_dvk, b_tilde, a_tilde,
     //   sigma, sigma_a, R_e, v_tilde_aud_s, b_tilde_aud_s,
-    //   r_tilde_aud_s, dvk_cipher_aud
+    //   r_tilde_aud_s, r_a_tilde_aud_s
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &owner.spendable_commitment);
     append_point(&mut pi, &owner.spending_public_key);
@@ -942,7 +944,7 @@ pub fn set_spender(
     append_field(&mut pi, &payload.v_tilde_aud_s);
     append_field(&mut pi, &payload.b_tilde_aud_s);
     append_field(&mut pi, &payload.r_tilde_aud_s);
-    append_field(&mut pi, &payload.dvk_cipher_aud);
+    append_field(&mut pi, &payload.r_a_tilde_aud_s);
 
     verify(e, CircuitType::SetSpender, &pi, proof);
 
@@ -972,7 +974,7 @@ pub fn set_spender(
         &payload.v_tilde_aud_s,
         &payload.b_tilde_aud_s,
         &payload.r_tilde_aud_s,
-        &payload.dvk_cipher_aud,
+        &payload.r_a_tilde_aud_s,
     );
 }
 

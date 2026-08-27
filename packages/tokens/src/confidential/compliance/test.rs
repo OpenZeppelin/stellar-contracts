@@ -223,7 +223,7 @@ fn spender_transfer_payload(e: &Env) -> SpenderTransferPayload {
         r_tilde_aud_r: fr(e),
         v_tilde_aud_s: fr(e),
         a_tilde_aud_s: fr(e),
-        dvk_cipher_aud: fr(e),
+        r_tilde_aud_s: fr(e),
     }
 }
 
@@ -240,7 +240,7 @@ fn set_spender_payload(e: &Env) -> SetSpenderPayload {
         v_tilde_aud_s: fr(e),
         b_tilde_aud_s: fr(e),
         r_tilde_aud_s: fr(e),
-        dvk_cipher_aud: fr(e),
+        r_a_tilde_aud_s: fr(e),
     }
 }
 

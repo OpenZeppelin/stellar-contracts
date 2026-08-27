@@ -104,7 +104,7 @@ Spenders enable use cases like automated trading bots, payment processors, or cu
 |:-----|:----|:-------------|
 | **Setup** | | |
 | 1 | Owner | Specifies the spender address (which must already be a registered account in the contract, so its spending public key can be looked up for delegation key escrow), the allowance amount, and a `live_until_ledger` expiration. |
-| 2 | Wallet | Generates a proof that the allowance is correctly carved out of the owner's spendable balance. The proof also covers derivation and ECDH escrow of a delegation viewing key (`dvk`) so the spender can independently track and decrypt its allowance state, and produces ciphertexts for the owner's auditor (escrow amount and post-operation balance checkpoint). |
+| 2 | Wallet | Generates a proof that the allowance is correctly carved out of the owner's spendable balance. The proof also covers derivation and ECDH escrow of a delegation viewing key (`dvk`) so the spender can independently track and decrypt its allowance state, and produces ciphertexts for the owner's auditor (escrow amount, post-operation balance checkpoint, and the blinding of the allowance commitment it just wrote). |
 | 3 | Contract | Verifies the proof, deducts the allowance from the owner's spendable balance commitment, and stores the spender delegation (allowance commitment, encrypted allowance, escrowed `dvk`, allowance salt, expiration). Emits an event with the owner's post-operation balance checkpoint and the owner-auditor ciphertexts. |
 | **Operation** | | |
 | 4 | Spender | Initiates a confidential transfer from the escrowed allowance to any registered recipient. A proof accompanies each transfer, covering allowance sufficiency, ECDH-derived encryption for the recipient, and dual-auditor ciphertexts for the recipient's and owner's auditors. |
@@ -133,7 +133,8 @@ The system supports **real-time auditing** via a dual-auditor model. Each accoun
 | Spender escrow / reclaim amount | n/a | Yes (owner's auditor) |
 | Post-transfer spender allowance | No (for spender transfers) | Yes (owner's auditor) |
 | Post-escrow / post-reclaim balance | n/a | Yes (owner's auditor), at spender setup and revocation respectively |
-| Delegation viewing key `dvk` | No | Yes (owner's auditor), at spender setup and on every spender transfer (enables opening the allowance commitment) |
+| Delegation viewing key `dvk` | No | No |
+| Allowance blinding $r_a$ | No | Yes (owner's auditor), at spender setup and on every spender transfer — one state's blinding per event, which with the amount opens that event's allowance commitment |
 
 The table covers every auditor ciphertext the protocol produces; `DESIGN_cont.md` §8.1-§8.5 is the normative account, including the bounds on each opening capability.
 

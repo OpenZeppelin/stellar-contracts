@@ -70,10 +70,12 @@ global R_TILDE_AUD_R: Field =
     0x16cb31d142cf3005f8bd95ab3f59c3bda0da0de7e1d2ac16b4d038548a02b364;
 global V_TILDE_AUD_S: Field =
     0x0d0a3aa77960977737f4355093d4672ea9f95556fabf63bda0913ebef52c42cf;
-// Lane-2 secret-escrow slot (O_a9): the delegation viewing key, re-escrowed
-// to the owner's auditor on every spender transfer.
-global DVK_CIPHER_AUD: Field =
-    0x10a1e8766310b1369a48b22e12f01b8610041bf25bc1807d01812491f9702f57;
+// Lane-2 blinding-escrow slot (O_a9): the NEW allowance blinding r_a', the
+// one O11 commits C_a' under, escrowed to the owner's auditor on every
+// spender transfer. Note it is derived from SIGMA_A_NEW while the lane-2 pad
+// keys off SIGMA_A -- see main.nr's O_a9 note.
+global R_TILDE_AUD_S: Field =
+    0x0382ab29c6554066d495613fdec52421d70c3bf49d0faaf25552266222af073a;
 global A_TILDE_AUD_S: Field =
     0x288ff48898f218dbba2a5c9546d0986af3257a4a539e23e4f35c404d6720c144;
 
@@ -110,7 +112,7 @@ fn print_fixtures() {
     let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
     let v_tilde_aud_s = V_TRANSFER + m_s[0];
     let a_tilde_aud_s = V_A_NEW + m_s[1];
-    let dvk_cipher_aud = DVK_I + m_s[2];
+    let r_tilde_aud_s = r_a_new + m_s[2];
 
     let yopx = y_op.x;
     let yopy = y_op.y;
@@ -151,7 +153,7 @@ fn print_fixtures() {
     println(f"R_TILDE_AUD_R = {r_tilde_aud_r}");
     println(f"V_TILDE_AUD_S = {v_tilde_aud_s}");
     println(f"A_TILDE_AUD_S = {a_tilde_aud_s}");
-    println(f"DVK_CIPHER_AUD = {dvk_cipher_aud}");
+    println(f"R_TILDE_AUD_S = {r_tilde_aud_s}");
 }
 
 #[test]
@@ -206,7 +208,7 @@ fn spender_transfer_auditor_fixtures_match_lib() {
     assert(r_transfer + m_r[1] == R_TILDE_AUD_R);
     assert(V_TRANSFER + m_s[0] == V_TILDE_AUD_S);
     assert(V_A_NEW + m_s[1] == A_TILDE_AUD_S);
-    assert(DVK_I + m_s[2] == DVK_CIPHER_AUD);
+    assert(derive_allow_r(DVK_I, SIGMA_A_NEW) + m_s[2] == R_TILDE_AUD_S);
 }
 
 // `run_main` accepts every public input as a parameter -- nothing baked in.
@@ -245,7 +247,7 @@ fn run_main(
     r_tilde_aud_r_in: Field,
     v_tilde_aud_s_in: Field,
     a_tilde_aud_s_in: Field,
-    dvk_cipher_aud_in: Field,
+    r_tilde_aud_s_in: Field,
 ) {
     main(
         sk_op_in,
@@ -278,7 +280,7 @@ fn run_main(
         r_tilde_aud_r_in,
         v_tilde_aud_s_in,
         a_tilde_aud_s_in,
-        dvk_cipher_aud_in,
+        r_tilde_aud_s_in,
     );
 }
 
@@ -314,7 +316,7 @@ fn run_fixture() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -385,7 +387,7 @@ fn second_transfer_against_same_allowance() {
         r_transfer + m_r[1],
         v_transfer_2 + m_s[0],
         v_a_new_2 + m_s[1],
-        DVK_I + m_s[2],
+        r_a_new_2 + m_s[2],
     );
 }
 
@@ -443,7 +445,7 @@ fn full_allowance_transfer() {
         r_transfer + m_r[1],
         V_A + m_s[0],
         0 + m_s[1],
-        DVK_I + m_s[2],
+        r_a_new + m_s[2],
     );
 }
 
@@ -481,7 +483,7 @@ fn rejects_wrong_sk_op() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -555,7 +557,7 @@ fn rejects_wrong_dvk_against_contract() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -604,7 +606,7 @@ fn rejects_wrong_allowance_opening() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         v_a_new_bad + m_s[1],
-        DVK_I + m_s[2],
+        r_a_new + m_s[2],
     );
 }
 
@@ -663,7 +665,7 @@ fn rejects_v_a_new_out_of_range() {
         r_transfer + m_r[1],
         v_transfer_too_large + m_s[0],
         (V_A - v_transfer_too_large) + m_s[1],
-        DVK_I + m_s[2],
+        r_a_new + m_s[2],
     );
 }
 
@@ -718,7 +720,7 @@ fn rejects_v_a_out_of_range() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         v_a_new_huge + m_s[1],
-        DVK_I + m_s[2],
+        r_a_new + m_s[2],
     );
 }
 
@@ -777,7 +779,7 @@ fn rejects_v_transfer_out_of_range() {
         r_transfer + m_r[1],
         v_transfer_huge + m_s[0],
         v_a_new_huge + m_s[1],
-        DVK_I + m_s[2],
+        r_a_new + m_s[2],
     );
 }
 
@@ -818,7 +820,7 @@ fn rejects_wrong_recipient_pvk() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -866,7 +868,7 @@ fn rejects_poisoned_c_transfer() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -904,7 +906,7 @@ fn rejects_tampered_v_tilde() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -950,7 +952,7 @@ fn rejects_tampered_a_tilde_new() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -988,7 +990,7 @@ fn rejects_tampered_c_a_new() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -1036,7 +1038,7 @@ fn rejects_sigma_a_new_equal_to_sigma_a() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -1096,7 +1098,7 @@ fn rejects_r_e_zero() {
         r_transfer_zero + m_r_zero[1],
         V_TRANSFER + m_s_zero[0],
         V_A_NEW + m_s_zero[1],
-        DVK_I + m_s_zero[2],
+        derive_allow_r(DVK_I, SIGMA_A_NEW) + m_s_zero[2],
     );
 }
 
@@ -1153,7 +1155,7 @@ fn rejects_wrong_r_e() {
         r_transfer_bad + m_r_bad[1],
         V_TRANSFER + m_s_bad[0],
         V_A_NEW + m_s_bad[1],
-        DVK_I + m_s_bad[2],
+        derive_allow_r(DVK_I, SIGMA_A_NEW) + m_s_bad[2],
     );
 }
 
@@ -1192,7 +1194,7 @@ fn rejects_off_curve_k_aud_r() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -1231,7 +1233,7 @@ fn rejects_identity_k_aud_r() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -1268,7 +1270,7 @@ fn rejects_off_curve_k_aud_s() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -1305,7 +1307,7 @@ fn rejects_identity_k_aud_s() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -1343,7 +1345,7 @@ fn rejects_tampered_v_tilde_aud_r() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -1381,7 +1383,7 @@ fn rejects_tampered_r_tilde_aud_r() {
         R_TILDE_AUD_R + 1,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -1419,7 +1421,7 @@ fn rejects_tampered_v_tilde_aud_s() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S + 1,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -1457,14 +1459,126 @@ fn rejects_tampered_a_tilde_aud_s() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S + 1,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
+// Salt and ephemeral reuse (characterization)
+// -------------------------------------------
+// The only freshness this circuit enforces is `sigma_a' != sigma_a`, and only
+// against the immediate predecessor; `r_e` is unchecked. The tests below pin
+// what happens under reuse rather than asserting it is prevented.
+
+#[test]
+fn alternating_sigma_a_reproduces_an_earlier_allowance_blinding() {
+    // A -> B -> A is accepted: the salt-rotation check only rules out the
+    // state the transfer consumes. Since r_a is a pure function of
+    // (dvk_i, sigma_a), returning to salt A reproduces salt A's blinding
+    // exactly -- R_A, the blinding of the very first allowance commitment. The
+    // consequence is linkability, not unsoundness: if the value also
+    // coincided, C_a would be byte-identical to a commitment already on-chain.
+    // Here the value differs, so only the blinding repeats.
+    let v_transfer_2: Field = 400;
+    let v_a_new_2: Field = V_A_NEW - v_transfer_2; // 500
+    let r_e_2: Field = R_E + 3;
+
+    // Back to SIGMA_A after one hop through SIGMA_A_NEW.
+    let r_a_new_2 = derive_allow_r(DVK_I, SIGMA_A);
+    assert(r_a_new_2 == R_A);
+
+    let pvk_recipient =
+        EmbeddedCurvePoint { x: PVK_RECIPIENT_X, y: PVK_RECIPIENT_Y, is_infinite: false };
+    let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
+    let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
+    let s = ecdh(r_e_2, pvk_recipient);
+    let r_transfer_2 = derive_transfer_blind(s, SIGMA_A_NEW);
+    let c_transfer_2 = commit(v_transfer_2, r_transfer_2);
+    let v_tilde_2 = encrypt_amount(v_transfer_2, s, SIGMA_A_NEW);
+    let c_a_new_2 = commit(v_a_new_2, r_a_new_2);
+    let a_tilde_new_2 = encrypt_allowance(v_a_new_2, DVK_I, SIGMA_A);
+    let r_e_2_pt = scalar_mul(r_e_2, H);
+    let s_a_r_2 = ecdh(r_e_2, k_aud_r);
+    let m_r_2 = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_2, SIGMA_A_NEW);
+    let s_a_s_2 = ecdh(r_e_2, k_aud_s);
+    let m_s_2 = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s_2, SIGMA_A_NEW);
+
+    run_main(
+        SK_OP,
+        DVK_I,
+        V_A_NEW,
+        derive_allow_r(DVK_I, SIGMA_A_NEW),
+        v_transfer_2,
+        r_e_2,
+        C_A_NEW_X,
+        C_A_NEW_Y,
+        SIGMA_A_NEW,
+        Y_OP_X,
+        Y_OP_Y,
+        PVK_RECIPIENT_X,
+        PVK_RECIPIENT_Y,
+        K_AUD_R_X,
+        K_AUD_R_Y,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        c_a_new_2.x,
+        c_a_new_2.y,
+        c_transfer_2.x,
+        c_transfer_2.y,
+        r_e_2_pt.x,
+        r_e_2_pt.y,
+        v_tilde_2,
+        a_tilde_new_2,
+        SIGMA_A,
+        v_transfer_2 + m_r_2[0],
+        r_transfer_2 + m_r_2[1],
+        v_transfer_2 + m_s_2[0],
+        v_a_new_2 + m_s_2[1],
+        r_a_new_2 + m_s_2[2],
+    );
+}
+
+#[test]
+fn repeated_r_e_and_sigma_a_repeat_every_channel_pad() {
+    // Reusing (r_e, sigma_a) repeats s, s_{a,r}, and s_{a,s}, and with them
+    // every mask on all three channels. Re-encrypting the same plaintexts
+    // under them republishes byte-identical ciphertexts -- no differential.
+    let pvk_recipient =
+        EmbeddedCurvePoint { x: PVK_RECIPIENT_X, y: PVK_RECIPIENT_Y, is_infinite: false };
+    let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
+    let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
+    let s = ecdh(R_E, pvk_recipient);
+    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, ecdh(R_E, k_aud_r), SIGMA_A);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, ecdh(R_E, k_aud_s), SIGMA_A);
+    assert(encrypt_amount(V_TRANSFER, s, SIGMA_A) == V_TILDE);
+    assert(V_TRANSFER + m_r[0] == V_TILDE_AUD_R);
+    assert(V_TRANSFER + m_s[0] == V_TILDE_AUD_S);
+    assert(V_A_NEW + m_s[1] == A_TILDE_AUD_S);
+    assert(derive_allow_r(DVK_I, SIGMA_A_NEW) + m_s[2] == R_TILDE_AUD_S);
+
+    // Change a plaintext under the repeated pad and the difference survives in
+    // the clear. Two transfers of different sizes under one (r_e, sigma_a)
+    // publish v_tilde values whose difference is the amount delta. The circuit
+    // cannot catch this -- a reused r_e is a well-formed witness -- so it is
+    // the honest client's obligation (Section 5.3, Section 9.6).
+    let v_transfer_2: Field = V_TRANSFER + 40;
+    assert((v_transfer_2 + m_s[0]) - V_TILDE_AUD_S == 40);
+}
+
 #[test(should_fail)]
-fn rejects_tampered_dvk_cipher_aud() {
-    // dvk_cipher_aud mutated by +1: O_a9 fails because the lane-2 escrow is
-    // pinned to dvk_i, which the prover's claim no longer matches.
+fn rejects_escrow_of_the_consumed_allowance_blinding() {
+    // The prover escrows R_A -- the blinding of the allowance this transfer
+    // CONSUMES -- instead of O10's r_a', the blinding of the allowance it
+    // writes. Correctly padded under the canonical lane-2 mask, so only O_a9
+    // can catch it, and it does.
+    //
+    // The distinction matters because the auditor's job is to track live
+    // state: a_tilde_aud_s (O_a8) already carries the post-transfer value, so
+    // pairing it with the pre-transfer blinding yields an opening of nothing
+    // on-chain. The auditor already knew the consumed opening -- it decrypted
+    // it from the previous operation's event.
+    let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA_A);
     run_main(
         SK_OP,
         DVK_I,
@@ -1496,7 +1610,46 @@ fn rejects_tampered_dvk_cipher_aud() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD + 1,
+        R_A + m_s[2],
+    );
+}
+
+#[test(should_fail)]
+fn rejects_tampered_r_tilde_aud_s() {
+    // r_tilde_aud_s mutated by +1: O_a9 fails because the lane-2 escrow is
+    // pinned to O10's r_a', which the prover's claim no longer matches.
+    run_main(
+        SK_OP,
+        DVK_I,
+        V_A,
+        R_A,
+        V_TRANSFER,
+        R_E,
+        C_A_X,
+        C_A_Y,
+        SIGMA_A,
+        Y_OP_X,
+        Y_OP_Y,
+        PVK_RECIPIENT_X,
+        PVK_RECIPIENT_Y,
+        K_AUD_R_X,
+        K_AUD_R_Y,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        C_A_NEW_X,
+        C_A_NEW_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
+        R_E_X,
+        R_E_Y,
+        V_TILDE,
+        A_TILDE_NEW,
+        SIGMA_A_NEW,
+        V_TILDE_AUD_R,
+        R_TILDE_AUD_R,
+        V_TILDE_AUD_S,
+        A_TILDE_AUD_S,
+        R_TILDE_AUD_S + 1,
     );
 }
 
@@ -1535,7 +1688,7 @@ fn rejects_wrong_k_aud_r() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
 
@@ -1574,6 +1727,6 @@ fn rejects_wrong_k_aud_s() {
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
         A_TILDE_AUD_S,
-        DVK_CIPHER_AUD,
+        R_TILDE_AUD_S,
     );
 }
