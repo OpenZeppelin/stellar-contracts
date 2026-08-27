@@ -788,24 +788,27 @@ impl RWA {
     ///
     /// The ID is supplied by the caller and carries no on-chain verification.
     /// A verified holder may therefore be a custodian holding on behalf of
-    /// beneficiaries who have no on-chain identity of their own. An issuer
-    /// that requires beneficial owners on the on-chain register should
-    /// override [`crate::fungible::FungibleToken::transfer`] and reject a
-    /// destination whose `id()` is `Some`; see the `rwa-token-example` for the
-    /// pattern.
+    /// beneficiaries who have no on-chain identity of their own.
+    ///
+    /// Whether to accept custodial destinations is the implementor's decision,
+    /// not the library's. An issuer that requires beneficial owners on the
+    /// on-chain register can override
+    /// [`crate::fungible::FungibleToken::transfer`] and reject a destination
+    /// whose `id()` is `Some`; `rwa-token-example` carries that pattern as a
+    /// showcase.
     pub fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         from.require_auth();
 
-        let (to_muxed_id, to) = (to.id(), to.address());
+        let to_address = to.address();
 
         // Snapshot before the update so the hook observes the pre-transfer
         // state.
         let from_snapshot = Self::account_snapshot(e, from);
-        let to_snapshot = Self::account_snapshot(e, &to);
+        let to_snapshot = Self::account_snapshot(e, &to_address);
 
         Self::validate_transfer(e, &from_snapshot, &to_snapshot, amount);
 
-        Base::update(e, Some(from), Some(&to), amount);
+        Base::update(e, Some(from), Some(&to_address), amount);
 
         let compliance_client = ComplianceClient::new(e, &Self::compliance(e));
         compliance_client.transferred(
@@ -815,7 +818,7 @@ impl RWA {
             &TransferKind::Standard,
             &e.current_contract_address(),
         );
-        emit_transfer(e, from, &to, to_muxed_id, amount);
+        emit_transfer(e, from, &to_address, to.id(), amount);
     }
 
     /// `transfer_from` override with added compliance and identity verification

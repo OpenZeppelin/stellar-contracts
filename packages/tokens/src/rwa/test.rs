@@ -748,8 +748,9 @@ fn muxed_destination_cannot_bypass_identity_verification() {
 }
 
 /// An issuer that requires beneficial owners on the on-chain register, and so
-/// refuses custodial sub-account destinations. Mirrors the override in
-/// `rwa-token-example`.
+/// refuses custodial sub-account destinations. Mirrors the showcase override
+/// in `rwa-token-example`; the library itself accepts muxed destinations, and
+/// the choice belongs to the implementor.
 #[contract]
 struct NoOmnibusToken;
 

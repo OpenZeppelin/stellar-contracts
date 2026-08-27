@@ -57,21 +57,28 @@ impl Pausable for RWATokenContract {
 impl FungibleToken for RWATokenContract {
     type ContractType = RWA;
 
-    /// Opting out of custodial (muxed) destinations.
+    /// Showcase: how to opt out of custodial (muxed) destinations.
     ///
-    /// [`RWA`] accepts a muxed destination: identity verification and
-    /// compliance run against the base address, and the muxed ID is recorded
-    /// in the transfer event so a custodian can attribute the transfer to one
-    /// of its off-chain sub-accounts. A verified holder may therefore be a
-    /// custodian holding on behalf of beneficiaries who have no on-chain
-    /// identity of their own, and the ID itself carries no on-chain
-    /// verification.
+    /// **SHOWCASE ONLY**: this override exists purely to illustrate how the
+    /// opt-out is written. It is neither a recommendation nor part of the
+    /// library's behavior, and it is not required for a conforming RWA token.
+    /// Whether to accept custodial destinations is entirely the implementor's
+    /// decision, and both answers are legitimate.
     ///
-    /// That is the right default for an omnibus arrangement, but not for every
-    /// issuer. This issuer requires beneficial owners on the on-chain
-    /// register, so a custodial sub-account destination is refused outright.
-    /// Deleting this override restores the library default, which accepts
-    /// muxed destinations.
+    /// Background: [`RWA`] accepts a muxed destination. Identity verification
+    /// and compliance run against the base address, and the muxed ID is
+    /// recorded in the transfer event so a custodian can attribute the
+    /// transfer to one of its off-chain sub-accounts. A verified holder may
+    /// therefore be a custodian holding on behalf of beneficiaries who have no
+    /// on-chain identity of their own, and the ID itself carries no on-chain
+    /// verification. That is the intended arrangement for omnibus custody, and
+    /// it is what the library does by default.
+    ///
+    /// An issuer that instead requires beneficial owners on the on-chain
+    /// register can refuse muxed destinations, which is what the body below
+    /// does. An issuer content with omnibus custody should simply delete this
+    /// override; the library default then applies and muxed destinations are
+    /// accepted.
     fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
         if to.id().is_some() {
             panic_with_error!(e, RWAError::IdentityVerificationFailed);
