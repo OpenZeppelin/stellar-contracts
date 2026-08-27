@@ -1,6 +1,6 @@
 use crate::main;
 use stellar_confidential_lib::{
-    commit, derive_spend_r, domain, ecdh, encrypt_auditor_sender_balance, encrypt_balance, H,
+    commit, derive_spend_r, domain, ecdh, encrypt_balance, H,
     scalar_mul, sponge_squeeze_3, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
@@ -75,8 +75,9 @@ fn print_fixtures() {
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
     let s_a_s = ecdh(R_E, k_aud_s);
-    let b_tilde_aud_s = encrypt_auditor_sender_balance(V_NEW, s_a_s, SIGMA);
-    let r_tilde_aud_s = r_new + sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA)[2];
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let b_tilde_aud_s = V_NEW + m_s[1];
+    let r_tilde_aud_s = r_new + m_s[2];
     let cx = c_new.x;
     let cy = c_new.y;
     let kx = k_aud_s.x;
@@ -117,10 +118,11 @@ fn withdraw_auditor_fixtures_match_lib() {
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
     let s_a_s = ecdh(R_E, k_aud_s);
-    let b_tilde_aud_s = encrypt_auditor_sender_balance(V_NEW, s_a_s, SIGMA);
     let vk = vk_from_sk(SK, ADDR_F);
     let r_new = derive_spend_r(vk, SIGMA);
-    let r_tilde_aud_s = r_new + sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA)[2];
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let b_tilde_aud_s = V_NEW + m_s[1];
+    let r_tilde_aud_s = r_new + m_s[2];
     assert(k_aud_s.x == K_AUD_S_X);
     assert(k_aud_s.y == K_AUD_S_Y);
     assert(r_e_pt.x == R_E_X);
@@ -166,8 +168,9 @@ fn full_withdrawal() {
     let b_tilde = encrypt_balance(0, vk, SIGMA);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
-    let b_tilde_aud_s = encrypt_auditor_sender_balance(0, s_a_s, SIGMA);
-    let r_tilde_aud_s = r_new + sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA)[2];
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let b_tilde_aud_s = m_s[1];
+    let r_tilde_aud_s = r_new + m_s[2];
     main(
         SK,
         V,
@@ -202,9 +205,9 @@ fn rejects_under_funded_withdrawal() {
     let b_tilde_invalid = encrypt_balance(V - a_too_large, vk, SIGMA);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
-    let b_tilde_aud_s_invalid = encrypt_auditor_sender_balance(V - a_too_large, s_a_s, SIGMA);
-    let r_tilde_aud_s_invalid =
-        r_new + sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA)[2];
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let b_tilde_aud_s_invalid = (V - a_too_large) + m_s[1];
+    let r_tilde_aud_s_invalid = r_new + m_s[2];
     main(
         SK,
         V,
@@ -534,9 +537,8 @@ fn rejects_identity_k_aud_s() {
 
 #[test(should_fail)]
 fn rejects_tampered_b_tilde_aud_s() {
-    // b_tilde_aud_s mutated by +1: W_a3+W_a4 fail because
-    // encrypt_auditor_sender_balance derives a specific scalar that no
-    // longer matches the prover's claim. Closes the
+    // b_tilde_aud_s mutated by +1: W_a4 fails because the lane-1 pad derives
+    // a specific scalar that no longer matches the prover's claim. Closes the
     // tampered-ciphertext criterion in the issue.
     main(
         SK,
@@ -559,6 +561,35 @@ fn rejects_tampered_b_tilde_aud_s() {
         R_E_Y,
         B_TILDE_AUD_S + 1,
         R_TILDE_AUD_S,
+    );
+}
+
+#[test(should_fail)]
+fn rejects_tampered_r_tilde_aud_s() {
+    // r_tilde_aud_s mutated by +1: W_a5 fails because the lane-2 escrow is
+    // pinned to r' = derive_spend_r(vk, sigma), which the prover's claim no
+    // longer matches.
+    main(
+        SK,
+        V,
+        R,
+        R_E,
+        C_SPEND_X,
+        C_SPEND_Y,
+        Y_X,
+        Y_Y,
+        ADDR_F,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        A,
+        C_SPEND_NEW_X,
+        C_SPEND_NEW_Y,
+        SIGMA,
+        B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
+        R_TILDE_AUD_S + 1,
     );
 }
 

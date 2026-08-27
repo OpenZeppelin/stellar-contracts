@@ -139,9 +139,9 @@ pub mod domain {
     /// on spender transfers. Constraints W_a3 / T_a6 / S_a3 / O_a6
     /// (`delta_aud_s`).
     ///
-    /// RevokeSpender (V_a3) still reads two lanes: it writes no checkpoint
-    /// that needs an escrow slot, and the two widths agree on every lane they
-    /// share (see [`sponge_squeeze_3`]).
+    /// RevokeSpender (V_a3) still reads two lanes, so the opening the auditor
+    /// holds is not renewed there and lapses until the next checkpoint; the
+    /// two widths agree on every lane they share (see [`sponge_squeeze_3`]).
     ///
     /// The tag stays in a single sponge mode per Section 2.5:
     /// `sponge_squeeze_2(d, s, sigma)[0]` is the same field element as
@@ -336,13 +336,15 @@ pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
 ///
 /// A single-output Poseidon rather than a third sponge lane, because at
 /// `set_spender` lane 2 of the owner-auditor sponge is already taken by S_a6.
-/// Costs one Poseidon2 permutation and zero scalar multiplications; the pad's
-/// freshness comes from `s_a_s`, which is fresh per operation because `r_e`
-/// is, and `op_i` is a nonce by parallel with S12.
+/// Costs one Poseidon2 permutation and zero scalar multiplications. `op_i` is
+/// a per-`(owner, spender)` constant that separates pads across delegations,
+/// not a nonce: the pad's freshness comes solely from `s_a_s`, which is fresh
+/// per operation because `r_e` is, and `r_e` is fresh only because the salt is
+/// (Section 5.3, Section 9.6).
 ///
 /// This is what gives the auditor the opening of `C_a`: with `dvk_i` it can
-/// derive `r_a = derive_allow_r(dvk_i, sigma_a)`. Any fold of `C_a` into
-/// `C_spend` therefore leaves the auditor's accumulator in sync.
+/// derive `r_a = derive_allow_r(dvk_i, sigma_a)` and open the allowance
+/// commitment at the delegation's every state transition (Section 8.5).
 pub fn encrypt_esc_dvk_auditor(dvk: Field, s_a_s: Field, op_i: Field) -> Field {
     dvk + poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY_AUDITOR, [s_a_s, op_i])
 }
@@ -359,11 +361,16 @@ pub fn encrypt_esc_dvk_auditor(dvk: Field, s_a_s: Field, op_i: Field) -> Field {
 /// and both outputs are served from the same permutation, so the constraint
 /// cost is exactly one Poseidon2 permutation per call.
 ///
-/// Used by: Transfer (T_a2 recipient-auditor amount + randomness, T_a6
-/// sender-auditor amount + balance) and SpenderTransfer (O_a2, O_a6).
+/// Used by the recipient-auditor channel of Transfer (T_a2) and
+/// SpenderTransfer (O_a2), and by RevokeSpender's sender-auditor channel
+/// (V_a3), which escrows nothing in lane 2. Every other sender-auditor
+/// channel reads [`sponge_squeeze_3`].
+///
+/// Defined as the two-lane prefix of [`sponge_squeeze_3`] so the two cannot
+/// drift apart: a change to the IV or the absorb applies to both by
+/// construction rather than by test.
 pub fn sponge_squeeze_2(d: Field, s: Field, sigma: Field) -> [Field; 2] {
-    let iv: Field = 3 * POSEIDON2_IV_BASE;
-    let state = poseidon2_permutation([d, s, sigma, iv], 4);
+    let state = sponge_squeeze_3(d, s, sigma);
     [state[0], state[1]]
 }
 
@@ -391,25 +398,4 @@ pub fn sponge_squeeze_3(d: Field, s: Field, sigma: Field) -> [Field; 3] {
     let iv: Field = 3 * POSEIDON2_IV_BASE;
     let state = poseidon2_permutation([d, s, sigma, iv], 4);
     [state[0], state[1], state[2]]
-}
-
-/// Sender-auditor encrypted balance checkpoint, packaged as a single call.
-///
-/// `b_tilde_aud_s = v_new + sponge_squeeze_2(AUDITOR_SENDER, s_a_s, sigma)[1]`,
-/// where `s_a_s` is the sender-auditor ECDH shared-secret scalar produced by
-/// [`ecdh`]. The pad is lane 1 -- the slot every sender channel (Withdraw
-/// W_a4, Transfer T_a8, SetSpender S_a5, SpenderTransfer O_a8, RevokeSpender
-/// V_a5) uses for its balance/allowance mask. Lane 0 is reserved for amount masks, so a balance
-/// checkpoint never shares a pad with an amount ciphertext even if a
-/// `(r_e, sigma)` pair is mistakenly reused across operations (the pair must
-/// be unique per proof; DESIGN Section 2.5).
-///
-/// No operation circuit calls this today: every sender-auditor channel now
-/// squeezes lane 2 as well (see [`sponge_squeeze_3`]) and reads its lanes from
-/// one array. It is kept as the named, fixture-pinned form of the lane-1
-/// balance ciphertext for SDK consumers, and because
-/// `sponge_squeeze_3(..)[1] == sponge_squeeze_2(..)[1]` makes the two
-/// interchangeable.
-pub fn encrypt_auditor_sender_balance(v_new: Field, s_a_s: Field, sigma: Field) -> Field {
-    v_new + sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, sigma)[1]
 }

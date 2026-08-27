@@ -64,13 +64,13 @@ mod tests;
 //                                                        Auditor-side escrow
 //                                                        of dvk_i. Hands the
 //                                                        owner's auditor the
-//                                                        full opening of C_a.
-//                                                        Folding an unopenable
-//                                                        C_a into C_spend
-//                                                        would desync the
-//                                                        auditor's accumulator
-//                                                        for the account
-//                                                        permanently.
+//                                                        full opening of C_a:
+//                                                        with dvk_i it derives
+//                                                        r_a and opens the
+//                                                        allowance at every
+//                                                        state transition of
+//                                                        the delegation
+//                                                        (Section 8.5).
 //                                                        A separate single-
 //                                                        output Poseidon
 //                                                        rather than a sponge

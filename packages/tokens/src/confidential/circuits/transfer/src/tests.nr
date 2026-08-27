@@ -196,7 +196,7 @@ fn transfer_auditor_fixtures_match_lib() {
     assert(r_new + m_s[2] == R_TILDE_AUD_S);
 }
 
-// `run_main` accepts all 24 public inputs as parameters -- nothing baked in.
+// `run_main` accepts every public input as a parameter -- nothing baked in.
 // Tests that target a specific constraint construct the public tuple so only
 // that constraint can fail: tamper the witness or public input under test
 // AND recompute every downstream public that depends on it, so no cascaded
@@ -1345,5 +1345,44 @@ fn rejects_tampered_b_tilde_aud_s() {
         V_TILDE_AUD_S,
         B_TILDE_AUD_S + 1,
         R_TILDE_AUD_S,
+    );
+}
+
+#[test(should_fail)]
+fn rejects_tampered_r_tilde_aud_s() {
+    // r_tilde_aud_s mutated by +1: T_a9 fails because the lane-2 escrow is
+    // pinned to r_A' = derive_spend_r(vk, sigma), which the prover's claim no
+    // longer matches.
+    run_main(
+        SK,
+        V,
+        R,
+        V_TRANSFER,
+        R_E,
+        C_SPEND_X,
+        C_SPEND_Y,
+        Y_X,
+        Y_Y,
+        ADDR_F,
+        PVK_B_X,
+        PVK_B_Y,
+        K_AUD_R_X,
+        K_AUD_R_Y,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        C_SPEND_NEW_X,
+        C_SPEND_NEW_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
+        R_E_X,
+        R_E_Y,
+        V_TILDE,
+        B_TILDE,
+        SIGMA,
+        V_TILDE_AUD_R,
+        R_TILDE_AUD_R,
+        V_TILDE_AUD_S,
+        B_TILDE_AUD_S,
+        R_TILDE_AUD_S + 1,
     );
 }

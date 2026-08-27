@@ -36,9 +36,9 @@ Directory `transfer/` is package `circuit_transfer`; `gadgets/commit/` is `gadge
 
 `poseidon_with_domain` is the only Poseidon entry point in `lib/src/lib.nr`; calling the underlying hash directly is a violation of the library contract. The domain tag is always the first absorbed element. The numeric tag values are the cross-language contract with the SDK — see `../CLAUDE.md` and `../docs/DESIGN_cont.md` §13, which is their only authoritative source.
 
-Sponge parameters, the canonical lane assignment, and the mode-exclusivity rule that follows from a single-block absorb are normative in `../docs/DESIGN.md` §2.5; the Noir sponge must match it exactly. The obligations that section places on this code: `sponge_squeeze_2(d,s,σ)[0]` must stay equal to `poseidon_with_domain(d,[s,σ])`, `sponge_squeeze_3(d,s,σ)[0..2]` must stay equal to `sponge_squeeze_2(d,s,σ)`, and `encrypt_auditor_sender_balance` must keep taking lane 1. A divergence in any of the three silently changes every existing mask.
+Sponge parameters, the canonical lane assignment, and the mode-exclusivity rule that follows from a single-block absorb are normative in `../docs/DESIGN.md` §2.5; the Noir sponge must match it exactly. The obligations that section places on this code: `sponge_squeeze_2(d,s,σ)[0]` must stay equal to `poseidon_with_domain(d,[s,σ])`, and `sponge_squeeze_3(d,s,σ)[0..2]` must stay equal to `sponge_squeeze_2(d,s,σ)` — which is why `sponge_squeeze_2` is defined as the prefix of `sponge_squeeze_3` rather than as a second permutation. A divergence in either silently changes every existing mask.
 
-`AUDITOR_SENDER` is the only tag squeezed three-wide and `AUDITOR_RECIPIENT` the only one squeezed two-wide; every other tag goes through `poseidon_with_domain`. Widening or narrowing a channel is a spec change, not a refactor.
+`AUDITOR_SENDER` is squeezed three-wide by every circuit that escrows lane 2 and two-wide only by RevokeSpender (V_a3); `AUDITOR_RECIPIENT` is always two-wide; every other tag goes through `poseidon_with_domain`. Widening or narrowing a channel is a spec change, not a refactor.
 
 ECDH must absorb both `S.x` and `S.y`; x-only extraction collapses `P` and `-P`.
 

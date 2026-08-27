@@ -1462,6 +1462,45 @@ fn rejects_tampered_a_tilde_aud_s() {
 }
 
 #[test(should_fail)]
+fn rejects_tampered_dvk_cipher_aud() {
+    // dvk_cipher_aud mutated by +1: O_a9 fails because the lane-2 escrow is
+    // pinned to dvk_i, which the prover's claim no longer matches.
+    run_main(
+        SK_OP,
+        DVK_I,
+        V_A,
+        R_A,
+        V_TRANSFER,
+        R_E,
+        C_A_X,
+        C_A_Y,
+        SIGMA_A,
+        Y_OP_X,
+        Y_OP_Y,
+        PVK_RECIPIENT_X,
+        PVK_RECIPIENT_Y,
+        K_AUD_R_X,
+        K_AUD_R_Y,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        C_A_NEW_X,
+        C_A_NEW_Y,
+        C_TRANSFER_X,
+        C_TRANSFER_Y,
+        R_E_X,
+        R_E_Y,
+        V_TILDE,
+        A_TILDE_NEW,
+        SIGMA_A_NEW,
+        V_TILDE_AUD_R,
+        R_TILDE_AUD_R,
+        V_TILDE_AUD_S,
+        A_TILDE_AUD_S,
+        DVK_CIPHER_AUD + 1,
+    );
+}
+
+#[test(should_fail)]
 fn rejects_wrong_k_aud_r() {
     // K_aud_r replaced by a valid but different on-curve key (Y_op). Shared
     // secret changes, recipient-channel masks change, O_a3 fails.
