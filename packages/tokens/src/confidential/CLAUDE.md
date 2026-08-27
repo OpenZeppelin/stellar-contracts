@@ -8,7 +8,7 @@ The module ships one token contract plus three satellites, each with the standar
 
 | Path | Role |
 |:---|:---|
-| `mod.rs`, `storage.rs` | The `ConfidentialToken` trait — eleven entry points — and the storage/orchestration layer |
+| `mod.rs`, `storage.rs` | The `ConfidentialToken` trait — eleven entry points, of which `revoke_spender` is proofless — and the storage/orchestration layer |
 | `verifier/` | Separate contract holding per-circuit UltraHonk verification keys |
 | `auditor/` | Separate contract holding the auditor key registry |
 | `compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract, clawback |

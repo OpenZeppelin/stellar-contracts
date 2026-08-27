@@ -17,8 +17,8 @@ use crate::confidential::{
     storage::{set_address_as_field_element, set_auditor, set_underlying_asset, set_verifier},
     verifier::CircuitType,
     ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, Hooks, RegisterData,
-    RegisterPayload, RevokeSpenderPayload, SetSpenderPayload, SpenderDelegation,
-    SpenderTransferPayload, TransferPayload, WithdrawPayload,
+    RegisterPayload, SetSpenderPayload, SpenderDelegation, SpenderTransferPayload, TransferPayload,
+    WithdrawPayload,
 };
 
 // ################## MOCK CONTRACTS ##################
@@ -244,19 +244,6 @@ fn set_spender_payload(e: &Env) -> SetSpenderPayload {
     }
 }
 
-fn revoke_spender_payload(e: &Env) -> RevokeSpenderPayload {
-    RevokeSpenderPayload {
-        c_spend_new: pt(e),
-        b_tilde: fr(e),
-        r_e_point: pt(e),
-        sigma: fr(e),
-        v_tilde_aud_s: fr(e),
-        b_tilde_aud_s: fr(e),
-    }
-}
-
-// ################## NO-CONFIG SHORT-CIRCUIT ##################
-
 #[test]
 fn hooks_short_circuit_without_config() {
     let h = setup();
@@ -278,7 +265,7 @@ fn hooks_short_circuit_without_config() {
             &spender_transfer_payload(&h.e),
         );
         ComplianceHooks::on_set_spender(&h.e, &alice, &op, 0, &set_spender_payload(&h.e));
-        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, &revoke_spender_payload(&h.e));
+        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op);
         assert!(compliance_config(&h.e).is_none());
         assert!(!is_frozen(&h.e, &alice));
     });
@@ -457,7 +444,7 @@ fn on_revoke_spender_panics_when_account_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &alice);
-        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, &revoke_spender_payload(&h.e));
+        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op);
     });
 }
 
@@ -469,7 +456,7 @@ fn on_revoke_spender_when_spender_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &op);
-        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, &revoke_spender_payload(&h.e));
+        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op);
     });
 }
 
@@ -570,7 +557,7 @@ fn on_revoke_spender_allows_policy_denied_spender() {
     let policy = h.e.register(DenyOnePolicy, (op.clone(),));
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &ComplianceConfig { policy: Some(policy), ..base_config() });
-        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, &revoke_spender_payload(&h.e));
+        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op);
     });
 }
 

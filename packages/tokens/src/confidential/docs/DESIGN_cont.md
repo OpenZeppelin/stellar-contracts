@@ -57,7 +57,7 @@ The capability is bounded in three ways:
 
 - **Forward-only**, on the same grounds as the recipient side.
 - **Maintained across merges.** An account binds a single `auditor_id` (Section 6.1), so the key that decrypts the `lane[2]` escrow is the same key that decrypts the recipient channel of every inbound flow to that account. Merge adds both the values and the blindings ($$v\_{\text{spend}}' = v\_s + v\_r$$, $$r\_{\text{spend}}' = r\_s + r\_r$$, Section 7.4), and the auditor holds each addend: $$(v\_{\text{transfer},i}, r\_{\text{transfer},i})$$ from the recipient-channel reconstruction above, and $$(a\_j, 0)$$ from the public deposits. It therefore carries the escrowed opening forward through every merge by the same addition the contract performs, rather than losing it at one.
-- **Not renewed by `revoke_spender`.** V\_a3 stays two-lane (DESIGN §7.9), so a revoke rewrites $$C\_{\text{spend}}$$ under a blinding the auditor never receives and leaves it with the post-reclaim *value* alone. The opening is re-acquired at the next checkpoint (W\_a5, T\_a9, S\_a6).
+- **Carried through `revoke_spender`.** The revoke is a public homomorphic fold, $$C\_{\text{spend}}' = C\_{\text{spend}} + C\_a$$, emitting no new checkpoint (DESIGN §7.9). The auditor holds the opening of the $$C\_a$$ being folded, escrowed at the delegation's last state change (§8.5), so it advances its own opening by the same addition the contract performs -- the merge case above, with a known addend.
 - **Rotation-scoped.** A newly activated key cannot decrypt escrows published under the previous one (Section 8.3). An auditor that carries its accumulated opening across the rotation keeps it; one that bootstraps from the new key alone re-acquires it at the next checkpoint.
 
 The recipient-side reconstruction is therefore event-scoped, while the sender-side escrow gives the account's auditor a **standing** opening of $$C\_{\text{spend}}$$, held continuously from its first checkpoint under the active key.
@@ -73,9 +73,8 @@ These bounded openings are what enable the clawback flow specified in [COMPLIANC
 - **Outgoing transfer**: auditor decrypts post-transfer balance $$(v\_A - v\_{\text{transfer}})$$ from $$\tilde{b}\_{\text{aud,s}}$$ and the matching blinding $$r\_A'$$ from $$\tilde{r}\_{\text{aud,s}}$$ (constraints T\_a5--T\_a9).
 - **Withdrawal**: auditor decrypts post-withdrawal balance $$(v - a)$$ from $$\tilde{b}\_{\text{aud,s}}$$ and the matching blinding $$r'$$ from $$\tilde{r}\_{\text{aud,s}}$$ (constraints W\_a1--W\_a5). The withdrawal amount $$a$$ is also visible as a public input.
 - **Set spender**: auditor decrypts escrowed amount $$v\_a$$ from $$\tilde{v}\_{\text{aud,s}}$$, post-escrow balance $$(v - v\_a)$$ from $$\tilde{b}\_{\text{aud,s}}$$, and the matching blinding $$r'$$ from $$\tilde{r}\_{\text{aud,s}}$$ (constraints S\_a1--S\_a6).
-- **Revoke spender**: auditor decrypts reclaimed amount $$v\_a$$ from $$\tilde{v}\_{\text{aud,s}}$$ and post-reclaim balance $$(v\_s + v\_a)$$ from $$\tilde{b}\_{\text{aud,s}}$$ (constraints V\_a1--V\_a5). This is the one checkpoint operation that escrows no blinding: V\_a3 stays two-lane.
 
-The three operations that also escrow the post-operation spendable blinding confer the opening capability bounded in Section 8.1. The recipient's auditor does not see the sender's balance in any of these operations.
+`revoke_spender` is absent from this list: it carries no proof and no auditor ciphertext (DESIGN §7.9). Each of the three operations above escrows the post-operation spendable blinding and so confers the opening capability bounded in Section 8.1, which is also what lets the auditor follow a revoke without one. The recipient's auditor does not see the sender's balance in any of these operations.
 
 **Per-transfer Pedersen randomness (recipient-auditor, not sender-auditor).** Beyond the transfer amount, the recipient's auditor also decrypts the per-transfer Pedersen blinding $$r\_{\text{transfer}}$$ from $$\tilde{r}\_{\text{aud,r}}$$ on every confidential transfer and spender-transfer; Section 8.1 states the opening capability this confers and its bounds (forward-only, receiving-side only, reset by merge). The sender's auditor does not see $$r\_{\text{transfer}}$$. The *originating account's own* $$vk$$ holder does, by recomputing $$r\_e$$ and hence $$s$$ (DESIGN.md §5.3); that path lies outside the auditor model and its consequences are stated in §9.4.
 
@@ -87,7 +86,7 @@ The three operations that also escrow the post-operation spendable blinding conf
 
 The auditor contract stores Grumpkin public keys as full affine points $$(x, y)$$ indexed by `auditor_id`. The contract validates that every inserted key is canonical, on-curve ($$y^2 \equiv x^3 - 17 \pmod{r}$$), and non-identity at insertion time (Section 3.1, Section 10.8). Each `auditor_id` MAY maintain a sequence of versions, each carrying its activation ledger, in which case rotation appends a new entry rather than overwriting the previous one. The reference registry shipped in this repository takes the simpler form: it keeps a single current key per `auditor_id`, which `rotate_key` overwrites in place; a versioned, activation-ledger registry is an optional production target.
 
-When building public inputs for any operation that produces auditor ciphertexts (transfers, withdrawals, set/revoke spender), the contract fetches the relevant auditor keys for the recipient's and/or sender's `auditor_id`. The contract passes the full Grumpkin point as a public input; the circuit constrains the ECDH ciphertexts against that exact point. The contract and the circuit are version-agnostic: they verify against whichever key the auditor contract currently exposes.
+When building public inputs for any operation that produces auditor ciphertexts (transfers, withdrawals, `set_spender`), the contract fetches the relevant auditor keys for the recipient's and/or sender's `auditor_id`. The contract passes the full Grumpkin point as a public input; the circuit constrains the ECDH ciphertexts against that exact point. The contract and the circuit are version-agnostic: they verify against whichever key the auditor contract currently exposes.
 
 **In-flight proofs across rotation.** A proof constructed against version $$v$$ becomes unverifiable the instant the auditor contract activates version $$v+1$$. The $$K\_{\text{aud}}$$ public input the contract fetches at verification no longer matches the value the prover committed to, so UltraHonk verification fails and the invocation **reverts at the proof-verification boundary**. The caller (sender, owner, or spender) reconstructs the proof against the new $$K\_{\text{aud}}$$ and resubmits. The rejection is benign: the contract's spendable balance, receiving balance, and delegation state are unchanged by the reverted call, the operation's salt is freshly sampled on retry (Section 9.6), and an observer cannot correlate the rejected attempt with the resubmission.
 
@@ -111,7 +110,7 @@ where $$s\_{a,r}$$, $$s\_{a,s}$$, and $$\sigma\_a'$$ are recovered from the even
 
 ### 8.5 Spender Allowance Auditing
 
-The auditor tracks each allowance's current value through the per-event ciphertexts produced at every state-changing operation: `set_spender` reveals the escrowed amount $$v\_a$$ (Section 8.2), `confidential_transfer_from` reveals the transfer amount and post-transfer allowance $$v\_a'$$ (Section 8.4), and `revoke_spender` reveals the reclaimed amount (Section 8.2).
+The auditor tracks each allowance's current value through the per-event ciphertexts produced at every state-changing operation: `set_spender` reveals the escrowed amount $$v\_a$$ (Section 8.2), and `confidential_transfer_from` reveals the transfer amount and post-transfer allowance $$v\_a'$$ (Section 8.4). `revoke_spender` publishes no ciphertext of its own; the auditor already holds the opening of the $$C\_a$$ it folds, from whichever of those two events wrote it.
 
 **Allowance opening.** The owner's auditor also receives the *blinding* of the allowance commitment each event writes: $$r\_a$$ under $$\delta\_{\text{esc\\\_allow\\\_r\\\_aud}}$$ at `set_spender` (S14, below) and $$r\_a'$$ in `lane[2]` at every spender transfer (O\_a9, §8.4). Paired with the value that event already publishes -- $$\tilde{v}\_{\text{aud,s}}$$ on `SetSpender`, $$\tilde{a}\_{\text{aud,s}}$$ on `SpenderTransfer` -- that is the full Pedersen opening of the $$C\_a$$ left on-chain, reconstructed from the event alone with no storage read. Unlike the spendable side there is no merge to fold in, since a delegation's only state transitions are the events themselves.
 
@@ -128,7 +127,7 @@ A single-output pad rather than a sponge lane, because `lane[2]` of this channel
 **Key rotation.** Decryption is scoped to events, and only to events. A key can decrypt an allowance ciphertext exactly when it was the active key at the moment that ciphertext was produced. Two consequences, and neither is stronger than that:
 
 - A freshly rotated-in key holds no opening for a live delegation. It acquires one at that delegation's next state-changing operation, when a fresh escrow is produced under it, and not before -- rotation does not re-anchor anything on its own.
-- A retired key does **not** lose track of state it already opened. Proofless folds -- merge (§7.4), and `revoke_spender` where the deployment runs it without a proof -- recompute $$C\_{\text{spend}}' = C\_{\text{spend}} + C\_a$$ publicly, emitting no new encrypted checkpoint, so a holder of an already-known opening carries it forward by the same addition the contract performs. Containment here is **event-scoped, not state-scoped**: rotation bounds what a key can newly decrypt, not what its holder can still compute.
+- A retired key does **not** lose track of state it already opened. Proofless folds -- merge (§7.4) and `revoke_spender` (§7.9) -- recompute $$C\_{\text{spend}}' = C\_{\text{spend}} + C\_a$$ publicly, emitting no new encrypted checkpoint, so a holder of an already-known opening carries it forward by the same addition the contract performs. Containment here is **event-scoped, not state-scoped**: rotation bounds what a key can newly decrypt, not what its holder can still compute.
 
 **Archive dependence.** The auditor must have *observed* the event. There is no state-based fallback: the escrowed blinding lives in the event and nowhere in contract storage, so an auditor that missed a delegation event cannot recover that opening from `a_tilde` and $$\sigma\_a$$ the way a $$dvk\_i$$ holder could. This extends an existing dependency rather than creating one -- DESIGN.md §5.2 already makes a durable event archive normative, and the recipient-side reconstruction, the spendable checkpoint, and the merge carry-forward are all event-scoped already. [INDEXER.md](./INDEXER.md) §7.1 states the operational consequences: a consistency check of each reconstructed opening against the stored `allowance_commitment` is the practical detection mechanism for a missed or reordered event, and delegation-entry TTL bounds how long that check remains possible.
 
@@ -232,9 +231,10 @@ pub enum CircuitType {
     Transfer = 2,
     SpenderTransfer = 3,
     SetSpender = 4,
-    RevokeSpender = 5,
 }
 ```
+
+`deposit`, `merge`, and `revoke_spender` carry no proof and have no circuit (Sections 7.3, 7.4, 7.9). The discriminants are part of the on-chain interface and are never renumbered.
 
 ### 10.2 Circuit Summary
 
@@ -245,7 +245,6 @@ pub enum CircuitType {
 | `Transfer` | Balance conservation; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; sender auditor: amount + balance + `lane[2]` escrow of the new spendable blinding); deterministic randomness for new sender balance; encrypted balance scalar; sender key ownership; range validity (balance $$\in [0, 2^{127})$$, amount $$\in [0, 2^{127})$$) |
 | `SpenderTransfer` | Allowance sufficiency; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; owner auditor: amount + allowance + `lane[2]` escrow of the new allowance blinding); deterministic randomness for new allowance; encrypted allowance scalar; spender key ownership; contract-bound indirectly via $$C\_a$$ chain (Section 7.8) |
 | `SetSpender` | Balance split; $$dvk\_i$$ derivation; ECDH escrow of $$dvk\_i$$ to the spender and of the allowance blinding to the owner's auditor; allowance commitment with deterministic randomness; encrypted balance and allowance scalars; owner-auditor ECDH ciphertexts (escrow amount + balance checkpoint + `lane[2]` escrow of the new spendable blinding); owner key ownership; contract-bound via $$vk$$ derivation |
-| `RevokeSpender` | Allowance decryption via $$dvk\_i$$; balance merge; deterministic randomness for new balance; encrypted balance scalar; owner-auditor ECDH ciphertexts (reclaimed amount + balance checkpoint); owner key ownership; contract-bound via $$vk$$ derivation |
 
 ### 10.3 Circuit Cost Analysis
 
@@ -260,9 +259,8 @@ The dominant cost in Noir circuits is elliptic curve scalar multiplication. With
 | `Transfer` | 8 | $$Y\_A$$ (T1), $$C\_{\text{spend}}^A$$ opening (T3), recipient ECDH (T5), $$R\_e$$ (T6), $$C\_{\text{transfer}}$$ (T8), $$C\_{\text{spend}}'$$ (T11), recipient-auditor ECDH (T\_a1), sender-auditor ECDH (T\_a5) |
 | `SpenderTransfer` | 8 | $$Y\_{\text{op}}$$ (O1), $$C\_a$$ opening (O2), recipient ECDH (O5), $$R\_e$$ (O6), $$C\_{\text{transfer}}$$ (O8), $$C\_a'$$ (O11), recipient-auditor ECDH (O\_a1), owner-auditor ECDH (O\_a5) |
 | `SetSpender` | 7 | $$Y$$ (S1), $$C\_{\text{spend}}$$ opening (S3), $$C\_a$$ (S7), $$C\_{\text{spend}}'$$ (S10), $$R\_e$$ (S\_a1), $$dvk\_i$$ escrow ECDH (S12, §7.11), owner-auditor ECDH (S\_a2) |
-| `RevokeSpender` | 6 | $$Y$$ (V1), $$C\_a$$ opening (V4), $$C\_{\text{spend}}$$ opening (V5), $$C\_{\text{spend}}'$$ (V7), $$R\_e$$ (V\_a1), owner-auditor ECDH (V\_a2) |
 
-`SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of §7.11 reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The auditor-side escrow of the allowance blinding $$r\_a$$ (S14) reuses the S\_a2 shared scalar and adds a Poseidon evaluation, not a call. The `lane[2]` escrows (W\_a5, T\_a9, S\_a6, O\_a9) read `lane[2]` of a permutation each circuit already computes and cost one field addition apiece. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`: `Register` 33, `Withdraw` 95, `RevokeSpender` 123, `Transfer` 134, `SetSpender` 135, `SpenderTransfer` 136.
+`SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of §7.11 reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The auditor-side escrow of the allowance blinding $$r\_a$$ (S14) reuses the S\_a2 shared scalar and adds a Poseidon evaluation, not a call. The `lane[2]` escrows (W\_a5, T\_a9, S\_a6, O\_a9) read `lane[2]` of a permutation each circuit already computes and cost one field addition apiece. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`: `Register` 33, `Withdraw` 95, `Transfer` 134, `SetSpender` 135, `SpenderTransfer` 136.
 
 The ECDH computations add scalar multiplications compared to a random-blinding scheme, but the unchunked design eliminates all per-chunk constraints (which, in a chunked scheme, would involve 8+ scalar multiplications for balance chunks and per-chunk range proofs).
 
@@ -330,6 +328,8 @@ fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> Field {
 3. Cross-contract call: `verifier.verify_proof(circuit_type, public_inputs, proof)`
 4. Verifier deserializes stored VK, runs UltraHonk verification (BN254 G1/G2 pairings, Fiat-Shamir, sumcheck)
 5. Contract applies homomorphic balance updates (Grumpkin point arithmetic via $$\mathbb{F}\_r$$ ops)
+
+The proofless operations (`deposit`, `merge`, `revoke_spender`) perform step 5 only. The verifier is oblivious to which circuit a key belongs to: it verifies the supplied proof against whatever key is stored under the supplied `CircuitType`, which is why the key set and the enum must be deployed together (§10.1).
 
 ### 10.6 Structured Reference String
 
@@ -426,8 +426,7 @@ trait ConfidentialToken {
     fn set_spender(e: Env, account: Address, spender: Address,
                     live_until_ledger: u32, data: Bytes);
 
-    fn revoke_spender(e: Env, account: Address, spender: Address,
-                       data: Bytes);
+    fn revoke_spender(e: Env, account: Address, spender: Address);
 
     fn confidential_balance(e: Env, account: Address) -> ConfidentialAccount;
 
@@ -437,9 +436,13 @@ trait ConfidentialToken {
 }
 ```
 
-A deployment that enables the optional compliance extension adds `compliance: Option<ComplianceConfig>` to this constructor and the freeze, configuration-rotation, and read entry points of [COMPLIANCE.md](./COMPLIANCE.md) §6 to this interface; the admin-gated ones are authorized by the deployment's own access-control module.
+`revoke_spender` carries no `data`: it is proofless (Section 7.9), and the contract reads everything it needs from the delegation entry. The same is true of `deposit` and `merge`.
 
-This table is authoritative: every entry is exactly the set of prover-supplied public inputs from the corresponding Section 7 operation (the contract loads the remaining public inputs from trusted state per §7.1), plus the `proof` blob. Names map directly to the Section 7 symbols.
+A deployment that enables the optional compliance extension adds `compliance: Option<ComplianceConfig>` to this constructor and the freeze, configuration-rotation, and read entry points of [COMPLIANCE.md](./COMPLIANCE.md) §6 to this interface. The admin-gated ones are authorized by the deployment's own access-control module.
+
+**Hooks.** Every entry point invokes the deployment's `Hooks` implementation after authorization and payload decoding and before the storage-layer operation. Hooks for operations that carry `data` receive the decoded payload by reference; the proofless `on_deposit`, `on_merge`, and `on_revoke_spender` receive none. The two compliance entry points invoke no hook, since their precondition — a frozen target — is exactly what a gating hook rejects ([COMPLIANCE.md](./COMPLIANCE.md) §5).
+
+This table is authoritative: every entry is exactly the set of prover-supplied public inputs from the corresponding Section 7 operation (the contract loads the remaining public inputs from trusted state per §7.1), plus the `proof` blob. Names map directly to the Section 7 symbols. The fields added by the lane-2 escrow and the auditor-side allowance-blinding escrow sit last in each payload and last in each public-input blob, so every pre-existing position is unchanged.
 
 | Operation | `data` contents |
 |:---|:---|
@@ -448,7 +451,6 @@ This table is authoritative: every entry is exactly the set of prover-supplied p
 | `confidential_transfer` | $$C\_{\text{spend}}'$$, $$C\_{\text{transfer}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\sigma$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, `proof` |
 | `confidential_transfer_from` | $$C\_a'$$, $$C\_{\text{transfer}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{a}'$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, `proof` |
 | `set_spender` | $$C\_{\text{spend}}'$$, $$C\_a$$, $$\text{escrowed\\\_dvk}$$, $$\tilde{b}$$, $$\tilde{a}$$, $$R\_e$$, $$\sigma$$, $$\sigma\_a$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, $$\tilde{r}\_{a,\text{aud,s}}$$, `proof` |
-| `revoke_spender` | $$C\_{\text{spend}}'$$, $$\tilde{b}$$, $$R\_e$$, $$\sigma$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, `proof` |
 
 For `confidential_transfer_from`, the stored allowance salt $$\sigma\_a$$ is **not** carried in `data`: the contract loads it from the `(from, spender)` delegation entry (§7.8 public-input table). Only the prover-chosen replacement $$\sigma\_a'$$ travels in `data`. It is bound as this transfer's channel nonce (O7, O9, O\_a2, O\_a6), as the new allowance state's salt (O10, O12), and against the salt it replaces (O14); it is then written back to the delegation entry as the new `allowance_salt` and emitted in the event (§6.2 *Transfer nonce*). This keeps the trust-boundary rule of §7.1 intact: caller-controlled bytes never overwrite the live $$\sigma\_a$$ used to verify the proof. `set_spender`, by contrast, has no prior delegation entry to load from, so its $$\sigma\_a$$ is prover-supplied and bound by S6.
 
@@ -487,15 +489,16 @@ Each state-modifying operation emits a structured event. Events carry the data n
 | `Transfer` | `from`, `to`, $$R\_e$$, $$\tilde{v}$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ |
 | `SpenderTransfer` | `spender`, `from`, `to`, $$R\_e$$, $$\tilde{v}$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ |
 | `SetSpender` | `account`, `spender`, `live_until_ledger`, $$R\_e$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, $$\tilde{r}\_{a,\text{aud,s}}$$ |
-| `RevokeSpender` | `account`, `spender`, $$R\_e$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ |
+| `RevokeSpender` | `account`, `spender`, $$\tilde{a}$$, $$\sigma\_a$$ |
 
-Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
+Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41. `RevokeSpender` carries the two delegation fields the fold deletes — `a_tilde`, which no other event holds, and the current `allowance_salt`, which reaches events only through `SpenderTransfer`'s $$\sigma\_a'$$ and so is absent for a delegation never spent from — so that the owner can open its post-revoke spendable commitment from events alone (Section 7.9); it is emitted with one shape by both the owner's `revoke_spender` and the compliance module's `force_revoke_spender` ([COMPLIANCE.md](./COMPLIANCE.md) §5).
 
 **Usage by consumers:**
 
 - **Recipient wallet**: processes `Transfer` and `SpenderTransfer` events using $$(R\_e, \tilde{v}, \sigma)$$ -- with $$\sigma\_a'$$ in place of $$\sigma$$ for `SpenderTransfer` -- to derive $$v\_{\text{transfer}}$$ and $$r\_{\text{transfer}}$$ (Section 5.3).
-- **Owner wallet**: processes all events for recovery (Section 5.2). The $$(\tilde{b}, \sigma)$$ pair from the most recent owner-initiated event forms a checkpoint.
-- **Auditor**: processes events containing $$R\_e$$ to compute ECDH shared secrets and decrypt amounts and balance checkpoints (Section 8.1, 8.2).
+- **Owner wallet**: processes all events for recovery (Section 5.2). The $$(\tilde{b}, \sigma)$$ pair from the most recent checkpoint event (`Withdraw`, `Transfer` as sender, `SetSpender`) anchors $$W\_{\text{spend}}$$; `Merge`, `RevokeSpender`, and `Clawback` are folded into it during replay.
+- **Auditor**: processes events containing $$R\_e$$ to compute ECDH shared secrets and decrypt amounts, balance checkpoints, and the escrowed blindings and delegation keys (Sections 8.1, 8.2, 8.5); folds `Merge`, `RevokeSpender`, and `Clawback` into its accumulators as Section 8.1 specifies.
+- **Indexer**: reconciles the pooled balance against the sum of claims (Section 9.3, [INDEXER.md](./INDEXER.md)).
 
 ### 11.3 Read Methods
 
@@ -515,7 +518,7 @@ The function returns the *spending-authority* state, not the *escrow-existence* 
 - **Owner wallet:** reads the same fields after losing local state, or before calling `revoke_spender`, to confirm the on-chain entry matches its records.
 - **Indexers:** verify their replayed delegation state against the live commitment, in the same way `confidential_balance` is used for account state (§5.2 "Consistency check").
 
-The auditor's allowance tracking does **not** use this method: per-event allowance ciphertexts (§8.5) are the auditor's data path; `a_tilde` is keyed to $$dvk\_i$$ and is unreadable without it.
+The auditor's allowance tracking does **not** use this method: per-event allowance ciphertexts (§8.5) are the auditor's data path. `a_tilde` is keyed to $$dvk\_i$$ and is unreadable without it, which excludes the owner's auditor too: S14 / O\_a9 escrow the allowance *blinding*, not the delegation viewing key, so the auditor opens $$C\_a$$ without ever reading this field.
 
 ---
 

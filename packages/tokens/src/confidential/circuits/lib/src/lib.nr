@@ -1,8 +1,8 @@
 //! # Confidential Token -- Noir Primitives
 //!
-//! Shared cryptographic primitives consumed by the six circuits described in
-//! Section 7 of the design document (Register, Withdraw, Transfer, SpenderTransfer,
-//! SetSpender, RevokeSpender).
+//! Shared cryptographic primitives consumed by the five circuits described in
+//! Section 7 of the design document (Register, Withdraw, Transfer,
+//! SpenderTransfer, SetSpender).
 //!
 //! Every constraint that involves a Pedersen commitment, a Poseidon2 hash with
 //! domain separation, an ECDH derivation, or a 128-bit range check funnels
@@ -139,11 +139,8 @@ pub mod domain {
     /// allowance blinding on spender transfers. Constraints W_a3 / T_a6 /
     /// S_a3 / O_a6 (`delta_aud_s`).
     ///
-    /// RevokeSpender (V_a3) still reads two lanes, so the opening the auditor
-    /// holds is not renewed there and lapses until the next checkpoint; the
-    /// two widths agree on every lane they share (see [`sponge_squeeze_3`]).
-    ///
-    /// The tag stays in a single sponge mode per Section 2.5:
+    /// Widened *everywhere it appears*, which is what keeps it in a single
+    /// sponge mode per Section 2.5:
     /// `sponge_squeeze_2(d, s, sigma)[0]` is the same field element as
     /// `poseidon_with_domain(d, [s, sigma])`, so a tag used in both modes
     /// would collapse one onto the other.
@@ -374,9 +371,8 @@ pub fn encrypt_esc_allow_r_auditor(r_a: Field, s_a_s: Field, op_i: Field) -> Fie
 /// cost is exactly one Poseidon2 permutation per call.
 ///
 /// Used by the recipient-auditor channel of Transfer (T_a2) and
-/// SpenderTransfer (O_a2), and by RevokeSpender's sender-auditor channel
-/// (V_a3), which escrows nothing in lane[2]. Every other sender-auditor
-/// channel reads [`sponge_squeeze_3`].
+/// SpenderTransfer (O_a2). Every sender-auditor channel reads
+/// [`sponge_squeeze_3`].
 ///
 /// Defined as the two-lane prefix of [`sponge_squeeze_3`] so the two cannot
 /// drift apart: a change to the IV or the absorb applies to both by

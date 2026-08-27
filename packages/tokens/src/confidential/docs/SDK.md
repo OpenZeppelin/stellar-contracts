@@ -291,7 +291,7 @@ Three derivations this document specifies or relies on are computed outside the 
 
 ## 7. Witness Assembly
 
-An implementation MUST provide witness assembly for each circuit it supports, covering the six core circuits of DESIGN_cont.md §10.1: `Register`, `Withdraw`, `Transfer`, `SpenderTransfer`, `SetSpender`, `RevokeSpender`.
+An implementation MUST provide witness assembly for each circuit it supports, covering the five circuits of DESIGN_cont.md §10.1: `Register`, `Withdraw`, `Transfer`, `SpenderTransfer`, `SetSpender`.
 
 **Public-input order is a wire contract.** The verifier sees an ordered vector of field elements with no knowledge of what they denote (DESIGN.md §7.1), so a permutation of two same-typed inputs produces a well-formed vector that verifies a different statement. Each builder MUST assemble public inputs in exactly the order the contract assembles them, and MUST cite the contract function it mirrors at the site of the ordering. The per-operation public-input tables in DESIGN.md §7.2–§7.9 are authoritative for *membership*; the contract's assembly is authoritative for *order*.
 
@@ -385,7 +385,8 @@ Event application MUST be ordered, deduplicated, and idempotent in combination, 
 
 Application rules are DESIGN.md §5.2's update table and are not restated here. Two properties worth making explicit:
 
-- `Withdraw`, sender-side `Transfer`, `SetSpender`, and `RevokeSpender` **overwrite** $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$ rather than adjusting it, so a wallet that missed intervening events still converges on the spendable side.
+- `Withdraw`, sender-side `Transfer`, and `SetSpender` **overwrite** $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$ rather than adjusting it, so a wallet that missed intervening events still converges on the spendable side.
+- `RevokeSpender` is not a checkpoint — it carries no $$\tilde{b}$$ — and is **folded**, like `Merge`. `RevokeSpender` adds the reclaimed allowance opening to $$W_{\text{spend}}$$, with $$v_a$$ and $$r_a$$ recovered from the event's $$\tilde{a}$$ and `allowance_salt` under the owner-derived $$dvk_i$$ (DESIGN.md §7.9); the event carries both because the fold deletes the entry that held them. A wallet that misses either event diverges until the next checkpoint and MUST rely on §10.6 to detect that.
 - A self-transfer — a `Transfer` whose `from` and `to` are the same account — MUST be applied in both roles: the sender side overwrites $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$, and the recipient side credits $$W_{\text{receive}}$$ from the same event's recipient-channel ciphertexts. The two roles act on different accumulators, so their relative order does not affect the result; applying only one loses the other accumulator's update.
 
 ### 10.3 In-flight operations
@@ -455,7 +456,7 @@ Two further obligations follow from data availability:
 
 A spender reconstructs its allowance state from the on-chain delegation entry rather than from event replay: it recovers $$dvk_i$$ from the escrowed value by ECDH (DESIGN.md §7.11), then reads the current allowance from the entry's encrypted allowance and salt (DESIGN_cont.md §11.3).
 
-Implementations MUST surface the delegation's expiry ledger and SHOULD warn ahead of it. They MUST represent expired-but-unrevoked delegations as still holding escrowed value (DESIGN.md §6.2).
+Implementations MUST surface the delegation's expiry ledger and SHOULD warn ahead of it. They MUST represent expired-but-unrevoked delegations as still holding escrowed value (DESIGN.md §6.2). A `RevokeSpender` event with the entry gone means the delegation was folded back, by the owner or forcibly by the compliance module (COMPLIANCE.md §5); the event shape is the same and a spender need not distinguish the two.
 
 A spender MUST NOT be able to reach the owner's spendable balance through any interface (§3).
 
@@ -472,9 +473,9 @@ The two channels differ in what they yield (DESIGN_cont.md §8.1):
 | Sender / owner ($$\delta_{\text{aud\\\_s}}$$) | Transfer amount, or the escrowed amount for `SetSpender` and the reclaimed amount for `RevokeSpender` | Sender's post-operation balance, or post-operation allowance for a spender transfer | Post-operation spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`; post-transfer allowance blinding $$r_a'$$ on `SpenderTransfer`; nothing on `RevokeSpender`, which stays two-lane |
 | Recipient ($$\delta_{\text{aud\\\_r}}$$) | Transfer amount | Per-transfer Pedersen randomness $$r_{\text{transfer}}$$ | — (channel is two-lane) |
 
-`Withdraw`, `SetSpender`, and `RevokeSpender` carry a sender-channel balance checkpoint whose pad is `lane[1]`. Only `Withdraw` leaves `lane[0]` unused, its amount being public (DESIGN.md W_a3, §4.3); `SetSpender` and `RevokeSpender` read `lane[0]` as well, for the escrowed and reclaimed amounts respectively (DESIGN.md S_a4, V_a4).
+`Withdraw` and `SetSpender` carry a sender-channel balance checkpoint whose pad is `lane[1]`. Only `Withdraw` leaves `lane[0]` unused, its amount being public (DESIGN.md W_a3, §4.3); `SetSpender` reads `lane[0]` as well, for the escrowed amount (DESIGN.md S_a4).
 
-An implementation MUST squeeze the sender / owner channel three-wide and MUST NOT widen the recipient channel. Reading `lane[2]` on `RevokeSpender` yields a pad over no ciphertext (V_a3 is two-lane, DESIGN.md §7.9); an implementation MUST treat a `RevokeSpender` event as carrying no escrowed blinding rather than substituting a stale one. Because the first two lanes of $$\text{SpongeSqueeze}_3$$ coincide with $$\text{SpongeSqueeze}_2$$ (§4.3), a client that already reads `lane[0]` and `lane[1]` keeps every value it decrypted before.
+An implementation MUST squeeze the sender / owner channel three-wide and MUST NOT widen the recipient channel. `RevokeSpender` opens no auditor channel at all, the fold being proofless (DESIGN.md §7.9); an implementation MUST treat that event as carrying no escrowed blinding rather than substituting a stale one. Because the first two lanes of $$\text{SpongeSqueeze}_3$$ coincide with $$\text{SpongeSqueeze}_2$$ (§4.3), a client that already reads `lane[0]` and `lane[1]` keeps every value it decrypted before.
 
 **Cross-channel agreement.** Where an auditor holds the key for both parties, the amount decrypts independently on each channel and the circuit constrains both to the same value, so the two MUST agree. An implementation SHOULD perform this comparison and treat disagreement as evidence that $$k$$ is not the auditor key for both parties of that event.
 

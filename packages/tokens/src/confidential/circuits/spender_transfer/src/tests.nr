@@ -397,7 +397,7 @@ fn full_allowance_transfer() {
     // which is a valid commitment to zero. a_tilde' and a_tilde_aud_s both
     // bind to 0 (plus mask) so the owner's auditor sees the post-transfer
     // allowance reach zero. The delegation entry isn't deleted (that's
-    // revoke_spender's job, Section 7.9) -- it now escrows zero value.
+    // revoke_spender's job) -- it now escrows zero value.
     let pvk_recipient =
         EmbeddedCurvePoint { x: PVK_RECIPIENT_X, y: PVK_RECIPIENT_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };

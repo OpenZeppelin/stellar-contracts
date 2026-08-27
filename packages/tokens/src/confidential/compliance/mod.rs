@@ -29,8 +29,8 @@ use soroban_sdk::{contractclient, contracterror, contractevent, contracttrait, A
 pub use storage::{ComplianceConfig, ComplianceStorageKey};
 
 use crate::confidential::{
-    ConfidentialToken, Hooks, RegisterPayload, RevokeSpenderPayload, SetSpenderPayload,
-    SpenderTransferPayload, TransferPayload, WithdrawPayload,
+    ConfidentialToken, Hooks, RegisterPayload, SetSpenderPayload, SpenderTransferPayload,
+    TransferPayload, WithdrawPayload,
 };
 
 // ################## POLICY ##################
@@ -288,12 +288,7 @@ impl Hooks for ComplianceHooks {
         storage::check_policy(e, spender, &config);
     }
 
-    fn on_revoke_spender(
-        e: &Env,
-        account: &Address,
-        _spender: &Address,
-        _payload: &RevokeSpenderPayload,
-    ) {
+    fn on_revoke_spender(e: &Env, account: &Address, _spender: &Address) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };

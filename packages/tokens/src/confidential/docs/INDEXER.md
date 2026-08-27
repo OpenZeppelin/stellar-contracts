@@ -50,23 +50,26 @@ All events emitted by the confidential token (DESIGN_cont §11.2) with the follo
 | `Deposit` | Receiving-side replay: accumulates `(amount, 0)` into the receiving opening. |
 | `Transfer` (recipient side) | Receiving-side replay: carries the recipient-channel ciphertexts for `(v_transfer, r_transfer)`. |
 | `SpenderTransfer` (recipient side) | Receiving-side replay, as above. |
-| `Merge` | Folds the receiving opening into the spendable opening; resets the receiving side. |
+| `Merge` | Anchor: folds the receiving opening into the spendable opening; resets the receiving side. |
 | `SetSpender`, `SpenderTransfer` (owner side) | **The auditor's only route to an allowance opening.** The escrowed allowance blinding rides these two events (`r_a_tilde_aud_s` on `SetSpender`, `r_tilde_aud_s` on `SpenderTransfer`) and appears nowhere in contract storage, so an auditor that misses one has no way to reconstruct the opening of the `C_a` it wrote — see §7 *Auditor recovery*. |
-| `Withdraw`, `Transfer` (sender side), `SetSpender`, `RevokeSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the owner's spendable balance. `SetSpender`/`RevokeSpender` are in scope as owner checkpoints only — a spender recovers allowance state from the on-chain delegation entry (`allowance_commitment`, `a_tilde`, `escrowed_dvk`, `allowance_salt`), not from the archive. The auditor-channel ciphertexts these events also carry are out of scope for wallet recovery. |
+| `Withdraw`, `Transfer` (sender side), `SetSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the owner's spendable balance. `SetSpender` is in scope as an owner checkpoint only — a spender recovers allowance state from the on-chain delegation entry (`allowance_commitment`, `a_tilde`, `escrowed_dvk`, `allowance_salt`), not from the archive. |
+| `RevokeSpender` | Spendable-side fold, not a checkpoint: the owner adds the reclaimed allowance opening to the spendable opening, deriving it from the event's `a_tilde` and `allowance_salt` (DESIGN §7.9). The event is emitted in the same shape whether the owner or the compliance module revoked. |
 
 A self-transfer — a `Transfer` whose `from` and `to` are the same account — carries both roles at once: it is a sender-side checkpoint and a recipient-side replay event, and recovery applies both (DESIGN §5.2).
 
-Configuration events (`UnderlyingAssetSet`, `VerifierSet`, `AuditorSet`, `AddressAsFieldSet`, verification-key events) are not needed for balance recovery; indexers SHOULD archive them anyway — they are low-volume and useful for deployment forensics.
+The auditor-channel fields these events carry (`v_tilde_aud_*`, `b_tilde_aud_s`, `r_tilde_aud_s`, `a_tilde_aud_s`, `r_a_tilde_aud_s`) are out of scope for wallet recovery. They are archived regardless, since the record is the verbatim event (§3.1). Event shapes are normative in DESIGN_cont §11.2.
+
+Configuration events (`UnderlyingAssetSet`, `VerifierSet`, `AuditorSet`, `AddressAsFieldSet`, verification-key events) and the compliance events `Frozen`, `Unfrozen`, and `ComplianceConfigChanged` are not needed for balance recovery; indexers SHOULD archive them anyway — they are low-volume and useful for deployment forensics, and the freeze history is what distinguishes a forced `RevokeSpender` from an owner-initiated one.
 
 ### 3.3 Account attribution
 
-Recovery is per-account, and an event belongs to **each** account address appearing in its topics — a `Transfer` to both the sender's and the recipient's history, a `SpenderTransfer` to the owner's, recipient's, and spender's. Attribution MUST come from the event topics, never from the transaction source account.
+Recovery is per-account, and an event belongs to **each** account address appearing in its topics — a `Transfer` to both the sender's and the recipient's history, a `SpenderTransfer` to the owner's, recipient's, and spender's, a `RevokeSpender` to the owner's and the spender's alone. Attribution MUST come from the event topics, never from the transaction source account.
 
 The indexer MAY apply this attribution server-side (per-account queries, §6 C2) or serve the whole per-contract stream and leave the client to select the events touching its account; both conform, since attribution is a pure function of the topics. Server-side per-account filtering is RECOMMENDED for high-volume contracts, where downloading the full contract history to every wallet does not scale.
 
 ### 3.4 Ordering
 
-The indexer MUST preserve and expose the total order `(ledger_seq, tx_application_order, event_index)` — all three components are persisted per §3.1. Replay correctness depends on it: interleaved deposits, transfers, and merges only reconstruct the right openings when applied in emission order (DESIGN §5.2 step 6).
+The indexer MUST preserve and expose the total order `(ledger_seq, tx_application_order, event_index)` — all three components are persisted per §3.1. Replay correctness depends on it: interleaved deposits, transfers, merges, and revokes only reconstruct the right openings when applied in emission order (DESIGN §5.2 step 6).
 
 ## 4. Ingestion Contract
 

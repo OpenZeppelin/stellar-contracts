@@ -44,7 +44,6 @@ fn register_each_circuit_round_trips() {
             CircuitType::Transfer,
             CircuitType::SpenderTransfer,
             CircuitType::SetSpender,
-            CircuitType::RevokeSpender,
         ]
         .into_iter()
         .enumerate()
@@ -130,12 +129,12 @@ fn storage_key_round_trip() {
 
     e.as_contract(&address, || {
         let verification_key = verification_key_bytes(&e, 0x77);
-        register_verification_key(&e, CircuitType::RevokeSpender, &verification_key);
+        register_verification_key(&e, CircuitType::SetSpender, &verification_key);
 
         let stored: Bytes = e
             .storage()
             .instance()
-            .get(&VerifierStorageKey::VerificationKey(CircuitType::RevokeSpender))
+            .get(&VerifierStorageKey::VerificationKey(CircuitType::SetSpender))
             .unwrap();
         assert_eq!(stored, verification_key);
     });

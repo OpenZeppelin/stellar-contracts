@@ -26,8 +26,8 @@
 //!   free functions in [`storage`].
 //! - The on-chain account state types [`ConfidentialAccount`] and
 //!   [`SpenderDelegation`] (DESIGN §6).
-//! - The six XDR payload types carried in the `data: Bytes` parameter (DESIGN
-//!   §11).
+//! - The five XDR payload types carried in the `data: Bytes` parameter (DESIGN
+//!   §11). `revoke_spender` is proofless and carries none.
 //! - Storage helpers and operation-level orchestration under [`storage`].
 //!
 //! ## Public-Input Encoding
@@ -137,9 +137,8 @@ mod test;
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Bytes, BytesN, Env};
 pub use storage::{
     ConfidentialAccount, ConfidentialTokenStorageKey, RegisterData, RegisterPayload,
-    RevokeSpenderData, RevokeSpenderPayload, SetSpenderData, SetSpenderPayload, SpenderDelegation,
-    SpenderTransferData, SpenderTransferPayload, TransferData, TransferPayload, WithdrawData,
-    WithdrawPayload,
+    SetSpenderData, SetSpenderPayload, SpenderDelegation, SpenderTransferData,
+    SpenderTransferPayload, TransferData, TransferPayload, WithdrawData, WithdrawPayload,
 };
 
 /// Lifecycle hooks invoked by [`ConfidentialToken`] at each
@@ -155,8 +154,8 @@ pub use storage::{
 /// For ops that carry a `data: Bytes` argument, the last parameter
 /// `payload` on the matching hook is a reference to the decoded operation
 /// payload (e.g. [`TransferPayload`] for [`Self::on_transfer`]). The proof
-/// is not forwarded. The proofless ops [`Self::on_deposit`] and
-/// [`Self::on_merge`] receive no `payload`.
+/// is not forwarded. The proofless ops [`Self::on_deposit`],
+/// [`Self::on_merge`] and [`Self::on_revoke_spender`] receive no `payload`.
 ///
 /// Default bodies are empty no-ops — overriding only the methods relevant
 /// to a given deployment is the expected pattern.
@@ -204,14 +203,10 @@ pub trait Hooks {
     ) {
     }
 
-    /// Invoked after `revoke_spender`'s auth and decode.
-    fn on_revoke_spender(
-        e: &Env,
-        account: &Address,
-        spender: &Address,
-        payload: &RevokeSpenderPayload,
-    ) {
-    }
+    /// Invoked after `revoke_spender`'s auth, before the allowance fold.
+    /// `revoke_spender` is proofless and carries no `data`, so this hook
+    /// receives no payload.
+    fn on_revoke_spender(e: &Env, account: &Address, spender: &Address) {}
 }
 
 /// Zero-cost [`Hooks`] implementation whose every callback is an empty
@@ -437,7 +432,8 @@ pub trait ConfidentialToken {
     /// * `live_until_ledger` - The ledger number at which the delegation
     ///   expires. Spending is authorized while `ledger.sequence() <=
     ///   live_until_ledger`. The escrowed value persists until
-    ///   `revoke_spender`.
+    ///   [`ConfidentialToken::revoke_spender`] — expiry blocks spending, never
+    ///   reclamation.
     /// * `data` - XDR-encoded [`SetSpenderData`].
     ///
     /// # Errors
@@ -475,28 +471,29 @@ pub trait ConfidentialToken {
     /// remaining escrowed allowance back into `account`'s spendable balance.
     /// Works for both active and expired-but-not-revoked delegations.
     ///
+    /// No proof is required; correctness follows from the homomorphic
+    /// property of Pedersen commitments, exactly as for
+    /// [`ConfidentialToken::merge`].
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The owner reclaiming the allowance.
     /// * `spender` - The previously-delegated spender.
-    /// * `data` - XDR-encoded [`RevokeSpenderData`].
     ///
     /// # Errors
     ///
-    /// * refer to [`storage::decode_data`] errors.
     /// * refer to [`storage::revoke_spender`] errors.
     ///
     /// # Events
     ///
     /// * topics - `["revoke_spender", account: Address, spender: Address]`
-    /// * data - `[r_e_point, sigma, b_tilde, v_tilde_aud_s, b_tilde_aud_s]`
-    fn revoke_spender(e: &Env, account: Address, spender: Address, data: Bytes) {
+    /// * data - `[a_tilde: BytesN<32>, allowance_salt: BytesN<32>]`
+    fn revoke_spender(e: &Env, account: Address, spender: Address) {
         account.require_auth();
 
-        let decoded: RevokeSpenderData = storage::decode_data(e, &data);
-        Self::Hooks::on_revoke_spender(e, &account, &spender, &decoded.payload);
-        storage::revoke_spender(e, &account, &spender, &decoded.payload, &decoded.proof);
+        Self::Hooks::on_revoke_spender(e, &account, &spender);
+        storage::revoke_spender(e, &account, &spender);
     }
 
     /// Returns the [`ConfidentialAccount`] stored under `account`.
@@ -844,7 +841,8 @@ pub fn emit_set_spender(
     .publish(e);
 }
 
-/// Event emitted when an spender is revoked.
+/// Event emitted when a delegation's escrowed allowance is folded back into
+/// the owner's spendable balance and the delegation is deleted.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RevokeSpender {
@@ -852,33 +850,23 @@ pub struct RevokeSpender {
     pub account: Address,
     #[topic]
     pub spender: Address,
-    pub r_e_point: BytesN<64>,
-    pub sigma: BytesN<32>,
-    pub b_tilde: BytesN<32>,
-    pub v_tilde_aud_s: BytesN<32>,
-    pub b_tilde_aud_s: BytesN<32>,
+    pub a_tilde: BytesN<32>,
+    pub allowance_salt: BytesN<32>,
 }
 
 /// Emits a `RevokeSpender` event.
-#[allow(clippy::too_many_arguments)]
 pub fn emit_revoke_spender(
     e: &Env,
     account: &Address,
     spender: &Address,
-    r_e_point: &BytesN<64>,
-    sigma: &BytesN<32>,
-    b_tilde: &BytesN<32>,
-    v_tilde_aud_s: &BytesN<32>,
-    b_tilde_aud_s: &BytesN<32>,
+    a_tilde: &BytesN<32>,
+    allowance_salt: &BytesN<32>,
 ) {
     RevokeSpender {
         account: account.clone(),
         spender: spender.clone(),
-        r_e_point: r_e_point.clone(),
-        sigma: sigma.clone(),
-        b_tilde: b_tilde.clone(),
-        v_tilde_aud_s: v_tilde_aud_s.clone(),
-        b_tilde_aud_s: b_tilde_aud_s.clone(),
+        a_tilde: a_tilde.clone(),
+        allowance_salt: allowance_salt.clone(),
     }
     .publish(e);
 }

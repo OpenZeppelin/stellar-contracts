@@ -208,27 +208,6 @@ pub struct SetSpenderData {
     pub proof: Bytes,
 }
 
-/// Payload for [`crate::confidential::ConfidentialToken::revoke_spender`].
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RevokeSpenderPayload {
-    pub c_spend_new: Point,
-    pub b_tilde: BytesN<32>,
-    pub r_e_point: Point,
-    pub sigma: BytesN<32>,
-    pub v_tilde_aud_s: BytesN<32>,
-    pub b_tilde_aud_s: BytesN<32>,
-}
-
-/// Envelope decoded from the `data: Bytes` argument of
-/// [`crate::confidential::ConfidentialToken::revoke_spender`].
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RevokeSpenderData {
-    pub payload: RevokeSpenderPayload,
-    pub proof: Bytes,
-}
-
 // ################## QUERY STATE ##################
 
 /// Returns the SEP-41 token address bound at construction.
@@ -961,87 +940,69 @@ pub fn set_spender(
     );
 }
 
-/// Revokes the `(account, spender)` delegation and folds the remaining
-/// escrowed allowance back into `account`'s spendable balance.
-/// Works for both active and expired-but-not-revoked delegations.
+/// Revokes the `(owner, spender)` delegation: folds the escrowed allowance
+/// commitment `C_a` back into `owner`'s spendable commitment and deletes the
+/// delegation entry. Works for both active and expired-but-not-revoked
+/// delegations.
+///
+/// **No proof is required.** The fold is pure homomorphic addition, exactly
+/// like [`merge`] (DESIGN §7.4): nothing is re-randomized and no private
+/// value is asserted. The escrowed amount was range-proven when the
+/// delegation was created and re-bounded on every spender transfer, and the
+/// next spend re-bounds the result — the same posture [`merge`] accepts.
+///
+/// The owner's post-revoke opening is `(v_s + v_a, r_s + r_a)`, recoverable
+/// from the emitted `a_tilde` and `allowance_salt` plus the owner's viewing
+/// key; the auditor recovers the same pair from its own channel plus the
+/// escrowed delegation viewing key (constraints S14 / O_a9).
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `account` - The owner reclaiming the allowance.
+/// * `owner` - The owner whose allowance is being reclaimed.
 /// * `spender` - The previously-delegated spender.
-/// * `payload` - The decoded [`RevokeSpenderPayload`].
-/// * `proof` - The raw UltraHonk proof bytes.
 ///
 /// # Errors
 ///
-/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` is not
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `owner` is not
 ///   registered.
-/// * [`ConfidentialTokenError::DelegationNotFound`] - When `(account, spender)`
+/// * [`ConfidentialTokenError::DelegationNotFound`] - When `(owner, spender)`
 ///   has no delegation.
-/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
-///   or fields from the proof are non-canonical.
-/// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
-///   verification.
-/// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
-///   errors.
 ///
 /// # Events
 ///
 /// * topics - `["revoke_spender", account: Address, spender: Address]`
-/// * data - `[r_e_point, sigma, b_tilde, v_tilde_aud_s, b_tilde_aud_s]`
+/// * data - `[a_tilde: BytesN<32>, allowance_salt: BytesN<32>]`
+///
+/// # Notes
+///
+/// `a_tilde` and `allowance_salt` are emitted because this call deletes the
+/// entry that held them and event history does not reliably carry either:
+/// no event carries `a_tilde`, and the salt reaches events only through
+/// `SpenderTransfer`'s `sigma_a_new`, which a delegation revoked without
+/// ever being spent from never published. Without them the owner could not
+/// open its own post-revoke spendable commitment (DESIGN §6.2). Both are
+/// public storage values, so emitting them discloses nothing new.
 ///
 /// # Security Warning
 ///
-/// **IMPORTANT**: This function bypasses authorization checks. The trait
-/// entry point is responsible for calling `account.require_auth()`.
-pub fn revoke_spender(
-    e: &Env,
-    account: &Address,
-    spender: &Address,
-    payload: &RevokeSpenderPayload,
-    proof: &Bytes,
-) {
-    let owner = get_account(e, account);
-    let delegation = get_spender_delegation(e, account, spender);
-    let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
-    let k_aud_s = auditor.get_key(&owner.auditor_id);
-    let addr_f = get_address_as_field_element(e);
-    let spender_id = address_to_field(e, spender);
+/// **IMPORTANT**: This function bypasses authorization checks. Callers own
+/// the gate: `account.require_auth()` on the owner path, the admin role on
+/// the compliance path
+/// ([`crate::confidential::compliance::storage::force_revoke_spender`]).
+pub fn revoke_spender(e: &Env, owner: &Address, spender: &Address) {
+    let account = get_account(e, owner);
+    let delegation = get_spender_delegation(e, owner, spender);
 
-    // PI order (DESIGN §7.9):
-    //   C_spend, C_a, sigma_a, Y, spender_id (op_i), addr_f, K_aud_s,
-    //   C_spend', b_tilde, sigma, R_e, v_tilde_aud_s, b_tilde_aud_s
-    let mut pi = Bytes::new(e);
-    append_point(&mut pi, &owner.spendable_commitment);
-    append_point(&mut pi, &delegation.allowance_commitment);
-    append_field(&mut pi, &delegation.allowance_salt);
-    append_point(&mut pi, &owner.spending_public_key);
-    append_field(&mut pi, &spender_id);
-    append_field(&mut pi, &addr_f);
-    append_point(&mut pi, &k_aud_s);
-    append_point(&mut pi, &payload.c_spend_new);
-    append_field(&mut pi, &payload.b_tilde);
-    append_field(&mut pi, &payload.sigma);
-    append_point(&mut pi, &payload.r_e_point);
-    append_field(&mut pi, &payload.v_tilde_aud_s);
-    append_field(&mut pi, &payload.b_tilde_aud_s);
+    let a_tilde = delegation.a_tilde.clone();
+    let allowance_salt = delegation.allowance_salt.clone();
 
-    verify(e, CircuitType::RevokeSpender, &pi, proof);
+    let c_spend_new =
+        Grumpkin::add(e, &account.spendable_commitment, &delegation.allowance_commitment);
+    set_spendable(e, owner, &c_spend_new);
+    delete_delegation(e, owner, spender);
 
-    set_spendable(e, account, &payload.c_spend_new);
-    delete_delegation(e, account, spender);
-
-    emit_revoke_spender(
-        e,
-        account,
-        spender,
-        &payload.r_e_point,
-        &payload.sigma,
-        &payload.b_tilde,
-        &payload.v_tilde_aud_s,
-        &payload.b_tilde_aud_s,
-    );
+    emit_revoke_spender(e, owner, spender, &a_tilde, &allowance_salt);
 }
 
 /// Sets the SEP-41 token address.
