@@ -161,7 +161,7 @@ Secret scalars — $$\sigma$$, $$\sigma_a$$ — MUST be produced by the rejectio
 
 DESIGN_cont.md §13 assigns all seventeen values and is their only source; the right-hand column is this document's addition. $$\delta_{\text{disc\\\_bind}}$$ and $$\delta_{\text{disc}}$$ belong to the off-chain disclosure layer (SELECTIVE_DISCLOSURE.md §2.2). Tag 1 is absorbed by the contract rather than by a circuit — the contract derives $$\text{addr\\\_f}$$ and $$\text{op}_i$$ on-chain and the circuits receive them as opaque public inputs (DESIGN.md §2.7 *Usage sites*) — so it is part of the on-chain wire contract all the same. None of 14–16 is absorbed either in a circuit or on-chain, so none is part of the on-chain wire contract, but all three are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
 
-All seventeen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tag 11 is the sole three-mask tag and tag 12 the sole two-mask tag; the remaining fifteen, including 1, 14–16, and 17, are single-output tags. Tag 17 is absorbed only by the `SetSpender` circuit (DESIGN.md S14), which escrows $$dvk_i$$ to the owner's auditor under a single-output pad rather than over lane 2, that lane being taken by the spendable blinding; its fixture is `circuits/lib/testdata/encrypt_esc_dvk_auditor.json`.
+All seventeen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tags 11 and 12 are the multi-lane tags — 11 read three-wide wherever lane 2 is escrowed and two-wide on `RevokeSpender`, 12 always two-wide; the remaining fifteen, including 1, 14–16, and 17, are single-output tags. Tag 17 is absorbed only by the `SetSpender` circuit (DESIGN.md S14), which escrows $$dvk_i$$ to the owner's auditor under a single-output pad rather than over lane 2, that lane being taken by the spendable blinding; its fixture is `circuits/lib/testdata/encrypt_esc_dvk_auditor.json`.
 
 ### 4.9 Address compression
 
@@ -461,22 +461,24 @@ A spender MUST NOT be able to reach the owner's spendable balance through any in
 
 ## 11. Auditor Client
 
-An auditor decrypts from the public event and its own secret $$k$$ alone, with no viewing key, holder cooperation, or extra on-chain read. For each channel it computes the shared scalar against the event's ephemeral point, derives the two lane masks (§4.3), and subtracts.
+An auditor decrypts from the public event and its own secret $$k$$ alone, with no viewing key, holder cooperation, or extra on-chain read. For each channel it computes the shared scalar against the event's ephemeral point, derives that channel's lane masks (§4.3) — three on the sender / owner channel, two on the recipient channel — and subtracts.
 
 The two channels differ in what they yield (DESIGN_cont.md §8.1):
 
-| Channel | Lane 0 | Lane 1 |
-|:--|:--|:--|
-| Sender / owner ($$\delta_{\text{aud\\\_s}}$$) | Transfer amount, or the escrowed amount for `SetSpender` and the reclaimed amount for `RevokeSpender` | Sender's post-operation balance, or post-operation allowance for a spender transfer |
-| Recipient ($$\delta_{\text{aud\\\_r}}$$) | Transfer amount | Per-transfer Pedersen randomness $$r_{\text{transfer}}$$ |
+| Channel | Lane 0 | Lane 1 | Lane 2 |
+|:--|:--|:--|:--|
+| Sender / owner ($$\delta_{\text{aud\\\_s}}$$) | Transfer amount, or the escrowed amount for `SetSpender` and the reclaimed amount for `RevokeSpender` | Sender's post-operation balance, or post-operation allowance for a spender transfer | Post-operation spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`; $$dvk_i$$ on `SpenderTransfer`; nothing on `RevokeSpender`, which stays two-lane |
+| Recipient ($$\delta_{\text{aud\\\_r}}$$) | Transfer amount | Per-transfer Pedersen randomness $$r_{\text{transfer}}$$ | — (channel is two-lane) |
 
 `Withdraw`, `SetSpender`, and `RevokeSpender` carry a sender-channel balance checkpoint whose pad is lane **1**. Only `Withdraw` leaves lane 0 unused, its amount being public (DESIGN.md W_a3, §4.3); `SetSpender` and `RevokeSpender` read lane 0 as well, for the escrowed and reclaimed amounts respectively (DESIGN.md S_a4, V_a4).
 
+An implementation MUST squeeze the sender / owner channel three-wide and MUST NOT widen the recipient channel. Reading lane 2 on `RevokeSpender` yields a pad over no ciphertext (V_a3 is two-lane, DESIGN.md §7.9); an implementation MUST treat a `RevokeSpender` event as carrying no escrowed blinding rather than substituting a stale one. Because the first two lanes of $$\text{SpongeSqueeze}_3$$ coincide with $$\text{SpongeSqueeze}_2$$ (§4.3), a client that already reads lanes 0 and 1 keeps every value it decrypted before.
+
 **Cross-channel agreement.** Where an auditor holds the key for both parties, the amount decrypts independently on each channel and the circuit constrains both to the same value, so the two MUST agree. An implementation SHOULD perform this comparison and treat disagreement as evidence that $$k$$ is not the auditor key for both parties of that event.
 
-**Scope MUST be represented, not implied.** The recipient-channel capability is forward-only, receiving-side only, and reset by merge (DESIGN_cont.md §8.1). Rotation itself needs no replay on the sender side: the next owner-initiated proof operation publishes a fresh balance checkpoint under the new key.
+**Scope MUST be represented, not implied.** The recipient-channel capability is forward-only, receiving-side only, and reset by merge (DESIGN_cont.md §8.1). The lane-2 opening of the sender channel is forward-only and **event-scoped**: it opens the spendable commitment as of the checkpoint that escrowed it, and lapses at the next merge that folds in an inbound confidential transfer (DESIGN_cont.md §8.1 *Sender-auditor opening capability*). An implementation MUST NOT present a stored lane-2 blinding as the current spendable blinding once such a merge has been observed. Rotation itself needs no replay on the sender side: the next owner-initiated proof operation publishes a fresh balance checkpoint under the new key.
 
-An auditor facade MUST NOT be able to construct a spending witness, and MUST NOT be able to open a post-merge spendable balance, since merge folds the receiving randomness into a blinding that depends on $$vk$$.
+An auditor facade MUST NOT be able to construct a spending witness. It MUST NOT be able to open a spendable balance past a merge that folded in an inbound confidential transfer, since that merge adds an $$r_{\text{transfer}}$$ the sender channel never carries; a deposits-only merge leaves the escrowed blinding valid, deposits contributing $$r = 0$$ (DESIGN.md §7.3).
 
 ---
 

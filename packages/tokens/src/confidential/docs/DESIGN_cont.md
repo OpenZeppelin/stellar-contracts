@@ -23,21 +23,23 @@ $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}}) \qquad \text{(DESIGN §2.4)}$$
 $$(m\_{v,r}, m\_{r,r}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_r}}, s\_{a,r}, \sigma)$$
 $$\tilde{v}\_{\text{aud,r}} = v\_{\text{transfer}} + m\_{v,r}, \qquad \tilde{r}\_{\text{aud,r}} = r\_{\text{transfer}} + m\_{r,r}$$
 
-**Sender's auditor** ($$K\_{\text{aud,s}}$$, from the sender's `auditor_id`) receives the transfer amount and the sender's post-transfer balance:
+**Sender's auditor** ($$K\_{\text{aud,s}}$$, from the sender's `auditor_id`) receives the transfer amount, the sender's post-transfer balance, and -- in the lane-2 secret-escrow slot (DESIGN §2.5 *Lane assignment*) -- the sender's post-transfer spendable blinding $$r\_A'$$:
 
 $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}}) \qquad \text{(DESIGN §2.4)}$$
-$$(m\_{v,s}, m\_{b,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$
-$$\tilde{v}\_{\text{aud,s}} = v\_{\text{transfer}} + m\_{v,s}, \qquad \tilde{b}\_{\text{aud,s}} = (v\_A - v\_{\text{transfer}}) + m\_{b,s}$$
+$$(m\_{v,s}, m\_{b,s}, m\_{r,s}) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$
+$$\tilde{v}\_{\text{aud,s}} = v\_{\text{transfer}} + m\_{v,s}, \qquad \tilde{b}\_{\text{aud,s}} = (v\_A - v\_{\text{transfer}}) + m\_{b,s}, \qquad \tilde{r}\_{\text{aud,s}} = r\_A' + m\_{r,s}$$
 
-The transfer circuit (constraints T\_a1--T\_a8) enforces correct computation. At operation time, the contract fetches both auditor keys from the auditor contract using the *stored* `auditor_id` field of each account; neither the sender nor the recipient can substitute a different key for the operation being proven. This guarantee is scoped to operation time: *which* auditor an account is bound to is chosen by the account owner at registration (DESIGN §7.2), subject only to existence in the auditor registry unless the deployment gates the selection in its `Hooks::on_register` implementation ([COMPLIANCE.md](./COMPLIANCE.md) §4.3).
+The transfer circuit (constraints T\_a1--T\_a9) enforces correct computation. At operation time, the contract fetches both auditor keys from the auditor contract using the *stored* `auditor_id` field of each account; neither the sender nor the recipient can substitute a different key for the operation being proven. This guarantee is scoped to operation time: *which* auditor an account is bound to is chosen by the account owner at registration (DESIGN §7.2), subject only to existence in the auditor registry unless the deployment gates the selection in its `Hooks::on_register` implementation ([COMPLIANCE.md](./COMPLIANCE.md) §4.3).
 
 Each auditor decrypts using their secret key $$k$$. For example, the sender's auditor:
 
 $$S\_{a,s} = k \cdot R\_e, \qquad s\_{a,s} = \text{Poseidon}(\delta\_{\text{ecdh}}, S\_{a,s}.x, S\_{a,s}.y)$$
-$$(m\_{v,s}, m\_{b,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$
-$$v\_{\text{transfer}} = \tilde{v}\_{\text{aud,s}} - m\_{v,s}, \qquad v\_{\text{new}} = \tilde{b}\_{\text{aud,s}} - m\_{b,s}$$
+$$(m\_{v,s}, m\_{b,s}, m\_{r,s}) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$
+$$v\_{\text{transfer}} = \tilde{v}\_{\text{aud,s}} - m\_{v,s}, \qquad v\_{\text{new}} = \tilde{b}\_{\text{aud,s}} - m\_{b,s}, \qquad r\_{\text{new}} = \tilde{r}\_{\text{aud,s}} - m\_{r,s}$$
 
 where $$R\_e$$ and $$\sigma$$ are published in the Transfer event. The recipient's auditor follows the same pattern with $$\delta\_{\text{aud\\\_r}}$$ to recover the pair $$(v\_{\text{transfer}}, r\_{\text{transfer}})$$.
+
+**The lane-2 slot.** Lane 2 of the sender-auditor channel (DESIGN §2.5 *Lane assignment*) carries the new spendable blinding on the three checkpoint operations (W\_a5, T\_a9, S\_a6) and the delegation viewing key $$dvk\_i$$ on spender transfers (O\_a9, Section 8.4). Carrying two kinds of plaintext under one lane is not pad reuse: the pad is fixed by $$(s\_{a,s}, \sigma)$$ or $$(s\_{a,s}, \sigma\_a)$$, both fresh per operation.
 
 **Recipient-auditor opening capability.** Because the recipient-auditor recovers $$r\_{\text{transfer}}$$ for every inbound transfer, and because deposits add to `receiving_commitment` with $$r = 0$$ (Section 7.3), the recipient-auditor can reconstruct the full Pedersen opening of $$C\_{\text{receive}}$$ between merges:
 
@@ -48,10 +50,18 @@ where $$i$$ ranges over inbound transfers and spender-transfers since the last m
 The capability is bounded in three ways:
 
 - **Forward-only.** Only events emitted while the auditor key was active are decryptable.
-- **Receiving-side only.** The opening covers `receiving_commitment`. It does not extend to $$C\_{\text{spend}}$$, whose blinding $$r\_s = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk\_A, \sigma)$$ depends on $$vk\_A$$ and is not derivable from any auditor key. The auditor knows the *value* $$v\_s$$ at every spend boundary via $$\tilde{b}\_{\text{aud,s}}$$ (Section 5.5), and can extend that with the known $$v\_r$$ contribution at each merge.
+- **Receiving-side only.** The reconstruction above covers `receiving_commitment`. It does not extend to $$C\_{\text{spend}}$$: the recipient-auditor cannot derive the spend-side blinding $$r\_s = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk\_A, \sigma)$$, which depends on $$vk\_A$$. It knows the *value* $$v\_s$$ at every spend boundary via $$\tilde{b}\_{\text{aud,s}}$$ (Section 5.5), and can extend that with the known $$v\_r$$ contribution at each merge. The spend-side opening reaches the *sender*-auditor by a different route -- the lane-2 escrow, bounded separately below -- not by this reconstruction.
 - **Reset by merge.** Merge folds $$r\_r$$ into the spendable-balance randomness ($$r\_{\text{spend}}' = r\_s + r\_r$$, Section 7.4) and emits no checkpoint, so the reconstruction above restarts from the next inbound flow.
 
-This bounded opening is what enables the clawback flow specified in [COMPLIANCE.md](./COMPLIANCE.md) §5: the recipient-auditor is the seize-enabling party for inbound flows while $$C\_{\text{receive}}$$ has not yet been merged, while the sender-auditor remains the seize-enabling party for the spendable-balance side via $$\tilde{b}\_{\text{aud,s}}$$.
+**Sender-auditor opening capability.** The lane-2 escrow hands the sender-auditor the *blinding* of the account's post-operation spendable balance directly, without $$vk\_A$$: together with the value in $$\tilde{b}\_{\text{aud,s}}$$ it is a full Pedersen opening of $$C\_{\text{spend}}'$$. It is available at exactly the three checkpoint operations that escrow lane 2 -- withdrawal (W\_a5), outgoing transfer (T\_a9), and `set_spender` (S\_a6) -- and is likewise bounded:
+
+- **Forward-only**, on the same grounds as the recipient side.
+- **Event-scoped, not standing.** `revoke_spender` escrows no blinding (V\_a3 stays two-lane, DESIGN §7.9), so a revoke leaves the auditor with the post-reclaim *value* alone and no opening.
+- **Lapsed by an inbound transfer.** An escrowed blinding survives a merge only when every inflow it folds in carried $$r = 0$$ -- that is, deposits only (Section 7.3), whose amounts are public, so the auditor can still open the post-merge $$C\_{\text{spend}}$$. A single inbound confidential transfer or spender-transfer folds in an $$r\_{\text{transfer}}$$ the sender-auditor does not hold, and the opening lapses until the next checkpoint.
+
+Neither auditor therefore holds a standing opening of $$C\_{\text{spend}}$$; each holds one only as of a named event.
+
+These bounded openings are what enable the clawback flow specified in [COMPLIANCE.md](./COMPLIANCE.md) §5: the recipient-auditor is the seize-enabling party for inbound flows while $$C\_{\text{receive}}$$ has not yet been merged, while the sender-auditor is the seize-enabling party for the spendable-balance side via $$\tilde{b}\_{\text{aud,s}}$$ and $$\tilde{r}\_{\text{aud,s}}$$.
 
 ### 8.2 Auditor Visibility Properties
 
@@ -59,12 +69,12 @@ This bounded opening is what enables the clawback flow specified in [COMPLIANCE.
 
 **Balance checkpoints.** The sender's auditor receives an encrypted balance checkpoint at every owner-initiated operation that produces a proof:
 
-- **Outgoing transfer**: auditor decrypts post-transfer balance $$(v\_A - v\_{\text{transfer}})$$ from $$\tilde{b}\_{\text{aud,s}}$$ (constraints T\_a5--T\_a8).
-- **Withdrawal**: auditor decrypts post-withdrawal balance $$(v - a)$$ from $$\tilde{b}\_{\text{aud,s}}$$ (constraints W\_a1--W\_a4). The withdrawal amount $$a$$ is also visible as a public input.
-- **Set spender**: auditor decrypts escrowed amount $$v\_a$$ from $$\tilde{v}\_{\text{aud,s}}$$ and post-escrow balance $$(v - v\_a)$$ from $$\tilde{b}\_{\text{aud,s}}$$ (constraints S\_a1--S\_a5).
-- **Revoke spender**: auditor decrypts reclaimed amount $$v\_a$$ from $$\tilde{v}\_{\text{aud,s}}$$ and post-reclaim balance $$(v\_s + v\_a)$$ from $$\tilde{b}\_{\text{aud,s}}$$ (constraints V\_a1--V\_a5).
+- **Outgoing transfer**: auditor decrypts post-transfer balance $$(v\_A - v\_{\text{transfer}})$$ from $$\tilde{b}\_{\text{aud,s}}$$ and the matching blinding $$r\_A'$$ from $$\tilde{r}\_{\text{aud,s}}$$ (constraints T\_a5--T\_a9).
+- **Withdrawal**: auditor decrypts post-withdrawal balance $$(v - a)$$ from $$\tilde{b}\_{\text{aud,s}}$$ and the matching blinding $$r'$$ from $$\tilde{r}\_{\text{aud,s}}$$ (constraints W\_a1--W\_a5). The withdrawal amount $$a$$ is also visible as a public input.
+- **Set spender**: auditor decrypts escrowed amount $$v\_a$$ from $$\tilde{v}\_{\text{aud,s}}$$, post-escrow balance $$(v - v\_a)$$ from $$\tilde{b}\_{\text{aud,s}}$$, and the matching blinding $$r'$$ from $$\tilde{r}\_{\text{aud,s}}$$ (constraints S\_a1--S\_a6).
+- **Revoke spender**: auditor decrypts reclaimed amount $$v\_a$$ from $$\tilde{v}\_{\text{aud,s}}$$ and post-reclaim balance $$(v\_s + v\_a)$$ from $$\tilde{b}\_{\text{aud,s}}$$ (constraints V\_a1--V\_a5). This is the one checkpoint operation that escrows no blinding: V\_a3 stays two-lane.
 
-The recipient's auditor does not see the sender's balance in any of these operations.
+The three operations that also escrow the post-operation spendable blinding confer the opening capability bounded in Section 8.1. The recipient's auditor does not see the sender's balance in any of these operations.
 
 **Per-transfer Pedersen randomness (recipient-auditor, not sender-auditor).** Beyond the transfer amount, the recipient's auditor also decrypts the per-transfer Pedersen blinding $$r\_{\text{transfer}}$$ from $$\tilde{r}\_{\text{aud,r}}$$ on every confidential transfer and spender-transfer; Section 8.1 states the opening capability this confers and its bounds (forward-only, receiving-side only, reset by merge). The sender's auditor does not see $$r\_{\text{transfer}}$$. The *originating account's own* $$vk$$ holder does, by recomputing $$r\_e$$ and hence $$s$$ (DESIGN.md §5.3); that path lies outside the auditor model and its consequences are stated in §9.4.
 
@@ -84,21 +94,23 @@ When building public inputs for any operation that produces auditor ciphertexts 
 
 ### 8.4 Spender Transfer Auditing
 
-Each spender transfer produces auditor ciphertexts under two keys (constraints O\_a1--O\_a8), following the same dual-auditor sponge model as owner transfers. The recipient's auditor decrypts the transfer amount and the per-transfer Pedersen randomness:
+Each spender transfer produces auditor ciphertexts under two keys (constraints O\_a1--O\_a9), following the same dual-auditor sponge model as owner transfers. The recipient's auditor decrypts the transfer amount and the per-transfer Pedersen randomness:
 
 $$(m\_{v,r}, m\_{r,r}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_r}}, s\_{a,r}, \sigma\_a)$$
 $$v\_{\text{transfer}} = \tilde{v}\_{\text{aud,r}} - m\_{v,r}, \qquad r\_{\text{transfer}} = \tilde{r}\_{\text{aud,r}} - m\_{r,r}$$
 
-The owner's auditor decrypts the transfer amount and post-transfer allowance:
+The owner's auditor decrypts the transfer amount, the post-transfer allowance, and -- in the lane-2 secret-escrow slot -- the delegation viewing key $$dvk\_i$$ (O\_a9):
 
-$$(m\_{v,s}, m\_{a,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma\_a)$$
-$$v\_{\text{transfer}} = \tilde{v}\_{\text{aud,s}} - m\_{v,s}, \qquad v\_a' = \tilde{a}\_{\text{aud,s}} - m\_{a,s}$$
+$$(m\_{v,s}, m\_{a,s}, m\_{r,s}) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma\_a)$$
+$$v\_{\text{transfer}} = \tilde{v}\_{\text{aud,s}} - m\_{v,s}, \qquad v\_a' = \tilde{a}\_{\text{aud,s}} - m\_{a,s}, \qquad dvk\_i = \text{dvk\\\_cipher\\\_aud} - m\_{r,s}$$
 
 where $$s\_{a,r}$$, $$s\_{a,s}$$, and $$\sigma\_a$$ are recovered from the event as in Section 8.1. The recipient-auditor opening capability stated in Section 8.1 extends to spender-transfer inbound flows: $$r\_{\text{transfer}}$$ from spender-transfers contributes to $$r\_r$$ in $$C\_{\text{receive}}$$ identically to owner-transfer inbound flows.
 
 ### 8.5 Spender Allowance Auditing
 
 The auditor tracks each allowance's current value through the per-event ciphertexts produced at every state-changing operation: `set_spender` reveals the escrowed amount $$v\_a$$ (Section 8.2), `confidential_transfer_from` reveals the transfer amount and post-transfer allowance $$v\_a'$$ (Section 8.4), and `revoke_spender` reveals the reclaimed amount (Section 8.2).
+
+**Allowance opening.** The owner's auditor also receives $$dvk\_i$$ itself: under $$\delta\_{\text{esc\\\_dvk\\\_aud}}$$ at `set_spender` (S14, DESIGN §7.11) and in lane 2 at every spender transfer (O\_a9, §8.4). Since the allowance blinding is $$r\_a = \text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a)$$ and $$\sigma\_a$$ is published in the event, the auditor reconstructs the full Pedersen opening of $$C\_a$$ at each of those events -- unlike the spendable side, with no merge to lapse it, since a delegation's only state transitions are the events themselves.
 
 **Key rotation.** Visibility is forward-only at the event level, matching the spendable-balance model (§8.2). A new key under the account's existing `auditor_id` sees an allowance at the next state-changing operation, when a fresh ciphertext is produced under the new key.
 
@@ -517,6 +529,6 @@ Each $$\delta$$ is a small positive integer in $$\mathbb{F}\_r$$, fixed for the 
 
 This table assigns all seventeen values; no other document assigns them. Tags 14–16 are never absorbed inside a core circuit — 14 is derived off-circuit (DESIGN.md §5.3 makes its derivation normative for every operation whose originator holds a viewing key), and 15–16 belong to the off-chain selective-disclosure layer ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §2.2) — so they are not part of the on-chain wire contract; `circuits/lib/src/lib.nr` accordingly implements 1–13 and 17. All seventeen values MUST still be distinct and each MUST be confined to a single sponge mode, so a deployment treats them as one namespace. Tag 17 is assigned out of sequence with its neighbours because it was added after 14–16; it takes its own tag rather than reusing $$\delta\_{\text{esc\\\_dvk}}$$ across two channels so that every row of §5.3's *Why reusing $$r\_e$$ is safe* keeps a distinct tag.
 
-**Provenance.** Sequential small integers are the simplest assignment that satisfies the requirement of *distinctness* across all Poseidon2 invocations in this protocol -- §3.2 models Poseidon2 as a pseudorandom function, so evaluations whose leading input differs are computationally independent. Distinctness alone is not sufficient: each tag must also be confined to a single sponge mode, since the multi-lane forms of §2.5 share their first lane with the single-output form on the same inputs; $$\delta\_{\text{aud\\\_s}}$$ is the one tag squeezed three-wide, and it is squeezed three-wide everywhere it appears. The values themselves carry no semantic meaning; the binding is purely positional and the table is the only authoritative source. Implementations MUST hardcode these exact numeric values.
+**Provenance.** Sequential small integers are the simplest assignment that satisfies the requirement of *distinctness* across all Poseidon2 invocations in this protocol -- §3.2 models Poseidon2 as a pseudorandom function, so evaluations whose leading input differs are computationally independent. Distinctness alone is not sufficient: each tag must also be confined to a single sponge mode, since the multi-lane forms of §2.5 share their first lane with the single-output form on the same inputs; $$\delta\_{\text{aud\\\_s}}$$ is the one tag ever squeezed three-wide, and the widths it is read at agree on their shared lanes (§2.5 *Mode exclusivity*). The values themselves carry no semantic meaning; the binding is purely positional and the table is the only authoritative source. Implementations MUST hardcode these exact numeric values.
 
 **Cross-protocol collision.** Future protocols that share Grumpkin / BN254 / Poseidon2 with this protocol -- e.g. an unrelated payments protocol that uses small-integer Poseidon2 domains -- could in principle pick the same numeric values for unrelated purposes. The protocol assumes that the surrounding inputs to Poseidon2 (key material, structural witnesses) sufficiently disambiguate even in such a case; no Poseidon2 invocation in this protocol is keyed solely on a $$\delta$$ value. If stronger isolation is desired, implementers may instead use the alternate scheme $$\delta\_X = \text{Poseidon2}(0, \text{ASCII}(\text{"openzeppelin/confidential-token/v1:X"}))$$, but this is a deployment-time choice that must be applied uniformly and disclosed in the deployment's circuit-binding documentation.
