@@ -58,7 +58,7 @@ global R_E_X: Field = 0x114ed4fcf2c57014eb678c577aa02f30ef590b713d7a6a5e87702d1c
 global R_E_Y: Field = 0x07a70cf826350d4f438c7a3c5e8761b0ae6cb63de757f0c96815f4057b9205f4;
 global B_TILDE_AUD_S: Field =
     0x288ff48898f218dbba2a5c9546d0986af3257a4a539e23e4f35c404d6720c07c;
-// Lane-2 secret-escrow slot: r_tilde_aud_s = r' + m_r, over W5's r'.
+// lane[2] secret-escrow slot: r_tilde_aud_s = r' + m_r, over W5's r'.
 global R_TILDE_AUD_S: Field =
     0x12bae1b1e1b12493e37d427d3ee28b481c37f7f456c4ab0c022b8ba6262ca57f;
 
@@ -537,7 +537,7 @@ fn rejects_identity_k_aud_s() {
 
 #[test(should_fail)]
 fn rejects_tampered_b_tilde_aud_s() {
-    // b_tilde_aud_s mutated by +1: W_a4 fails because the lane-1 pad derives
+    // b_tilde_aud_s mutated by +1: W_a4 fails because the lane[1] pad derives
     // a specific scalar that no longer matches the prover's claim. Closes the
     // tampered-ciphertext criterion in the issue.
     main(
@@ -566,7 +566,7 @@ fn rejects_tampered_b_tilde_aud_s() {
 
 #[test(should_fail)]
 fn rejects_tampered_r_tilde_aud_s() {
-    // r_tilde_aud_s mutated by +1: W_a5 fails because the lane-2 escrow is
+    // r_tilde_aud_s mutated by +1: W_a5 fails because the lane[2] escrow is
     // pinned to r' = derive_spend_r(vk, sigma), which the prover's claim no
     // longer matches.
     main(

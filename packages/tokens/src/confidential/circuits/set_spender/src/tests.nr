@@ -84,7 +84,7 @@ global ESCROWED_DVK_CIPHER: Field =
     0x1ef89e3bd93ec1afed649d150e9d0ff5df72002759e260cb66b06604a4d7ebe0;
 global V_TILDE_AUD_S: Field =
     0x0d0a3aa77960977737f4355093d4672ea9f95556fabf63bda0913ebef52c4397;
-// Lane-2 spendable-blinding escrow (S_a6) and the auditor-side allowance-
+// lane[2] spendable-blinding escrow (S_a6) and the auditor-side allowance-
 // blinding escrow (S14). Both are blindings of commitments this operation
 // writes -- C_spend' and C_a respectively.
 global R_TILDE_AUD_S: Field =
@@ -1522,7 +1522,7 @@ fn rejects_escrow_of_blinding_for_the_wrong_sigma_a() {
 
 #[test(should_fail)]
 fn rejects_tampered_r_tilde_aud_s() {
-    // r_tilde_aud_s mutated by +1: S_a6 fails because the lane-2 escrow is
+    // r_tilde_aud_s mutated by +1: S_a6 fails because the lane[2] escrow is
     // pinned to r' = derive_spend_r(vk, sigma), which the prover's claim no
     // longer matches.
     run_main(

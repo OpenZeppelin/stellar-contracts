@@ -71,7 +71,7 @@ global V_TILDE_AUD_S: Field =
     0x0d0a3aa77960977737f4355093d4672ea9f95556fabf63bda0913ebef52c42cf;
 global B_TILDE_AUD_S: Field =
     0x288ff48898f218dbba2a5c9546d0986af3257a4a539e23e4f35c404d6720c144;
-// Lane-2 secret-escrow slot: r_tilde_aud_s = r_A' + m_r_s, over T10's r_A'.
+// lane[2] secret-escrow slot: r_tilde_aud_s = r_A' + m_r_s, over T10's r_A'.
 global R_TILDE_AUD_S: Field =
     0x12bae1b1e1b12493e37d427d3ee28b481c37f7f456c4ab0c022b8ba6262ca57f;
 
@@ -1350,7 +1350,7 @@ fn rejects_tampered_b_tilde_aud_s() {
 
 #[test(should_fail)]
 fn rejects_tampered_r_tilde_aud_s() {
-    // r_tilde_aud_s mutated by +1: T_a9 fails because the lane-2 escrow is
+    // r_tilde_aud_s mutated by +1: T_a9 fails because the lane[2] escrow is
     // pinned to r_A' = derive_spend_r(vk, sigma), which the prover's claim no
     // longer matches.
     run_main(

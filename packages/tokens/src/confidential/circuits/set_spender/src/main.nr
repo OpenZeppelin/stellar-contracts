@@ -77,7 +77,7 @@ mod tests;
 //                                                        A separate single-
 //                                                        output Poseidon
 //                                                        rather than a sponge
-//                                                        lane, because lane 2
+//                                                        lane, because lane[2]
 //                                                        of this channel is
 //                                                        taken by S_a6. Costs
 //                                                        one Poseidon and zero

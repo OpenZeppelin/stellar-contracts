@@ -236,7 +236,7 @@ fn sponge_squeeze_2_first_matches_poseidon_with_domain() {
 #[test]
 fn sponge_squeeze_3_agrees_with_squeeze_2_on_shared_lanes() {
     // The widening from two lanes to three must be observationally identical
-    // on lanes 0 and 1 for every domain tag: both squeezes read the same
+    // on lane[0] and lane[1] for every domain tag: both squeezes read the same
     // post-permutation state, and the absorb occupies a single rate-3 block.
     // This is what lets `delta_aud_s` be widened everywhere it appears
     // without renumbering a single existing constraint.
@@ -252,8 +252,8 @@ fn sponge_squeeze_3_agrees_with_squeeze_2_on_shared_lanes() {
 
 #[test]
 fn sponge_squeeze_3_outputs_distinct() {
-    // Lane 2 comes from a third rate position of the same permutation and
-    // must differ from both others. A collision would let an observer who
+    // The lane[2] mask comes from rate position state[2] and must differ
+    // from both others. A collision would let an observer who
     // recovers the balance mask also recover the secret-escrow pad -- and
     // with it the account's spendable blinding, which is exactly what the
     // slot exists to keep between the sender and its auditor.
@@ -501,19 +501,19 @@ fn fixtures_match_testdata() {
     assert(ss2_r[0] == SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_0);
     assert(ss2_r[1] == SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_1);
 
-    // Lane 0 is the single-squeeze funnel: the absorb fits one rate-3 block,
-    // so a tag used in both modes would collapse one onto the other
-    // (Section 2.5 mode exclusivity).
+    // The lane[0] output is the single-squeeze funnel: the absorb fits one
+    // rate-3 block, so a tag used in both modes would collapse one onto the
+    // other (Section 2.5 mode exclusivity).
     assert(
         poseidon_with_domain(domain::AUDITOR_SENDER, [s_ecdh, sigma])
             == SPONGE_SQUEEZE_2_AUDITOR_SENDER_0,
     );
 
-    // The three-lane squeeze must agree with the two-lane one on lanes 0-1:
-    // the absorb fits one rate-3 block, so both are served from the same
-    // permutation. If this diverges, widening the sender-auditor channel
-    // silently changed every existing mask and every published ciphertext
-    // became undecryptable.
+    // The three-lane squeeze must agree with the two-lane one on lane[0]
+    // and lane[1]: the absorb fits one rate-3 block, so both are served from
+    // the same permutation. If this diverges, widening the sender-auditor
+    // channel silently changed every existing mask and every published
+    // ciphertext became undecryptable.
     let ss3_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_ecdh, sigma);
     assert(ss3_s[0] == SPONGE_SQUEEZE_2_AUDITOR_SENDER_0);
     assert(ss3_s[1] == SPONGE_SQUEEZE_2_AUDITOR_SENDER_1);
@@ -542,8 +542,8 @@ global SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_0: Field =
     0x0801e6d7184cea11e6225fcfb4e88a90674cb085da8ebc04918c57cc44b9c25d;
 global SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_1: Field =
     0x131187e2ac296c1c54c2be2a5cbe614644f01c754108ce25359212d67b36ecc3;
-// Lane 2 of the same permutation -- the sender-auditor secret-escrow slot.
-// Mirrored in `testdata/sponge_squeeze_3.json`.
+// The lane[2] output of the same permutation -- the sender-auditor
+// secret-escrow slot. Mirrored in `testdata/sponge_squeeze_3.json`.
 global SPONGE_SQUEEZE_3_AUDITOR_SENDER_2: Field =
     0x1c4e67103733b87be6672e0af91fc5416b6d582bf99d5a0f78ea6aaf5fab20b0;
 

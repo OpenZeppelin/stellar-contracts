@@ -133,8 +133,8 @@ pub mod domain {
     pub global ESCROWED_DELEGATION_VIEWING_KEY: Field = 10;
     /// Sender or owner-auditor channel tag for Poseidon2 sponge masks
     /// (Section 2.5, Section 8.1). **Three lanes**, and the only tag squeezed
-    /// three-wide: lane 0 is the amount mask (where applicable), lane 1 the
-    /// balance/allowance checkpoint mask, lane 2 the commitment-blinding
+    /// three-wide: lane[0] is the amount mask (where applicable), lane[1] the
+    /// balance/allowance checkpoint mask, lane[2] the commitment-blinding
     /// escrow slot -- the new spendable blinding on checkpoints, the new
     /// allowance blinding on spender transfers. Constraints W_a3 / T_a6 /
     /// S_a3 / O_a6 (`delta_aud_s`).
@@ -342,8 +342,8 @@ pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
 /// `r_a_tilde_aud_s = r_a + Poseidon2(ESC_ALLOW_R_AUD, s_a_s, op_i)` where
 /// `s_a_s = ecdh(r_e, K_aud_s)` is the *owner-auditor* shared scalar.
 ///
-/// A single-output Poseidon rather than a third sponge lane, because at
-/// `set_spender` lane 2 of the owner-auditor sponge is already taken by S_a6.
+/// A single-output Poseidon rather than a further sponge lane, because at
+/// `set_spender` lane[2] of the owner-auditor sponge is already taken by S_a6.
 /// Costs one Poseidon2 permutation and zero scalar multiplications. `op_i` is
 /// a per-`(owner, spender)` constant that separates pads across delegations,
 /// not a nonce: the pad's freshness comes solely from `s_a_s`, which is fresh
@@ -375,7 +375,7 @@ pub fn encrypt_esc_allow_r_auditor(r_a: Field, s_a_s: Field, op_i: Field) -> Fie
 ///
 /// Used by the recipient-auditor channel of Transfer (T_a2) and
 /// SpenderTransfer (O_a2), and by RevokeSpender's sender-auditor channel
-/// (V_a3), which escrows nothing in lane 2. Every other sender-auditor
+/// (V_a3), which escrows nothing in lane[2]. Every other sender-auditor
 /// channel reads [`sponge_squeeze_3`].
 ///
 /// Defined as the two-lane prefix of [`sponge_squeeze_3`] so the two cannot
@@ -389,13 +389,13 @@ pub fn sponge_squeeze_2(d: Field, s: Field, sigma: Field) -> [Field; 2] {
 /// Poseidon2 sponge with three squeezes. Absorbs `(d, s, sigma)` and returns
 /// the first three rate-elements of the post-permutation state in order.
 ///
-/// Implements `SpongeSqueeze_3(delta, s, sigma)` from Section 2.5. Lane 0 is
-/// the amount mask and lane 1 the balance / allowance / randomness mask, as in
-/// [`sponge_squeeze_2`]. **Lane 2 is the sender-auditor blinding-escrow
-/// slot**: it carries the blinding of a commitment the operation writes, and
-/// never a key -- the new spendable blinding on the three checkpoint
-/// operations (W_a5 / T_a9 / S_a6), the new allowance blinding on spender
-/// transfers (O_a9).
+/// Implements `SpongeSqueeze_3(delta, s, sigma)` from Section 2.5. As in
+/// [`sponge_squeeze_2`], lane[0] is the amount mask and lane[1] the balance /
+/// allowance / randomness mask. **The lane[2] slot is the sender-auditor
+/// blinding escrow**: it carries the blinding of a commitment the operation
+/// writes, and never a key -- the new spendable blinding on the three
+/// checkpoint operations (W_a5 / T_a9 / S_a6), the new allowance blinding on
+/// spender transfers (O_a9).
 ///
 /// `sponge_squeeze_3(d, s, sigma)[0..2] == sponge_squeeze_2(d, s, sigma)`, by
 /// construction: the absorb fits one rate-3 block, so all three outputs are
@@ -404,7 +404,7 @@ pub fn sponge_squeeze_2(d: Field, s: Field, sigma: Field) -> [Field; 2] {
 /// value and costs no extra constraints. The capacity lane at `state[3]` stays
 /// untouched.
 ///
-/// The blindings lane 2 carries still belong to different commitment roles --
+/// The blindings lane[2] carries still belong to different commitment roles --
 /// spendable on the checkpoints, allowance on spender transfers -- so the
 /// uniformity is documentary, not a claim that a recipient can substitute one
 /// for the other. Each is scoped to the operation that emitted it.

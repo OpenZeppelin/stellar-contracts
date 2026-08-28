@@ -44,9 +44,9 @@ mod tests;
 //   W_a3 (m_b, m_r)  = SpongeSqueeze_3(delta_aud_s,
 //                                     s_{a,s},
 //                                     sigma)[1], [2]    Sender-channel sponge,
-//                                                      lanes 1 and 2. Lane 0
-//                                                      (the amount slot) is
-//                                                      unused -- the
+//                                                      lane[1] and lane[2].
+//                                                      The lane[0] amount
+//                                                      slot is unused -- the
 //                                                      withdrawal amount is
 //                                                      public -- and skipping
 //                                                      it keeps the checkpoint
@@ -179,7 +179,7 @@ fn main(
     // W_a2 (shared-secret scalar)
     let s_a_s = ecdh(r_e, k_aud_s);
 
-    // W_a3 (sender-channel masks: lane 0 unused, then balance, then the
+    // W_a3 (sender-channel masks: lane[0] unused, then balance, then the
     // secret-escrow slot)
     let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, sigma);
 

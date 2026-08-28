@@ -71,7 +71,7 @@ global R_TILDE_AUD_R: Field =
     0x11504bfdaa7e3dfb4b38918d6ae2ba379abfda0a53ebc00fd1b561e805407c96;
 global V_TILDE_AUD_S: Field =
     0x08ad26221dfe94a593dae37d3efdbe93a503a3cfe35bd10c3ab60061267c20fc;
-// Lane-2 blinding-escrow slot (O_a9): the NEW allowance blinding r_a', the
+// lane[2] blinding-escrow slot (O_a9): the NEW allowance blinding r_a', the
 // one O11 commits C_a' under, escrowed to the owner's auditor on every
 // spender transfer. Pad and plaintext both key off SIGMA_A_NEW.
 global R_TILDE_AUD_S: Field =
@@ -1583,7 +1583,7 @@ fn repeated_r_e_and_sigma_a_new_repeat_every_channel_pad() {
 fn rejects_escrow_of_the_consumed_allowance_blinding() {
     // The prover escrows R_A -- the blinding of the allowance this transfer
     // CONSUMES -- instead of O10's r_a', the blinding of the allowance it
-    // writes. Correctly padded under the canonical lane-2 mask, so only O_a9
+    // writes. Correctly padded under the canonical lane[2] mask, so only O_a9
     // can catch it, and it does.
     //
     // The distinction matters because the auditor's job is to track live
@@ -1631,7 +1631,7 @@ fn rejects_escrow_of_the_consumed_allowance_blinding() {
 
 #[test(should_fail)]
 fn rejects_tampered_r_tilde_aud_s() {
-    // r_tilde_aud_s mutated by +1: O_a9 fails because the lane-2 escrow is
+    // r_tilde_aud_s mutated by +1: O_a9 fails because the lane[2] escrow is
     // pinned to O10's r_a', which the prover's claim no longer matches.
     run_main(
         SK_OP,
