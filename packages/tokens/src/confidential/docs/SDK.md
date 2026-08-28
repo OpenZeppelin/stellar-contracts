@@ -396,11 +396,13 @@ The projection MUST still be reconciled against the event, and MUST NOT be treat
 
 ### 10.4 Salt freshness
 
-A fresh $$\sigma$$ MUST be sampled for every **attempt**, including retries after a reverted or dropped transaction.
+A fresh salt MUST be sampled for every **attempt**, including retries after a reverted or dropped transaction. The salt that must be fresh is the one the operation's pads absorb: $$\sigma$$ for owner-initiated operations, and $$\sigma_a'$$ — the replacement allowance salt — for spender transfers (DESIGN.md §6.2 *Transfer nonce*).
 
-DESIGN_cont.md §9.6 motivates this as unlinkability: a fresh $$\sigma$$ prevents an observer correlating a reverted attempt with its retry. It is equally a confidentiality requirement, because the salt is the sole freshness input to every derived pad in the operation, the ephemeral scalar included (DESIGN.md §2.5, §5.3). Reuse therefore repeats the ephemeral key and every channel mask that depends on it.
+DESIGN_cont.md §9.6 motivates this as unlinkability: a fresh salt prevents an observer correlating a reverted attempt with its retry. It is equally a confidentiality requirement, because the salt is the sole freshness input to every derived pad in the operation, the ephemeral scalar included (DESIGN.md §2.5, §5.3). Reuse therefore repeats the ephemeral key and every channel mask that depends on it, and two attempts that differ only in amount publish that difference in the clear.
 
 An implementation MUST NOT cache or reuse a salt across attempts, and MUST NOT derive it from anything an observer can predict.
+
+**Freshness is not enforced on-chain.** Constraint O14 rejects only $$\sigma_a' = \sigma_a$$, the adjacent collision; a circuit cannot see a delegation's older salts. An implementation MUST therefore treat non-repetition of $$\sigma_a'$$ over the whole life of a delegation as its own obligation, and MUST NOT cycle salts through a bounded set.
 
 ### 10.5 Deterministic ephemeral scalars
 

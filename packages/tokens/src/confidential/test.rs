@@ -702,7 +702,6 @@ fn set_spender_stores_delegation() {
             live_until_ledger: 1_000u32,
             r_e_point: fixture_point(&h.e),
             sigma: fixture_field(&h.e, 0x23),
-            sigma_a: fixture_field(&h.e, 0x24),
             b_tilde: fixture_field(&h.e, 0x21),
             v_tilde_aud_s: fixture_field(&h.e, 0x25),
             b_tilde_aud_s: fixture_field(&h.e, 0x26),
@@ -808,7 +807,6 @@ fn auditor_key_rotation_rescopes_the_escrowed_allowance_opening() {
             live_until_ledger: 1_000u32,
             r_e_point: fixture_point(&h.e),
             sigma: fixture_field(&h.e, 0x23),
-            sigma_a: fixture_field(&h.e, 0x24),
             b_tilde: fixture_field(&h.e, 0x21),
             v_tilde_aud_s: fixture_field(&h.e, 0x25),
             b_tilde_aud_s: fixture_field(&h.e, 0x26),
@@ -841,7 +839,6 @@ fn auditor_key_rotation_rescopes_the_escrowed_allowance_opening() {
             to: bob.clone(),
             r_e_point: fixture_point(&h.e),
             v_tilde: fixture_field(&h.e, 0x31),
-            sigma_a: fixture_field(&h.e, 0x24),
             sigma_a_new: fixture_field(&h.e, 0x33),
             v_tilde_aud_r: fixture_field(&h.e, 0x34),
             r_tilde_aud_r: fixture_field(&h.e, 0x35),
@@ -908,8 +905,8 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
             to: bob.clone(),
             r_e_point: fixture_point(&h.e),
             v_tilde: fixture_field(&h.e, 0x31),
-            // The delegation's pre-transfer salt, read from storage.
-            sigma_a: fixture_field(&h.e, 0x24),
+            // The payload's sigma_a', not the stored allowance_salt (0x24) it
+            // replaces: every pad and the ephemeral scalar are keyed to it.
             sigma_a_new: fixture_field(&h.e, 0x33),
             v_tilde_aud_r: fixture_field(&h.e, 0x34),
             r_tilde_aud_r: fixture_field(&h.e, 0x35),
@@ -926,6 +923,50 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
     // Bob's receiving balance accumulated.
     let bob_acc = h.token.confidential_balance(&bob);
     assert_ne!(bob_acc.receiving_commitment.to_array(), [0u8; 64]);
+}
+
+/// The `SpenderTransfer` event carries the transfer's channel nonce
+/// `sigma_a'`, not the stored `allowance_salt` it replaces (DESIGN §6.2
+/// *Transfer nonce*). Emitting the stored salt would hand the recipient and
+/// both auditors a nonce none of the pads absorbed, and would repeat across a
+/// retry.
+#[test]
+fn confidential_transfer_from_emits_new_salt_as_channel_nonce() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+    let bob = Address::generate(&h.e);
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.register(&bob, &1u32, &register_data(&h.e));
+    h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
+    let stored_salt = h.token.get_spender_delegation(&alice, &spender).allowance_salt;
+    assert_eq!(stored_salt, fixture_field(&h.e, 0x24));
+
+    h.token.confidential_transfer_from(&spender, &alice, &bob, &spender_transfer_data(&h.e));
+
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &SpenderTransfer {
+            spender: spender.clone(),
+            from: alice.clone(),
+            to: bob.clone(),
+            r_e_point: fixture_point(&h.e),
+            v_tilde: fixture_field(&h.e, 0x31),
+            sigma_a_new: fixture_field(&h.e, 0x33),
+            v_tilde_aud_r: fixture_field(&h.e, 0x34),
+            r_tilde_aud_r: fixture_field(&h.e, 0x35),
+            v_tilde_aud_s: fixture_field(&h.e, 0x36),
+            a_tilde_aud_s: fixture_field(&h.e, 0x37),
+            r_tilde_aud_s: fixture_field(&h.e, 0x38),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
+    let delegation = h.token.get_spender_delegation(&alice, &spender);
+    assert_eq!(delegation.allowance_salt, fixture_field(&h.e, 0x33));
 }
 
 #[test]

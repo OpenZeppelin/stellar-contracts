@@ -115,8 +115,6 @@ pub struct WithdrawPayload {
     pub r_e_point: Point,
     pub sigma: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
-    /// Sender-auditor secret-escrow slot (sponge lane 2): the blinding of the
-    /// new spendable commitment, `r' + m_r_s` (constraint W_a5).
     pub r_tilde_aud_s: BytesN<32>,
 }
 
@@ -144,8 +142,6 @@ pub struct TransferPayload {
     pub r_tilde_aud_r: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
-    /// Sender-auditor secret-escrow slot (sponge lane 2): the blinding of the
-    /// sender's new spendable commitment, `r_A' + m_r_s` (constraint T_a9).
     pub r_tilde_aud_s: BytesN<32>,
 }
 
@@ -173,8 +169,6 @@ pub struct SpenderTransferPayload {
     pub r_tilde_aud_r: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub a_tilde_aud_s: BytesN<32>,
-    /// Owner-auditor blinding-escrow slot (sponge lane 2): the blinding of
-    /// the new allowance commitment, `r_a' + m_r_s` (constraint O_a9).
     pub r_tilde_aud_s: BytesN<32>,
 }
 
@@ -201,14 +195,7 @@ pub struct SetSpenderPayload {
     pub sigma_a: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
-    /// Owner-auditor secret-escrow slot (sponge lane 2): the blinding of the
-    /// new spendable commitment, `r' + m_r_s` (constraint S_a6).
     pub r_tilde_aud_s: BytesN<32>,
-    /// Owner-auditor escrow of the allowance blinding,
-    /// `r_a + Poseidon2(delta_esc_allow_r_aud, s_a_s, op_i)` (constraint
-    /// S14). Distinct from `r_tilde_aud_s` above, which escrows the *spendable*
-    /// blinding, and from `escrowed_dvk`, which hands the *spender* the
-    /// delegation viewing key.
     pub r_a_tilde_aud_s: BytesN<32>,
 }
 
@@ -783,8 +770,8 @@ pub fn confidential_transfer(
 ///
 /// * topics - `["spender_transfer", spender: Address, from: Address, to:
 ///   Address]`
-/// * data - `[r_e_point, v_tilde, sigma_a, sigma_a_new, v_tilde_aud_r,
-///   r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s, r_tilde_aud_s]`
+/// * data - `[r_e_point, v_tilde, sigma_a_new, v_tilde_aud_r, r_tilde_aud_r,
+///   v_tilde_aud_s, a_tilde_aud_s, r_tilde_aud_s]`
 ///
 /// # Security Warning
 ///
@@ -813,8 +800,6 @@ pub fn confidential_transfer_from(
     // owner).
     let k_aud_s = auditor.get_key(&owner.auditor_id);
 
-    // Capture it here to emit in the event below.
-    let sigma_a = delegation.allowance_salt.clone();
     // PI order (DESIGN §7.8):
     //   C_a, sigma_a, Y_op, PVK_recipient, K_aud_r, K_aud_s,
     //   C_a', C_transfer, R_e, v_tilde, a_tilde', sigma_a',
@@ -858,7 +843,6 @@ pub fn confidential_transfer_from(
         to,
         &payload.r_e_point,
         &payload.v_tilde,
-        &sigma_a,
         &payload.sigma_a_new,
         &payload.v_tilde_aud_r,
         &payload.r_tilde_aud_r,
@@ -899,8 +883,8 @@ pub fn confidential_transfer_from(
 /// # Events
 ///
 /// * topics - `["set_spender", account: Address, spender: Address]`
-/// * data - `[live_until_ledger: u32, r_e_point, sigma, sigma_a, b_tilde,
-///   v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s, r_a_tilde_aud_s]`
+/// * data - `[live_until_ledger: u32, r_e_point, sigma, b_tilde, v_tilde_aud_s,
+///   b_tilde_aud_s, r_tilde_aud_s, r_a_tilde_aud_s]`
 ///
 /// # Security Warning
 ///
@@ -969,7 +953,6 @@ pub fn set_spender(
         live_until_ledger,
         &payload.r_e_point,
         &payload.sigma,
-        &payload.sigma_a,
         &payload.b_tilde,
         &payload.v_tilde_aud_s,
         &payload.b_tilde_aud_s,

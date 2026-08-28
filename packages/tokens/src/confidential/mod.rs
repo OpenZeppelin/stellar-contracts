@@ -401,7 +401,7 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["spender_transfer", spender: Address, from: Address, to:
     ///   Address]`
-    /// * data - `[r_e_point, v_tilde, sigma_a, sigma_a_new, v_tilde_aud_r,
+    /// * data - `[r_e_point, v_tilde, sigma_a_new, v_tilde_aud_r,
     ///   r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s, r_tilde_aud_s]`
     fn confidential_transfer_from(
         e: &Env,
@@ -448,7 +448,7 @@ pub trait ConfidentialToken {
     /// # Events
     ///
     /// * topics - `["set_spender", account: Address, spender: Address]`
-    /// * data - `[live_until_ledger: u32, r_e_point, sigma, sigma_a, b_tilde,
+    /// * data - `[live_until_ledger: u32, r_e_point, sigma, b_tilde,
     ///   v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s, r_a_tilde_aud_s]`
     fn set_spender(
         e: &Env,
@@ -756,7 +756,6 @@ pub struct SpenderTransfer {
     pub to: Address,
     pub r_e_point: BytesN<64>,
     pub v_tilde: BytesN<32>,
-    pub sigma_a: BytesN<32>,
     pub sigma_a_new: BytesN<32>,
     pub v_tilde_aud_r: BytesN<32>,
     pub r_tilde_aud_r: BytesN<32>,
@@ -774,7 +773,6 @@ pub fn emit_spender_transfer(
     to: &Address,
     r_e_point: &BytesN<64>,
     v_tilde: &BytesN<32>,
-    sigma_a: &BytesN<32>,
     sigma_a_new: &BytesN<32>,
     v_tilde_aud_r: &BytesN<32>,
     r_tilde_aud_r: &BytesN<32>,
@@ -788,7 +786,6 @@ pub fn emit_spender_transfer(
         to: to.clone(),
         r_e_point: r_e_point.clone(),
         v_tilde: v_tilde.clone(),
-        sigma_a: sigma_a.clone(),
         sigma_a_new: sigma_a_new.clone(),
         v_tilde_aud_r: v_tilde_aud_r.clone(),
         r_tilde_aud_r: r_tilde_aud_r.clone(),
@@ -810,7 +807,6 @@ pub struct SetSpender {
     pub live_until_ledger: u32,
     pub r_e_point: BytesN<64>,
     pub sigma: BytesN<32>,
-    pub sigma_a: BytesN<32>,
     pub b_tilde: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
@@ -827,7 +823,6 @@ pub fn emit_set_spender(
     live_until_ledger: u32,
     r_e_point: &BytesN<64>,
     sigma: &BytesN<32>,
-    sigma_a: &BytesN<32>,
     b_tilde: &BytesN<32>,
     v_tilde_aud_s: &BytesN<32>,
     b_tilde_aud_s: &BytesN<32>,
@@ -840,7 +835,6 @@ pub fn emit_set_spender(
         live_until_ledger,
         r_e_point: r_e_point.clone(),
         sigma: sigma.clone(),
-        sigma_a: sigma_a.clone(),
         b_tilde: b_tilde.clone(),
         v_tilde_aud_s: v_tilde_aud_s.clone(),
         b_tilde_aud_s: b_tilde_aud_s.clone(),
