@@ -63,7 +63,7 @@
 //! The check is by deliberate design **not** an on-curve check. Prover-
 //! supplied points are constrained on-curve in-circuit by their
 //! `multi_scalar_mul` derivation and pinned to `≠ O` by explicit
-//! nonzero-scalar constraints (DESIGN §10.8: R4/R5, W8, T13, S13, O13, V10).
+//! nonzero-scalar constraints (DESIGN §10.8: R4/R5, W8, T13, S13, O13).
 //! The only proof-less Grumpkin entry point is the auditor key, which the
 //! auditor contract validates canonical-encoding, on-curve, and non-identity
 //! at insertion via [`auditor::storage::validate_point`].

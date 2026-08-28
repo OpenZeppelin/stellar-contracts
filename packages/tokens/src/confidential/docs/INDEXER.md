@@ -53,13 +53,13 @@ All events emitted by the confidential token (DESIGN_cont §11.2) with the follo
 | `Merge` | Anchor: folds the receiving opening into the spendable opening; resets the receiving side. |
 | `SetSpender`, `SpenderTransfer` (owner side) | **The auditor's only route to an allowance opening.** The escrowed allowance blinding rides these two events (`r_a_tilde_aud_s` on `SetSpender`, `r_tilde_aud_s` on `SpenderTransfer`) and appears nowhere in contract storage, so an auditor that misses one has no way to reconstruct the opening of the `C_a` it wrote — see §7 *Auditor recovery*. |
 | `Withdraw`, `Transfer` (sender side), `SetSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the owner's spendable balance. `SetSpender` is in scope as an owner checkpoint only — a spender recovers allowance state from the on-chain delegation entry (`allowance_commitment`, `a_tilde`, `escrowed_dvk`, `allowance_salt`), not from the archive. |
-| `RevokeSpender` | Spendable-side fold, not a checkpoint: the owner adds the reclaimed allowance opening to the spendable opening, deriving it from the event's `a_tilde` and `allowance_salt` (DESIGN §7.9). The event is emitted in the same shape whether the owner or the compliance module revoked. |
+| `RevokeSpender` | Spendable-side fold, not a checkpoint: the owner adds the reclaimed allowance opening to the spendable opening, deriving it from the event's `a_tilde` and `allowance_salt` (DESIGN §7.9). |
 
 A self-transfer — a `Transfer` whose `from` and `to` are the same account — carries both roles at once: it is a sender-side checkpoint and a recipient-side replay event, and recovery applies both (DESIGN §5.2).
 
 The auditor-channel fields these events carry (`v_tilde_aud_*`, `b_tilde_aud_s`, `r_tilde_aud_s`, `a_tilde_aud_s`, `r_a_tilde_aud_s`) are out of scope for wallet recovery. They are archived regardless, since the record is the verbatim event (§3.1). Event shapes are normative in DESIGN_cont §11.2.
 
-Configuration events (`UnderlyingAssetSet`, `VerifierSet`, `AuditorSet`, `AddressAsFieldSet`, verification-key events) and the compliance events `Frozen`, `Unfrozen`, and `ComplianceConfigChanged` are not needed for balance recovery; indexers SHOULD archive them anyway — they are low-volume and useful for deployment forensics, and the freeze history is what distinguishes a forced `RevokeSpender` from an owner-initiated one.
+Configuration events (`UnderlyingAssetSet`, `VerifierSet`, `AuditorSet`, `AddressAsFieldSet`, verification-key events) and the compliance events `Frozen`, `Unfrozen`, and `ComplianceConfigChanged` are not needed for balance recovery; indexers SHOULD archive them anyway — they are low-volume and useful for deployment forensics.
 
 ### 3.3 Account attribution
 

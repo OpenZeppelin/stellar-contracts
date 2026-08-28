@@ -49,7 +49,7 @@ The design is built on three interlocking mechanisms:
 
 3. **Proof-less merge.** Incoming funds accumulate in a receiving balance that is separate from the spendable balance. To make received funds spendable, the owner authorizes a merge - no ZK proof is required. Since merge requires owner authorization and incoming transfers touch only the receiving balance, neither the spend path nor the merge path can be front-run by a third party.
 
-Six Noir/UltraHonk circuits cover registration, withdrawal, confidential transfer, spender transfer, spender delegation, and spender revocation. The proof system leverages the Grumpkin–BN254 curve cycle: Grumpkin point arithmetic is native inside Noir circuits (no field emulation), while Soroban natively supports BN254 operations for UltraHonk proof verification.
+Five Noir/UltraHonk circuits cover registration, withdrawal, confidential transfer, spender transfer, and spender delegation. The proof system leverages the Grumpkin–BN254 curve cycle: Grumpkin point arithmetic is native inside Noir circuits (no field emulation), while Soroban natively supports BN254 operations for UltraHonk proof verification.
 
 ---
 
@@ -263,7 +263,7 @@ i.e., the total committed value across all confidential accounts never exceeds t
 
 ### 3.5 Governance and Upgradeability
 
-The constructor binds the contract to fixed `admin`, `token`, `verifier`, and `auditor` addresses. It additionally computes and stores `addr_f = address_to_field(env.current_contract_address())` (§2.7) in **instance storage** as a single canonical $$\mathbb{F}\_r$$ Field; this is the value every owner-initiated proof references via constraints R2 / W2 / T2 / S2 / V2. The compressed `addr_f` Field is computed once at construction (not recomputed per call) to ensure all proofs across the contract's lifetime bind to the same Field representative of the contract's address. Beyond that, this specification does not prescribe a governance policy for upgrading these components or for rotating per-circuit verification keys. Concrete deployments differ widely in spender structure, regulatory posture, and emergency-response requirements, so these decisions are deliberately left to implementers.
+The constructor binds the contract to fixed `admin`, `token`, `verifier`, and `auditor` addresses. It additionally computes and stores `addr_f = address_to_field(env.current_contract_address())` (§2.7) in **instance storage** as a single canonical $$\mathbb{F}\_r$$ Field; this is the value every owner-initiated proof references via constraints R2 / W2 / T2 / S2. The compressed `addr_f` Field is computed once at construction (not recomputed per call) to ensure all proofs across the contract's lifetime bind to the same Field representative of the contract's address. Beyond that, this specification does not prescribe a governance policy for upgrading these components or for rotating per-circuit verification keys. Concrete deployments differ widely in spender structure, regulatory posture, and emergency-response requirements, so these decisions are deliberately left to implementers.
 
 Questions an implementer must answer:
 
@@ -290,7 +290,7 @@ The spending public key is stored on-chain at registration. Knowledge of $$sk$$ 
 
 $$vk = \text{Poseidon}(\delta\_{\text{vk}}, sk, \text{addr\\\_f})$$
 
-A scalar in $$\mathbb{F}\_r$$, unique per $$(sk, \text{addr\\\_f})$$ pair. Enables balance decryption without spending authority, and — through the ephemeral-scalar derivation of §5.3 — reconstruction of the Pedersen openings of transfers the account originated; §9.4 states the full capability of a compromised $$vk$$. Cannot recover $$sk$$ (Poseidon preimage resistance). Because $$\text{addr\\\_f}$$ is bound into the derivation, proofs that constrain $$vk$$ (R2, W2, T2, S2, V2) are inherently bound to the contract, eliminating the need for explicit per-circuit context binding.
+A scalar in $$\mathbb{F}\_r$$, unique per $$(sk, \text{addr\\\_f})$$ pair. Enables balance decryption without spending authority, and — through the ephemeral-scalar derivation of §5.3 — reconstruction of the Pedersen openings of transfers the account originated; §9.4 states the full capability of a compromised $$vk$$. Cannot recover $$sk$$ (Poseidon preimage resistance). Because $$\text{addr\\\_f}$$ is bound into the derivation, proofs that constrain $$vk$$ (R2, W2, T2, S2) are inherently bound to the contract, eliminating the need for explicit per-circuit context binding.
 
 ### 4.3 Public Viewing Key
 
@@ -360,7 +360,7 @@ $$W\_{\text{receive}} = (v\_r, r\_r) \quad \text{such that} \quad C\_{\text{rece
 | Outgoing transfer/withdrawal of amount $$a$$ | Proof outputs new commitment with deterministic randomness. $$W\_{\text{spend}} \leftarrow (v\_s - a, \\; \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk, \sigma))$$ |
 | Merge | $$W\_{\text{spend}} \leftarrow (v\_s + v\_r, \\; r\_s + r\_r)$$; $$W\_{\text{receive}} \leftarrow (0, 0)$$ |
 | Set spender (escrow amount $$a$$) | Proof outputs new commitment. $$W\_{\text{spend}} \leftarrow (v\_s - a, \\; \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk, \sigma))$$ |
-| Revoke spender, by the owner or forced by the compliance module | Proofless fold. $$W\_{\text{spend}} \mathrel{+}= (v\_a, r\_a)$$, the escrow opening recovered from the event per §7.9 |
+| Revoke spender | Proofless fold. $$W\_{\text{spend}} \mathrel{+}= (v\_a, r\_a)$$, the escrow opening recovered from the event per §7.9 |
 
 The Merge and Revoke spender rows use exact integer addition; $$W\_{\text{spend}}.r$$ is not reduced modulo $$r$$ or $$q$$ as merges accumulate. At proof-construction time the wallet reduces $$W\_{\text{spend}}.r$$ modulo $$q$$ and encodes the canonical $$\mathbb{F}\_q$$ representative as a single $$\mathbb{F}\_r$$ `Field`; the case where that encoding is unavailable is specified in [DESIGN_cont.md](./DESIGN_cont.md) §10.4 *Post-merge witness availability*.
 
@@ -456,7 +456,7 @@ $$\text{PVK} = vk \cdot H$$. Set once at registration. Used by senders for ECDH 
 
 **`spendable_commitment`**
 
-The commitment the owner can spend from. Modified by owner-authorized operations -- transfers out, withdrawals, merge, `set_spender`, `revoke_spender` -- and by the compliance module's `force_revoke_spender` ([COMPLIANCE.md](./COMPLIANCE.md) §5). Encoded as a single Grumpkin affine point (64 bytes).
+The commitment the owner can spend from. Modified by owner-authorized operations -- transfers out, withdrawals, merge, `set_spender`, `revoke_spender` -- and, in a deployment that enables the optional compliance extension, by its clawback ([COMPLIANCE.md](./COMPLIANCE.md) §5, outline only). Encoded as a single Grumpkin affine point (64 bytes).
 
 
 **`receiving_commitment`**
@@ -505,7 +505,7 @@ The split is what makes a retry safe. A reverted call leaves the delegation entr
 
 The ledger number at which the delegation expires. The delegation is live while `ledger.sequence() <= live_until_ledger` and expired once `ledger.sequence() > live_until_ledger`. Checked on every `confidential_transfer_from`. The entry lives in persistent, not temporary, storage: automatic cleanup would destroy escrowed funds.
 
-The `(owner, spender)` storage entry holds at most one delegation. `set_spender` (Section 7.7) reverts if a delegation already exists for that pair, regardless of whether the existing delegation is past `live_until_ledger`. Expiry only prevents the spender from spending; the escrowed value persists on-chain until `revoke_spender` (Section 7.9), or the compliance module's `force_revoke_spender` on a frozen owner ([COMPLIANCE.md](./COMPLIANCE.md) §5), folds it back into the owner's spendable balance. Re-delegating to the same spender therefore requires the sequence: `revoke_spender` then `set_spender`. This rule is what keeps the balance-conservation invariant (Section 9.3) well-defined over stored delegations: every delegation is either active, expired-pending-revoke, or absent, and the escrowed value is never silently dropped.
+The `(owner, spender)` storage entry holds at most one delegation. `set_spender` (Section 7.7) reverts if a delegation already exists for that pair, regardless of whether the existing delegation is past `live_until_ledger`. Expiry only prevents the spender from spending; the escrowed value persists on-chain until `revoke_spender` (Section 7.9) folds it back into the owner's spendable balance. Re-delegating to the same spender therefore requires the sequence: `revoke_spender` then `set_spender`. This rule is what keeps the balance-conservation invariant (Section 9.3) well-defined over stored delegations: every delegation is either active, expired-pending-revoke, or absent, and the escrowed value is never silently dropped.
 
 ---
 
@@ -789,11 +789,11 @@ delete Delegation(account, spender)
 emit RevokeSpender(account, spender, a_tilde, allowance_salt)
 ```
 
-The fold works for both active and expired-but-not-revoked delegations (§6.2). The compliance module exposes the same fold behind an admin gate as `force_revoke_spender`, on frozen owners only ([COMPLIANCE.md](./COMPLIANCE.md) §5); the event shape is identical on both paths, and whether a revoke was forced is recoverable from the account's freeze history.
+The fold works for both active and expired-but-not-revoked delegations (§6.2).
 
 **Owner state update.** By Proposition 1 applied to the allowance commitment, the post-revoke opening is $$(v\_s + v\_a, \\; r\_s + r\_a)$$. The owner derives $$dvk\_i$$ from $$vk$$ (§4.4), recovers $$v\_a = \tilde{a} - \text{Poseidon}(\delta\_{\text{enc\\\_allow}}, dvk\_i, \sigma\_a)$$ and $$r\_a = \text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a)$$ from the event, and applies $$W\_{\text{spend}} \mathrel{+}= (v\_a, r\_a)$$ (§5.2).
 
-**Why the event carries $$\tilde{a}$$ and $$\sigma\_a$$.** The fold deletes the delegation entry in the same invocation, and no other event holds either value: `SetSpender` emits neither, and `SpenderTransfer` emits the salt it consumed rather than the one it wrote, with $$\tilde{a}'$$ written to storage only. Both are public storage values, so emitting them discloses nothing new.
+**Why the event carries $$\tilde{a}$$ and $$\sigma\_a$$.** The fold deletes the delegation entry in the same invocation, and neither field is reliably reachable from event history. $$\tilde{a}$$ is in no event at all: `SetSpender` publishes the owner's balance ciphertext $$\tilde{b}$$ and never the owner-readable allowance ciphertext, and `SpenderTransfer` writes its $$\tilde{a}'$$ to storage only. $$\sigma\_a$$ reaches events only through `SpenderTransfer`, which emits the replacement $$\sigma\_a'$$ it writes and not the salt it consumed (§6.2 *Transfer nonce*); `SetSpender` emits the owner's spendable salt $$\sigma$$ and no allowance salt, so a delegation revoked without ever being spent from published neither field. Co-emitting both lets this event alone open the fold, with no scan. Both are public storage values, so emitting them adds no disclosure the delegation entry did not already carry, but it does move them into the permanent event archive, outliving the entry TTL that would otherwise have retired them.
 
 **Encrypted balance.** Revocation emits no $$\tilde{b}$$ and is not a checkpoint (§5.2); the next owner-initiated proof operation issues a fresh checkpoint. The auditor already holds the opening of $$C\_a$$ from the delegation's last state change -- the escrowed blinding $$r\_a$$ (S14 / O\_a9) paired with the value that event published (Section 8.5) -- and folds it into its own accumulator (Section 8.1) by the same public addition the contract performs, so its view of $$C\_{\text{spend}}$$ survives the revoke.
 

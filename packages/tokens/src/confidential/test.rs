@@ -7,6 +7,7 @@ use soroban_sdk::{
     xdr::ToXdr,
     Address, Bytes, BytesN, Env, Event,
 };
+use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
 use crate::confidential::{
     auditor::{storage as auditor_storage, ConfidentialAuditor},
@@ -165,8 +166,8 @@ impl ConfidentialVerifier for ReplayGuardVerifier {
 /// registered at the moment of the operation, so "which key version can read
 /// this event" reduces, at the contract level, to "which `K_aud_s` went into
 /// the public-input blob". This mock captures exactly that. `K_aud_s` sits at
-/// limb 8 of the SetSpender blob and limb 9 of the SpenderTransfer and
-/// RevokeSpender blobs (DESIGN §7.7 - §7.9).
+/// limb 8 of the SetSpender blob and limb 9 of the SpenderTransfer blob
+/// (DESIGN §7.7 - §7.8).
 #[contract]
 struct KeyRecordingVerifier;
 
@@ -726,6 +727,29 @@ fn revoke_spender_deletes_delegation() {
     assert_eq!(h.e.events().all().events().len(), 1);
 
     assert!(!h.token.is_spender(&alice, &spender));
+}
+
+#[test]
+fn revoke_spender_folds_allowance_into_spendable() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
+
+    let pre = h.token.confidential_balance(&alice);
+    let delegation = h.token.get_spender_delegation(&alice, &spender);
+    let expected = h.e.as_contract(&h.token.address, || {
+        Grumpkin::add(&h.e, &pre.spendable_commitment, &delegation.allowance_commitment)
+    });
+
+    h.token.revoke_spender(&alice, &spender);
+
+    let post = h.token.confidential_balance(&alice);
+    assert_eq!(post.spendable_commitment, expected);
+    assert_eq!(post.receiving_commitment, pre.receiving_commitment);
 }
 
 #[test]

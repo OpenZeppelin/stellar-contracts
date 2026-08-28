@@ -244,6 +244,8 @@ fn set_spender_payload(e: &Env) -> SetSpenderPayload {
     }
 }
 
+// ################## NO-CONFIG SHORT-CIRCUIT ##################
+
 #[test]
 fn hooks_short_circuit_without_config() {
     let h = setup();

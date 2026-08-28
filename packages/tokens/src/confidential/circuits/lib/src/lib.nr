@@ -107,7 +107,7 @@ pub mod domain {
     /// `dvk = Poseidon2(DELEGATION_VIEWING_KEY, vk, op_i)`. Section 4.4 (`delta_dvk`).
     pub global DELEGATION_VIEWING_KEY: Field = 3;
     /// Deterministic randomness for the new spendable balance:
-    /// `r' = Poseidon2(SPEND_RANDOMNESS, vk, sigma)`. Constraints W5/T10/S9/V6 (`delta_spend_r`).
+    /// `r' = Poseidon2(SPEND_RANDOMNESS, vk, sigma)`. Constraints W5/T10/S9 (`delta_spend_r`).
     pub global SPEND_RANDOMNESS: Field = 4;
     /// ECDH-derived blinding for the transfer commitment:
     /// `r_transfer = Poseidon2(TRANSFER_BLINDING, s, sigma)`. Constraints T7/O7 (`delta_transfer_blind`).
@@ -117,7 +117,7 @@ pub mod domain {
     pub global TRANSFER_AMOUNT: Field = 6;
     /// Mask for the encrypted balance scalar:
     /// `b_tilde = v_new + Poseidon2(ENCRYPTED_BALANCE, vk, sigma)`.
-    /// Constraints W7/T12/S11/V8 (`delta_enc_bal`).
+    /// Constraints W7/T12/S11 (`delta_enc_bal`).
     pub global ENCRYPTED_BALANCE: Field = 7;
     /// Mask for the encrypted allowance scalar:
     /// `a_tilde = v_a + Poseidon2(ENCRYPTED_ALLOWANCE, dvk, sigma_a)`.
@@ -272,7 +272,7 @@ pub fn poseidon_with_domain<let N: u32>(d: Field, inputs: [Field; N]) -> Field {
 /// Viewing key. Section 4.2. `vk = Poseidon2(VK, sk, addr_f)`.
 ///
 /// The `addr_f` parameter (the contract's address as a `Field`) binds the
-/// viewing key -- and therefore every proof that constrains `vk` (R2/W2/T2/S2/V2)
+/// viewing key -- and therefore every proof that constrains `vk` (R2/W2/T2/S2)
 /// -- to a specific deployed contract. Dropping `addr_f` here would let a proof for
 /// one contract verify against another's verifier.
 pub fn vk_from_sk(sk: Field, addr_f: Field) -> Field {
@@ -291,7 +291,7 @@ pub fn dvk_from_vk_op(vk: Field, op_i: Field) -> Field {
 }
 
 /// Deterministic randomness for the new spendable balance after an
-/// owner-initiated proof operation. Constraints W5 / T10 / S9 / V6.
+/// owner-initiated proof operation. Constraints W5 / T10 / S9.
 pub fn derive_spend_r(vk: Field, sigma: Field) -> Field {
     poseidon_with_domain(domain::SPEND_RANDOMNESS, [vk, sigma])
 }
@@ -318,7 +318,7 @@ pub fn encrypt_amount(v_transfer: Field, s: Field, sigma: Field) -> Field {
 }
 
 /// Encrypts the new spendable balance under the owner's viewing key.
-/// Constraints W7 / T12 / S11 / V8. `b_tilde = v_new + Poseidon2(ENC_BAL, vk, sigma)`.
+/// Constraints W7 / T12 / S11. `b_tilde = v_new + Poseidon2(ENC_BAL, vk, sigma)`.
 pub fn encrypt_balance(v_new: Field, vk: Field, sigma: Field) -> Field {
     v_new + poseidon_with_domain(domain::ENCRYPTED_BALANCE, [vk, sigma])
 }

@@ -953,8 +953,11 @@ pub fn set_spender(
 ///
 /// The owner's post-revoke opening is `(v_s + v_a, r_s + r_a)`, recoverable
 /// from the emitted `a_tilde` and `allowance_salt` plus the owner's viewing
-/// key; the auditor recovers the same pair from its own channel plus the
-/// escrowed delegation viewing key (constraints S14 / O_a9).
+/// key. The owner's auditor recovers the same pair from its own channel: `r_a`
+/// from the allowance-blinding escrow (constraint S14 at `set_spender`, the
+/// lane-2 slot O_a9 at a spender transfer) and `v_a` from the amount
+/// ciphertext that same event published, subject to the rotation condition in
+/// DESIGN_cont §8.3.
 ///
 /// # Arguments
 ///
@@ -976,33 +979,24 @@ pub fn set_spender(
 ///
 /// # Notes
 ///
-/// `a_tilde` and `allowance_salt` are emitted because this call deletes the
-/// entry that held them and event history does not reliably carry either:
-/// no event carries `a_tilde`, and the salt reaches events only through
-/// `SpenderTransfer`'s `sigma_a_new`, which a delegation revoked without
-/// ever being spent from never published. Without them the owner could not
-/// open its own post-revoke spendable commitment (DESIGN §6.2). Both are
-/// public storage values, so emitting them discloses nothing new.
+/// The event carries `a_tilde` and `allowance_salt` because this call deletes
+/// the entry that held them; DESIGN §7.9 states why each is needed and what
+/// emitting it costs.
 ///
 /// # Security Warning
 ///
-/// **IMPORTANT**: This function bypasses authorization checks. Callers own
-/// the gate: `account.require_auth()` on the owner path, the admin role on
-/// the compliance path
-/// ([`crate::confidential::compliance::storage::force_revoke_spender`]).
+/// **IMPORTANT**: This function bypasses authorization checks. The trait
+/// entry point is responsible for calling `account.require_auth()`.
 pub fn revoke_spender(e: &Env, owner: &Address, spender: &Address) {
-    let account = get_account(e, owner);
+    let mut account = get_account(e, owner);
     let delegation = get_spender_delegation(e, owner, spender);
 
-    let a_tilde = delegation.a_tilde.clone();
-    let allowance_salt = delegation.allowance_salt.clone();
-
-    let c_spend_new =
+    account.spendable_commitment =
         Grumpkin::add(e, &account.spendable_commitment, &delegation.allowance_commitment);
-    set_spendable(e, owner, &c_spend_new);
+    e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(owner.clone()), &account);
     delete_delegation(e, owner, spender);
 
-    emit_revoke_spender(e, owner, spender, &a_tilde, &allowance_salt);
+    emit_revoke_spender(e, owner, spender, &delegation.a_tilde, &delegation.allowance_salt);
 }
 
 /// Sets the SEP-41 token address.
