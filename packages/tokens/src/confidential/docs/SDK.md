@@ -445,12 +445,12 @@ Merge is proof-less and owner-authorized, and neither a merge nor an in-flight s
 
 ### 10.9 Recovery
 
-Recovery follows the procedure of DESIGN.md §5.2 *Recovery*, with the reconstructed state verified per §10.6. Its two anchors differ: the latest checkpoint event pins $$W_{\text{spend}}$$ in one lookup, while $$W_{\text{receive}}$$ restarts at $$T_0$$ — the account's last `Merge` at or before that checkpoint — from which the replay window runs.
+Recovery follows the procedure of DESIGN.md §5.2 *Recovery*, with the reconstructed state verified per §10.6. Its two anchors differ: the latest checkpoint event pins $$W_{\text{spend}}$$ as of that checkpoint in one lookup, with the `Merge` and `RevokeSpender` folds that follow it applied over the replay window per §10.2, while $$W_{\text{receive}}$$ restarts at $$T_0$$ — the account's last `Merge` at or before that checkpoint — from which that window runs.
 
 Two further obligations follow from data availability:
 
 - Recovery from a root alone depends on a conforming indexer (INDEXER.md). Without one, a client can see that funds exist but cannot reconstruct the opening needed to spend them.
-- **With RPC-only event access, a client MUST sync at least once per RPC retention window**, and MUST warn when it has not. The spendable side is robust, since each checkpoint is self-contained, but the receiving side is a running sum from $$T_0$$, so a crediting event that ages out before it is applied takes its opening with it permanently.
+- **With RPC-only event access, a client MUST sync at least once per RPC retention window**, and MUST warn when it has not. Any event that ages out before it is applied takes its opening with it permanently: a crediting event on the receiving side, which is a running sum from $$T_0$$, and a `RevokeSpender` after the latest checkpoint, whose $$\tilde{a}$$ and `allowance_salt` survive nowhere else once the delegation entry is deleted (DESIGN.md §7.9). Only the spend history preceding the checkpoint is expendable, each checkpoint being self-contained.
 
 ### 10.10 Spender-side wallet
 
