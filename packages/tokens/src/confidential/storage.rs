@@ -955,7 +955,7 @@ pub fn set_spender(
 /// from the emitted `a_tilde` and `allowance_salt` plus the owner's viewing
 /// key. The owner's auditor recovers the same pair from its own channel: `r_a`
 /// from the allowance-blinding escrow (constraint S14 at `set_spender`, the
-/// lane-2 slot O_a9 at a spender transfer) and `v_a` from the amount
+/// `lane[2]` slot O_a9 at a spender transfer) and `v_a` from the amount
 /// ciphertext that same event published, subject to the rotation condition in
 /// DESIGN_cont §8.3.
 ///

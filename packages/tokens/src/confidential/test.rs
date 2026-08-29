@@ -753,6 +753,33 @@ fn revoke_spender_folds_allowance_into_spendable() {
 }
 
 #[test]
+fn revoke_spender_after_expiry_folds_allowance() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.set_spender(&alice, &spender, &10u32, &set_spender_data(&h.e));
+
+    let pre = h.token.confidential_balance(&alice);
+    let delegation = h.token.get_spender_delegation(&alice, &spender);
+    let expected = h.e.as_contract(&h.token.address, || {
+        Grumpkin::add(&h.e, &pre.spendable_commitment, &delegation.allowance_commitment)
+    });
+
+    h.e.ledger().set_sequence_number(100);
+    assert!(!h.token.is_spender(&alice, &spender));
+
+    h.token.revoke_spender(&alice, &spender);
+
+    assert_eq!(h.token.confidential_balance(&alice).spendable_commitment, expected);
+    assert!(!h.e.as_contract(&h.token.address, || token_storage::delegation_exists(
+        &h.e, &alice, &spender
+    )));
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #3504)")]
 fn revoke_unknown_spender_panics() {
     let h = setup();
@@ -865,10 +892,9 @@ fn auditor_key_rotation_rescopes_the_escrowed_allowance_opening() {
 
     // Step 4 -- revocation is a proofless fold (§7.9), so it opens no auditor
     // channel: the event republishes the two delegation fields the fold
-    // deletes and nothing else. An auditor that missed step 3 gets no second
-    // chance here -- it has to fold the allowance it already holds into
-    // C_spend, or wait for the owner's next checkpoint. This is the field
-    // list, and the absence is the point.
+    // deletes and nothing else. An auditor that missed step 3 folds the
+    // allowance it already holds into C_spend, or waits for the owner's next
+    // checkpoint.
     h.token.revoke_spender(&alice, &spender);
     let revoke_events = h.e.events().all();
     assert_eq!(
