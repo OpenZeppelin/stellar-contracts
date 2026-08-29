@@ -15,7 +15,7 @@ The module ships one token contract plus three satellites, each with the standar
 | `circuits/` | Noir workspace, compiled by `nargo`, not `cargo` |
 | `docs/` | The protocol specification (see below) |
 
-Balances are Pedersen commitments on Grumpkin; every operation that consumes private state carries a proof the contract forwards to the verifier contract.
+Balances are Pedersen commitments on Grumpkin. Every operation that opens or re-randomizes a commitment carries a proof the contract forwards to the verifier contract; `deposit`, `merge`, and `revoke_spender` are proofless homomorphic folds.
 
 **Not production ready.** The UltraHonk backend (`rs-soroban-ultrahonk`) is unfinished and unaudited. The `# ⚠️ Not Production Ready` blocks in `mod.rs` and `verifier/mod.rs` are load-bearing — do not remove or soften them.
 

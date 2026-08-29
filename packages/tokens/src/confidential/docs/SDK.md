@@ -386,7 +386,7 @@ Event application MUST be ordered, deduplicated, and idempotent in combination, 
 Application rules are DESIGN.md §5.2's update table and are not restated here. Two properties worth making explicit:
 
 - `Withdraw`, sender-side `Transfer`, and `SetSpender` **overwrite** $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$ rather than adjusting it, so a wallet that missed intervening events still converges on the spendable side.
-- `RevokeSpender` is not a checkpoint — it carries no $$\tilde{b}$$ — and is **folded**, like `Merge`. `RevokeSpender` adds the reclaimed allowance opening to $$W_{\text{spend}}$$, with $$v_a$$ and $$r_a$$ recovered from the event's $$\tilde{a}$$ and `allowance_salt` under the owner-derived $$dvk_i$$ (DESIGN.md §7.9); the event carries both because the fold deletes the entry that held them. A wallet that misses either event diverges until the next checkpoint and MUST rely on §10.6 to detect that.
+- `RevokeSpender` is not a checkpoint — it carries no $$\tilde{b}$$ — and is **folded**, like `Merge`. `RevokeSpender` adds the reclaimed allowance opening to $$W_{\text{spend}}$$, with $$v_a$$ and $$r_a$$ recovered from the event's $$\tilde{a}$$ and `allowance_salt` under the owner-derived $$dvk_i$$ (DESIGN.md §7.9). A wallet that misses either event diverges until the next checkpoint and MUST rely on §10.6 to detect that.
 - A self-transfer — a `Transfer` whose `from` and `to` are the same account — MUST be applied in both roles: the sender side overwrites $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$, and the recipient side credits $$W_{\text{receive}}$$ from the same event's recipient-channel ciphertexts. The two roles act on different accumulators, so their relative order does not affect the result; applying only one loses the other accumulator's update.
 
 ### 10.3 In-flight operations
@@ -464,7 +464,7 @@ A spender MUST NOT be able to reach the owner's spendable balance through any in
 
 ## 11. Auditor Client
 
-An auditor decrypts from the public event and its own secret $$k$$ alone, with no viewing key, holder cooperation, or extra on-chain read. The allowance opening comes straight out of the event: the blinding of the $$C_a$$ that operation writes is escrowed in the event itself -- tag 17 on `SetSpender`, `lane[2]` on `SpenderTransfer` -- and the matching value is in the sender-channel ciphertext (DESIGN_cont.md §8.5). An auditor that did not observe the event holds no opening for that state and cannot derive one; there is no key from which the openings follow. For each channel it computes the shared scalar against the event's ephemeral point, derives that channel's lane masks (§4.3) — three on the sender / owner channel, two on the recipient channel — and subtracts.
+An auditor decrypts from the public event and its own secret $$k$$ alone, with no viewing key, holder cooperation, or extra on-chain read. The allowance opening comes straight out of the event: the blinding of the $$C_a$$ that operation writes is escrowed in the event itself -- tag 17 on `SetSpender`, `lane[2]` on `SpenderTransfer` -- and the matching value is in the sender-channel ciphertext (DESIGN_cont.md §8.5). An auditor that did not observe the event holds no opening for that state and cannot derive one. For each channel it computes the shared scalar against the event's ephemeral point, derives that channel's lane masks (§4.3) — three on the sender / owner channel, two on the recipient channel — and subtracts.
 
 The two channels differ in what they yield (DESIGN_cont.md §8.1):
 

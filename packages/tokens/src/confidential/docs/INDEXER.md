@@ -51,7 +51,7 @@ All events emitted by the confidential token (DESIGN_cont §11.2) with the follo
 | `Transfer` (recipient side) | Receiving-side replay: carries the recipient-channel ciphertexts for `(v_transfer, r_transfer)`. |
 | `SpenderTransfer` (recipient side) | Receiving-side replay, as above. |
 | `Merge` | Anchor: folds the receiving opening into the spendable opening; resets the receiving side. |
-| `SetSpender`, `SpenderTransfer` (owner side) | **The auditor's only route to an allowance opening.** The escrowed allowance blinding rides these two events (`r_a_tilde_aud_s` on `SetSpender`, `r_tilde_aud_s` on `SpenderTransfer`) and appears nowhere in contract storage, so an auditor that misses one has no way to reconstruct the opening of the `C_a` it wrote — see §7 *Auditor recovery*. |
+| `SetSpender`, `SpenderTransfer` (owner side) | **The auditor's only route to an allowance opening.** The escrowed allowance blinding rides these two events (`r_a_tilde_aud_s` on `SetSpender`, `r_tilde_aud_s` on `SpenderTransfer`) and appears nowhere in contract storage (DESIGN_cont §8.5 *Archive dependence*; §7 *Auditor recovery*). |
 | `Withdraw`, `Transfer` (sender side), `SetSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the owner's spendable balance. `SetSpender` is in scope as an owner checkpoint only — a spender recovers allowance state from the on-chain delegation entry (`allowance_commitment`, `a_tilde`, `escrowed_dvk`, `allowance_salt`), not from the archive. |
 | `RevokeSpender` | Spendable-side fold, not a checkpoint: the owner adds the reclaimed allowance opening to the spendable opening, deriving it from the event's `a_tilde` and `allowance_salt` (DESIGN §7.9). |
 
@@ -122,12 +122,12 @@ The indexer is trusted for **availability and completeness only** — never for 
 
 ### 7.1 Auditor recovery
 
-An auditor's allowance tracking is strictly event-scoped and has no state-based fallback. The opening of a delegation's `C_a` is escrowed only in the event that wrote it (DESIGN_cont §8.5), so a missed, reordered, or unarchived `SetSpender` / `SpenderTransfer` leaves the auditor holding a value it cannot open until the delegation's next state-changing operation. This is a stronger dependency on the archive than the spendable side, where the auditor's opening survives merges by homomorphic carry-forward (DESIGN_cont §8.1).
+An auditor's allowance tracking is strictly event-scoped and has no state-based fallback. The opening of a delegation's `C_a` is escrowed only in the event that wrote it (DESIGN_cont §8.5), so a missed, reordered, or unarchived `SetSpender` / `SpenderTransfer` leaves the auditor holding a value it cannot open until the delegation's next state-changing operation.
 
 Two consequences for deployments:
 
 - **Consistency checking is the practical detection mechanism.** Soroban enforces nothing about archive completeness, ordering, or availability. An auditor client SHOULD verify each reconstructed allowance opening against the stored `allowance_commitment` — `C_a =? v_a·G + r_a·H` — which is the same fails-closed check §7 states for wallets. A mismatch is evidence of a missed, reordered, or pruned event rather than of a wrong balance.
-- **Delegation TTL bounds the recovery anchor.** `live_until_ledger` governs spending authority and is independent of the delegation entry's persistent-entry TTL. If the entry itself is archived away, the commitment the auditor checks against is gone, so the consistency check above becomes unavailable exactly when it is most needed. Deployments SHOULD monitor delegation-entry TTL, not only `live_until_ledger`.
+- **Delegation TTL bounds the recovery anchor.** `live_until_ledger` governs spending authority and is independent of the delegation entry's persistent-entry TTL. If the entry itself is archived away, the commitment the auditor checks against is gone, so the consistency check above is then unavailable. Deployments SHOULD monitor delegation-entry TTL, not only `live_until_ledger`.
 
 ## 8. Conformance and Versioning
 
