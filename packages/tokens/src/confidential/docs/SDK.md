@@ -387,6 +387,7 @@ Application rules are DESIGN.md §5.2's update table and are not restated here. 
 
 - `Withdraw`, sender-side `Transfer`, and `SetSpender` **overwrite** $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$ rather than adjusting it, so a wallet that missed intervening events still converges on the spendable side.
 - `RevokeSpender` is not a checkpoint — it carries no $$\tilde{b}$$ — and is **folded**, like `Merge`. `RevokeSpender` adds the reclaimed allowance opening to $$W_{\text{spend}}$$, with $$v_a$$ and $$r_a$$ recovered from the event's $$\tilde{a}$$ and `allowance_salt` under the owner-derived $$dvk_i$$ (DESIGN.md §7.9). A wallet that misses either event diverges until the next checkpoint and MUST rely on §10.6 to detect that.
+- `Clawback` is likewise not a checkpoint and is **folded**: the `Merge` rule, then the event's public `amount` subtracted from $$W_{\text{spend}}$$'s value (COMPLIANCE.md §5.7). It occurs only in deployments that enable the compliance extension.
 - A self-transfer — a `Transfer` whose `from` and `to` are the same account — MUST be applied in both roles: the sender side overwrites $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$, and the recipient side credits $$W_{\text{receive}}$$ from the same event's recipient-channel ciphertexts. The two roles act on different accumulators, so their relative order does not affect the result; applying only one loses the other accumulator's update.
 
 ### 10.3 In-flight operations
@@ -412,8 +413,6 @@ An implementation MUST derive the ephemeral scalar of every operation the holder
 $$r_e = \text{poseidon\\\_with\\\_domain}(\delta_{\text{eph}}, [vk, \sigma_E])$$
 
 where $$vk$$ is the originator's viewing key and $$\sigma_E$$ the operation's salt. DESIGN.md §5.3 is the normative source: it fixes which viewing key and salt each operation derives from, and the retry rule for the negligible case that the derivation yields zero.
-
-**Scope.** The clawback circuit is the one operation outside the rule, its ephemeral belonging to the auditor: an implementation that constructs clawback witnesses obtains that scalar by the §4.7 procedure, no viewing key being available there (COMPLIANCE.md §5.3).
 
 **Three consequences an implementation MUST handle.**
 
@@ -445,7 +444,7 @@ Merge is proof-less and owner-authorized, and neither a merge nor an in-flight s
 
 ### 10.9 Recovery
 
-Recovery follows the procedure of DESIGN.md §5.2 *Recovery*, with the reconstructed state verified per §10.6. Its two anchors differ: the latest checkpoint event pins $$W_{\text{spend}}$$ as of that checkpoint in one lookup, with the `Merge` and `RevokeSpender` folds that follow it applied over the replay window per §10.2, while $$W_{\text{receive}}$$ restarts at $$T_0$$ — the account's last `Merge` at or before that checkpoint — from which that window runs.
+Recovery follows the procedure of DESIGN.md §5.2 *Recovery*, with the reconstructed state verified per §10.6. Its two anchors differ: the latest checkpoint event pins $$W_{\text{spend}}$$ as of that checkpoint in one lookup, with the `Merge`, `RevokeSpender`, and `Clawback` folds that follow it applied over the replay window per §10.2, while $$W_{\text{receive}}$$ restarts at $$T_0$$ — the account's last `Merge` or `Clawback` at or before that checkpoint — from which that window runs.
 
 Two further obligations follow from data availability:
 
@@ -480,6 +479,8 @@ An implementation MUST squeeze the sender / owner channel three-wide and MUST NO
 **Cross-channel agreement.** Where an auditor holds the key for both parties, the amount decrypts independently on each channel and the circuit constrains both to the same value, so the two MUST agree. An implementation SHOULD perform this comparison and treat disagreement as evidence that $$k$$ is not the auditor key for both parties of that event.
 
 **Scope MUST be represented, not implied.** The recipient-channel capability is forward-only, reset by merge, and yields no opening of the spendable commitment (DESIGN_cont.md §8.1). The `lane[2]` opening of the sender channel is forward-only and **standing**: it opens the spendable commitment as of the checkpoint that escrowed it and stays valid through merges provided the client folded in every inbound flow since the previous merge, one account key serving both channels (DESIGN_cont.md §8.1 *Sender-auditor opening capability*). Maintaining it is the client's job: an implementation MUST add the `lane[0]` amount and `lane[1]` $$r_{\text{transfer}}$$ of every inbound `Transfer` and `SpenderTransfer` to its stored $$(v, r)$$, and MUST treat each `Deposit` as $$(\text{amount}, 0)$$ (DESIGN.md §7.3). On a `RevokeSpender` event it MUST add the $$(v_a, r_a)$$ it recorded for that delegation, the fold being public and the addend already escrowed (DESIGN_cont.md §8.5); where it holds no such record it MUST mark the opening unavailable until the next `lane[2]` escrow rather than carry a stale one. Across a key rotation, what an implementation may carry forward and what it MUST treat as unopened are fixed by DESIGN_cont.md §8.3.
+
+**Clawback witness.** In a deployment that enables seizure (COMPLIANCE.md §5), the clawback witness is the pair of openings the client already maintains — the standing sender-channel opening of $$C_{\text{spend}}$$ and the recipient-channel opening of $$C_{\text{receive}}$$ (COMPLIANCE.md §5.2, §5.3). An implementation MUST verify both against the on-chain commitments before proving, and on a `Clawback` event MUST advance the standing opening by the `Merge` rule and the event's public `amount` (COMPLIANCE.md §5.7).
 
 An auditor facade MUST NOT be able to construct a spending witness. It can open the spendable balance past a merge — the inbound $$r_{\text{transfer}}$$ reaches the same key on the recipient channel — so a facade that exposes openings exposes them for the account's whole history under the active key.
 
@@ -539,7 +540,7 @@ $$vk$$ MUST NOT be presented as a safely-shareable read-only credential. It expo
 
 **Proving latency.** Single-digit seconds on contemporary hardware is the design target (OVERVIEW.md). Implementations MUST treat it as user-visible.
 
-**Sync and replay bounds.** The replay window runs from the account's last `Merge` at or before its latest checkpoint, or from registration for an account that has not merged before that checkpoint (DESIGN.md §5.2 *Recovery*), which is unbounded in age. Implementations MUST NOT assume a bounded window, and SHOULD use the archive's checkpoint lookup where available (INDEXER.md §6, C1) so that a dormant account is not obliged to transfer its entire history.
+**Sync and replay bounds.** The replay window runs from the account's last `Merge` or `Clawback` at or before its latest checkpoint, or from registration if there is none before that checkpoint (DESIGN.md §5.2 *Recovery*), which is unbounded in age. Implementations MUST NOT assume a bounded window, and SHOULD use the archive's checkpoint lookup where available (INDEXER.md §6, C1) so that a dormant account is not obliged to transfer its entire history.
 
 **Storage growth.** Per-account event volume is linear in inbound transfers and unbounded by design, since incoming-transfer spam is rate-limited only by transaction fees (DESIGN_cont.md §9.5). Implementations MUST NOT size local storage on the assumption that inbound volume tracks the user's own activity.
 

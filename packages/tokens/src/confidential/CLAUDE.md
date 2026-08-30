@@ -11,7 +11,7 @@ The module ships one token contract plus three satellites, each with the standar
 | `mod.rs`, `storage.rs` | The `ConfidentialToken` trait — eleven entry points, of which `revoke_spender` is proofless — and the storage/orchestration layer |
 | `verifier/` | Separate contract holding per-circuit UltraHonk verification keys |
 | `auditor/` | Separate contract holding the auditor key registry |
-| `compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract, clawback |
+| `compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract — plus the opt-in `ConfidentialClawback` trait (`clawback`, `force_revoke_spender`) |
 | `circuits/` | Noir workspace, compiled by `nargo`, not `cargo` |
 | `docs/` | The protocol specification (see below) |
 
@@ -25,13 +25,13 @@ Balances are Pedersen commitments on Grumpkin. Every operation that opens or re-
 
 ## Canonical encoding is a security boundary
 
-The public-input blob is a positional concatenation of 32-byte big-endian `Bn254Fr` representatives, in the order given by each circuit's table in DESIGN §7. Grumpkin points contribute two limbs (`x` then `y`).
+The public-input blob is a positional concatenation of 32-byte big-endian `Bn254Fr` representatives, in the order given by each circuit's table in DESIGN §7 (COMPLIANCE §5.3 for the clawback circuit). Grumpkin points contribute two limbs (`x` then `y`).
 
 Soroban's host silently reduces values `≥ r` modulo `r` rather than rejecting them, so `x` and `x + r` deserialise to the same field element. Every caller-supplied scalar and coordinate must therefore reach `verify_proof` through `append_field` / `append_point`, which call `Grumpkin::is_canonical_field` / `is_canonical_point`. Bypassing those helpers breaks byte-uniqueness of stored state and emitted events even though proofs still verify.
 
 ## Code cites the spec by section number
 
-Rust carries roughly sixteen `DESIGN §N` / `DESIGN_cont §N` references in doc comments. Renumbering a spec section silently invalidates them — nothing checks. Before renumbering, grep the module for the old number.
+Rust carries roughly two dozen `DESIGN §N` / `DESIGN_cont §N` / `COMPLIANCE §N` references in doc comments, and `circuits/clawback/src/main.nr` cites `COMPLIANCE.md` by section too. Renumbering a spec section silently invalidates them — nothing checks. Before renumbering, grep the module for the old number.
 
 ## Tests
 
@@ -55,7 +55,7 @@ Everything else defers by citation: `SDK.md`, `SELECTIVE_DISCLOSURE.md`, `INDEXE
 
 ### Duplicated tables that drift
 
-Five things exist in more than one file. Changing the normative copy means grepping for every other one:
+Six things exist in more than one file. Changing the normative copy means grepping for every other one:
 
 | Content | Normative source | Copies live in |
 |:---|:---|:---|
@@ -63,7 +63,8 @@ Five things exist in more than one file. Changing the normative copy means grepp
 | Sponge lane assignment | `DESIGN.md` §2.5 | `SDK.md` §4.3 and §11 |
 | Per-circuit scalar-multiplication counts | `DESIGN_cont.md` §10.3 | `OVERVIEW.md` |
 | Checkpoint event set | `DESIGN.md` §5.2 | `INDEXER.md`, `SDK.md` |
-| Replay-window anchor `T₀` | `DESIGN.md` §5.2 | `INDEXER.md`, `OVERVIEW.md` |
+| Replay-window anchor `T₀` (`Register`, `Merge`, `Clawback`) | `DESIGN.md` §5.2 | `INDEXER.md`, `OVERVIEW.md`, `SDK.md`, `COMPLIANCE.md` §5.7 |
+| ACIR opcode counts | `circuits/constraints.baseline` | `DESIGN_cont.md` §10.3, `circuits/CLAUDE.md` |
 
 The tags are a cross-language wire contract. `DESIGN_cont.md` §13 is their only authoritative source: it assigns every value, and it states which subset `circuits/lib/src/lib.nr` implements and why the remainder are absent. Changing any assigned value is a new deployment, not an upgrade.
 

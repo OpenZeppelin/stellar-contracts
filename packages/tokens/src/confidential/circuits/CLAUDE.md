@@ -22,11 +22,11 @@ There is no `nargo fmt` step in CI and no formatter config — Noir formatting i
 
 ### `compiler_version = "=1.0.0"` is deliberate
 
-It appears in all thirteen package `Nargo.toml` files — the workspace manifest `circuits/Nargo.toml` carries only `[workspace]` — and looks like a mistake. Nargo requirements cannot name prereleases, so the real toolchain — **nargo 1.0.0-beta.11 + bb 0.87.0**, pinned in `.github/workflows/noir.yml` — is documented in the comment above it instead. Do not "correct" this to `=1.0.0-beta.11`.
+It appears in all fourteen package `Nargo.toml` files — the workspace manifest `circuits/Nargo.toml` carries only `[workspace]` — and looks like a mistake. Nargo requirements cannot name prereleases, so the real toolchain — **nargo 1.0.0-beta.11 + bb 0.87.0**, pinned in `.github/workflows/noir.yml` — is documented in the comment above it instead. Do not "correct" this to `=1.0.0-beta.11`.
 
 ### Do not prune unused public inputs
 
-`_acct_f` in `register/src/main.nr` is referenced by no gate and looks like dead code. It is the replay binding: UltraHonk absorbs every public input into the transcript, so a proof produced for one account fails when the contract assembles the blob for another. Removing it lets anyone replay a legitimate registration's published proof and payload to mint duplicate-key accounts. Each operation circuit declares its exact public-input count in a header comment — withdraw 16, transfer / spender_transfer 25, set_spender 26 — and the count is part of the contract with the on-chain assembler.
+`_acct_f` in `register/src/main.nr` is referenced by no gate and looks like dead code. It is the replay binding: UltraHonk absorbs every public input into the transcript, so a proof produced for one account fails when the contract assembles the blob for another. Removing it lets anyone replay a legitimate registration's published proof and payload to mint duplicate-key accounts. `clawback/src/main.nr` carries three such bindings — `addr_f`, `_acct_f`, `_dest_f` — and `_dest_f` is what stops a compromised clawback signer from settling a witness to a destination of its own choosing. Each operation circuit declares its exact public-input count in a header comment — clawback 8, withdraw 16, transfer / spender_transfer 25, set_spender 26 — and the count is part of the contract with the on-chain assembler.
 
 ### Package names are load-bearing
 
@@ -60,7 +60,7 @@ LC_ALL=C nargo info | grep '^|' | LC_ALL=C sort > constraints.baseline
 
 `LC_ALL=C` is mandatory on **both** sides of the pipe — byte order is the only ordering stable between macOS and the Ubuntu runner. The redirect overwrites the file's header comments; re-paste them, because CI's failure message asks for them.
 
-Two non-obvious consequences: adding or removing a **gadget** changes the baseline even when no circuit logic changed, and the ACIR opcode counts are quoted in prose at `../docs/DESIGN_cont.md` §10.3 (Register 33, Withdraw 95, Transfer 134, SetSpender 135, SpenderTransfer 136). Nothing enforces that second copy — update it in the same PR.
+Two non-obvious consequences: adding or removing a **gadget** changes the baseline even when no circuit logic changed, and the ACIR opcode counts are quoted in prose at `../docs/DESIGN_cont.md` §10.3 (Register 33, Clawback 51, Withdraw 95, Transfer 134, SetSpender 135, SpenderTransfer 136). Nothing enforces that second copy — update it in the same PR.
 
 ### `vks/`
 
@@ -88,4 +88,4 @@ Note the standing obligation on the future TS SDK (`../docs/SDK.md` §6.1): its 
 
 ## Version bumps
 
-`.github/workflows/noir.yml` is the source of truth for `NARGO_VERSION` and `BB_VERSION`, and the two must be bumped together — the VK pipeline is byte-sensitive to bb. The string `1.0.0-beta.11` is duplicated across all thirteen package `Nargo.toml` files, `constraints.baseline`, `vks/README.md` (which also restates the bb version), and this file. A bump touches all of them and requires regenerating both the baseline and the VKs. The installer scripts in CI are pinned to git commits with SHA256 verification; bump URL and hash together.
+`.github/workflows/noir.yml` is the source of truth for `NARGO_VERSION` and `BB_VERSION`, and the two must be bumped together — the VK pipeline is byte-sensitive to bb. The string `1.0.0-beta.11` is duplicated across all fourteen package `Nargo.toml` files, `constraints.baseline`, `vks/README.md` (which also restates the bb version), and this file. A bump touches all of them and requires regenerating both the baseline and the VKs. The installer scripts in CI are pinned to git commits with SHA256 verification; bump URL and hash together.

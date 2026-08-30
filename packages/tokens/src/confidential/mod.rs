@@ -87,9 +87,11 @@
 //! `amount` units between the two accounts, with no fees deducted in transit
 //! and no rebasing applied. [`storage::deposit`] credits the
 //! confidential receiving balance with `amount · G` after the SEP-41
-//! transfer, and [`storage::withdraw`] debits the confidential
-//! spendable balance by `amount` before transferring the same amount out;
-//! neither call re-measures the contract's own balance. With a
+//! transfer, [`storage::withdraw`] debits the confidential
+//! spendable balance by `amount` before transferring the same amount out,
+//! and [`compliance::storage::clawback`] does the same on its
+//! `Some(destination)` branch; none of the three re-measures the contract's
+//! own balance. With a
 //! fee-on-transfer, rebasing, or otherwise malicious token implementation,
 //! the confidential ledger would drift from the on-chain reserves —
 //! credit a higher amount than was actually received, or pay out less than
@@ -125,6 +127,21 @@
 //! clawback empties the pool, leaving all holders' confidential balances
 //! unbacked and unwithdrawable. Issuer-led SAC deployments must weigh both
 //! powers explicitly alongside the exact-transfer assumption.
+//!
+//! The compliance extension's
+//! [`clawback`](compliance::ConfidentialClawback::clawback) gives the issuer a
+//! *legitimate* reason to make such a call. A seizure with `destination: None`
+//! reduces the target's confidential claim without moving any underlying, so
+//! the pool ends up over-collateralized by exactly that amount and the issuer's
+//! own SAC clawback against this contract's address is what extracts the
+//! surplus. That ordering — seize first, extract second — is what keeps the
+//! call safe; the reverse passes through a deficit borne by every other holder.
+//! An issuer extracting more than the accumulated surplus is the hazard this
+//! warning already describes, unchanged.
+//!
+//! **Value leaves the pool through two exits**, not one: [`storage::withdraw`],
+//! and [`compliance::storage::clawback`] on its `Some(destination)` branch,
+//! which moves exactly the seized amount to the destination the proof bound.
 
 pub mod auditor;
 pub mod compliance;
@@ -838,7 +855,15 @@ pub fn emit_set_spender(
 }
 
 /// Event emitted when a delegation's escrowed allowance is folded back into
-/// the owner's spendable balance and the delegation is deleted.
+/// the owner's spendable balance and the delegation deleted — by the owner
+/// through [`ConfidentialToken::revoke_spender`], or by the compliance module
+/// through `ConfidentialClawback::force_revoke_spender`. One shape serves both
+/// gates: the wallet and auditor state updates are identical either way, and
+/// whether a revoke was forced is recoverable from the account's freeze
+/// history and the invoking role.
+///
+/// Carries the two delegation fields the fold destroys and that no other event
+/// holds.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RevokeSpender {

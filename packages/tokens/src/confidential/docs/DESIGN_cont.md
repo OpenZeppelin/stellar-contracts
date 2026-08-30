@@ -49,7 +49,7 @@ The capability is bounded in three ways:
 
 - **Forward-only.** Only events emitted while the auditor key was active are decryptable.
 - **Recipient-channel only.** The reconstruction above yields an opening of `receiving_commitment`: the spend-side blinding $$r\_s = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk\_A, \sigma)$$ depends on $$vk\_A$$ and is not derivable from the recipient channel.
-- **Reset by merge.** Merge folds $$r\_r$$ into the spendable-balance randomness ($$r\_{\text{spend}}' = r\_s + r\_r$$, Section 7.4) and emits no checkpoint, so the reconstruction above restarts from the next inbound flow.
+- **Reset by merge.** Merge folds $$r\_r$$ into the spendable-balance randomness ($$r\_{\text{spend}}' = r\_s + r\_r$$, Section 7.4) and emits no checkpoint, so the reconstruction above restarts from the next inbound flow. A clawback resets it the same way ([COMPLIANCE.md](./COMPLIANCE.md) §5.7).
 
 **Sender-auditor opening capability.** The `lane[2]` escrow hands the sender-auditor the *blinding* of the account's post-operation spendable balance directly, without $$vk\_A$$: together with the value in $$\tilde{b}\_{\text{aud,s}}$$ it is a full Pedersen opening of $$C\_{\text{spend}}'$$. It is available at the three checkpoint operations that escrow the spendable blinding -- withdrawal (W\_a5), outgoing transfer (T\_a9), and `set_spender` (S\_a6) -- and is likewise bounded:
 
@@ -165,6 +165,7 @@ This invariant is maintained by:
 - **Set spender** moves value from $$v\_{\text{spend}}$$ to $$v\_{\text{allowance}\_i}$$; enforced by S3–S7.
 - **Spender transfer** decreases $$v\_{\text{allowance}\_i}$$ and increases recipient's $$v\_{\text{receive}}$$ by $$v\_{\text{transfer}}$$; enforced by O2–O8.
 - **Revoke** moves remaining $$v\_{\text{allowance}\_i}$$ back to $$v\_{\text{spend}}$$ (Proposition 1); the sum is unchanged.
+- **Clawback** (compliance extension) removes a public amount from $$v\_{\text{spend}} + v\_{\text{receive}}$$ without a withdrawal, enforced by CB1–CB3; in a deployment that enables it, seized amounts count alongside $$w\_k$$ on the left-hand side ([COMPLIANCE.md](./COMPLIANCE.md) §5.4).
 
 ### 9.4 Privacy Properties
 
@@ -186,7 +187,7 @@ As with $$vk$$ above, the openings are self-verifying artifacts a holder can han
 
 The recovery procedure, the definition of the **checkpoint** it is built around, the replay window it runs over, and the durable-archive requirement it depends on are all specified in [DESIGN.md](./DESIGN.md) §5.2 *Recovery*. This section states the security properties that follow from it.
 
-**Why the two anchors compose.** No `Merge` falls strictly between $$T\_0$$ and the checkpoint, by construction of $$T\_0$$ as the last merge at or before it. Within $$(T\_0, \text{checkpoint}]$$ the only spendable-affecting events are therefore checkpoint events and `RevokeSpender` folds, and the latest checkpoint's $$(\tilde{b}, \sigma)$$ supersedes both — which is why the replay skips them ([DESIGN.md](./DESIGN.md) §5.2 *Recovery*, step 6). Any `Merge` the replay encounters necessarily sits after the checkpoint and is folded normally, against the receiving opening it actually consumed.
+**Why the two anchors compose.** No `Merge` or `Clawback` falls strictly between $$T\_0$$ and the checkpoint, by construction of $$T\_0$$ as the last of either at or before it. Within $$(T\_0, \text{checkpoint}]$$ the only spendable-affecting events are therefore checkpoint events and `RevokeSpender` folds, and the latest checkpoint's $$(\tilde{b}, \sigma)$$ supersedes both — which is why the replay skips them ([DESIGN.md](./DESIGN.md) §5.2 *Recovery*, step 6). Any `Merge` the replay encounters necessarily sits after the checkpoint and is folded normally, against the receiving opening it actually consumed.
 
 **Recoverability.** An owner who holds $$vk$$ reconstructs both openings deterministically from the account's event history, so the loss of local wallet state is not a loss of funds. The single-lookup shortcut on the spendable side is sound rather than merely convenient: each checkpoint's $$\tilde{b}$$ is bound to the $$C\_{\text{spend}}$$ it certifies by the emitting operation's own proof (W7, T12, S11), so a checkpoint cannot misreport the balance the wallet restarts from. Beyond the event history and the on-chain commitments, recovery requires nothing from the auditor, from counterparties, or from the contract admin.
 
@@ -214,7 +215,7 @@ Because $$\sigma$$ is sampled fresh via CSPRNG for every operation, a retry afte
 
 ### 10.1 Circuits
 
-All proof logic is written in Noir, compiled to UltraHonk circuits. The system uses 5 circuits:
+All proof logic is written in Noir, compiled to UltraHonk circuits. The system uses six circuits, the last belonging to the optional compliance extension:
 
 ```rust
 #[contracttype]
@@ -225,10 +226,11 @@ pub enum CircuitType {
     Transfer = 2,
     SpenderTransfer = 3,
     SetSpender = 4,
+    Clawback = 6,
 }
 ```
 
-`deposit`, `merge`, and `revoke_spender` carry no proof and have no circuit (Sections 7.3, 7.4, 7.9). The discriminants are part of the on-chain interface and are never renumbered.
+`deposit`, `merge`, and `revoke_spender` carry no proof and have no circuit (Sections 7.3, 7.4, 7.9). The discriminants are part of the on-chain interface and are never renumbered; 5 is retired — it was `RevokeSpender` before revocation became proofless — and is never reassigned.
 
 ### 10.2 Circuit Summary
 
@@ -239,6 +241,7 @@ pub enum CircuitType {
 | `Transfer` | Balance conservation; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; sender auditor: amount + balance + `lane[2]` escrow of the new spendable blinding); deterministic randomness for new sender balance; encrypted balance scalar; sender key ownership; range validity (balance $$\in [0, 2^{127})$$, amount $$\in [0, 2^{127})$$) |
 | `SpenderTransfer` | Allowance sufficiency; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; owner auditor: amount + allowance + `lane[2]` escrow of the new allowance blinding); deterministic randomness for new allowance; encrypted allowance scalar; spender key ownership; contract-bound indirectly via $$C\_a$$ chain (Section 7.8) |
 | `SetSpender` | Balance split; $$dvk\_i$$ derivation; ECDH escrow of $$dvk\_i$$ to the spender and of the allowance blinding to the owner's auditor; allowance commitment with deterministic randomness; encrypted balance and allowance scalars; owner-auditor ECDH ciphertexts (escrow amount + balance checkpoint + `lane[2]` escrow of the new spendable blinding); owner key ownership; contract-bound via $$vk$$ derivation |
+| `Clawback` | Knowledge of the openings of the target's $$C\_{\text{spend}}$$ and $$C\_{\text{receive}}$$; public seize amount bounded by their sum, remainder in range; no key ownership, no ephemeral ([COMPLIANCE.md](./COMPLIANCE.md) §5.3) |
 
 ### 10.3 Circuit Cost Analysis
 
@@ -253,8 +256,9 @@ The dominant cost in Noir circuits is elliptic curve scalar multiplication. With
 | `Transfer` | 8 | $$Y\_A$$ (T1), $$C\_{\text{spend}}^A$$ opening (T3), recipient ECDH (T5), $$R\_e$$ (T6), $$C\_{\text{transfer}}$$ (T8), $$C\_{\text{spend}}'$$ (T11), recipient-auditor ECDH (T\_a1), sender-auditor ECDH (T\_a5) |
 | `SpenderTransfer` | 8 | $$Y\_{\text{op}}$$ (O1), $$C\_a$$ opening (O2), recipient ECDH (O5), $$R\_e$$ (O6), $$C\_{\text{transfer}}$$ (O8), $$C\_a'$$ (O11), recipient-auditor ECDH (O\_a1), owner-auditor ECDH (O\_a5) |
 | `SetSpender` | 7 | $$Y$$ (S1), $$C\_{\text{spend}}$$ opening (S3), $$C\_a$$ (S7), $$C\_{\text{spend}}'$$ (S10), $$R\_e$$ (S\_a1), $$dvk\_i$$ escrow ECDH (S12, §7.11), owner-auditor ECDH (S\_a2) |
+| `Clawback` | 2 | $$C\_{\text{spend}}$$ opening (CB1), $$C\_{\text{receive}}$$ opening (CB2) |
 
-`SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of §7.11 reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The auditor-side escrow of the allowance blinding $$r\_a$$ (S14) reuses the S\_a2 shared scalar and adds one Poseidon evaluation. The `lane[2]` escrows (W\_a5, T\_a9, S\_a6, O\_a9) read `lane[2]` of a permutation each circuit already computes and cost one field addition apiece. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`: `Register` 33, `Withdraw` 95, `Transfer` 134, `SetSpender` 135, `SpenderTransfer` 136.
+`SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of §7.11 reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The auditor-side escrow of the allowance blinding $$r\_a$$ (S14) reuses the S\_a2 shared scalar and adds one Poseidon evaluation. The `lane[2]` escrows (W\_a5, T\_a9, S\_a6, O\_a9) read `lane[2]` of a permutation each circuit already computes and cost one field addition apiece. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`: `Register` 33, `Clawback` 51, `Withdraw` 95, `Transfer` 134, `SetSpender` 135, `SpenderTransfer` 136.
 
 The ECDH computations add scalar multiplications compared to a random-blinding scheme, but the unchunked design eliminates all per-chunk constraints (which, in a chunked scheme, would involve 8+ scalar multiplications for balance chunks and per-chunk range proofs).
 
@@ -430,9 +434,9 @@ trait ConfidentialToken {
 }
 ```
 
-A deployment that enables the optional compliance extension adds `compliance: Option<ComplianceConfig>` to this constructor and the freeze, configuration-rotation, and read entry points of [COMPLIANCE.md](./COMPLIANCE.md) §6 to this interface. The admin-gated ones are authorized by the deployment's own access-control module.
+A deployment that enables the optional compliance extension adds `compliance: Option<ComplianceConfig>` to this constructor and the freeze, configuration-rotation, read, and — when it opts into `ConfidentialClawback` — seizure entry points of [COMPLIANCE.md](./COMPLIANCE.md) §6 to this interface. The admin-gated ones are authorized by the deployment's own access-control module.
 
-**Hooks.** Every entry point invokes the deployment's `Hooks` implementation after authorization and payload decoding and before the storage-layer operation. Hooks for operations that carry `data` receive the decoded payload by reference; the proofless `on_deposit`, `on_merge`, and `on_revoke_spender` receive none. The two compliance entry points invoke no hook, since their precondition — a frozen target — is exactly what a gating hook rejects ([COMPLIANCE.md](./COMPLIANCE.md) §5).
+**Hooks.** Every entry point invokes the deployment's `Hooks` implementation after authorization and payload decoding and before the storage-layer operation. Hooks for operations that carry `data` receive the decoded payload by reference; the proofless `on_deposit`, `on_merge`, and `on_revoke_spender` receive none. The two seizure entry points, `clawback` and `force_revoke_spender`, invoke no hook, since their precondition — a frozen target — is exactly what a gating hook rejects ([COMPLIANCE.md](./COMPLIANCE.md) §5).
 
 This table is authoritative: every entry is exactly the set of prover-supplied public inputs from the corresponding Section 7 operation (the contract loads the remaining public inputs from trusted state per §7.1), plus the `proof` blob. Names map directly to the Section 7 symbols.
 
@@ -488,8 +492,8 @@ Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
 **Usage by consumers:**
 
 - **Recipient wallet**: processes `Transfer` and `SpenderTransfer` events using $$(R\_e, \tilde{v}, \sigma)$$ -- with $$\sigma\_a'$$ in place of $$\sigma$$ for `SpenderTransfer` -- to derive $$v\_{\text{transfer}}$$ and $$r\_{\text{transfer}}$$ (Section 5.3).
-- **Owner wallet**: processes all events for recovery (Section 5.2). The $$(\tilde{b}, \sigma)$$ pair from the most recent checkpoint event (`Withdraw`, `Transfer` as sender, `SetSpender`) anchors $$W\_{\text{spend}}$$; `Merge` and `RevokeSpender` are folded into it during replay.
-- **Auditor**: processes events containing $$R\_e$$ to compute ECDH shared secrets and decrypt amounts, balance checkpoints, and the escrowed blindings (Sections 8.1, 8.2, 8.5); folds `Merge` and `RevokeSpender` into its accumulators as Section 8.1 specifies.
+- **Owner wallet**: processes all events for recovery (Section 5.2). The $$(\tilde{b}, \sigma)$$ pair from the most recent checkpoint event (`Withdraw`, `Transfer` as sender, `SetSpender`) anchors $$W\_{\text{spend}}$$; `Merge`, `RevokeSpender`, and `Clawback` are folded into it during replay.
+- **Auditor**: processes events containing $$R\_e$$ to compute ECDH shared secrets and decrypt amounts, balance checkpoints, and the escrowed blindings (Sections 8.1, 8.2, 8.5); folds `Merge`, `RevokeSpender`, and `Clawback` into its accumulators as Section 8.1 and [COMPLIANCE.md](./COMPLIANCE.md) §5.7 specify.
 - **Indexer**: reconciles the pooled balance against the sum of claims (Section 9.3, [INDEXER.md](./INDEXER.md)).
 
 ### 11.3 Read Methods

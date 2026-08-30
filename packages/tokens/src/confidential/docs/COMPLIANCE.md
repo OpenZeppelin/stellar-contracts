@@ -46,8 +46,8 @@ Three functions are added to the core contract interface:
 
 ```rust
 impl Token {
-    fn freeze(e: Env, account: Address, admin: Address);   // admin auth
-    fn unfreeze(e: Env, account: Address, admin: Address); // admin auth
+    fn freeze(e: Env, account: Address, operator: Address);   // admin auth
+    fn unfreeze(e: Env, account: Address, operator: Address); // admin auth
     fn is_frozen(e: Env, account: Address) -> bool;
 }
 ```
@@ -171,65 +171,88 @@ impl Hooks for ApprovedAuditorHooks {
 
 ---
 
-## 5. Clawback (Outline Only)
+## 5. Clawback
 
-This section specifies seizing value from a single confidential account: extracting a bounded amount and settling it to the issuer over a transparent path. It is separate from **freeze** (§2), and the two must not be conflated.
+This section specifies seizing value from a single frozen confidential account: reducing its committed claim by a public amount, bounded by what the account holds, and settling the corresponding underlying over a transparent path. It is separate from **freeze** (§2), and the two must not be conflated.
 
 - **Freeze is immediate and unilateral.** It needs no coordination and is the correct response to an urgent order: a frozen account can neither send, receive, deposit, nor withdraw. It can be triggered by the token admin (§2) or — when the base asset is a SAC and `sac_passthrough` is set — by the issuer's own `set_authorized`/freeze surfacing through the SAC `authorized()` check (§2.2, the *transitive compliance* path), with no state mirrored by the token admin.
-- **Seize is the multi-step, coordinated flow** specified below. It is normally preceded by a freeze and relies on it: the freeze is what keeps the target's commitments from changing between proof construction and submission (§5.3, *Anti-replay*).
+- **Seize is the coordinated flow** specified below. It requires the freeze: the freeze is what keeps the target's commitments from changing between proof construction and submission (§5.6).
 
-**Terminology.** This flow is called *clawback* because it mirrors the clawback semantics of Stellar Classic / SAC assets, but it is a distinct mechanism.
+**Terminology.** This flow is called *clawback* because it mirrors the clawback semantics of Stellar Classic / SAC assets, but it is a distinct mechanism. It is delivered by the opt-in `ConfidentialClawback` trait, whose two entry points are `clawback` and `force_revoke_spender` (§6); a deployment that omits that impl block ships freeze and policy gating with no seizure capability.
 
 ### 5.1 The Pooled-Custody Problem
 
-Once an account deposits into the contract, the underlying SEP-41 ledger lists the token contract as the holder of those funds, not the depositor. An issuer's SAC-level `clawback(token_address, amount)` call would drain the pool, debiting unrelated accounts. The contract therefore does not forward SAC-level clawback to individual confidential accounts; it must instead extract value from a single targeted account's confidential balance and settle that value to the issuer through a transparent path.
+Once an account deposits into the contract, the underlying SEP-41 ledger lists the token contract as the holder of those funds, not the depositor. An issuer's SAC-level `clawback(token_address, amount)` drains the pool as a whole and debits every holder. Seizing from one account therefore has to happen at the confidential layer: reduce that account's committed claim, then reconcile the pool.
 
-The challenge is that the contract does not know the targeted account's balance. The balance is held as a Pedersen commitment whose opening is private to the owner. The clawback amount must be validated against the actual encrypted value without exposing it on-chain and without trusting the admin to choose a value at random.
+The contract does not know the targeted account's balance. `C_spend` and `C_receive` are Pedersen commitments whose openings are private, so the seize amount must be validated against the committed values without exposing them on-chain and without trusting the admin's word for them.
 
-### 5.2 Admin + Auditor Coordination
+### 5.2 Roles and Separation
 
-Three roles bear on this flow:
+- **Token admin** — the access-control authority on the confidential-token contract (§1.1). Authorizes the freeze and the two seizure entry points; decides *whether* to seize.
+- **Witness holder** — whoever holds the Pedersen openings of the target's `C_spend` and `C_receive`. Produces the proof and thereby decides *how much* and *where to*, both being bound into it (§5.3).
+- **Issuer (SAC admin)** — when the base asset is a Stellar Asset Contract, the holder of its standardized admin interface (CAP-0046-06). Extracts the pool surplus a `None` settlement leaves behind (§5.4) and can freeze independently of the token admin via SAC passthrough (§2.2).
 
-- **Token admin** — the access-control authority on the confidential-token contract (§1.1). Authorizes the freeze, the seize entry point, and settlement.
-- **Issuer (SAC admin)** — when the base asset is a Stellar Asset Contract, the holder of its standardized admin interface (`mint`, `clawback`, `set_authorized`; CAP-0046-06). Seized value settles to the issuer over the transparent SEP-41 path, and the issuer can freeze independently of the token admin via SAC passthrough (§2.2).
-- **Auditor** — holder of the off-chain auditor decryption key bound to the account at registration (`DESIGN_cont.md` §8). Governs visibility of confidential balances; cannot move funds or change contract state.
+The witness is producible by the **auditor** or by the **owner**, and not by the admin, which holds no blinding. The owner derives both openings from `vk` (`DESIGN.md` §5.2). The auditor's capability is the one `DESIGN_cont.md` §8.1 specifies: `(v_s, r_s)` tracked forward from the `lane[2]` blinding escrow of the account's most recent checkpoint (W_a5 / T_a9 / S_a6) through every fold since — `Merge`, `RevokeSpender` against the allowance opening of `DESIGN_cont.md` §8.5, and `Clawback` per §5.7 — and `(v_r, r_r)` rebuilt from the recipient channel of every inbound flow since the last reset. One key serves both channels for an account (`DESIGN.md` §6.1), so a deployment that intends to use clawback need only ensure that key's custodian can assemble both halves. Cooperating senders can in principle assemble the receiving-side half from their own transfers (`DESIGN_cont.md` §8.2), so the separation is a property of how the flow is constructed rather than a cryptographic impossibility.
 
-The seize itself is carried out by the token admin and the auditor together. The admin authorizes the on-chain action per the role above; the auditor unlocks knowledge of the target's balance. Two halves of the target's confidential position are covered by the two auditor channels (see `DESIGN_cont.md` §8.1, §8.2). The **sender-auditor** decrypts the spendable-balance checkpoint $$\tilde{b}\_{\text{aud,s}}$$ from the target's most recent checkpoint event, recovering $$v\_s$$, and folds in every proofless operation the account performed since (§5.3 constraint 2). The **recipient-auditor** decrypts the per-transfer pairs $$(v\_{\text{transfer},i}, r\_{\text{transfer},i})$$ from every inbound transfer and spender-transfer since the last merge, recovering the full Pedersen opening $$(v\_r, r\_r)$$ of the target's `receiving_commitment`. The auditor then produces a zero-knowledge proof bounding the clawback amount by $$v\_s + v\_r$$, without revealing either summand.
+Neither party can act alone: the admin cannot produce the proof, and the witness holder cannot pass the admin gate. A colluding owner supplying the witness is harmless — it is the party being seized from. Deployments typically place the seizure authority under a dedicated role, separate from the freeze role (§1.1).
 
-Neither party can act alone: the admin cannot produce the proof, and the auditor cannot freeze the account or move funds. This is the same trust separation present in the core protocol (admin governs state transitions, auditor governs visibility) extended to a write surface.
+### 5.3 Circuit
 
-**The auditor is not the sole holder of the inbound openings.** Each inbound transfer's originator can reconstruct the opening of the transfer it sent, by recomputing $$r\_e$$ from its own viewing key and the salt published in the event (`DESIGN.md` §5.3, `DESIGN_cont.md` §8.2). This does not weaken the flow below, which sources $$(v\_r, r\_r)$$ from the auditor, and no single sender can open the target's $$C\_{\text{receive}}$$ as a whole — that needs every contributing transfer plus the deposits. It does mean the receiving-side half of the seize witness could in principle be assembled from cooperating senders, so the two-party separation above is a property of how this flow is constructed rather than a cryptographic impossibility.
+The clawback circuit (`circuits/clawback`, `CircuitType::Clawback = 6`, verification key at `circuits/vks/clawback.vk.json`) proves that a public seize amount is bounded by the target's committed total without revealing either balance. It is the only circuit with no key-ownership constraint and no ephemeral scalar: both openings are pinned by Pedersen binding, and nothing else needs pinning.
 
-The admin role here is the same access-control surface introduced in §1.1; deployments typically place it under a dedicated `clawback` role in RBAC, separate from the freeze role.
+**Public inputs** — 8 fields, in canonical order. The contract loads or recomputes every one; none is prover-supplied, which is why `data` carries the proof alone (§6).
 
-**Auditor routing.** The recipient-auditor and the sender-auditor roles for a single account are served by the same key: each account binds a single `auditor_id` at registration (`DESIGN.md` §6.1) which the contract uses for both the sender-channel ciphertexts on the account's outgoing operations and the recipient-channel ciphertexts on the account's incoming transfers (the two channels are separated by domain tags $$\delta\_{\text{aud\\\_s}}$$ and $$\delta\_{\text{aud\\\_r}}$$, not by distinct keys). Deployments that intend to use clawback therefore need only ensure the off-chain custodian of that key is operationally capable of producing both halves of the witness — the spendable-balance checkpoint decryption and the per-transfer $$r\_{\text{transfer},i}$$ replay — when the admin initiates a seizure.
+| Idx | Input | Source |
+|:--|:--|:--|
+| 0–1 | `C_spend.x`, `C_spend.y` | Target's `spendable_commitment` |
+| 2–3 | `C_receive.x`, `C_receive.y` | Target's `receiving_commitment` |
+| 4 | `alpha` | The `amount` argument |
+| 5 | `addr_f` | Instance storage (`DESIGN.md` §2.7) |
+| 6 | `acct_f` | `address_to_field(account)` |
+| 7 | `dest_f` | `address_to_field(destination)` under `Some`; the zero field under `None` |
 
-### 5.3 New Circuit
+**Private witnesses.** `v_s, r_s, v_r, r_r` — the openings of the two commitments.
 
-The clawback proof is a constant-size circuit deployed through the existing Verifier surface. It binds the seize amount $$\alpha$$ by the sum of the spendable and receiving balances of the target account, refreshes the spendable-balance checkpoint, and rewrites `receiving_commitment` to a zero commitment so the seized inbound flow is consumed atomically.
+**Constraints.**
 
-**Public inputs.** $$C\_{\text{spend}}, C\_{\text{receive}}, K\_{\text{aud,s}}, \tilde{b}\_{\text{aud,s}}^{\text{old}}, \tilde{r}\_{\text{aud,s}}^{\text{old}}, R\_e^{\text{old}}, \sigma^{\text{old}}, \alpha, C\_{\text{spend}}^{\text{new}}, \tilde{b}\_{\text{aud,s}}^{\text{new}}, \tilde{r}\_{\text{aud,s}}^{\text{new}}, R\_e^{\text{new}}, \sigma^{\text{new}}, addr\_f$$.
+- **CB1** `C_spend = Com(v_s, r_s)`
+- **CB2** `C_receive = Com(v_r, r_r)`
+- **CB3** `v_s, v_r, alpha, v_s + v_r - alpha ∈ [0, 2^127)` (`DESIGN.md` §2.6). The last term is the soundness-critical one: `v_s` and `v_r` each in range does not bound their sum against `alpha`, and an over-seize would drive the committed value negative mod `r` — a commitment the owner can still open but never again satisfy under W4 / T4.
 
-**Private witnesses.** $$k\_{\text{aud,s}}, v\_s, r\_s, v\_r, r\_r, r\_s', r\_e^{\text{new}}$$, plus the sponge outputs from old and new auditor-channel sponge calls. The recipient-auditor's secret key does not appear in the witness because the recipient-channel decryption (recovery of $$(v\_r, r\_r)$$ from per-transfer events) is performed off-chain by the auditor; the circuit only re-verifies the resulting Pedersen opening of $$C\_{\text{receive}}$$ (constraint 1).
+`(0, 0)` is the encoding of the identity for either commitment, opened as `(0, 0)`; `C_receive = O` is the common case and needs no special handling. `addr_f`, `acct_f`, and `dest_f` are referenced by no gate. Their membership in the public-input set is the binding, on the `register` / `acct_f` precedent (`DESIGN.md` §7.2): UltraHonk absorbs every public input into the transcript, so a proof built for one contract, account, or settlement destination fails when the contract assembles the blob for another. `dest_f` in particular is what stops a compromised clawback signer from settling a witness built for one destination to an address of its own choosing. The zero sentinel for `None` is unambiguous because `address_to_field` is a Poseidon2 output.
 
-**Constraints (sketch).**
+The circuit compiles to 51 ACIR opcodes (`DESIGN_cont.md` §10.3).
 
-1. **Receiving-balance opening.** $$C\_{\text{receive}} = v\_r \cdot G + r\_r \cdot H$$. The recipient-auditor reconstructs $$(v\_r, r\_r)$$ off-chain from per-transfer events; the proof asserts knowledge of this opening.
-2. **Spendable-balance decryption.** $$(m\_{v,s}^{\text{old}}, m\_{b,s}^{\text{old}}, m\_{r,s}^{\text{old}}) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, \text{ECDH}(k\_{\text{aud,s}}, R\_e^{\text{old}}), \sigma^{\text{old}})$$, then $$v\_s = \tilde{b}\_{\text{aud,s}}^{\text{old}} - m\_{b,s}^{\text{old}}$$ and $$r\_s = \tilde{r}\_{\text{aud,s}}^{\text{old}} - m\_{r,s}^{\text{old}}$$, and $$C\_{\text{spend}} = v\_s \cdot G + r\_s \cdot H$$. The `lane[2]` escrow (`DESIGN.md` W\_a5 / T\_a9 / S\_a6) is what makes this a closed derivation: the circuit recovers the blinding from the auditor channel itself. The old checkpoint referenced here is the account's most recent `lane[2]` escrow, which the proofless operations do not produce — neither `merge` (`DESIGN.md` §7.4) nor `revoke_spender` (`DESIGN.md` §7.9) publishes one. Anchoring on an earlier checkpoint requires folding: $$C\_{\text{spend}}$$ is a public input the contract loads from live storage, so the equality above holds only once every fold performed since that checkpoint has been added into $$(v\_s, r\_s)$$.
+### 5.4 Contract Flow
 
-   **Precondition.** The seize-enabling auditor MUST hold the opening of every addend folded since the checkpoint it anchors on — `DESIGN_cont.md` §8.3 states when a key does. An auditor that does not, having rotated in after an addend's event or missed it from its archive, cannot assemble this witness. Nor can the target be made to re-anchor it: every operation that issues a fresh checkpoint is gated on the account being unfrozen, and §5.2's flow requires the freeze. A deployment that intends to use clawback therefore owes the same archive completeness §8.5 *Archive dependence* already requires of the auditor.
+`clawback(account, amount, destination, data, operator)` runs, after the deployment's access-control check on `operator`:
 
-3. **Range and bound.** $$\alpha, v\_s, v\_r \in [0, 2^{127})$$ and $$\alpha \le v\_s + v\_r$$.
-4. **Refreshed checkpoint.** $$r\_e^{\text{new}}$$ is **sampled** by the auditor per `DESIGN.md` §2.2, not derived. This is the one operation in the protocol that samples its ephemeral scalar: `DESIGN.md` §5.3 derives $$r\_e$$ from the originator's viewing key, and the originator here is the auditor, which holds no account's viewing key. Then $$R\_e^{\text{new}} = r\_e^{\text{new}} \cdot H$$, $$r\_e^{\text{new}} \neq 0$$, and, with $$(m\_{v,s}^{\text{new}}, m\_{b,s}^{\text{new}}, m\_{r,s}^{\text{new}}) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, \text{ECDH}(k\_{\text{aud,s}}, R\_e^{\text{new}}), \sigma^{\text{new}})$$, both $$\tilde{b}\_{\text{aud,s}}^{\text{new}} = (v\_s + v\_r - \alpha) + m\_{b,s}^{\text{new}}$$ and $$\tilde{r}\_{\text{aud,s}}^{\text{new}} = r\_s' + m\_{r,s}^{\text{new}}$$.
-5. **New spendable commitment.** $$C\_{\text{spend}}^{\text{new}} = (v\_s + v\_r - \alpha) \cdot G + r\_s' \cdot H$$. The commitment is a public input, since $$v\_s$$, $$v\_r$$, and $$r\_s'$$ are all private witnesses.
+1. **Preconditions.** `is_frozen(account)`, else `AccountNotFrozen`; `amount > 0`, else `InvalidClawbackAmount`; `destination` is not `Some` naming this contract, else `InvalidClawbackDestination` — such a seize is a `None` in effect while reporting a settlement, which breaks per-branch pool reconciliation for any indexer.
+2. **Public inputs.** Assembled in the §5.3 order through `append_point` / `append_field` / `append_amount`, so every coordinate and scalar passes the canonicality guards. `data` decodes to `ClawbackData { proof }`.
+3. **Verification** against `CircuitType::Clawback`.
+4. **State update.** `C_spend <- C_spend + C_receive - alpha·G` and `C_receive <- O`: the `Merge` rule (`DESIGN.md` §7.4) followed by a public debit, with no fresh randomness. The new opening is `(v_s + v_r - alpha, r_s + r_r)`, which the owner and the auditor recompute from the event's `amount` alone, so the seized account stays spendable. Re-randomizing under a prover-chosen blinding instead would leave the owner unable to open its own commitment.
+5. **Settlement**, by `destination`:
+   - `None` — no underlying moves. The pool is left over-collateralized by `amount`; nothing in the contract reads its own pooled balance, so the surplus is inert, and only the underlying's issuer can extract it, through a SAC `clawback` against the contract's address. **That extraction must follow the seize, never precede it.** Seize-then-extract passes through surplus, which is harmless; extract-then-seize passes through deficit, borne by every other holder and permanent if the seize then turns out to be unbuildable. `None` means "no on-chain settlement from this contract", not "the issuer has already extracted".
+   - `Some(d)` — exactly `amount` is transferred to `d` in the same invocation, so the pool and the sum of claims move together and the issuer is not involved. This branch inherits the module's exact-transfer assumption (`DESIGN.md` §3.4) and couples the seizure to the contract's own SAC authorization: an issuer that deauthorizes the contract blocks it. A deployment that needs seizures to survive that uses `None`.
+6. **Event.** `Clawback { account, amount, destination }` (§6.1).
 
-**Post-verification.** The contract stores the prover-supplied $$C\_{\text{spend}}^{\text{new}}$$, zeroes $$C\_{\text{receive}}$$, transfers $$\alpha$$ of the underlying SEP-41 token to the issuer, and emits an event carrying $$(\tilde{b}\_{\text{aud,s}}^{\text{new}}, \tilde{r}\_{\text{aud,s}}^{\text{new}}, R\_e^{\text{new}}, \sigma^{\text{new}})$$ so the auditor sees the new checkpoint and its blinding.
+The confidential debit strictly precedes the SEP-41 transfer, matching `withdraw`. Clawback is the one operation that reduces the sum of claims without a `Withdraw` (`DESIGN_cont.md` §9.3), and it invokes no `Hooks` callback: the freeze gate would reject exactly the account it acts on (`DESIGN_cont.md` §11).
 
-**Anti-replay.** The contract consumes $$C\_{\text{spend}}$$ and $$C\_{\text{receive}}$$ as proof public inputs at verification time. If either commitment changes between proof construction and submission (e.g., an inbound transfer arrives), verification fails because the proof was bound to a different $$C\_{\text{receive}}$$. The §2 contract-level freeze applied to the target per §5.2's flow blocks both spending and receiving, so neither $$C\_{\text{spend}}$$ nor $$C\_{\text{receive}}$$ can change between proof construction and submission, and the proof's bindings hold across the isolate-then-settle handshake.
+### 5.5 Forced Revocation
 
-**What is no longer needed.** The earlier sketch of an on-chain receiving-side accumulator and a per-transfer compliance hook on `confidential_transfer`, `confidential_transfer_from`, and `deposit` is not required. The recipient-auditor's opening of $$C\_{\text{receive}}$$ is reconstructed entirely off-chain from event scans (`DESIGN_cont.md` §8.1).
+Escrowed allowances are invisible to `clawback`, which sees only `C_spend` and `C_receive`. `force_revoke_spender(account, spender, operator)` moves them into reach: with `account` frozen (`AccountNotFrozen` otherwise), it performs the owner's `revoke_spender` fold (`DESIGN.md` §7.9) under the admin gate in place of the owner's authorization and emits the same `RevokeSpender` event, carrying `a_tilde` and `allowance_salt`. No proof is involved, and expired delegations are revocable — expiry blocks spending, never reclamation. Like `clawback`, it invokes no `Hooks` callback.
 
-Detailed encoding and the two-phase isolate-then-settle entry-point sequencing are deferred to a follow-up revision of this document.
+The owner and the auditor fold the event as they would an owner-initiated one (`DESIGN.md` §5.2; `DESIGN_cont.md` §8.5). For the auditor the archive dependence of `DESIGN_cont.md` §8.5 applies unchanged: `r_a` is not derivable from `a_tilde` and `σ_a`, so its standing opening of `C_spend` survives the fold only if it observed the delegation's last `SetSpender` / `SpenderTransfer` event.
+
+### 5.6 Anti-Replay and the Freeze
+
+`C_spend` and `C_receive` are public inputs, so any change to either between proof construction and submission — an inbound transfer, a merge, a revoke — fails verification with `InvalidProof`. A successful seize changes both, so a proof never verifies twice; the `amount > 0` precondition is what closes the one state-preserving case, `alpha = 0` against `C_receive = O`.
+
+The freeze is what holds the commitments still: applied per §2 it blocks the seven positions `ComplianceHooks` gates, and nothing else moves them. **That is a deployment obligation, not a trait guarantee.** `ConfidentialClawback: ConfidentialCompliance` forces a `freeze` / `unfreeze` implementation but constrains nothing about the deployment's `Hooks`. Wiring `NoHooks` next to a `ConfidentialClawback` impl yields a `freeze` that writes the flag and an `is_frozen` that returns `true` while every token operation stays ungated, so the target spends out before the seizure lands and the admin's only signal is an `InvalidProof` once the commitments have moved. A deployment that enables clawback MUST wire `ComplianceHooks`, or a custom `Hooks` impl that gates the same seven positions (§4).
+
+### 5.7 Wallet and Auditor Consequences
+
+`Clawback` is a receiving-side reset and a `T_0` anchor, alongside `Merge` (`DESIGN.md` §5.2 *Recovery*; `INDEXER.md` §2). It is not a checkpoint: it carries no `b_tilde`, so its effect on the spendable side is absorbed into the next owner-initiated proof operation. The owner applies the `Merge` row of `DESIGN.md` §5.2 followed by `W_spend.v -= amount`; the auditor advances its standing opening identically (`DESIGN_cont.md` §8.1 *Sender-auditor opening capability*). A `RevokeSpender` emitted by `force_revoke_spender` is indistinguishable from an owner-initiated one for both consumers.
 
 ---
 
@@ -242,18 +265,25 @@ impl Token {
                      auditor: Address, compliance: Option<ComplianceConfig>);
 
     // Freeze (§2)
-    fn freeze(e: Env, account: Address, admin: Address);
-    fn unfreeze(e: Env, account: Address, admin: Address);
+    fn freeze(e: Env, account: Address, operator: Address);
+    fn unfreeze(e: Env, account: Address, operator: Address);
     fn is_frozen(e: Env, account: Address) -> bool;
 
     // Config rotation (admin auth per §1.1, reverts when compliance.is_none())
     // Replaces the entire ComplianceConfig in one call.
-    fn set_compliance_config(e: Env, config: ComplianceConfig, admin: Address);
+    fn set_compliance_config(e: Env, config: ComplianceConfig, operator: Address);
 
     // Reads
     fn compliance_config(e: Env) -> Option<ComplianceConfig>;
+
+    // Clawback (§5), opt-in via ConfidentialClawback
+    fn clawback(e: Env, account: Address, amount: i128, destination: Option<Address>,
+                data: Bytes /* XDR ClawbackData { proof } */, operator: Address);
+    fn force_revoke_spender(e: Env, account: Address, spender: Address, operator: Address);
 }
 ```
+
+`operator` is the address whose authorization the deployment's access-control module checks (§1.1).
 
 ### 6.1 Events
 
@@ -261,5 +291,15 @@ impl Token {
 |:---|:---|
 | `Frozen`, `Unfrozen` | `account` |
 | `ComplianceConfigChanged` | `policy`, `sac_passthrough` |
+| `Clawback` | `account` (topic), `amount`, `destination` |
+| `RevokeSpender` | as `DESIGN_cont.md` §11.2, when emitted by `force_revoke_spender` |
 
-Clawback-related events are specified alongside the clawback flow in the follow-up revision.
+### 6.2 Errors
+
+The seizure entry points add three variants to `ComplianceError`:
+
+| Error | Code | Raised when |
+|:---|:--|:---|
+| `AccountNotFrozen` | 3604 | the target of `clawback` or `force_revoke_spender` is not frozen |
+| `InvalidClawbackAmount` | 3605 | `amount <= 0` |
+| `InvalidClawbackDestination` | 3606 | `destination` is `Some` naming the contract's own address |
