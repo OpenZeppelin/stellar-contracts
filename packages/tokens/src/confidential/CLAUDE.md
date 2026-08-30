@@ -43,7 +43,7 @@ Beyond the root guide's conventions:
 
 ## The documentation set
 
-`docs/` is a specification, not commentary, and it is the single largest maintenance hazard in this module. Nine of the last sixteen commits on this branch were doc-consistency fixes.
+`docs/` is a specification, not commentary, and it is the single largest maintenance hazard in this module — doc-consistency fixes outnumber code commits on this branch.
 
 ### Normativity
 
@@ -67,9 +67,21 @@ Five things exist in more than one file. Changing the normative copy means grepp
 
 The tags are a cross-language wire contract. `DESIGN_cont.md` §13 is their only authoritative source: it assigns every value, and it states which subset `circuits/lib/src/lib.nr` implements and why the remainder are absent. Changing any assigned value is a new deployment, not an upgrade.
 
-### Editing rules
+### Economy
 
-- **Cite, do not restate.** Every drift bug in the recent history came from a second copy of something. When tempted to summarise a neighbouring section, write `§N` instead.
+Every sentence is a maintenance liability: a claim written twice has to be fixed twice, and the second copy is the one that goes stale. Doc work here trends net-negative in lines.
+
+- **One owning section per claim.** Every fact has exactly one home; everywhere else writes `§N`. When tempted to summarise a neighbouring section for the reader's convenience, cite it instead;
+- **Say it once, then move on.** No second-register restatement, no paragraph-closing punchline, no recap of the section's own argument in its last sentence. If a paragraph's content survives deleting it, delete it.
+- **Gloss a symbol at its definition site only.** Re-glossing `s` or `r_e` in each section that uses them is three more places to update when a name changes.
+- **No pre-stating.** A `Note:` or lead-in that previews what the next paragraph spells out in full is a duplicate. Fold it into the argument.
+- **Motivation before constraint.** State what a rule protects against, then the rule. Rationale appended after the fact invites a second copy of the rule next to it.
+- **Drop concessive asides.** "…though X would not be a violation either" earns nothing and dates fast.
+- **Grep before adding.** A new claim is usually a second copy of an existing one. Search the normative pair for the symbol or term before writing a sentence about it.
+- **A citation is not a summary.** `§8.1` is the whole reference. `§8.1, which escrows the allowance blinding` re-creates the copy the citation was avoiding — name the target only when the sentence would be unparseable without it.
+
+### Style
+
 - **Match the file's math style, not a global one.** `DESIGN*.md` and `SELECTIVE_DISCLOSURE.md` use `$$…$$` with backslash-escaped subscripts (`$$\mathbb{F}\_r$$`); `SDK.md` uses `$$…$$` unescaped; `OVERVIEW.md` uses single `$…$`; `INDEXER.md` and `COMPLIANCE.md` use backticked ASCII and no LaTeX.
 - **Symbols are a maintained namespace.** `sk`/`vk`/`dvk_i`/`PVK`/`Y`; `r_e` and `R_e = r_e·H`; `σ` (operation salt) is distinct from `σ_a` (per-delegation allowance salt); tilde means ciphertext; `C_spend` / `C_receive` / `C_transfer` / `C_a`; `r_a` is `C_a`'s blinding and `r_a'` the post-transfer one. An audit finding once required renaming the `tx` subscript to `transfer` across the whole module.
 - Prose is full-width — no hard wrapping. One paragraph or list item per line.

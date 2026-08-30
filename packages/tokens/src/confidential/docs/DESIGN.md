@@ -147,7 +147,7 @@ The domain tag is always the first element absorbed, so $$\text{Poseidon2}(\delt
 
 $$\text{SpongeSqueeze}\_n(\delta\_{\text{channel}}, s, \sigma) = \bigl(\text{state}[0], \\, \ldots, \\, \text{state}[n-1]\bigr), \qquad \text{state} = \text{permute}\bigl([\delta\_{\text{channel}}, \\, s, \\, \sigma, \\, 3 \cdot 2^{64}]\bigr)$$
 
-where $$s$$ is the ECDH shared scalar of Section 2.4 and $$n \in \\{2, 3\\}$$ is the number of rate lanes read; the capacity lane $$\text{state}[3]$$ is never squeezed. Two channel tags are used: $$\delta\_{\text{aud\\\_s}}$$ for the sender-auditor channel keyed by $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$, squeezed three-wide, and $$\delta\_{\text{aud\\\_r}}$$ for the recipient-auditor channel keyed by $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$, squeezed two-wide. No other arity is instantiated. Because the absorb is one block, every width reads a prefix of one permutation output: $$\text{SpongeSqueeze}\_3(\delta, s, \sigma)[i] = \text{SpongeSqueeze}\_2(\delta, s, \sigma)[i]$$ for $$i \in \\{0, 1\\}$$, and $$\text{SpongeSqueeze}\_n(\delta, s, \sigma)[0] = \text{Poseidon2}(\delta, s, \sigma)$$. Widening a channel adds a lane without changing the value of any existing one.
+where $$s$$ is the ECDH shared scalar of Section 2.4 and $$n \in \\{2, 3\\}$$ is the number of rate lanes read; the capacity lane $$\text{state}[3]$$ is never squeezed. Two channel tags are used: $$\delta\_{\text{aud\\\_s}}$$ for the sender-auditor channel keyed by $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$, squeezed three-wide, and $$\delta\_{\text{aud\\\_r}}$$ for the recipient-auditor channel keyed by $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$, squeezed two-wide. No other arity is instantiated. Because the absorb is one block, every width reads a prefix of one permutation output: $$\text{SpongeSqueeze}\_3(\delta, s, \sigma)[i] = \text{SpongeSqueeze}\_2(\delta, s, \sigma)[i]$$ for $$i \in \\{0, 1\\}$$, and $$\text{SpongeSqueeze}\_n(\delta, s, \sigma)[0] = \text{Poseidon2}(\delta, s, \sigma)$$.
 
 **Lane assignment.** Squeeze order is canonical. Lanes are named by their zero-based index into the squeeze output: `lane[i]` is $$\text{SpongeSqueeze}\_n(\delta, s, \sigma)[i]$$, so a three-wide squeeze yields `lane[0]`, `lane[1]`, and `lane[2]`. `lane[0]` is always an amount mask and `lane[1]` is always a balance, allowance, or randomness mask, fixed per operation by the formulas in Sections 7 and 8. `lane[2]`, present only on the sender-auditor channel, is the **blinding-escrow slot**. It carries the new spendable blinding on the three checkpoint operations (W\_a5, T\_a9, S\_a6) and the new allowance blinding on spender transfers (O\_a9). The Withdraw checkpoint (W\_a3, W\_a5) takes `lane[1]` and `lane[2]` and leaves the amount lane unused, so a checkpoint pad can never coincide with an amount pad.
 
@@ -362,7 +362,7 @@ $$W\_{\text{receive}} = (v\_r, r\_r) \quad \text{such that} \quad C\_{\text{rece
 | Set spender (escrow amount $$a$$) | Proof outputs new commitment. $$W\_{\text{spend}} \leftarrow (v\_s - a, \\; \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk, \sigma))$$ |
 | Revoke spender | Proofless fold. $$W\_{\text{spend}} \mathrel{+}= (v\_a, r\_a)$$, the escrow opening recovered from the event per §7.9 |
 
-The Merge and Revoke spender rows use exact integer addition; $$W\_{\text{spend}}.r$$ is not reduced modulo $$r$$ or $$q$$ as merges accumulate. At proof-construction time the wallet reduces $$W\_{\text{spend}}.r$$ modulo $$q$$ and encodes the canonical $$\mathbb{F}\_q$$ representative as a single $$\mathbb{F}\_r$$ `Field`; the case where that encoding is unavailable is specified in [DESIGN_cont.md](./DESIGN_cont.md) §10.4 *Post-merge witness availability*.
+The Merge and Revoke spender rows use exact integer addition; $$W\_{\text{spend}}.r$$ is not reduced modulo $$r$$ or $$q$$ as folds accumulate. At proof-construction time the wallet reduces $$W\_{\text{spend}}.r$$ modulo $$q$$ and encodes the canonical $$\mathbb{F}\_q$$ representative as a single $$\mathbb{F}\_r$$ `Field`; the case where that encoding is unavailable is specified in [DESIGN_cont.md](./DESIGN_cont.md) §10.4 *Post-merge witness availability*.
 
 After every owner-initiated operation that produces a proof, $$r\_s$$ resets to a deterministic value. This is the **normalization** property: the spendable balance's blinding factor is always recoverable from $$(vk, \sigma)$$ at spend boundaries. Together with $$\tilde{b}$$, both emitted in the spend-boundary event, each spend boundary forms a **checkpoint** from which the spendable opening $$(v\_s, r\_s)$$ *as of that boundary* is recoverable via a single event lookup, with no replay of the spend history preceding it. $$W\_{\text{receive}}$$ has no such anchor: a checkpoint leaves $$C\_{\text{receive}}$$ untouched, which only `Merge` (§7.4) resets, so recovering it requires a replay (see Recovery below).
 
@@ -495,7 +495,7 @@ Per-delegation salt for allowance randomness derivation, encoded as `BytesN<32>`
 
 **Transfer nonce.** Unlike $$\sigma$$, which an owner samples afresh for every operation, $$\sigma\_a$$ is stored state: a reverted transfer leaves the delegation entry untouched, so the retry is forced to reuse it. Pads keyed to it would repeat $$r\_e$$ and every mask across the two attempts, and a retry that changed the amount would publish the difference in the clear (§2.5).
 
-A spender transfer avoids this by splitting the salt's two jobs, which pull in opposite directions: opening the stored allowance must be deterministic, since the value has to reproduce the randomness the commitment on-chain was built under, while keying pads must be fresh on every attempt. The stored $$\sigma\_a$$ does only the first (O3); every pad the transfer derives, and its ephemeral scalar, absorbs a prover-chosen replacement $$\sigma\_a'$$ instead (§7.8).
+A spender transfer avoids this by splitting the salt's two jobs: opening the stored allowance must be deterministic, since the value has to reproduce the randomness the commitment on-chain was built under, while keying pads must be fresh on every attempt. The stored $$\sigma\_a$$ does only the first (O3); every pad the transfer derives, and its ephemeral scalar, absorbs a prover-chosen replacement $$\sigma\_a'$$ instead (§7.8).
 
 **`live_until_ledger`**
 
@@ -749,7 +749,7 @@ The spender transfers from the owner's escrowed allowance to a recipient.
 | O\_a6 | $$(m\_{v,s}, m\_{a,s}, m\_{r,s}) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma\_a')$$ (owner-auditor channel masks) |
 | O\_a7 | $$\tilde{v}\_{\text{aud,s}} = v\_{\text{transfer}} + m\_{v,s}$$ (owner-auditor encrypted transfer amount) |
 | O\_a8 | $$\tilde{a}\_{\text{aud,s}} = (v\_a - v\_{\text{transfer}}) + m\_{a,s}$$ (owner-auditor encrypted post-transfer allowance) |
-| O\_a9 | $$\tilde{r}\_{\text{aud,s}} = r\_a' + m\_{r,s}$$ (owner-auditor escrow of the NEW allowance blinding, the one O11 commits under) |
+| O\_a9 | $$\tilde{r}\_{\text{aud,s}} = r\_a' + m\_{r,s}$$ (owner-auditor escrow of the new allowance blinding, over O10's $$r\_a'$$) |
 
 **Public inputs (25 fields):**
 
@@ -789,7 +789,7 @@ The fold works for both active and expired-but-not-revoked delegations (§6.2).
 
 **Owner state update.** By Proposition 1 applied to the allowance commitment, the post-revoke opening is $$(v\_s + v\_a, \\; r\_s + r\_a)$$. The owner derives $$dvk\_i$$ from $$vk$$ (§4.4), recovers $$v\_a = \tilde{a} - \text{Poseidon}(\delta\_{\text{enc\\\_allow}}, dvk\_i, \sigma\_a)$$ and $$r\_a = \text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a)$$ from the event, and applies $$W\_{\text{spend}} \mathrel{+}= (v\_a, r\_a)$$ (§5.2).
 
-**Why the event carries $$\tilde{a}$$ and $$\sigma\_a$$.** The fold deletes the delegation entry in the same invocation, so neither field is readable from storage afterwards. `SpenderTransfer` writes its $$\tilde{a}'$$ to storage only. $$\sigma\_a$$ reaches events only through `SpenderTransfer`, which emits the replacement $$\sigma\_a'$$ it writes and not the salt it consumed (§6.2 *Transfer nonce*): the salt this fold consumes is therefore the `sigma_a_new` of the most recent `SpenderTransfer`, recoverable only by scanning back to it, and for a delegation revoked without ever being spent from it is published nowhere at all, since `SetSpender` emits the owner's spendable salt $$\sigma$$ and no allowance salt. Co-emitting both lets this event alone open the fold, with no scan.
+**Why the event carries $$\tilde{a}$$ and $$\sigma\_a$$.** The fold deletes the delegation entry in the same invocation, so neither field is readable from storage afterwards. `SpenderTransfer` writes its $$\tilde{a}'$$ to storage only. $$\sigma\_a$$ reaches events only through `SpenderTransfer`, which emits the replacement $$\sigma\_a'$$ it writes and not the salt it consumed (§6.2 *Transfer nonce*): the salt this fold consumes is therefore the `sigma_a_new` of the most recent `SpenderTransfer`, recoverable only by scanning back to it, and for a delegation revoked without ever being spent from it is published nowhere, since `SetSpender` emits the owner's spendable salt $$\sigma$$ and no allowance salt.
 
 **Encrypted balance.** Revocation emits no $$\tilde{b}$$ and is not a checkpoint (§5.2); the next owner-initiated proof operation issues a fresh checkpoint. The auditor carries its opening of $$C\_{\text{spend}}$$ through the fold as Section 8.1 specifies, using the opening of $$C\_a$$ it holds from the delegation's last state change (Section 8.5).
 
@@ -815,11 +815,7 @@ The spender decrypts using $$sk\_{\text{op}}$$. The `set_spender` proof enforces
 
 The $$r\_e$$ here is the same scalar S\_a1 commits to ($$R\_e = r\_e \cdot H$$), so the escrow's $$R\_x$$ and the auditor channel's $$R\_e.x$$ are forced equal.
 
-The same proof also escrows to the owner's *auditor* (S14), under its own domain tag and over the auditor shared scalar -- what it escrows is the allowance blinding $$r\_a$$, not a second copy of $$dvk\_i$$. That construction, its decryption path, why it escrows the blinding rather than the key, and why it is a single-output pad rather than a sponge lane are specified in [DESIGN_cont.md](./DESIGN_cont.md) §8.5.
-
-### 7.12 Expiry and Revert Safety
-
-A reverted transaction leaves the delegation entry unchanged, so the stored `allowance_salt` recurs on the retry. Every value a retry could vary is therefore keyed to the prover-chosen $$\sigma\_a'$$ (§6.2 *Transfer nonce*). Delegation storage, expiry, and revocation semantics are specified in §6.2.
+The same proof also escrows the allowance blinding $$r\_a$$ to the owner's auditor (S14), under its own domain tag over the auditor shared scalar; the construction and its decryption path are specified in [DESIGN_cont.md](./DESIGN_cont.md) §8.5.
 
 ---
 

@@ -81,10 +81,6 @@ mod tests;
 //                                                           escrow of the new
 //                                                           spendable blinding,
 //                                                           over T10's r_A'.
-//                                                           Lets the auditor
-//                                                           track the full
-//                                                           opening of C_spend
-//                                                           forward.
 //
 // Point-validation doctrine (Section 10.8)
 // ----------------------------------------
@@ -260,7 +256,7 @@ fn main(
     // T_a5 (sender-auditor shared-secret scalar)
     let s_a_s = ecdh(r_e, k_aud_s);
 
-    // T_a6 (sender-channel masks: amount, balance, then the secret-escrow
+    // T_a6 (sender-channel masks: amount, balance, then the blinding-escrow
     // slot)
     let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, sigma);
 

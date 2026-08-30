@@ -129,12 +129,11 @@ The system supports **real-time auditing** via a dual-auditor model. Each accoun
 | Sender's post-transfer balance | No | Yes |
 | Withdrawal amount | n/a | Yes (publicly visible) |
 | Post-withdrawal balance | n/a | Yes |
-| Post-operation spendable blinding factor | No | Yes, at withdrawal, outgoing transfer, and spender setup (enables opening the sender's spendable balance from that event onward, since the same key also receives every inbound transfer's blinding; not renewed at spender revocation) |
+| Post-operation spendable blinding factor | No | Yes, at withdrawal, outgoing transfer, and spender setup |
 | Spender escrow amount | n/a | Yes (owner's auditor) |
 | Post-transfer spender allowance | No (for spender transfers) | Yes (owner's auditor) |
 | Post-escrow balance | n/a | Yes (owner's auditor), at spender setup |
-| Delegation viewing key `dvk` | No | No |
-| Allowance blinding $r_a$ | No | Yes (owner's auditor), at spender setup and on every spender transfer — one state's blinding per event, which with the amount opens that event's allowance commitment |
+| Allowance blinding $r_a$ | No | Yes (owner's auditor), at spender setup and every spender transfer |
 
 The table covers every auditor ciphertext the protocol produces; `DESIGN_cont.md` §8.1-§8.5 is the normative account, including the bounds on each opening capability.
 
@@ -146,7 +145,7 @@ Each auditor decrypts its ciphertexts by running the channel sponge (recipient-a
 - **Dual-auditor ciphertexts.** The ciphertexts each operation produces are enforced by its zero-knowledge proof, so they cannot be omitted or malformed, and no extra action is needed from users.
 - **Per-account scope.** Auditing one account reveals nothing about any other account.
 - **Recipient-side opening capability.** The recipient's auditor holds the per-transfer Pedersen blinding $r_{\text{transfer}}$, hence the full Pedersen opening of the recipient's receiving balance between merges, which is what enables the seizure/clawback flow specified in `COMPLIANCE.md` §5; the capability and its bounds are specified in `DESIGN_cont.md` §8.1.
-- **Sender-side opening capability.** The sender's auditor holds the opening of the account's spendable balance as of each withdrawal, outgoing transfer, and spender setup, because those operations also encrypt the post-operation blinding factor to it. Because one key serves both of an account's auditor channels, the capability survives merges rather than expiring with the event; its bounds are specified in `DESIGN_cont.md` §8.1.
+- **Sender-side opening capability.** The sender's auditor holds the opening of the account's spendable balance as of each withdrawal, outgoing transfer, and spender setup, because those operations also encrypt the post-operation blinding factor to it. Because one key serves both of an account's auditor channels, the capability survives merges; its bounds are specified in `DESIGN_cont.md` §8.1.
 - **Seamless auditor rotation.** When an auditor key is rotated, the new key immediately receives ciphertexts on subsequent operations. For the sender's auditor, the balance checkpoint at the next owner-initiated proof operation (transfer, withdrawal, or set spender) provides the current balance with no event replay; `DESIGN_cont.md` §8.3 bounds what a rotated key can open beyond that checkpoint.
 - **Spender visibility.** The owner's auditor sees spender transfer amounts and post-transfer allowances via the same dual-auditor mechanism, and additionally sees the escrowed amount at `set_spender`.
 - **Viewing vs. spending separation.** A viewing key cannot move or spend funds. Spending requires the separate spending key, which is never shared.

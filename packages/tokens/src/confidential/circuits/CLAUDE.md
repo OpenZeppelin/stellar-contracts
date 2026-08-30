@@ -22,7 +22,7 @@ There is no `nargo fmt` step in CI and no formatter config — Noir formatting i
 
 ### `compiler_version = "=1.0.0"` is deliberate
 
-It appears in all thirteen package `Nargo.toml` files -- the workspace manifest `circuits/Nargo.toml` carries only `[workspace]` -- and looks like a mistake. Nargo requirements cannot name prereleases, so the real toolchain — **nargo 1.0.0-beta.11 + bb 0.87.0**, pinned in `.github/workflows/noir.yml` — is documented in the comment above it instead. Do not "correct" this to `=1.0.0-beta.11`.
+It appears in all thirteen package `Nargo.toml` files — the workspace manifest `circuits/Nargo.toml` carries only `[workspace]` — and looks like a mistake. Nargo requirements cannot name prereleases, so the real toolchain — **nargo 1.0.0-beta.11 + bb 0.87.0**, pinned in `.github/workflows/noir.yml` — is documented in the comment above it instead. Do not "correct" this to `=1.0.0-beta.11`.
 
 ### Do not prune unused public inputs
 
@@ -36,11 +36,11 @@ Directory `transfer/` is package `circuit_transfer`; `gadgets/commit/` is `gadge
 
 `poseidon_with_domain` is the only Poseidon entry point in `lib/src/lib.nr`; calling the underlying hash directly is a violation of the library contract. The domain tag is always the first absorbed element. The numeric tag values are the cross-language contract with the SDK — see `../CLAUDE.md` and `../docs/DESIGN_cont.md` §13, which is their only authoritative source.
 
-Sponge parameters, the canonical lane assignment, and the mode-exclusivity rule that follows from a single-block absorb are normative in `../docs/DESIGN.md` §2.5; the Noir sponge must match it exactly. The obligations that section places on this code: `sponge_squeeze_2(d,s,σ)[0]` must stay equal to `poseidon_with_domain(d,[s,σ])`, and `sponge_squeeze_3(d,s,σ)[0..2]` must stay equal to `sponge_squeeze_2(d,s,σ)` — which is why `sponge_squeeze_2` is defined as the prefix of `sponge_squeeze_3` rather than as a second permutation. A divergence in either silently changes every existing mask.
+Sponge parameters, the canonical lane assignment, and the mode-exclusivity rule that follows from a single-block absorb are normative in `../docs/DESIGN.md` §2.5; the Noir sponge must match it exactly. The obligations that section places on this code: `sponge_squeeze_2(d,s,σ)[0]` must stay equal to `poseidon_with_domain(d,[s,σ])`, and `sponge_squeeze_3(d,s,σ)[0..2]` must stay equal to `sponge_squeeze_2(d,s,σ)` — which is why `sponge_squeeze_2` is defined as the prefix of `sponge_squeeze_3`. A divergence in either silently changes every existing mask.
 
-`AUDITOR_SENDER` is always squeezed three-wide; `AUDITOR_RECIPIENT` is always two-wide; every other tag goes through `poseidon_with_domain`. Widening or narrowing a channel is a spec change, not a refactor.
+`AUDITOR_SENDER` is always squeezed three-wide; `AUDITOR_RECIPIENT` is always two-wide; every other tag goes through `poseidon_with_domain`. Widening or narrowing a channel is a spec change.
 
-`lane[2]` carries **the blinding of a commitment the operation writes, never a key** — `r'` on W_a5 / T_a9 / S_a6, `r_a'` on O_a9. Tag 17 (`ESCROWED_ALLOWANCE_BLINDING_AUDITOR`) is the same idea off-sponge: SetSpender's `lane[2]` is already taken, so S14 escrows `r_a` under a single-output pad. Do not escrow `dvk_i` here: it is permanent per `(owner, spender)` and survives revoke-then-re-delegate, so one leaked ciphertext would open every allowance state for that pair, past and future (`../docs/DESIGN_cont.md` §8.5).
+`lane[2]` carries the blinding of a commitment the operation writes — `r'` on W_a5 / T_a9 / S_a6, `r_a'` on O_a9. Tag 17 (`ESCROWED_ALLOWANCE_BLINDING_AUDITOR`) escrows `r_a` off-sponge at S14; the construction is specified in `../docs/DESIGN_cont.md` §8.5.
 
 ECDH must absorb both `S.x` and `S.y`; x-only extraction collapses `P` and `-P`.
 

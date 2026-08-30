@@ -64,29 +64,7 @@ mod tests;
 //                                                        Auditor-side escrow
 //                                                        of the allowance
 //                                                        blinding S6 derived
-//                                                        and S7 committed to.
-//                                                        With v_tilde_aud_s
-//                                                        (S_a4) this hands the
-//                                                        owner's auditor the
-//                                                        opening of the C_a
-//                                                        this operation writes
-//                                                        (Section 8.5) --
-//                                                        one state, not the
-//                                                        key that generates
-//                                                        every state.
-//                                                        A separate single-
-//                                                        output Poseidon
-//                                                        rather than a sponge
-//                                                        lane, because lane[2]
-//                                                        of this channel is
-//                                                        taken by S_a6. Costs
-//                                                        one Poseidon and zero
-//                                                        scalar muls; r_a is
-//                                                        already a witness
-//                                                        (S6).
-//                                                        Unconditional -- there
-//                                                        is no delegation that
-//                                                        can exist without it.
+//                                                        (Section 8.5).
 //   S13 r_e != 0                                         Rules out R_e = O,
 //                                                        S_{a,s} = O, and a
 //                                                        trivial escrow
@@ -177,14 +155,8 @@ mod tests;
 //                                                escrow of the new spendable
 //                                                blinding; emitted.
 //   25   r_a_tilde_aud_s      r_a_tilde_aud_s   Prover-supplied owner-auditor
-//                                                escrow of the new allowance
-//                                                blinding; emitted. Distinct
-//                                                from r_tilde_aud_s (index
-//                                                24), which escrows the
-//                                                spendable blinding, and from
-//                                                escrowed_dvk_cipher, which
-//                                                hands the spender the
-//                                                delegation key.
+//                                                escrow of the allowance
+//                                                blinding; emitted.
 //
 // Private witnesses
 // -----------------
@@ -323,10 +295,7 @@ fn main(
     // S_a6
     assert(r_new + m_s[2] == r_tilde_aud_s);
 
-    // S14 -- reuses s_a_s from S_a2, so no new scalar multiplication. Runs
-    // after the auditor block so the shared scalar is already in scope. The
-    // escrowed value is S6's r_a, the very blinding S7 committed under, so the
-    // auditor's opening matches the C_a this proof writes on-chain.
+    // S14 (reuses s_a_s from S_a2)
     let r_a_tilde_aud_s_derived = encrypt_esc_allow_r_auditor(r_a, s_a_s, op_i);
     assert(r_a_tilde_aud_s_derived == r_a_tilde_aud_s);
 }

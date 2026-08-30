@@ -48,7 +48,7 @@ where $$i$$ ranges over inbound transfers and spender-transfers since the last m
 The capability is bounded in three ways:
 
 - **Forward-only.** Only events emitted while the auditor key was active are decryptable.
-- **Receiving-side only.** The reconstruction above covers `receiving_commitment`. It does not extend to $$C\_{\text{spend}}$$: the recipient-auditor cannot derive the spend-side blinding $$r\_s = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk\_A, \sigma)$$, which depends on $$vk\_A$$.
+- **Recipient-channel only.** The reconstruction above yields an opening of `receiving_commitment`: the spend-side blinding $$r\_s = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk\_A, \sigma)$$ depends on $$vk\_A$$ and is not derivable from the recipient channel.
 - **Reset by merge.** Merge folds $$r\_r$$ into the spendable-balance randomness ($$r\_{\text{spend}}' = r\_s + r\_r$$, Section 7.4) and emits no checkpoint, so the reconstruction above restarts from the next inbound flow.
 
 **Sender-auditor opening capability.** The `lane[2]` escrow hands the sender-auditor the *blinding* of the account's post-operation spendable balance directly, without $$vk\_A$$: together with the value in $$\tilde{b}\_{\text{aud,s}}$$ it is a full Pedersen opening of $$C\_{\text{spend}}'$$. It is available at the three checkpoint operations that escrow the spendable blinding -- withdrawal (W\_a5), outgoing transfer (T\_a9), and `set_spender` (S\_a6) -- and is likewise bounded:
@@ -57,8 +57,6 @@ The capability is bounded in three ways:
 - **Maintained across merges.** An account binds a single `auditor_id` (Section 6.1), so the key that decrypts the `lane[2]` escrow is the same key that decrypts the recipient channel of every inbound flow to that account. Merge adds both the values and the blindings ($$v\_{\text{spend}}' = v\_s + v\_r$$, $$r\_{\text{spend}}' = r\_s + r\_r$$, Section 7.4). An auditor that decrypted the inbound flows since the previous merge holds each addend -- $$(v\_{\text{transfer},i}, r\_{\text{transfer},i})$$ from the recipient-channel reconstruction above, and $$(a\_j, 0)$$ from the public deposits -- and carries the escrowed opening forward by the same addition the contract performs.
 - **Carried through `revoke_spender`.** The revoke is a public homomorphic fold, $$C\_{\text{spend}}' = C\_{\text{spend}} + C\_a$$, emitting no new checkpoint (Section 7.9). An auditor that decrypted the delegation's last state-changing event holds the opening of the $$C\_a$$ being folded (Section 8.5) and advances its own opening by the same addition the contract performs.
 - **Rotation-scoped.** Both folds above depend on the auditor having decrypted the event that produced the addend; Section 8.3 *Decryption capability across rotation* states what a rotated key can and cannot open.
-
-The recipient-side reconstruction is therefore event-scoped, while the sender-side escrow gives the account's auditor a **standing** opening of $$C\_{\text{spend}}$$, held from its first checkpoint under the active key for as long as the fold condition above is met.
 
 These bounded openings are what the clawback flow specified in [COMPLIANCE.md](./COMPLIANCE.md) §5 draws its witness from.
 
@@ -91,9 +89,9 @@ When building public inputs for any operation that produces auditor ciphertexts 
 **Decryption capability across rotation.** A key decrypts an auditor ciphertext exactly when it was the active key at the moment that ciphertext was produced. Rotation therefore affects the two holders asymmetrically:
 
 - **Retired key.** Its holder keeps what it already opened. Rotation does not revoke a held opening, and the proofless folds advance it exactly as Section 8.1 specifies.
-- **New key.** Its holder starts with nothing and re-anchors per commitment: at the next checkpoint operation for $$C\_{\text{spend}}$$ (Section 8.2), at the delegation's next state-changing operation for $$C\_a$$ (Section 8.5), and not before.
+- **New key.** Its holder starts with nothing and re-anchors per commitment: at the next checkpoint operation for $$C\_{\text{spend}}$$ (Section 8.2), and at the delegation's next state-changing operation for $$C\_a$$ (Section 8.5).
 
-Re-anchoring is not a one-time cost. Each proofless fold consumes an addend produced by an earlier event, and a holder that bootstrapped from the new key alone cannot open an addend that predates the rotation. Such a holder is returned to unopened by every fold that consumes one, and re-anchored only at the next checkpoint operation following it. A merge's addends reach back only as far as the previous merge; a delegation's last state change is bounded only by its entry TTL.
+Each proofless fold consumes an addend produced by an earlier event, and a holder that bootstrapped from the new key alone cannot open an addend that predates the rotation. Such a holder loses its opening at every fold that consumes one, and re-anchors only at the next checkpoint operation following it. A merge's addends reach back only as far as the previous merge; a delegation's last state change is bounded only by its entry TTL.
 
 ### 8.4 Spender Transfer Auditing
 
@@ -107,9 +105,9 @@ The owner's auditor decrypts the transfer amount, the post-transfer allowance, a
 $$(m\_{v,s}, m\_{a,s}, m\_{r,s}) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma\_a')$$
 $$v\_{\text{transfer}} = \tilde{v}\_{\text{aud,s}} - m\_{v,s}, \qquad v\_a' = \tilde{a}\_{\text{aud,s}} - m\_{a,s}, \qquad r\_a' = \tilde{r}\_{\text{aud,s}} - m\_{r,s}$$
 
-$$(\tilde{a}\_{\text{aud,s}}, \tilde{r}\_{\text{aud,s}})$$ open the post-transfer $$C\_a'$$, the state left on-chain.
-
 where $$s\_{a,r}$$, $$s\_{a,s}$$, and $$\sigma\_a'$$ are recovered from the event as in Section 8.1. The recipient-auditor opening capability stated in Section 8.1 extends to spender-transfer inbound flows: $$r\_{\text{transfer}}$$ from spender-transfers contributes to $$r\_r$$ in $$C\_{\text{receive}}$$ identically to owner-transfer inbound flows.
+
+$$(\tilde{a}\_{\text{aud,s}}, \tilde{r}\_{\text{aud,s}})$$ open the post-transfer $$C\_a'$$, the state left on-chain.
 
 ### 8.5 Spender Allowance Auditing
 
@@ -117,15 +115,13 @@ The auditor tracks each allowance's current value from the per-event ciphertexts
 
 **Allowance opening.** The owner's auditor also receives the *blinding* of the allowance commitment each event writes: $$r\_a$$ under $$\delta\_{\text{esc\\\_allow\\\_r\\\_aud}}$$ at `set_spender` (S14, below) and $$r\_a'$$ in `lane[2]` at every spender transfer (O\_a9, §8.4). Paired with the value that event already publishes -- $$\tilde{v}\_{\text{aud,s}}$$ on `SetSpender`, $$\tilde{a}\_{\text{aud,s}}$$ on `SpenderTransfer` -- that is the full Pedersen opening of the $$C\_a$$ left on-chain, reconstructed from the event alone with no storage read. Unlike the spendable side there is no merge to fold in, since a delegation's only state transitions are the events themselves. This is what `revoke_spender` folds against: it publishes no ciphertext of its own (§7.9), and the auditor opens the $$C\_a$$ from whichever event last wrote it.
 
-**Auditor-side allowance-blinding escrow.** At `set_spender` the owner escrows $$r\_a$$ -- the blinding S6 derived and S7 committed under -- to its own auditor, not $$dvk\_i$$: $$dvk\_i$$ is permanent for the $$(owner, spender)$$ pair (§4.4), so one leaked ciphertext of it opens every allowance state that pair ever holds, where a leaked $$r\_a$$ costs one.
+**Auditor-side allowance-blinding escrow.** At `set_spender` the owner escrows $$r\_a$$ to its own auditor. A blinding is per state, so one leaked escrow ciphertext opens one allowance state.
 
 $$\tilde{r}\_{a,\text{aud,s}} = \text{Poseidon}(\delta\_{\text{esc\\\_allow\\\_r\\\_aud}}, s\_{a,s}, \text{op}\_i) + r\_a$$
 
 reusing the S\_a2 shared scalar $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$ rather than opening a new ECDH channel; §10.3 gives the cost. The auditor recovers $$s\_{a,s}$$ from $$k\_{\text{aud,s}}$$ and the event's $$R\_e$$, and $$\text{op}\_i$$ from the event's `spender` topic, then subtracts. Because the escrowed value is pinned to S6, the opening the auditor holds necessarily matches the $$C\_a$$ the same proof wrote.
 
-A single-output pad rather than a sponge lane, because `lane[2]` of this channel is already taken by the spendable blinding (S\_a6). Distinct tags separate the two despite the shared scalar, each confined to one sponge mode as DESIGN §2.5 *Mode exclusivity* requires. $$\text{op}\_i$$ is a per-$$(owner, spender)$$ constant, not a nonce, so this pad's freshness is inherited from $$r\_e$$ and hence from the salt -- the one derivation DESIGN §5.3 singles out on that ground. Re-delegating to the same spender under a reused salt would therefore republish a byte-identical ciphertext.
-
-**Key rotation.** Section 8.3 governs. What is allowance-specific is that no periodic checkpoint shortens the wait: a rotated-in key holds no opening for a live delegation until that delegation's next state-changing operation.
+It is a single-output pad because `lane[2]` of this channel is taken by the spendable blinding (S\_a6). Distinct tags separate the two despite the shared scalar, each confined to one sponge mode as DESIGN §2.5 *Mode exclusivity* requires. Its pad freshness is that of $$r\_e$$ (DESIGN §5.3 *Why reusing $$r\_e$$ is safe*).
 
 **Archive dependence.** The auditor must have *observed* the event: the escrowed blinding lives nowhere in contract storage, so an auditor that missed a delegation event cannot recover that opening from `a_tilde` and $$\sigma\_a$$ the way a $$dvk\_i$$ holder could. DESIGN.md §5.2 already makes a durable event archive normative; [INDEXER.md](./INDEXER.md) §7.1 states the operational consequences for auditor clients.
 
@@ -182,7 +178,7 @@ This invariant is maintained by:
 
 Two properties of that last capability deserve stating plainly. It is **retroactive**: the derivation is deterministic in $$(vk, \sigma)$$ and $$\sigma$$ is published, so a compromise today opens every transfer the account ever originated. And it **reaches outside the account's own state**: the commitments it opens were added to *recipients'* `receiving_commitment` values. The transfer *amounts* were already inferable from $$vk$$ alone, by differencing consecutive balance checkpoints and netting the inbound credits and merges between them, so amount visibility is not what changes; the openings are, and an opening is a self-verifying artifact that its holder can hand to any third party. This is why $$vk$$ cannot be treated as a safely shareable read-only credential ([SDK.md](./SDK.md) §13): a counterparty that needs visibility into an account's outbound transfers receives per-event disclosure proofs bound to it and to a nonce ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §7), not the key.
 
-**Auditor key compromise.** An account binds one key for both channels (Section 6.1), so a compromise is best read per account rather than per role. For every account that used the compromised key, the attacker acquires: all amounts and balance checkpoints; the standing opening of $$C\_{\text{spend}}$$ from the first post-activation checkpoint, maintained across merges exactly as Section 8.1 describes; the opening of $$C\_{\text{receive}}$$ between merges; and the escrowed allowance blinding $$r\_a$$ from every delegation event it observed, hence the opening of each $$C\_a$$ those events wrote (Section 8.5). It cannot recover viewing keys, read data from before the key was active, or authorize any spending. After key rotation, new operations are protected by the new key.
+**Auditor key compromise.** An account binds one key for both channels (Section 6.1). For every account that used the compromised key, the attacker acquires: all amounts and balance checkpoints; the standing opening of $$C\_{\text{spend}}$$ from the first post-activation checkpoint, maintained across merges exactly as Section 8.1 describes; the opening of $$C\_{\text{receive}}$$ between merges; and the escrowed allowance blinding $$r\_a$$ from every delegation event it observed, hence the opening of each $$C\_a$$ those events wrote (Section 8.5). It cannot recover viewing keys, read data from before the key was active, or authorize any spending. After key rotation, new operations are protected by the new key.
 
 As with $$vk$$ above, the openings are self-verifying artifacts a holder can hand to any third party, so an auditor key is custodied at the same level as a viewing key ([SDK.md](./SDK.md) §13).
 
@@ -258,7 +254,7 @@ The dominant cost in Noir circuits is elliptic curve scalar multiplication. With
 | `SpenderTransfer` | 8 | $$Y\_{\text{op}}$$ (O1), $$C\_a$$ opening (O2), recipient ECDH (O5), $$R\_e$$ (O6), $$C\_{\text{transfer}}$$ (O8), $$C\_a'$$ (O11), recipient-auditor ECDH (O\_a1), owner-auditor ECDH (O\_a5) |
 | `SetSpender` | 7 | $$Y$$ (S1), $$C\_{\text{spend}}$$ opening (S3), $$C\_a$$ (S7), $$C\_{\text{spend}}'$$ (S10), $$R\_e$$ (S\_a1), $$dvk\_i$$ escrow ECDH (S12, §7.11), owner-auditor ECDH (S\_a2) |
 
-`SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of §7.11 reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The auditor-side escrow of the allowance blinding $$r\_a$$ (S14) reuses the S\_a2 shared scalar and adds a Poseidon evaluation, not a call. The `lane[2]` escrows (W\_a5, T\_a9, S\_a6, O\_a9) read `lane[2]` of a permutation each circuit already computes and cost one field addition apiece. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`: `Register` 33, `Withdraw` 95, `Transfer` 134, `SetSpender` 135, `SpenderTransfer` 136.
+`SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of §7.11 reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The auditor-side escrow of the allowance blinding $$r\_a$$ (S14) reuses the S\_a2 shared scalar and adds one Poseidon evaluation. The `lane[2]` escrows (W\_a5, T\_a9, S\_a6, O\_a9) read `lane[2]` of a permutation each circuit already computes and cost one field addition apiece. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`: `Register` 33, `Withdraw` 95, `Transfer` 134, `SetSpender` 135, `SpenderTransfer` 136.
 
 The ECDH computations add scalar multiplications compared to a random-blinding scheme, but the unchunked design eliminates all per-chunk constraints (which, in a chunked scheme, would involve 8+ scalar multiplications for balance chunks and per-chunk range proofs).
 
@@ -327,7 +323,7 @@ fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> Field {
 4. Verifier deserializes stored VK, runs UltraHonk verification (BN254 G1/G2 pairings, Fiat-Shamir, sumcheck)
 5. Contract applies homomorphic balance updates (Grumpkin point arithmetic via $$\mathbb{F}\_r$$ ops)
 
-The proofless operations (`deposit`, `merge`, `revoke_spender`) perform step 5 only. The verifier is oblivious to which circuit a key belongs to: it verifies the supplied proof against whatever key is stored under the supplied `CircuitType`, which is why the key set and the enum must be deployed together (§10.1).
+The proofless operations (`deposit`, `merge`, `revoke_spender`) perform step 5 only.
 
 ### 10.6 Structured Reference String
 
@@ -546,7 +542,7 @@ Each $$\delta$$ is a small positive integer in $$\mathbb{F}\_r$$, fixed for the 
 | $$\delta\_{\text{disc}}$$ | 16 | Disclosure ciphertext to the disclosure recipient ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §4) |
 | $$\delta\_{\text{esc\\\_allow\\\_r\\\_aud}}$$ | 17 | Allowance-blinding escrow to the owner's auditor (S14, §8.5) |
 
-This table assigns all seventeen values; no other document assigns them. Tags 14–16 are never absorbed inside a core circuit — 14 is derived off-circuit (DESIGN.md §5.3 makes its derivation normative for every operation whose originator holds a viewing key), and 15–16 belong to the off-chain selective-disclosure layer ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §2.2) — so they are not part of the on-chain wire contract; `circuits/lib/src/lib.nr` accordingly implements 1–13 and 17. All seventeen values MUST still be distinct and each MUST be confined to a single sponge mode, so a deployment treats them as one namespace. Tag 17 is assigned out of sequence with its neighbours because it was added after 14–16. It takes its own tag rather than reusing $$\delta\_{\text{esc\\\_dvk}}$$ because the two escrows key off different shared scalars ($$Y\_{\text{op}}$$ vs $$K\_{\text{aud,s}}$$), which is the distinct-domain leg of §5.3's *Why reusing $$r\_e$$ is safe*. It shares its shared scalar with $$\delta\_{\text{aud\\\_s}}$$ instead; the tag separation is stated in §8.5; per-tag mode exclusivity is DESIGN.md §2.5 *Mode exclusivity*.
+This table assigns all seventeen values; no other document assigns them. Tags 14–16 are never absorbed inside a core circuit — 14 is derived off-circuit (DESIGN.md §5.3 makes its derivation normative for every operation whose originator holds a viewing key), and 15–16 belong to the off-chain selective-disclosure layer ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §2.2) — so they are not part of the on-chain wire contract; `circuits/lib/src/lib.nr` accordingly implements 1–13 and 17. All seventeen values MUST still be distinct and each MUST be confined to a single sponge mode, so a deployment treats them as one namespace. Tag 17's construction is specified in §8.5.
 
 **Provenance.** Sequential small integers are the simplest assignment that satisfies the requirement of *distinctness* across all Poseidon2 invocations in this protocol -- §3.2 models Poseidon2 as a pseudorandom function, so evaluations whose leading input differs are computationally independent. Distinctness alone is not sufficient: each tag must also be confined to a single sponge mode, since the multi-lane forms of §2.5 share `lane[0]` with the single-output form on the same inputs; $$\delta\_{\text{aud\\\_s}}$$ is the one tag ever squeezed three-wide, and the widths it is read at agree on their shared lanes (§2.5 *Mode exclusivity*). The values themselves carry no semantic meaning; the binding is purely positional and the table is the only authoritative source. Implementations MUST hardcode these exact numeric values.
 

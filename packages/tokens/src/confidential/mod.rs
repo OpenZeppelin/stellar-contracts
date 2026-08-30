@@ -204,8 +204,6 @@ pub trait Hooks {
     }
 
     /// Invoked after `revoke_spender`'s auth, before the allowance fold.
-    /// `revoke_spender` is proofless and carries no `data`, so this hook
-    /// receives no payload.
     fn on_revoke_spender(e: &Env, account: &Address, spender: &Address) {}
 }
 
@@ -432,8 +430,7 @@ pub trait ConfidentialToken {
     /// * `live_until_ledger` - The ledger number at which the delegation
     ///   expires. Spending is authorized while `ledger.sequence() <=
     ///   live_until_ledger`. The escrowed value persists until
-    ///   [`ConfidentialToken::revoke_spender`] — expiry blocks spending, never
-    ///   reclamation.
+    ///   [`ConfidentialToken::revoke_spender`].
     /// * `data` - XDR-encoded [`SetSpenderData`].
     ///
     /// # Errors
@@ -472,8 +469,7 @@ pub trait ConfidentialToken {
     /// Works for both active and expired-but-not-revoked delegations.
     ///
     /// No proof is required; correctness follows from the homomorphic
-    /// property of Pedersen commitments, exactly as for
-    /// [`ConfidentialToken::merge`].
+    /// property of Pedersen commitments.
     ///
     /// # Arguments
     ///

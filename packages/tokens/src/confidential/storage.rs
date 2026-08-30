@@ -943,21 +943,8 @@ pub fn set_spender(
 /// Revokes the `(owner, spender)` delegation: folds the escrowed allowance
 /// commitment `C_a` back into `owner`'s spendable commitment and deletes the
 /// delegation entry. Works for both active and expired-but-not-revoked
-/// delegations.
-///
-/// **No proof is required.** The fold is pure homomorphic addition, exactly
-/// like [`merge`] (DESIGN §7.4): nothing is re-randomized and no private
-/// value is asserted. The escrowed amount was range-proven when the
-/// delegation was created and re-bounded on every spender transfer, and the
-/// next spend re-bounds the result — the same posture [`merge`] accepts.
-///
-/// The owner's post-revoke opening is `(v_s + v_a, r_s + r_a)`, recoverable
-/// from the emitted `a_tilde` and `allowance_salt` plus the owner's viewing
-/// key. The owner's auditor recovers the same pair from its own channel: `r_a`
-/// from the allowance-blinding escrow (constraint S14 at `set_spender`, the
-/// `lane[2]` slot O_a9 at a spender transfer) and `v_a` from the amount
-/// ciphertext that same event published, subject to the rotation condition in
-/// DESIGN_cont §8.3.
+/// delegations. The fold and the openings it yields to the owner and the
+/// auditor are specified in DESIGN §7.9 and DESIGN_cont §8.5.
 ///
 /// # Arguments
 ///
@@ -976,12 +963,6 @@ pub fn set_spender(
 ///
 /// * topics - `["revoke_spender", account: Address, spender: Address]`
 /// * data - `[a_tilde: BytesN<32>, allowance_salt: BytesN<32>]`
-///
-/// # Notes
-///
-/// The event carries `a_tilde` and `allowance_salt` because this call deletes
-/// the entry that held them; DESIGN §7.9 states why each is needed and what
-/// emitting it costs.
 ///
 /// # Security Warning
 ///
