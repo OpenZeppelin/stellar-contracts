@@ -119,15 +119,19 @@ $$\text{ECDH}(a, B) = \text{poseidon\\\_with\\\_domain}(\delta_{\text{ecdh}}, [S
 
 The derivation MUST fail rather than proceed if $$S$$ is the identity: with $$\sigma$$ public, an identity shared secret makes every derived ciphertext trivially decryptable, which is why the circuits carry explicit nonzero-scalar constraints (DESIGN_cont.md §10.8).
 
-### 4.6 Blinding accumulation — mod $$q$$, never mod $$r$$
+### 4.6 Blinding accumulation
 
-Commitment blinding factors accumulate under homomorphic point addition, so they accumulate in the **Grumpkin scalar field** $$\mathbb{F}_q$$ (§4.1):
+Commitment blinding factors compose under homomorphic point addition, so their arithmetic is that of the **Grumpkin scalar field** $$\mathbb{F}_q$$ (§4.1):
 
 $$\text{Com}(v_1, r_1) + \text{Com}(v_2, r_2) = \text{Com}(v_1 + v_2, \\, (r_1 + r_2) \bmod q)$$
 
-Reducing modulo $$r$$ instead yields an opening that is off by $$q - r$$ and no longer matches the on-chain point, and for two full-size blindings the integer sum crosses $$q$$ roughly half the time. Implementations MUST provide distinct, clearly named addition operations for the two moduli and MUST use the $$\mathbb{F}_q$$ one for every blinding accumulation: merge (DESIGN.md §7.4) and receiving-balance credit (DESIGN.md §5.2 *Update rules*).
+Reducing modulo $$r$$ instead yields an opening that is off by $$q - r$$ and no longer matches the on-chain point, and for two full-size blindings the integer sum crosses $$q$$ roughly half the time. Implementations MUST provide distinct, clearly named reduction operations for the two moduli.
 
-Committed **values** accumulate as exact integers and MUST NOT be reduced by either modulus; DESIGN.md §2.3 establishes that they never wrap.
+**One reduction point.** An implementation MUST fold blindings with unbounded integer addition and MUST NOT reduce by either modulus as folds compose. This governs merge (DESIGN.md §7.4), the `RevokeSpender` and `Clawback` folds, and receiving-balance credit (DESIGN.md §5.2 *Update rules*) alike.
+
+An implementation MUST reduce modulo $$q$$ to the canonical representative only where a blinding leaves an accumulator for the curve: a proof witness, or the recommit of the §10.6 consistency check. §10.7 tests for encodability at that same point.
+
+Committed **values** accumulate as exact integers and are never reduced; DESIGN.md §2.3 establishes that they never wrap.
 
 ### 4.7 Scalar sampling
 
@@ -371,7 +375,7 @@ Separating the first two matters most: they present as the same opaque failure o
 
 ### 10.1 State model
 
-The wallet maintains the two accumulators of DESIGN.md §5.2 — $$W_{\text{spend}}$$ and $$W_{\text{receive}}$$ — plus a sync position and any in-flight projection (§10.3). Values accumulate as exact integers; blindings accumulate modulo $$q$$ (§4.6).
+The wallet maintains the two accumulators of DESIGN.md §5.2 — $$W_{\text{spend}}$$ and $$W_{\text{receive}}$$ — plus a sync position and any in-flight projection (§10.3). Values and blindings alike accumulate as exact integers; a blinding is reduced modulo $$q$$ only where it leaves an accumulator for the curve (§4.6).
 
 Persistence MUST be pluggable, since the same core serves environments with very different storage. With RPC-only event access, discarding persisted state loses the receiving-side openings permanently (§10.9), so it MUST NOT be treated as an evictable cache.
 
@@ -430,11 +434,11 @@ Implementations MUST report which accumulator diverged, since the two have diffe
 
 ### 10.7 The unspendable-blinding case
 
-A post-merge spendable blinding can land outside the range a Noir `Field` encodes, leaving no constructible proof against the affected commitment while on-chain state stays well-formed and §10.6's check still passes (DESIGN_cont.md §10.4 *Post-merge witness availability*).
+$$W_{\text{spend}}.r$$ is an exact integer, but a proof witnesses it as a single $$\mathbb{F}_r$$ `Field`. After any of the three proofless folds — `Merge`, `RevokeSpender`, `Clawback` — its canonical $$\mathbb{F}_q$$ representative can land in $$[r, q)$$, which no `Field` encodes, so no proof can be constructed against that commitment. The state itself is sound: the commitment is a well-formed Grumpkin point, and §10.6's check recommits from the same representative and still passes (DESIGN_cont.md §10.4 *Post-merge witness availability*).
 
-An implementation MUST detect this condition and surface it as a distinct, named state rather than as a generic proof-construction failure.
+An implementation MUST test the reduction rather than the accumulator: before attempting a proof, reduce $$W_{\text{spend}}.r$$ modulo $$q$$ at §4.6's reduction point and compare the representative against $$r$$. The unreduced accumulator carries no signal: after a few folds an integer sum past $$r$$ is the ordinary case.
 
-It MUST also surface the recovery path: the condition resolves at the next merge that folds in an inbound confidential transfer, and an account whose only inflows are deposits stays affected until one arrives (DESIGN_cont.md §10.4 *Soft recovery*).
+A failed comparison MUST surface as a distinct, named state rather than as a generic proof-construction failure. The recovery path MUST surface with it: the condition resolves at the next merge that folds in an inbound confidential transfer, and an account whose only inflows are deposits stays affected until one arrives (DESIGN_cont.md §10.4 *Soft recovery*).
 
 ### 10.8 Merge policy
 
