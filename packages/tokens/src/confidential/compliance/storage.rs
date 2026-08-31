@@ -35,18 +35,8 @@ pub struct ComplianceConfig {
 
 /// Envelope decoded from the `data: Bytes` argument of
 /// [`crate::confidential::compliance::ConfidentialClawback::clawback`].
-///
-/// The other five operations carry a `{ payload, proof }` envelope. Clawback
-/// carries the proof alone, because the clawback circuit has no
-/// prover-supplied public inputs at all — the Pedersen openings are private
-/// witnesses, and every public input is either loaded from trusted state or
-/// recomputed from the invocation arguments. There is nothing for a payload
-/// to hold, and Soroban has no representation for an empty `#[contracttype]`
-/// struct.
-///
-/// Keeping the envelope rather than taking `proof: Bytes` directly preserves
-/// the uniform `data: Bytes` trait surface and leaves room to add a `payload`
-/// field later without changing any signature.
+/// Carries the proof alone: the clawback circuit has no prover-supplied
+/// public inputs, so there is no payload to accompany it.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClawbackData {
@@ -199,42 +189,17 @@ pub fn unfreeze(e: &Env, account: &Address) {
 /// Reduces `account`'s confidential claim by `amount` and settles the
 /// corresponding underlying according to `destination`.
 ///
-/// The proof establishes three things the contract cannot check itself, since
-/// the balances are committed: that the prover knows the Pedersen openings of
-/// both `C_spend` and `C_receive` (CB1, CB2), and that the seize is bounded by
-/// what those openings hold, `amount <= v_spend + v_receive` (CB3). The
-/// witness is producible by anyone holding the openings — the auditor, or the
-/// owner — and *not* by the admin, which holds no blinding. That asymmetry is
-/// what keeps the two-party separation intact: the compliance authority
-/// decides *whether* to seize, the auditor decides *how much* and *where to*.
+/// The proof establishes what the contract cannot check against committed
+/// balances: that the prover knows the Pedersen openings of `C_spend` and
+/// `C_receive` (CB1, CB2), and that `amount <= v_spend + v_receive` (CB3).
+/// The witness is producible by anyone holding the openings — the auditor, or
+/// the owner — and not by the admin, which holds no blinding.
 ///
 /// The post-verification update is the [`crate::confidential::storage::merge`]
 /// rule plus a public debit — `C_spend <- C_spend + C_receive - amount * G`
-/// and `C_receive <- O` — with no
-/// fresh randomness anywhere. The new opening is
-/// `(v_s + v_r - amount, r_s + r_r)`, which both the owner and the auditor can
-/// recompute — **the seized account stays spendable**. Re-randomizing under an
-/// admin-chosen blinding instead would leave the owner unable to open its own
-/// commitment and brick the account permanently.
-///
-/// # Settlement
-///
-/// Under `None` no underlying moves: the pool is left over-collateralized by
-/// `amount`, inert (nothing in this contract reads its own pooled balance) and
-/// extractable only by the underlying's own issuer, through a SAC `clawback`
-/// against this contract's address. **That extraction must follow this call,
-/// never precede it.** Seize-then-extract passes through surplus, which is
-/// harmless; extract-then-seize passes through *deficit*, which is borne by
-/// every other holder and becomes permanent if the seize then turns out to be
-/// unbuildable. `None` therefore means "no on-chain settlement from this
-/// contract", not "the issuer has already extracted".
-///
-/// Under `Some(d)`, exactly `amount` is transferred to `d` in this invocation,
-/// so the pool and the sum of claims move together and the issuer is not
-/// involved. This branch re-inherits the module's exact-transfer assumption
-/// and couples the seizure to this contract's own SAC authorization — an
-/// issuer that deauthorizes the contract blocks it entirely. A deployment that
-/// needs seizures to survive that must use `None`.
+/// and `C_receive <- O` — with no fresh randomness. The new opening is
+/// `(v_s + v_r - amount, r_s + r_r)`, which both the owner and the auditor
+/// recompute, so the seized account stays spendable.
 ///
 /// # Arguments
 ///
@@ -264,17 +229,19 @@ pub fn unfreeze(e: &Env, account: &Address) {
 ///
 /// # Notes
 ///
-/// On the `Some(d)` branch the confidential debit strictly precedes the SEP-41
-/// transfer, matching [`crate::confidential::storage::withdraw`]'s
-/// debit-then-transfer order. Soroban reverts the invocation atomically, so
-/// the order does not affect atomicity; it keeps one convention across the two
-/// functions that both reduce a claim and move the underlying behind it.
+/// Under `None` no underlying moves: the pool is left over-collateralized by
+/// `amount`, extractable only by the underlying's own issuer through a SAC
+/// `clawback` against this contract's address. That extraction must follow
+/// this call.
+///
+/// Under `Some(d)`, exactly `amount` is transferred to `d` in this invocation,
+/// so the pool and the sum of claims move together.
 ///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait entry
 /// point [`crate::confidential::compliance::ConfidentialClawback::clawback`]
-/// owns the admin gate.
+/// is responsible for authorizing `operator`.
 pub fn clawback(
     e: &Env,
     account: &Address,
@@ -288,18 +255,14 @@ pub fn clawback(
     if amount <= 0 {
         panic_with_error!(e, ComplianceError::InvalidClawbackAmount);
     }
-    // A seize settling to this contract's own address is a `None` in economic
-    // effect while reporting a destination, which breaks the per-branch pool
-    // reconciliation for any indexer.
     if destination.as_ref() == Some(&e.current_contract_address()) {
         panic_with_error!(e, ComplianceError::InvalidClawbackDestination);
     }
 
     let data = get_account(e, account);
     let addr_f = get_address_as_field_element(e);
-    // `dest_f` is the zero field under `None`. Unambiguous as a sentinel:
-    // `address_to_field` is a Poseidon2 output, so reaching exactly zero
-    // would be a preimage attack on the hash.
+    // Zero is an unambiguous `None` sentinel: `address_to_field` is a
+    // Poseidon2 output.
     let dest_f = match destination {
         Some(d) => address_to_field(e, d),
         None => BytesN::from_array(e, &[0u8; 32]),
@@ -308,11 +271,9 @@ pub fn clawback(
     // PI order (COMPLIANCE §5.3):
     //   C_spend, C_receive, alpha, addr_f, acct_f, dest_f
     //
-    // `addr_f`, `acct_f` and `dest_f` are referenced by no constraint. Their
-    // membership in the public-input set *is* the binding — UltraHonk absorbs
-    // every public input into the transcript — following the `register`
-    // precedent (`_acct_f`). It binds the proof to one contract, one account,
-    // and one settlement destination.
+    // `addr_f`, `acct_f` and `dest_f` are referenced by no constraint; their
+    // membership in the public-input set binds the proof to one contract, one
+    // account, and one settlement destination, on the `register` precedent.
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &data.spendable_commitment);
     append_point(&mut pi, &data.receiving_commitment);
@@ -323,7 +284,6 @@ pub fn clawback(
 
     verify(e, CircuitType::Clawback, &pi, proof);
 
-    // `amount as u128` is safe: `amount > 0` was checked above.
     let seized = Grumpkin::mul(e, &Grumpkin::generator(e), amount as u128);
     let c_spend_new = Grumpkin::sub(
         e,
@@ -345,7 +305,7 @@ pub fn clawback(
 /// owner's participation.
 ///
 /// Escrowed value is invisible to [`clawback`], which sees only `C_spend` and
-/// `C_receive`; this is what moves it into reach. The fold itself is the same
+/// `C_receive`; this moves it into reach. The fold itself is the same
 /// proofless primitive the owner's
 /// [`revoke_spender`](crate::confidential::ConfidentialToken::revoke_spender)
 /// uses — only the authorization gate differs.
@@ -371,7 +331,7 @@ pub fn clawback(
 /// **IMPORTANT**: This function bypasses authorization checks. The trait entry
 /// point
 /// [`crate::confidential::compliance::ConfidentialClawback::force_revoke_spender`]
-/// owns the admin gate.
+/// is responsible for authorizing `operator`.
 pub fn force_revoke_spender(e: &Env, account: &Address, spender: &Address) {
     if !is_frozen(e, account) {
         panic_with_error!(e, ComplianceError::AccountNotFrozen);

@@ -26,7 +26,7 @@ It appears in all fourteen package `Nargo.toml` files — the workspace manifest
 
 ### Do not prune unused public inputs
 
-`_acct_f` in `register/src/main.nr` is referenced by no gate and looks like dead code. It is the replay binding: UltraHonk absorbs every public input into the transcript, so a proof produced for one account fails when the contract assembles the blob for another. Removing it lets anyone replay a legitimate registration's published proof and payload to mint duplicate-key accounts. `clawback/src/main.nr` carries three such bindings — `addr_f`, `_acct_f`, `_dest_f` — and `_dest_f` is what stops a compromised clawback signer from settling a witness to a destination of its own choosing. Each operation circuit declares its exact public-input count in a header comment — clawback 8, withdraw 16, transfer / spender_transfer 25, set_spender 26 — and the count is part of the contract with the on-chain assembler.
+`_acct_f` in `register/src/main.nr` is referenced by no gate and looks like dead code. It is the replay binding: UltraHonk absorbs every public input into the transcript, so a proof produced for one account fails when the contract assembles the blob for another. Removing it lets anyone replay a legitimate registration's published proof and payload to mint duplicate-key accounts. `clawback/src/main.nr` carries three such bindings — `addr_f`, `_acct_f`, `_dest_f` — and removing `_dest_f` lets a compromised clawback signer settle a witness to a destination of its own choosing. Each operation circuit declares its exact public-input count in a header comment — clawback 8, withdraw 16, transfer / spender_transfer 25, set_spender 26 — and the count is part of the contract with the on-chain assembler.
 
 ### Package names are load-bearing
 

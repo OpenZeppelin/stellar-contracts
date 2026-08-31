@@ -1144,15 +1144,11 @@ pub fn set_address_as_field_element(e: &Env) {
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function performs no authorization check, consumes no
-/// proof, and verifies no conservation property. A caller that reaches it
-/// without a verified proof can write arbitrary commitments — inflating any
-/// balance or zeroing anyone's. Establishing that the write preserves balance
-/// conservation (DESIGN_cont §9.3) is entirely the caller's obligation.
-///
-/// It exists solely for the compliance module's clawback flow
+/// proof, and verifies no conservation property. Establishing that the write
+/// preserves balance conservation (DESIGN_cont §9.3) is the caller's
+/// obligation. It exists for the compliance module's clawback flow
 /// ([`crate::confidential::compliance::storage::clawback`]), which discharges
-/// that obligation in-circuit before calling, and its visibility is
-/// deliberately crate-internal.
+/// that obligation in-circuit before calling.
 pub(crate) fn set_commitments(e: &Env, account: &Address, c_spend: &Point, c_receive: &Point) {
     let mut data = get_account(e, account);
     data.spendable_commitment = c_spend.clone();

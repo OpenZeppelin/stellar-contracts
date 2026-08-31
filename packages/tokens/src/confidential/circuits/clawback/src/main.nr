@@ -7,8 +7,7 @@ mod tests;
 // Proves that a compliance seizure of the public amount `alpha` is bounded by
 // what the target actually holds, without revealing either balance. It is the
 // only circuit in the system with no key-ownership constraint and no `r_e`:
-// both openings are pinned by Pedersen binding directly, so there is nothing
-// left to forge and nothing to pin.
+// both openings are pinned by Pedersen binding directly.
 //
 // Constraints
 // -----------
@@ -18,41 +17,21 @@ mod tests;
 //                                            target's receiving commitment.
 //   CB3 v_s, v_r, alpha, and
 //       v_s + v_r - alpha in [0, 2^127)      The seize bound (Section 2.6).
-//                                            The final term is the
-//                                            soundness-critical one: it is
-//                                            what makes
-//                                            alpha <= v_s + v_r, and without
-//                                            it an over-seize would drive the
-//                                            committed value negative mod F_r
-//                                            -- openable arithmetically but
-//                                            never again satisfiable under
-//                                            W4 / T4, i.e. an unspendable
-//                                            account.
-//
-// Who can produce this witness
-// ----------------------------
-// Anyone holding both Pedersen openings: the auditor, which tracks them
-// forward from the sender-auditor secret-escrow slot (W_a5 / T_a9 / S_a6), or
-// the owner, which derives them from `vk`. **Not the compliance admin**, which
-// holds no blinding. That asymmetry is the whole of COMPLIANCE.md Section
-// 5.2's "neither party can act alone": the admin decides whether to seize, the
-// witness-holder decides how much and where to. A colluding owner supplying
-// the witness is harmless -- it is the party being seized from.
+//                                            The final term establishes
+//                                            alpha <= v_s + v_r.
 //
 // Identity encoding
 // -----------------
 // The circuit MUST accept (0, 0) as the identity for either commitment, opened
-// as (0, 0). `C_receive = O` whenever the target has nothing pending, which is
-// the common case. `commit(0, 0)` returns the identity point, whose
-// `EmbeddedCurvePoint` encoding has x = y = 0, so the equality checks below
-// hold without a special case.
+// as (0, 0). `C_receive = O` whenever the target has nothing pending.
+// `commit(0, 0)` returns the identity point, whose `EmbeddedCurvePoint`
+// encoding has x = y = 0, so the equality checks below hold without a special
+// case.
 //
-// Point-validation doctrine (Section 10.8)
+// Point-validation
 // ----------------------------------------
 // C_spend and C_receive are the only points, and both are bound to in-circuit
 // multi_scalar_mul outputs (CB1, CB2), so they are on-curve by construction.
-// There is no public-input key to validate: the circuit consumes no auditor
-// key, no spending key, and no ephemeral.
 //
 // Public inputs (8 fields, in COMPLIANCE.md Section 5.3 canonical order)
 // ----------------------------------------------------------------------
@@ -74,19 +53,8 @@ mod tests;
 //                                    computed per-call.
 //
 // `addr_f`, `_acct_f`, and `_dest_f` are referenced by no gate and look like
-// dead parameters. They are the bindings, on the `register/_acct_f` precedent:
-// UltraHonk absorbs every public input into the transcript, so a proof
-// produced against one contract, account, or settlement destination fails when
-// the contract assembles the blob for another. Removing `_dest_f` in
-// particular would turn a compromised clawback signer from a griefer into a
-// thief -- it could take a witness the auditor built for one destination and
-// settle it to an address of its own choosing. Do not prune them.
-//
-// The first two additionally cover the degenerate case of two accounts whose
-// commitments are both O. Anti-replay comes from C_spend and C_receive
-// themselves: both change on a successful seize, so a proof never verifies
-// twice -- which holds only because the contract rejects alpha = 0, the sole
-// state-preserving case (C_receive = O together with alpha = 0).
+// dead parameters: their presence in the public-input set is the binding, on
+// the `register/_acct_f` precedent.
 //
 // Private witnesses
 // -----------------
@@ -124,8 +92,7 @@ fn main(
     assert(c_receive_derived.y == c_receive_y);
 
     // CB3 -- Section 2.6's 127-bit decomposition / recomposition pattern.
-    // The sum check is the soundness-critical step: v_s and v_r each in range
-    // does not bound their difference from alpha.
+    // Range on v_s and v_r alone does not bound v_s + v_r - alpha.
     v_s.assert_max_bit_size::<127>();
     v_r.assert_max_bit_size::<127>();
     alpha.assert_max_bit_size::<127>();

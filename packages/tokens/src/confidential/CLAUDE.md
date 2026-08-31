@@ -72,7 +72,7 @@ The tags are a cross-language wire contract. `DESIGN_cont.md` §13 is their only
 
 Every sentence is a maintenance liability: a claim written twice has to be fixed twice, and the second copy is the one that goes stale. Doc work here trends net-negative in lines.
 
-- **One owning section per claim.** Every fact has exactly one home; everywhere else writes `§N`. When tempted to summarise a neighbouring section for the reader's convenience, cite it instead;
+- **One owning section per claim.** Every fact has exactly one home; everywhere else writes `§N`. When tempted to summarise a neighbouring section for the reader's convenience, cite it instead.
 - **Say it once, then move on.** No second-register restatement, no paragraph-closing punchline, no recap of the section's own argument in its last sentence. If a paragraph's content survives deleting it, delete it.
 - **Gloss a symbol at its definition site only.** Re-glossing `s` or `r_e` in each section that uses them is three more places to update when a name changes.
 - **No pre-stating.** A `Note:` or lead-in that previews what the next paragraph spells out in full is a duplicate. Fold it into the argument.

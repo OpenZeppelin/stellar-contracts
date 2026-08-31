@@ -58,7 +58,7 @@ The capability is bounded in three ways:
 - **Carried through `revoke_spender`.** The revoke is a public homomorphic fold, $$C\_{\text{spend}}' = C\_{\text{spend}} + C\_a$$, emitting no new checkpoint (Section 7.9). An auditor that decrypted the delegation's last state-changing event holds the opening of the $$C\_a$$ being folded (Section 8.5) and advances its own opening by the same addition the contract performs.
 - **Rotation-scoped.** Both folds above depend on the auditor having decrypted the event that produced the addend; Section 8.3 *Decryption capability across rotation* states what a rotated key can and cannot open.
 
-These bounded openings are what the clawback flow specified in [COMPLIANCE.md](./COMPLIANCE.md) §5 draws its witness from.
+The clawback flow specified in [COMPLIANCE.md](./COMPLIANCE.md) §5 draws its witness from these bounded openings.
 
 ### 8.2 Auditor Visibility Properties
 
@@ -189,7 +189,7 @@ The recovery procedure, the definition of the **checkpoint** it is built around,
 
 **Why the two anchors compose.** No `Merge` or `Clawback` falls strictly between $$T\_0$$ and the checkpoint, by construction of $$T\_0$$ as the last of either at or before it. Within $$(T\_0, \text{checkpoint}]$$ the only spendable-affecting events are therefore checkpoint events and `RevokeSpender` folds, and the latest checkpoint's $$(\tilde{b}, \sigma)$$ supersedes both — which is why the replay skips them ([DESIGN.md](./DESIGN.md) §5.2 *Recovery*, step 6). Any `Merge` the replay encounters necessarily sits after the checkpoint and is folded normally, against the receiving opening it actually consumed.
 
-**Recoverability.** An owner who holds $$vk$$ reconstructs both openings deterministically from the account's event history, so the loss of local wallet state is not a loss of funds. The single-lookup shortcut on the spendable side is sound rather than merely convenient: each checkpoint's $$\tilde{b}$$ is bound to the $$C\_{\text{spend}}$$ it certifies by the emitting operation's own proof (W7, T12, S11), so a checkpoint cannot misreport the balance the wallet restarts from. Beyond the event history and the on-chain commitments, recovery requires nothing from the auditor, from counterparties, or from the contract admin.
+**Recoverability.** An owner who holds $$vk$$ reconstructs both openings deterministically from the account's event history, so the loss of local wallet state is not a loss of funds. The single-lookup shortcut on the spendable side is sound: each checkpoint's $$\tilde{b}$$ is bound to the $$C\_{\text{spend}}$$ it certifies by the emitting operation's own proof (W7, T12, S11), so a checkpoint cannot misreport the balance the wallet restarts from. Beyond the event history and the on-chain commitments, recovery requires nothing from the auditor, from counterparties, or from the contract admin.
 
 **Integrity fails closed.** The event archive is trusted for availability, not for integrity. Recovery terminates in a consistency check against the on-chain commitments ([DESIGN.md](./DESIGN.md) §5.2 *Recovery*, step 7) and Pedersen commitments are binding (Section 2.3), so a tampered or truncated history cannot yield an opening that verifies against a balance the account does not hold — it yields a detectable mismatch. The residual risk is therefore denial of recovery, a liveness failure, rather than silent corruption of the reconstructed balance. [INDEXER.md](./INDEXER.md) §7 specifies the archive's trust model and the client-side checks that follow from it.
 
@@ -436,7 +436,7 @@ trait ConfidentialToken {
 
 A deployment that enables the optional compliance extension adds `compliance: Option<ComplianceConfig>` to this constructor and the freeze, configuration-rotation, read, and — when it opts into `ConfidentialClawback` — seizure entry points of [COMPLIANCE.md](./COMPLIANCE.md) §6 to this interface. The admin-gated ones are authorized by the deployment's own access-control module.
 
-**Hooks.** Every entry point invokes the deployment's `Hooks` implementation after authorization and payload decoding and before the storage-layer operation. Hooks for operations that carry `data` receive the decoded payload by reference; the proofless `on_deposit`, `on_merge`, and `on_revoke_spender` receive none. The two seizure entry points, `clawback` and `force_revoke_spender`, invoke no hook, since their precondition — a frozen target — is exactly what a gating hook rejects ([COMPLIANCE.md](./COMPLIANCE.md) §5).
+**Hooks.** Every entry point invokes the deployment's `Hooks` implementation after authorization and payload decoding and before the storage-layer operation. Hooks for operations that carry `data` receive the decoded payload by reference; the proofless `on_deposit`, `on_merge`, and `on_revoke_spender` receive none. The two seizure entry points, `clawback` and `force_revoke_spender`, invoke no hook, since a gating hook rejects exactly their precondition — a frozen target ([COMPLIANCE.md](./COMPLIANCE.md) §5).
 
 This table is authoritative: every entry is exactly the set of prover-supplied public inputs from the corresponding Section 7 operation (the contract loads the remaining public inputs from trusted state per §7.1), plus the `proof` blob. Names map directly to the Section 7 symbols.
 

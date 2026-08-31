@@ -12,9 +12,8 @@
 //!    token entry point against the active configuration. Wire as `type Hooks =
 //!    ComplianceHooks;` on a contract that implements [`ConfidentialToken`].
 //! 2. [`ConfidentialCompliance`] — the admin-facing trait.
-//! 3. [`ConfidentialClawback`] — the opt-in seizure trait. Omitting its impl
-//!    block is how a deployment ships freeze and policy gating without seizure
-//!    capability.
+//! 3. [`ConfidentialClawback`] — the opt-in seizure trait. Omit its impl block
+//!    to ship freeze and policy gating without seizure capability.
 //! 4. [`Policy`] — the cross-contract interface for an external allowlist /
 //!    denylist / KYC / sanctions registry.
 //! 5. Storage helpers in [`storage`].
@@ -171,14 +170,13 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 // ################## CLAWBACK TRAIT ##################
 
 /// Opt-in seizure interface. A deployment that wants freeze and policy gating
-/// but no seizure capability simply omits this impl block — a compile-time
-/// choice with no storage, no configuration, and no misconfiguration mode.
+/// but no seizure capability omits this impl block.
 ///
 /// Both methods follow the [`ConfidentialCompliance`] pattern: no default
 /// body, so the contract author must supply the access-control check
 /// explicitly. Both require the target to be frozen, and neither consults the
-/// [`Hooks`] impl — gating them would be self-defeating, since the freeze gate
-/// rejects exactly the accounts these methods exist to act on.
+/// [`Hooks`] impl, whose freeze gate would reject exactly the accounts these
+/// methods act on.
 ///
 /// # Security Warning
 ///
@@ -190,14 +188,12 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 /// [`NoHooks`](crate::confidential::NoHooks) alongside this impl block gets a
 /// `freeze` that writes the flag and an `is_frozen` that returns `true`, so
 /// the precondition passes — while every token operation stays ungated and
-/// the target spends its balance out before the seizure lands. The freeze is
-/// then satisfied and meaningless, and the admin's only signal is an
-/// `InvalidProof` once the commitment has moved.
+/// the target spends its balance out before the seizure lands. The admin's
+/// only signal is an `InvalidProof` once the commitment has moved.
 ///
-/// Wiring [`ComplianceHooks`], or a custom [`Hooks`] impl that gates the same
-/// seven positions (`on_deposit`, `on_merge`, `on_withdraw`, `on_transfer`,
-/// `on_spender_transfer`, `on_set_spender`, `on_revoke_spender`), is a
-/// **deployment obligation** of this trait.
+/// Wiring [`ComplianceHooks`], or a custom [`Hooks`] impl that gates the token
+/// positions (`on_withdraw`, `on_transfer`, etc) , is a **deployment
+/// obligation** of this trait.
 #[contracttrait]
 pub trait ConfidentialClawback: ConfidentialCompliance {
     /// Reduces `account`'s confidential claim by `amount` and settles the
@@ -205,20 +201,19 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     ///
     /// With `None`, no underlying is transferred: the pool is left
     /// over-collateralized by `amount`, and extraction is the issuer's own SAC
-    /// `clawback` against this contract's address — safe in that order, and
-    /// only in that order (see [`storage::clawback`]). With `Some(d)`, exactly
-    /// `amount` is transferred to `d` in this invocation and the pool stays in
-    /// step with the sum of confidential claims.
+    /// `clawback` against this contract's address. With `Some(d)`, exactly
+    /// `amount` is transferred to `d` in this invocation and the pool stays
+    /// in step with the sum of confidential claims.
     ///
     /// `destination` is bound into the proof, so a proof built for one
     /// destination cannot be submitted against another, and `Some` naming this
     /// contract's own address is rejected.
     ///
-    /// `account` MUST be frozen: the freeze is what holds `C_spend` and
-    /// `C_receive` still between proof construction and submission, which is
-    /// what the proof's bindings rely on. Note that the freeze only
-    /// immobilizes the target if the deployment's [`Hooks`] impl gates on it —
-    /// see the trait-level warning.
+    /// `account` MUST be frozen: the freeze holds `C_spend` and `C_receive`
+    /// still between proof construction and submission, which the proof's
+    /// bindings rely on. Note that the freeze only immobilizes the target if
+    /// the deployment's [`Hooks`] impl gates on it — see the trait-level
+    /// warning.
     ///
     /// # Arguments
     ///
@@ -243,9 +238,8 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// # Security Warning
     ///
     /// Implementations MUST authorize `operator` before calling
-    /// [`storage::clawback`], which authorizes nobody. The trait cannot
-    /// provide a default body — see [`ConfidentialCompliance`]'s trait-level
-    /// docstring for the rationale.
+    /// [`storage::clawback`]. The trait cannot provide a default body — see
+    /// [`ConfidentialCompliance`]'s trait-level docstring for the rationale.
     fn clawback(
         e: &Env,
         account: Address,
@@ -257,14 +251,12 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
 
     /// Folds the `(account, spender)` delegation's escrowed allowance back
     /// into `account`'s spendable balance and deletes the delegation, without
-    /// the owner's participation. This is what brings escrowed value into the
-    /// reach of [`ConfidentialClawback::clawback`], which can only see
-    /// `C_spend` and `C_receive`.
+    /// the owner's participation. It brings escrowed value into the reach of
+    /// [`ConfidentialClawback::clawback`].
     ///
     /// Identical fold to the owner's
     /// [`revoke_spender`](crate::confidential::ConfidentialToken::revoke_spender);
-    /// only the authorization gate differs. Works against expired delegations
-    /// too — expiry blocks spending, never reclamation.
+    /// only the authorization gate differs.
     ///
     /// `account` MUST be frozen.
     ///
@@ -287,7 +279,9 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// # Security Warning
     ///
     /// Implementations MUST authorize `operator` before calling
-    /// [`storage::force_revoke_spender`], which authorizes nobody.
+    /// [`storage::force_revoke_spender`]. The trait cannot provide a default
+    /// body — see [`ConfidentialCompliance`]'s trait-level docstring for the
+    /// rationale.
     fn force_revoke_spender(e: &Env, account: Address, spender: Address, operator: Address);
 }
 
@@ -442,17 +436,11 @@ pub enum ComplianceError {
     /// for the target account (only reachable when `sac_passthrough` is
     /// enabled).
     NotAuthorizedBySac = 3603,
-    /// Indicates the clawback target is not frozen. The freeze is what holds
-    /// the target's commitments still between proof construction and
-    /// submission.
+    /// Indicates the clawback target is not frozen.
     AccountNotFrozen = 3604,
-    /// Indicates the seize amount is not strictly positive. Load-bearing
-    /// beyond diagnostics: it guards the `amount as u128` cast in
-    /// post-verification, and it is what makes a clawback proof
-    /// non-replayable.
+    /// Indicates the seize amount is not strictly positive.
     InvalidClawbackAmount = 3605,
-    /// Indicates `destination` is `Some` naming this contract's own address,
-    /// which would create pool surplus while reporting a settlement.
+    /// Indicates `destination` is `Some` naming this contract's own address.
     InvalidClawbackDestination = 3606,
 }
 
@@ -491,8 +479,7 @@ pub fn emit_unfrozen(e: &Env, account: &Address) {
 }
 
 /// Event emitted when a confidential claim is reduced by a compliance
-/// seizure. `destination` is `None` when no underlying moved — the contract's
-/// pooled balance is then left over-collateralized by `amount` — and `Some(d)`
+/// seizure. `destination` is `None` when no underlying moved, and `Some(d)`
 /// when exactly `amount` was transferred to `d` in the same invocation.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
