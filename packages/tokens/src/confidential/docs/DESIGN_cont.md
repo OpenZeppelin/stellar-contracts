@@ -486,8 +486,11 @@ Each state-modifying operation emits a structured event. Events carry the data n
 | `SpenderTransfer` | `spender`, `from`, `to`, $$R\_e$$, $$\tilde{v}$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ |
 | `SetSpender` | `account`, `spender`, `live_until_ledger`, $$R\_e$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, $$\tilde{r}\_{a,\text{aud,s}}$$ |
 | `RevokeSpender` | `account`, `spender`, $$\tilde{a}$$, $$\sigma\_a$$ |
+| `Clawback` | `account`, `amount`, `destination` |
 
-Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
+Amount fields in `Deposit`, `Withdraw`, and `Clawback` are typed `i128`, matching SEP-41.
+
+`Clawback` is emitted only by deployments that enable the optional compliance extension ([COMPLIANCE.md](./COMPLIANCE.md) §5).
 
 **Usage by consumers:**
 
