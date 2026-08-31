@@ -78,7 +78,7 @@ Every sentence is a maintenance liability: a claim written twice has to be fixed
 - **Motivation before constraint.** State what a rule protects against, then the rule. Rationale appended after the fact invites a second copy of the rule next to it.
 - **Drop concessive asides.** "…though X would not be a violation either" earns nothing and dates fast.
 - **Grep before adding.** A new claim is usually a second copy of an existing one. Search the normative pair for the symbol or term before writing a sentence about it.
-- **A citation is not a summary.** `§8.1` is the whole reference. `§8.1, which escrows the allowance blinding` re-creates the copy the citation was avoiding — name the target only when the sentence would be unparseable without it.
+- **A citation is not a summary.** `§8.1` is the whole reference. `§8.1, which escrows the allowance blinding` re-creates the copy the citation was avoiding — name the target only when the sentence would be unparsable without it.
 
 ### Style
 
