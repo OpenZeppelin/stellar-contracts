@@ -771,7 +771,8 @@ fn set_underlying_asset_twice_panics() {
 #[should_panic(expected = "Error(Contract, #3512)")]
 fn set_address_as_field_element_twice_panics() {
     // `__constructor` already populated the entry; calling
-    // `set_address_as_field_element` again must trip `AddressAsFieldAlreadySet`.
+    // `set_address_as_field_element` again must trip
+    // `AddressAsFieldAlreadySet`.
     let h = setup();
     h.e.as_contract(&h.token_addr, || {
         token_storage::set_address_as_field_element(&h.e);

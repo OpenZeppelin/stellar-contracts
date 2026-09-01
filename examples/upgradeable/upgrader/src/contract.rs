@@ -33,8 +33,8 @@ impl Upgrader {
         let contract_client = UpgradeableClient::new(e, &contract_address);
 
         contract_client.upgrade(&wasm_hash, &operator);
-        // The types of the arguments to the migrate function are unknown to this
-        // contract, so we need to call it with invoke_contract.
+        // The types of the arguments to the migrate function are unknown to
+        // this contract, so we need to call it with invoke_contract.
         e.invoke_contract::<()>(&contract_address, &MIGRATE, migration_data);
     }
 }

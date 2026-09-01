@@ -42,8 +42,8 @@ fn test_sac_generic() {
     let sac = e.register_stellar_asset_contract_v2(issuer.clone());
     let sac_client = StellarAssetClient::new(&e, &sac.address());
 
-    // Register the account contract, passing in the two signers (public keys) to
-    // the constructor.
+    // Register the account contract, passing in the two signers (public keys)
+    // to the constructor.
     let new_admin = e.register(
         SacAdminExampleContract,
         (
@@ -106,9 +106,9 @@ fn test_sac_generic_e2e_mint_and_clawback() {
     ]);
     let operator_pk = operator.verifying_key().to_bytes();
 
-    // Deploy a real SAC. `register_stellar_asset_contract_v2` creates a separate
-    // issuer account internally; enabling clawback on it makes minted balances
-    // clawbackable.
+    // Deploy a real SAC. `register_stellar_asset_contract_v2` creates a
+    // separate issuer account internally; enabling clawback on it makes
+    // minted balances clawbackable.
     let initial_admin = Address::generate(&e);
     let sac = e.register_stellar_asset_contract_v2(initial_admin);
     // `ClawbackEnabledFlag` makes minted balances clawbackable; `RevocableFlag`
@@ -134,12 +134,13 @@ fn test_sac_generic_e2e_mint_and_clawback() {
     e.mock_all_auths();
     sac_client.set_admin(&admin);
 
-    // `Val` -> `ScVal`, matching how the host serializes the recorded call args.
+    // `Val` -> `ScVal`, matching how the host serializes the recorded call
+    // args.
     let sc = |v: Val| ScVal::try_from_val(&e, &v).unwrap();
 
-    // Build a `SorobanAuthorizationEntry` signed by the operator, exactly as the
-    // host presents the SAC invocation to `__check_auth`. `set_auths` also
-    // disables the `mock_all_auths` enabled above.
+    // Build a `SorobanAuthorizationEntry` signed by the operator, exactly as
+    // the host presents the SAC invocation to `__check_auth`. `set_auths`
+    // also disables the `mock_all_auths` enabled above.
     let build_auth = |fn_name: &str, args: std::vec::Vec<ScVal>, nonce: i64| {
         let exp = e.ledger().sequence() + 1000;
         let invocation = SorobanAuthorizedInvocation {
@@ -186,7 +187,8 @@ fn test_sac_generic_e2e_mint_and_clawback() {
     sac_client.mint(&recipient, &1000);
     assert_eq!(sac_client.balance(&recipient), 1000);
 
-    // clawback(recipient, 400) through the real SAC, authorized by `__check_auth`.
+    // clawback(recipient, 400) through the real SAC, authorized by
+    // `__check_auth`.
     e.set_auths(&[build_auth(
         "clawback",
         std::vec![recipient_arg.clone(), sc(400i128.into_val(&e))],

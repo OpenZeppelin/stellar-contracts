@@ -777,7 +777,8 @@ fn bidirectional_mapping_same_key_same_registry_same_topic_fails() {
     e.as_contract(&contract_id, || {
         allow_key(&e, &public_key, &registry, scheme, topic);
 
-        // Try to add same key again for same topic and same registry - should fail
+        // Try to add same key again for same topic and same registry - should
+        // fail
         allow_key(&e, &public_key, &registry, scheme, topic);
     });
 }
@@ -884,7 +885,8 @@ fn bidirectional_mapping_same_key_different_topics() {
         let topic_keys_43 = get_keys_for_topic(&e, 43);
         assert_eq!(topic_keys_43.len(), 1);
 
-        // Verify Registries mapping has 2 entries (one per topic/registry combination)
+        // Verify Registries mapping has 2 entries (one per topic/registry
+        // combination)
         let signing_key = SigningKey { public_key: public_key.clone(), scheme };
         let registries = get_registries(&e, &signing_key);
         assert_eq!(registries.len(), 2);
@@ -990,8 +992,8 @@ fn allow_key_topic_not_allowed() {
     let topic = 42u32;
 
     e.as_contract(&contract_id, || {
-        // Try to allow key for topic 42 which is not in the issuer's allowed topics -
-        // should panic
+        // Try to allow key for topic 42 which is not in the issuer's allowed
+        // topics - should panic
         allow_key(&e, &public_key, &registry_id, scheme, topic);
     });
 }
@@ -1078,8 +1080,8 @@ fn remove_key_prevents_dangling_keys_across_multiple_topics() {
         // Step 2: Remove key from (T2, R2) - this is the last registry pair
         remove_key(&e, &public_key, &registry2, scheme, topic2);
 
-        // After removing the last registry pair, the key should NOT be allowed for ANY
-        // topic
+        // After removing the last registry pair, the key should NOT be allowed
+        // for ANY topic
         assert!(!is_key_allowed_for_topic(&e, &public_key, scheme, topic1));
         assert!(!is_key_allowed_for_topic(&e, &public_key, scheme, topic2));
 
@@ -1206,8 +1208,8 @@ fn signature_invalidation_vs_per_claim_revocation() {
         assert!(is_claim_revoked(&e, &identity, claim_topic, &claim_data_1));
         assert!(!is_claim_revoked(&e, &identity, claim_topic, &claim_data_2));
 
-        // Signature invalidation: increment nonce invalidates all previous SIGNATURES
-        // but does NOT affect per-claim revocation status
+        // Signature invalidation: increment nonce invalidates all previous
+        // SIGNATURES but does NOT affect per-claim revocation status
         invalidate_claim_signatures(&e, &identity, claim_topic);
 
         // The per-claim revocation persists even after nonce change
@@ -1242,7 +1244,8 @@ fn invalidate_claim_signatures_nonce_overflow() {
         // Verify nonce is at max
         assert_eq!(get_current_nonce_for(&e, &identity, claim_topic), u32::MAX);
 
-        // Attempt to invalidate signatures - should panic with MathOverflow (361)
+        // Attempt to invalidate signatures - should panic with MathOverflow
+        // (361)
         invalidate_claim_signatures(&e, &identity, claim_topic);
     });
 }
@@ -1289,7 +1292,8 @@ fn is_claim_expired_returns_false_for_future_expiration() {
 #[test]
 fn is_claim_expired_returns_true_for_past_expiration() {
     let e = Env::default();
-    e.ledger().with_mut(|li| li.timestamp = 10000); // Set ledger timestamp to 10000
+    e.ledger().with_mut(|li| li.timestamp = 10000); // Set ledger timestamp to
+                                                    // 10000
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
@@ -1300,7 +1304,8 @@ fn is_claim_expired_returns_true_for_past_expiration() {
 
         let encoded = encode_claim_data_expiration(&e, created_at, valid_until, &claim_data);
 
-        // Current ledger timestamp (10000) is much higher than valid_until (2000)
+        // Current ledger timestamp (10000) is much higher than valid_until
+        // (2000)
         assert!(is_claim_expired(&e, &encoded));
     });
 }
@@ -1308,7 +1313,8 @@ fn is_claim_expired_returns_true_for_past_expiration() {
 #[test]
 fn is_claim_expired_returns_true_for_current_timestamp() {
     let e = Env::default();
-    e.ledger().with_mut(|li| li.timestamp = 5000); // Set ledger timestamp to 5000
+    e.ledger().with_mut(|li| li.timestamp = 5000); // Set ledger timestamp to
+                                                   // 5000
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
