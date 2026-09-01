@@ -55,17 +55,14 @@ fn get_valid_args_sorted(e: &Env) -> (Bytes32, LeafData, Vec<Bytes32>) {
 
 fn get_valid_args_unsorted(e: &Env) -> (Bytes32, LeafData, Vec<Bytes32>) {
     // constructed with the following data and sha256 hasher
-    //[
-    //{ index: 0, address:
-    //{ "GDD4CDYMGZ2TST2P3FI453VPP5HYKQJZXPDUQEV23V4E2BFI2U7W6BH6", amount: 101
-    //{ } index: 1, address:
-    //{ "GBJWGSVNARYGOM3HSXRCTM2P7Z7D36KCH63WSE4IICTUGOFG736AR6WU", amount: 102
-    //{ } index: 2, address:
-    //{ "GA5WRXT22B7I2GS4HCUXGYZWRINJYPJMIVMXGXDSBQCMRJ2EXRKSB35B", amount: 103
-    //{ } index: 3, address:
-    //{ "CAASCQKVVBSLREPEUGPOTQZ4BC2NDBY2MW7B2LGIGFUPIY4Z3XUZRVTX", amount: 100
-    //{ }
-    //]
+    // ```
+    // [
+    //   { index: 0, address: "GDD4CDYMGZ2TST2P3FI453VPP5HYKQJZXPDUQEV23V4E2BFI2U7W6BH6", amount: 101 },
+    //   { index: 1, address: "GBJWGSVNARYGOM3HSXRCTM2P7Z7D36KCH63WSE4IICTUGOFG736AR6WU", amount: 102 },
+    //   { index: 2, address: "GA5WRXT22B7I2GS4HCUXGYZWRINJYPJMIVMXGXDSBQCMRJ2EXRKSB35B", amount: 103 },
+    //   { index: 3, address: "CAASCQKVVBSLREPEUGPOTQZ4BC2NDBY2MW7B2LGIGFUPIY4Z3XUZRVTX", amount: 100 },
+    // ]
+    // ```
     let root = Bytes32::from_array(
         e,
         &hex!("103d1530956325ffc0b01abc52b7b3bedecf9a0b013553e864e3cecddf3bea2d"),
