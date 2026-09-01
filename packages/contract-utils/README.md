@@ -150,7 +150,7 @@ The `merkle_distributor` module implements a Merkle-based claim distribution sys
 
 The `math` module provides fixed-point arithmetic: a `Wad` decimal type with 18 decimal places, and free functions for `x * y / denominator` on both `i128` and `I256` with an explicit rounding direction.
 
-Each operation comes in a panicking and a checked variant. The panicking variants raise `SorobanFixedPointError::Overflow` (1500); the checked variants return `None`.
+Each operation comes in a panicking and a checked variant. The panicking variants raise `SorobanFixedPointError::Overflow` (1500) when the result overflows; the checked variants return `None`. `Wad`'s operators (`+`, `-`, `*`, `/`) work directly on `i128` and panic with a native arithmetic error instead (see the `# Overflow` section on `Wad`).
 
 #### Usage Examples
 
@@ -187,7 +187,7 @@ Above `2^128` the operation rejects rather than returning an incorrect value, an
 
 Phantom overflow handling does not extend to `Wad`'s operator implementations (`+`, `-`, `*`, `/`), because an operator cannot reach an `Env` to build the intermediate. Their narrower bounds are tabulated in the `# Overflow` section of `Wad`'s documentation, and `checked_mul` / `checked_div` should be preferred wherever an operand can plausibly exceed them.
 
-Zero denominators and `MIN / -1` are left to the platform rather than mapped to a contract error, since these are plain arithmetic operations. Both surface a native or host arithmetic error from the panicking variants, and `None` from the checked ones.
+Zero denominators and `MIN / -1` are left to the platform rather than mapped to a contract error, since these are plain arithmetic operations; the checked variants return `None` for them. The `math` module documentation details which error each failure surfaces as.
 
 ## Installation
 

@@ -241,8 +241,8 @@ fn test_div_operator_dividend_bound() {
 #[should_panic]
 fn test_div_operator_dividend_bound_exceeded() {
     let e = Env::default();
-    // A dividend above `i128::MAX / WAD_SCALE` ~= 170.1411 overflows even when
-    // dividing by one.
+    // A dividend above `i128::MAX / WAD_SCALE^2` ~= 170.1411 overflows even
+    // when dividing by one.
     let _ = Wad::from_integer(&e, 171) / Wad::from_integer(&e, 1);
 }
 

@@ -15,13 +15,6 @@
 //!   error for graceful handling, including when the intermediate `x * y`
 //!   multiplication overflows and the result cannot be recovered.
 //!
-//! These are plain arithmetic operations, so domain errors are left to the
-//! platform rather than mapped to contract errors: a zero `denominator`, and
-//! `MIN / -1`, fail with a native or host arithmetic error. The checked
-//! variants return `None` for both. [`SorobanFixedPointError::DivisionByZero`]
-//! is reserved for the higher-level helpers where a zero argument is a semantic
-//! mistake rather than an arithmetic one, such as [`wad::Wad::from_ratio`].
-//!
 //! ### Phantom Overflow Handling
 //!
 //! For `i128` operations, intermediate multiplication overflow is handled
@@ -34,9 +27,12 @@
 //! division is distributed, which is an exact identity:
 //!
 //! ```text
-//! x = q1*D + r1     y = q2*D + r2     (0 <= r1, r2 < D)
-//! floor(x*y/D) = q1*q2*D + q1*r2 + r1*q2 + floor(r1*r2/D)
+//! |x| = q1*D + r1     |y| = q2*D + r2     (D = |denominator|, 0 <= r1, r2 < D)
+//! floor(|x*y|/D) = q1*q2*D + q1*r2 + r1*q2 + floor(r1*r2/D)
 //! ```
+//!
+//! The decomposition runs on magnitudes; the result's sign is reapplied before
+//! the rounding direction is.
 //!
 //! Three of the four terms are bounded by the answer or by an input, so they
 //! fit whenever the inputs and the result do. Only `r1*r2` is bounded by `D`
@@ -56,6 +52,31 @@
 //! because an operator cannot reach an `Env` to construct the `I256`
 //! intermediate. The resulting bounds are tabulated in the `# Overflow`
 //! section on [`wad::Wad`].
+//!
+//! ### Error Reporting
+//!
+//! Domain errors (a zero `denominator`, `MIN / -1`) are left to the platform
+//! rather than mapped to contract errors, since these are plain arithmetic
+//! operations. What the platform raises depends on the width:
+//!
+//! - **`i128`**: native Rust arithmetic, whose panics surface on-chain as a
+//!   generic wasm trap (`Error(WasmVm, InvalidAction)`).
+//! - **`I256`**: host calls, for which the host raises a single arithmetic
+//!   error, `Error(Object, ArithDomain)`, identical for overflow, division by
+//!   zero and `MIN / -1`.
+//!
+//! The `I256` phantom-overflow fallback runs on checked operations, so every
+//! failure inside it, a zero `denominator` included, collapses into a single
+//! `None` and surfaces as [`SorobanFixedPointError::Overflow`], consistent
+//! with the one host error covering all these faults.
+//!
+//! The platform therefore never distinguishes a division by zero from an
+//! overflow; a caller that needs a distinct division-by-zero signal has to
+//! validate the denominator up front. That is what the higher-level helpers
+//! such as [`wad::Wad::from_ratio`] do with
+//! [`SorobanFixedPointError::DivisionByZero`].
+//!
+//! The checked variants return `None` for every failure above.
 //!
 //! ## Structure
 //!

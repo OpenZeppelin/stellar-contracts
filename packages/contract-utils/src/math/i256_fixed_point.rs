@@ -6,8 +6,8 @@
 // the division is distributed, which is an exact identity rather than an
 // approximation:
 //
-//     x = q1*D + r1     y = q2*D + r2     (0 <= r1, r2 < D)
-//     floor(x*y/D) = q1*q2*D + q1*r2 + r1*q2 + floor(r1*r2/D)
+//     |x| = q1*D + r1     |y| = q2*D + r2     (D = |denominator|, 0 <= r1, r2 < D)
+//     floor(|x*y|/D) = q1*q2*D + q1*r2 + r1*q2 + floor(r1*r2/D)
 
 use soroban_sdk::{panic_with_error, Env, I256, U256};
 
@@ -133,10 +133,9 @@ pub fn mul_div_ceil(x: &I256, y: &I256, denominator: &I256) -> I256 {
 ///
 /// # Notes
 ///
-/// Domain errors are left to the host rather than mapped to a contract error,
-/// since this is a plain arithmetic operation. A zero `denominator` and
-/// `I256::MIN / -1` both fail with the host's own arithmetic error.
-/// [`checked_mul_div`] returns `None` for both.
+/// Domain errors (a zero `denominator`, `I256::MIN / -1`) are left to the
+/// platform; refer to the module documentation for how each failure surfaces.
+/// [`checked_mul_div`] returns `None` for all of them.
 pub fn mul_div(x: &I256, y: &I256, denominator: &I256) -> I256 {
     let e = x.env();
     match x.checked_mul(y) {
@@ -217,13 +216,10 @@ fn to_magnitude(v: &I256) -> U256 {
         // bit-for-bit inversion: `U256::MAX - u == !u` exactly. Therefore `-u
         // == (U256::MAX - u) + 1`.
         //
-        // In an 8-bit analogue, negating 5: `255 - 5 + 1 == 251 == 0xFB`, and 0xFB read
-        // as an i8 is -5.
-        // Negating 128, which is `|i8::MIN|` and has no positive i8
-        // form, gives `255 - 128 + 1 == 128 == 0x80`, which read as an i8 is
-        // -128.
-        // The same arithmetic at 256 bits is how `|I256::MIN|`, which is `2^255`,
-        // survives the round trip.
+        // In an 8-bit analogue: negating 5 gives `255 - 5 + 1 == 0xFB`, which read
+        // as an i8 is -5; negating 128 (`|i8::MIN|`, which has no positive i8 form)
+        // gives `0x80`, i.e. -128. The same arithmetic at 256 bits is how
+        // `|I256::MIN|`, which is `2^255`, survives the round trip.
         //
         // Neither the subtraction nor the addition can leave `U256` here: `v < 0`
         // reinterprets to `u >= 2^255`, so `U256::MAX - u <= 2^255 - 1`, and adding one
@@ -240,8 +236,7 @@ fn to_magnitude(v: &I256) -> U256 {
 /// The inverse of [`to_magnitude`], and the point where leaving `I256`'s range
 /// is caught. Also returns `None`, rather than `Some(0)`, for a zero magnitude
 /// with `negative` set; [`checked_mul_div_decomposed`] covers why that cannot
-/// arise from the fallback and what it means for a test that calls the fallback
-/// directly.
+/// arise from the fallback.
 fn from_magnitude(e: &Env, mag: &U256, negative: bool) -> Option<I256> {
     if negative {
         // The largest magnitude any `I256` has is `2^255`, which sits well inside
@@ -257,13 +252,6 @@ fn from_magnitude(e: &Env, mag: &U256, negative: bool) -> Option<I256> {
         // `from_parts` takes four 64-bit limbs, most significant first, so the constant
         // below is `0x8000_0000_0000_0000 * 2^192`, which is `2^63 * 2^192`, which is
         // `2^255`.
-        //
-        // The bound is compared explicitly rather than inferred from a sign mismatch
-        // after reinterpretation. An explicit bound and a sign-mismatch check detect
-        // the same condition, and sign-mismatch is one operation cheaper, but
-        // the bound is what an auditor can
-        // check against the type's documented range without reasoning about two's
-        // complement.
         if *mag > U256::from_parts(e, 0x8000_0000_0000_0000, 0, 0, 0) {
             return None;
         }
@@ -309,9 +297,8 @@ fn from_magnitude(e: &Env, mag: &U256, negative: bool) -> Option<I256> {
 /// abs_y = q2 * abs_d + r2        with 0 <= r2 < abs_d
 /// ```
 ///
-/// The operands here are absolute values (not positive nor negative), with the
-/// sign reapplied at the very end. Why they must be absolute is explained
-/// further down, just after the identity; take it as given for a moment.
+/// The operands here are absolute values, with the sign reapplied at the very
+/// end; why they must be absolute is explained after the identity.
 ///
 /// Substituting both splits into the product and expanding gives four terms:
 ///
@@ -403,43 +390,34 @@ fn from_magnitude(e: &Env, mag: &U256, negative: bool) -> Option<I256> {
 /// example through `mul_div(I256::MIN, 3, 3)`. Converting in and
 /// out goes through the big-endian byte encoding because the SDK offers no
 /// other bridge between `I256` and `U256`: there is no `to_parts`, no bitwise
-/// operations and no wrapping arithmetic. `exp_ln.rs` already relies on the
-/// same round-trip, for the same kind of reason.
+/// operations and no wrapping arithmetic.
 ///
 /// The terms `q1*q2*abs_d`, `q1*r2` and `r1*q2` are whole integers, so the
 /// entire fractional part of the quotient sits in `rem_product / abs_d`. That
-/// is why the truncated magnitude,
-/// `mag`, is just those three terms plus `floor(rem_product / abs_d)`, and why
-/// `rem_product % abs_d` alone decides whether the result is exact.
+/// is why the truncated magnitude, `mag`, is just those three terms plus
+/// `floor(rem_product / abs_d)`, and why `rem_product % abs_d` alone decides
+/// whether the result is exact.
 ///
 /// What the identity buys, beyond avoiding the product, is what bounds each of
-/// its four terms. `q1*q2*abs_d` is at
-/// most the answer itself, `q1*r2` is at most `abs_x`, and `r1*q2` is at most
-/// `abs_y`, so all three fit whenever the inputs and the answer do. Only
-/// `rem_product` is bounded by the denominator alone, at just under `abs_d *
-/// abs_d`, with no relation to how big the answer is. That single term is the
-/// whole source of the `|denominator| <= 2^128` domain, since `abs_d * abs_d`
-/// has to stay below `2^256`. It is also the one place the unsigned range earns
-/// its keep: capped at `I256` instead, the ceiling would fall to `2^127.5`.
-/// With `abs_d` at `2^128 - 1` and both remainders maximal, `rem_product`
-/// reaches `2^256 - 2^130 + 4`, twice what `I256` holds and comfortably inside
-/// `U256`.
+/// its four terms. `q1*q2*abs_d` is at most the answer itself, `q1*r2` is at
+/// most `abs_x`, and `r1*q2` is at most `abs_y`, so all three fit whenever the
+/// inputs and the answer do. Only `rem_product` is bounded by the denominator
+/// alone, at just under `abs_d * abs_d`, with no relation to how big the answer
+/// is. That single term is the whole source of the `|denominator| <= 2^128`
+/// domain, since `abs_d * abs_d` has to stay below `2^256`. It is also why the
+/// magnitudes are `U256`: capped at `I256`, the ceiling would fall to
+/// `2^127.5`. With `abs_d` at `2^128 - 1` and both remainders maximal,
+/// `rem_product` reaches `2^256 - 2^130 + 4`, twice what `I256` holds and
+/// comfortably inside `U256`.
 ///
-/// One edge is worth knowing about. Reapplying a negative sign to a zero
-/// magnitude is not representable by the negation [`from_magnitude`] uses, so
-/// it answers `None` there. That cannot happen on any path a caller reaches:
-/// arriving here at all requires `x * y` to have overflowed, so `|x * y| >=
-/// 2^255`, and `|denominator| <= 2^255` for every `I256`, which
-/// puts the quotient magnitude at one or above. It does happen when this
-/// function is called directly with small operands, where the `None` reads as a
-/// bug rather than as a domain violation. A test doing that has to stay inside
-/// `|x * y| >= |denominator|`, which is the domain production actually reaches.
+/// One edge: reapplying a negative sign to a zero magnitude is not
+/// representable by the negation [`from_magnitude`] uses, so it answers `None`
+/// there. No entry point reaches that case, since arriving here requires
+/// `x * y` to have overflowed, which puts the quotient magnitude at one or
+/// above. Only a direct call with `|x * y| < |denominator|` can hit it.
 ///
-/// `pub(super)` rather than private so that the differential test comparing
-/// this fallback against the fast path, on the domain where both are defined,
-/// can reach it from `crate::math::test`. `pub(super)` resolves to `pub(in
-/// crate::math)`, which covers the test module as a descendant;
-/// `exp_ln::ln_wad` and `exp_ln::exp_wad` use the same visibility.
+/// `pub(super)` so the differential test in `crate::math::test` can compare
+/// this fallback against the fast path.
 pub(super) fn checked_mul_div_decomposed(
     x: &I256,
     y: &I256,
