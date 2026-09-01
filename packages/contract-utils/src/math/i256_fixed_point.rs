@@ -207,23 +207,25 @@ fn to_magnitude(v: &I256) -> U256 {
     let e = v.env();
     let u = U256::from_be_bytes(e, &v.to_be_bytes());
     if *v < I256::from_i32(e, 0) {
-        // Two's-complement negation, normally `!u + 1`, done without bitwise operations
-        // because the SDK has none.
+        // Two's-complement negation, normally `!u + 1`, done without bitwise
+        // operations because the SDK has none.
         //
-        // Inverting every bit is the same as subtracting from all-ones. Every bit of
-        // `U256::MAX` is 1, and at each position `1 - bit` yields the flipped bit, so
-        // no position ever borrows from its neighbour and the subtraction is a
-        // bit-for-bit inversion: `U256::MAX - u == !u` exactly. Therefore `-u
-        // == (U256::MAX - u) + 1`.
+        // Inverting every bit is the same as subtracting from all-ones. Every
+        // bit of `U256::MAX` is 1, and at each position `1 - bit`
+        // yields the flipped bit, so no position ever borrows from its
+        // neighbour and the subtraction is a bit-for-bit inversion:
+        // `U256::MAX - u == !u` exactly. Therefore `-u == (U256::MAX -
+        // u) + 1`.
         //
-        // In an 8-bit analogue: negating 5 gives `255 - 5 + 1 == 0xFB`, which read
-        // as an i8 is -5; negating 128 (`|i8::MIN|`, which has no positive i8 form)
-        // gives `0x80`, i.e. -128. The same arithmetic at 256 bits is how
-        // `|I256::MIN|`, which is `2^255`, survives the round trip.
+        // In an 8-bit analogue: negating 5 gives `255 - 5 + 1 == 0xFB`, which
+        // read as an i8 is -5; negating 128 (`|i8::MIN|`, which has no
+        // positive i8 form) gives `0x80`, i.e. -128. The same
+        // arithmetic at 256 bits is how `|I256::MIN|`, which is
+        // `2^255`, survives the round trip.
         //
-        // Neither the subtraction nor the addition can leave `U256` here: `v < 0`
-        // reinterprets to `u >= 2^255`, so `U256::MAX - u <= 2^255 - 1`, and adding one
-        // to that stays below `2^256`.
+        // Neither the subtraction nor the addition can leave `U256` here: `v <
+        // 0` reinterprets to `u >= 2^255`, so `U256::MAX - u <= 2^255 -
+        // 1`, and adding one to that stays below `2^256`.
         U256::max_value(e).sub(&u).add(&U256::from_u32(e, 1))
     } else {
         u
@@ -239,35 +241,37 @@ fn to_magnitude(v: &I256) -> U256 {
 /// arise from the fallback.
 fn from_magnitude(e: &Env, mag: &U256, negative: bool) -> Option<I256> {
     if negative {
-        // The largest magnitude any `I256` has is `2^255`, which sits well inside
-        // `U256`. Coming back is different. `U256` reaches `2^256 - 1`, while `I256`
-        // stops at `2^255 - 1` going up and `-2^255` going down, so most of the upper
-        // half of `U256` has no signed counterpart. The magnitude arriving here was
-        // produced by the summation, which is free to exceed the signed range, so it
-        // has to be bounds-checked before it is reinterpreted.
+        // The largest magnitude any `I256` has is `2^255`, which sits well
+        // inside `U256`. Coming back is different. `U256` reaches
+        // `2^256 - 1`, while `I256` stops at `2^255 - 1` going up and
+        // `-2^255` going down, so most of the upper half of `U256` has
+        // no signed counterpart. The magnitude arriving here was
+        // produced by the summation, which is free to exceed the signed range,
+        // so it has to be bounds-checked before it is reinterpreted.
         //
-        // The limit differs by sign, because the signed range is not symmetric. A
-        // negative result may use the whole `2^255`, since `I256::MIN` is `-2^255`.
+        // The limit differs by sign, because the signed range is not symmetric.
+        // A negative result may use the whole `2^255`, since
+        // `I256::MIN` is `-2^255`.
         //
-        // `from_parts` takes four 64-bit limbs, most significant first, so the constant
-        // below is `0x8000_0000_0000_0000 * 2^192`, which is `2^63 * 2^192`, which is
-        // `2^255`.
+        // `from_parts` takes four 64-bit limbs, most significant first, so the
+        // constant below is `0x8000_0000_0000_0000 * 2^192`, which is
+        // `2^63 * 2^192`, which is `2^255`.
         if *mag > U256::from_parts(e, 0x8000_0000_0000_0000, 0, 0, 0) {
             return None;
         }
-        // The same `(U256::MAX - v) + 1` negation as in `to_magnitude`, run the other
-        // way. `checked_add` rather than `add` is what handles a zero magnitude; see
-        // the note on this function for why that case cannot arrive from the
-        // fallback.
+        // The same `(U256::MAX - v) + 1` negation as in `to_magnitude`, run the
+        // other way. `checked_add` rather than `add` is what handles a
+        // zero magnitude; see the note on this function for why that
+        // case cannot arrive from the fallback.
         let negated = U256::max_value(e).sub(mag).checked_add(&U256::from_u32(e, 1))?;
-        // The bytes are unchanged; only their interpretation goes from unsigned to
-        // signed.
+        // The bytes are unchanged; only their interpretation goes from unsigned
+        // to signed.
         Some(I256::from_be_bytes(e, &negated.to_be_bytes()))
     } else {
         // The positive end stops one short of the negative end, at
-        // `I256::MAX == 2^255 - 1`, so this bound is one lower than the one above. In
-        // limbs, `(2^63 - 1) * 2^192` plus all-ones in the remaining three sums to
-        // exactly `2^255 - 1`.
+        // `I256::MAX == 2^255 - 1`, so this bound is one lower than the one
+        // above. In limbs, `(2^63 - 1) * 2^192` plus all-ones in the
+        // remaining three sums to exactly `2^255 - 1`.
         if *mag > U256::from_parts(e, 0x7fff_ffff_ffff_ffff, u64::MAX, u64::MAX, u64::MAX) {
             return None;
         }
@@ -439,11 +443,11 @@ pub(super) fn checked_mul_div_decomposed(
     let q2 = abs_y.checked_div(&abs_d)?;
     let r2 = abs_y.checked_rem_euclid(&abs_d)?;
 
-    // `r1 * r2` is the only term bounded by `abs_d` alone rather than by an input
-    // or by the answer, which makes this multiplication the exact detector for
-    // `|denominator| > 2^128`: it can fail only when `abs_d * abs_d` exceeds
-    // `2^256`, so nothing inside the documented domain reaches the failure and
-    // nothing outside it receives a wrong answer.
+    // `r1 * r2` is the only term bounded by `abs_d` alone rather than by an
+    // input or by the answer, which makes this multiplication the exact
+    // detector for `|denominator| > 2^128`: it can fail only when `abs_d *
+    // abs_d` exceeds `2^256`, so nothing inside the documented domain
+    // reaches the failure and nothing outside it receives a wrong answer.
     let rem_product = r1.checked_mul(&r2)?;
 
     // Every term is non-negative, so each partial sum is bounded by the final

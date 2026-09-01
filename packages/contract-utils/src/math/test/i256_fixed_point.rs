@@ -97,12 +97,13 @@ fn test_mul_div_floor_large_number() {
 fn test_mul_div_floor_phantom_overflow_resolves() {
     let env = Env::default();
     let x: I256 = I256::from_i128(&env, i128::MAX);
-    // x * 10^39 overflows the I256 intermediate (max ~5.8e76), so this exercises
-    // the fallback. The quotient is 10^21 * x, which fits, so it is recovered
-    // rather than failing.
+    // x * 10^39 overflows the I256 intermediate (max ~5.8e76), so this
+    // exercises the fallback. The quotient is 10^21 * x, which fits, so it
+    // is recovered rather than failing.
     //
-    // 10^39 is the multiplier we need, but it exceeds i128::MAX (~1.7e38), so it
-    // cannot be written as `10i128.pow(39)`. It is built in I256 space instead.
+    // 10^39 is the multiplier we need, but it exceeds i128::MAX (~1.7e38), so
+    // it cannot be written as `10i128.pow(39)`. It is built in I256 space
+    // instead.
     let y: I256 = I256::from_i128(&env, 10i128.pow(20)).mul(&I256::from_i128(&env, 10i128.pow(19)));
     let denominator: I256 = I256::from_i128(&env, 10i128.pow(18));
 
@@ -152,11 +153,11 @@ fn test_mul_div_ceil_large_number() {
 fn test_mul_div_ceil_phantom_overflow_resolves() {
     let env = Env::default();
     let x: I256 = I256::from_i128(&env, i128::MAX);
-    // Same input as the floor case. The division is exact, so ceil returns the same
-    // value.
+    // Same input as the floor case. The division is exact, so ceil returns the
+    // same value.
     //
-    // 10^39 exceeds i128::MAX (~1.7e38), so it is built in I256 space rather than
-    // as `10i128.pow(39)`.
+    // 10^39 exceeds i128::MAX (~1.7e38), so it is built in I256 space rather
+    // than as `10i128.pow(39)`.
     let y: I256 = I256::from_i128(&env, 10i128.pow(20)).mul(&I256::from_i128(&env, 10i128.pow(19)));
     let denominator: I256 = I256::from_i128(&env, 10i128.pow(18));
 
@@ -552,9 +553,10 @@ fn test_checked_mul_div_floor_negative_with_remainder() {
 #[test]
 fn test_checked_mul_div_mul_overflow_resolves() {
     let env = Env::default();
-    // x * y = I256::MAX * 2 overflows I256, but the quotient is exactly I256::MAX.
-    // The remainders are both zero, so the decomposition recovers the answer
-    // and the checked variants return `Some` where they used to return `None`.
+    // x * y = I256::MAX * 2 overflows I256, but the quotient is exactly
+    // I256::MAX. The remainders are both zero, so the decomposition
+    // recovers the answer and the checked variants return `Some` where they
+    // used to return `None`.
     let x: I256 = I256::max_value(&env);
     let y: I256 = I256::from_i128(&env, 2);
     let denominator: I256 = I256::from_i128(&env, 2);
@@ -586,8 +588,8 @@ fn test_mul_div_min_by_negative_one_panics() {
     // division, so this is the one failure the module reports as the host's
     // arithmetic error rather than a contract error code. Pinned deliberately
     // rather than fixed: the i128 sibling has the identical trap, and routing
-    // the fast path through the checked helper would re-price every non-overflowing
-    // call.
+    // the fast path through the checked helper would re-price every
+    // non-overflowing call.
     let x: I256 = I256::min_value(&env);
     let y: I256 = I256::from_i128(&env, 1);
     let denominator: I256 = I256::from_i128(&env, -1);
@@ -598,8 +600,9 @@ fn test_mul_div_min_by_negative_one_panics() {
 #[test]
 fn test_checked_mul_div_min_by_negative_one_returns_none() {
     let env = Env::default();
-    // The checked counterpart of the case above. Both fail, which is what keeps the
-    // two families in agreement on their domain; only the reporting differs.
+    // The checked counterpart of the case above. Both fail, which is what keeps
+    // the two families in agreement on their domain; only the reporting
+    // differs.
     let x: I256 = I256::min_value(&env);
     let y: I256 = I256::from_i128(&env, 1);
     let denominator: I256 = I256::from_i128(&env, -1);
@@ -807,17 +810,19 @@ fn assert_rounding_matrix(
 #[test]
 fn decomposition_matches_fast_path_works() {
     let e = Env::default();
-    // Thousands of metered host calls in one `Env` exceed the default budget, and
-    // the resulting `Error(Budget, ExceededLimit)` names no test logic at all.
+    // Thousands of metered host calls in one `Env` exceed the default budget,
+    // and the resulting `Error(Budget, ExceededLimit)` names no test logic
+    // at all.
     e.cost_estimate().budget().reset_unlimited();
 
     let mut compared = 0u32;
     for x in -13i128..=13 {
         for y in -13i128..=13 {
             for d in -6i128..=6 {
-                // Production reaches the fallback only with `|x * y| >= 2^255 >= |d|`,
-                // so the result magnitude is at least one. Calling the core directly
-                // outside that band asks `from_magnitude` for a negatively signed
+                // Production reaches the fallback only with `|x * y| >= 2^255
+                // >= |d|`, so the result magnitude is at least
+                // one. Calling the core directly outside that
+                // band asks `from_magnitude` for a negatively signed
                 // zero, which it answers `None` to by design.
                 if d == 0 || x == 0 || y == 0 || x.abs() * y.abs() < d.abs() {
                     continue;
@@ -910,8 +915,8 @@ fn mul_div_at_maximal_remainders_works() {
     // x * y = 4n^2 - 12n + 9 = (n - 1)(4n - 8) + 1
     // ```
     //
-    // The quotient is `4n - 8`, which is `2^130 - 8`, and the remainder is 1, so
-    // the result is inexact.
+    // The quotient is `4n - 8`, which is `2^130 - 8`, and the remainder is 1,
+    // so the result is inexact.
     let n = two_pow(&e, 128);
     let d = n.sub(&i(&e, 1));
     let x = n.mul(&i(&e, 2)).sub(&i(&e, 3));
@@ -937,10 +942,10 @@ fn checked_mul_div_above_two_pow_128_returns_none() {
     assert_eq!(checked_mul_div_ceil(&x, &x, &d), None);
     assert_eq!(checked_mul_div(&x, &x, &d), None);
 
-    // The rejection is not confined to answers that would not fit. Here the true
-    // answer is `2^60`, which fits with room to spare, and the operation rejects
-    // anyway because `|denominator|` is past the ceiling. That is the false
-    // rejection the `2^128` condition buys.
+    // The rejection is not confined to answers that would not fit. Here the
+    // true answer is `2^60`, which fits with room to spare, and the
+    // operation rejects anyway because `|denominator|` is past the ceiling.
+    // That is the false rejection the `2^128` condition buys.
     let wide = two_pow(&e, 130);
     let wide_d = two_pow(&e, 200);
 
@@ -963,9 +968,10 @@ fn mul_div_above_two_pow_128_panics() {
 #[test]
 fn mul_div_at_practical_scales_works() {
     let e = Env::default();
-    // Every fixed-point scale in practical use, each with a product that overflows.
-    // Taking `y` as the denominator makes the exact answer `x` with no remainder,
-    // an expected value that owes nothing to the decomposition.
+    // Every fixed-point scale in practical use, each with a product that
+    // overflows. Taking `y` as the denominator makes the exact answer `x`
+    // with no remainder, an expected value that owes nothing to the
+    // decomposition.
     let x = two_pow(&e, 200);
     for d in [
         i(&e, 10i128.pow(18)), // WAD
@@ -983,9 +989,9 @@ fn mul_div_at_practical_scales_works() {
 #[test]
 fn mul_div_inexact_at_wad_scale_works() {
     let e = Env::default();
-    // The WAD scale with a remainder. Taking `y = d + 1` makes the exact quotient
-    // `x + x/d`, so the expected value is computable on the fast path, where
-    // `2^200` and `10^18` both fit comfortably.
+    // The WAD scale with a remainder. Taking `y = d + 1` makes the exact
+    // quotient `x + x/d`, so the expected value is computable on the fast
+    // path, where `2^200` and `10^18` both fit comfortably.
     let d = i(&e, 10i128.pow(18));
     let x = two_pow(&e, 200);
     let y = d.add(&i(&e, 1));
@@ -1003,16 +1009,16 @@ fn mul_div_inexact_at_wad_scale_works() {
 #[test]
 fn mul_div_beyond_guaranteed_domain_works() {
     let e = Env::default();
-    // `2^128` is a sufficient domain, not a necessary one: a denominator far above
-    // it still succeeds when the remainders stay small. Here `|d|` is `2^255`,
-    // the largest magnitude an `I256` has, both quotients are zero, and `r1 *
-    // r2` is only `2^255`.
+    // `2^128` is a sufficient domain, not a necessary one: a denominator far
+    // above it still succeeds when the remainders stay small. Here `|d|` is
+    // `2^255`, the largest magnitude an `I256` has, both quotients are
+    // zero, and `r1 * r2` is only `2^255`.
     //
-    // It is also the smallest result the fallback can produce. Entering it requires
-    // `|x * y| >= 2^255`, and no `|denominator|` exceeds `2^255`, so the magnitude
-    // is at least one. This input sits exactly on that floor and carries a
-    // negative sign, the pairing `from_magnitude` cannot represent for a zero
-    // magnitude.
+    // It is also the smallest result the fallback can produce. Entering it
+    // requires `|x * y| >= 2^255`, and no `|denominator|` exceeds `2^255`,
+    // so the magnitude is at least one. This input sits exactly on that
+    // floor and carries a negative sign, the pairing `from_magnitude`
+    // cannot represent for a zero magnitude.
     let x = two_pow(&e, 128);
     let y = two_pow(&e, 127);
     let d = I256::min_value(&e);
@@ -1029,14 +1035,14 @@ fn mul_div_beyond_guaranteed_domain_works() {
 fn mul_div_at_denominator_max_works() {
     let e = Env::default();
     // The input the design's failure taxonomy cites to show that `2^128` is a
-    // sufficient domain rather than a necessary one. `|denominator|` is `2^255 - 1`
-    // here, far above the ceiling, but the split leaves `r1 = r2 = 0`, so `r1 * r2`
-    // never grows and the exact answer comes back.
+    // sufficient domain rather than a necessary one. `|denominator|` is `2^255
+    // - 1` here, far above the ceiling, but the split leaves `r1 = r2 = 0`,
+    // so `r1 * r2` never grows and the exact answer comes back.
     //
-    // A different term profile from `mul_div_beyond_guaranteed_domain_works`, where
-    // both quotients are zero and the whole answer comes from the fractional term.
-    // Here `q1 = q2 = 1` and both remainders are zero, so it all comes from
-    // `q1 * q2 * abs_d`.
+    // A different term profile from `mul_div_beyond_guaranteed_domain_works`,
+    // where both quotients are zero and the whole answer comes from the
+    // fractional term. Here `q1 = q2 = 1` and both remainders are zero, so
+    // it all comes from `q1 * q2 * abs_d`.
     let max = I256::max_value(&e);
 
     assert_eq!(max.checked_mul(&max), None);
@@ -1072,8 +1078,8 @@ fn rounding_matrix_in_fallback_domain_works() {
     let magnitude = three.mul(&a).mul(&b).add(&i(&e, 2).mul(&a)).add(&b);
     assert_rounding_matrix(&e, &abs_x, &abs_y, &three, &magnitude, true);
 
-    // Exact shape, chosen so that neither remainder is zero. With `d = 6`, `r1 = 2`
-    // and `r2 = 3`, `r1 * r2` is a non-zero exact multiple of `d`:
+    // Exact shape, chosen so that neither remainder is zero. With `d = 6`, `r1
+    // = 2` and `r2 = 3`, `r1 * r2` is a non-zero exact multiple of `d`:
     //
     // ```text
     // x = 6a + 2, y = 6b + 3   ->   x * y = 36ab + 18a + 12b + 6
@@ -1123,9 +1129,10 @@ fn mul_div_negative_inexact_rounds_away_from_zero_works() {
     // |x * y| / 7 = 7a^2 + 8a + 2 + 1/7
     // ```
     //
-    // so the magnitude is `7a^2 + 8a + 2` and the result is negative and inexact.
-    // Floor is the mode that moves away from zero here, which is the direction that
-    // leaks value in a vault or fee path when it is missed.
+    // so the magnitude is `7a^2 + 8a + 2` and the result is negative and
+    // inexact. Floor is the mode that moves away from zero here, which is
+    // the direction that leaks value in a vault or fee path when it is
+    // missed.
     let a = two_pow(&e, 126);
     let seven = i(&e, 7);
     let x = negate(&seven.mul(&a).add(&i(&e, 3)));
@@ -1143,11 +1150,12 @@ fn mul_div_negative_inexact_rounds_away_from_zero_works() {
 fn checked_mul_div_rounds_in_fallback_domain_works() {
     let e = Env::default();
     // Each checked function passes its own rounding mode into the fallback, and
-    // nothing else here pins those three arguments to a value. The rejection cases
-    // return `None` in every mode, the exact cases make all three modes agree, and
-    // the dispatcher test compares a dispatcher against the leaf it delegates to,
-    // so a leaf and its dispatcher move together when the leaf is wrong. An
-    // inexact fallback quotient is the input that separates the modes.
+    // nothing else here pins those three arguments to a value. The rejection
+    // cases return `None` in every mode, the exact cases make all three
+    // modes agree, and the dispatcher test compares a dispatcher against
+    // the leaf it delegates to, so a leaf and its dispatcher move together
+    // when the leaf is wrong. An inexact fallback quotient is the input
+    // that separates the modes.
     //
     // With `d = 5` and `a = 2^126`:
     //
@@ -1168,8 +1176,9 @@ fn checked_mul_div_rounds_in_fallback_domain_works() {
     assert_eq!(checked_mul_div(&x, &y, &five), Some(magnitude.clone()));
     assert_eq!(checked_mul_div_ceil(&x, &y, &five), Some(magnitude.add(&i(&e, 1))));
 
-    // Negated, where floor is the mode that moves away from zero. This half is what
-    // separates floor from truncate; on a positive result the two agree.
+    // Negated, where floor is the mode that moves away from zero. This half is
+    // what separates floor from truncate; on a positive result the two
+    // agree.
     let neg_x = negate(&x);
     let truncate = negate(&magnitude);
 
@@ -1181,10 +1190,10 @@ fn checked_mul_div_rounds_in_fallback_domain_works() {
 #[test]
 fn mul_div_with_zero_operand_stays_on_fast_path_works() {
     let e = Env::default();
-    // The fallback's sign rule is an XOR over the three operands, which matches the
-    // sign of the true result only because a product involving zero never
-    // overflows. A negative denominator is what would expose a reliance on it:
-    // the XOR alone calls these results negative.
+    // The fallback's sign rule is an XOR over the three operands, which matches
+    // the sign of the true result only because a product involving zero
+    // never overflows. A negative denominator is what would expose a
+    // reliance on it: the XOR alone calls these results negative.
     let zero = i(&e, 0);
     let max = I256::max_value(&e);
     let neg_one = i(&e, -1);
@@ -1206,11 +1215,12 @@ fn mul_div_with_zero_operand_stays_on_fast_path_works() {
 #[test]
 fn mul_div_with_min_operand_works() {
     let e = Env::default();
-    // `|I256::MIN|` is `2^255`, which the type itself cannot hold, so the operand
-    // reaches the core as an unsigned magnitude and has to come back through the
-    // negation intact. `MIN * 3 / 3` puts `2^255` on both ends of that round trip:
-    // the split is `q1 = (2^255 - 2)/3` and `r1 = 2`, since `2^255 % 3 == 2`, and
-    // the terms sum back to `3*q1 + 2`, which is `2^255` exactly.
+    // `|I256::MIN|` is `2^255`, which the type itself cannot hold, so the
+    // operand reaches the core as an unsigned magnitude and has to come
+    // back through the negation intact. `MIN * 3 / 3` puts `2^255` on both
+    // ends of that round trip: the split is `q1 = (2^255 - 2)/3` and `r1 =
+    // 2`, since `2^255 % 3 == 2`, and the terms sum back to `3*q1 + 2`,
+    // which is `2^255` exactly.
     let min = I256::min_value(&e);
     let three = i(&e, 3);
 
@@ -1224,14 +1234,14 @@ fn mul_div_with_min_operand_works() {
 #[test]
 fn mul_div_result_at_i256_min_works() {
     let e = Env::default();
-    // `I256`'s range is asymmetric, so the largest representable magnitude depends
-    // on the sign: `2^255` is one past `I256::MAX` going up, but exactly
-    // `I256::MIN` going down. `2^128 * 2^128 / -2` lands on it from the
-    // negative side.
+    // `I256`'s range is asymmetric, so the largest representable magnitude
+    // depends on the sign: `2^255` is one past `I256::MAX` going up, but
+    // exactly `I256::MIN` going down. `2^128 * 2^128 / -2` lands on it from
+    // the negative side.
     //
-    // The product has to be `2^256` rather than `2^255` for the fast path to give
-    // up. A negative product of `2^255` is `I256::MIN`, which `checked_mul`
-    // accepts.
+    // The product has to be `2^256` rather than `2^255` for the fast path to
+    // give up. A negative product of `2^255` is `I256::MIN`, which
+    // `checked_mul` accepts.
     let x = two_pow(&e, 128);
     let d = i(&e, -2);
 
@@ -1246,9 +1256,9 @@ fn mul_div_result_at_i256_min_works() {
 #[test]
 fn checked_mul_div_result_above_i256_max_returns_none() {
     let e = Env::default();
-    // The positive half of the case above, same magnitude and same denominator up
-    // to sign. `2^255` has no positive representation, so the upper bound
-    // rejects it one short of where the negative bound accepts.
+    // The positive half of the case above, same magnitude and same denominator
+    // up to sign. `2^255` has no positive representation, so the upper
+    // bound rejects it one short of where the negative bound accepts.
     let x = two_pow(&e, 128);
     let d = i(&e, 2);
 
@@ -1260,9 +1270,10 @@ fn checked_mul_div_result_above_i256_max_returns_none() {
 #[test]
 fn checked_mul_div_result_outside_range_returns_none() {
     let e = Env::default();
-    // A magnitude of `3 * 2^254`, past `I256` in both directions but well inside
-    // `U256`, so the summation itself succeeds and the rejection comes from the
-    // sign-specific bound rather than from a checked multiplication.
+    // A magnitude of `3 * 2^254`, past `I256` in both directions but well
+    // inside `U256`, so the summation itself succeeds and the rejection
+    // comes from the sign-specific bound rather than from a checked
+    // multiplication.
     let x = two_pow(&e, 128);
     let y = i(&e, 3).mul(&two_pow(&e, 126));
     let one = i(&e, 1);
@@ -1277,16 +1288,17 @@ fn checked_mul_div_result_outside_range_returns_none() {
 #[test]
 fn mul_div_with_all_terms_non_zero_works() {
     let e = Env::default();
-    // Every term of the decomposition live at once, including the dropped-fraction
-    // term that the cases above leave at zero. With `d = 5` and `a = 2^126`:
+    // Every term of the decomposition live at once, including the
+    // dropped-fraction term that the cases above leave at zero. With `d =
+    // 5` and `a = 2^126`:
     //
     // ```text
     // x = 5a + 3, y = 5a + 4   ->   x * y = 25a^2 + 35a + 12
     // x * y / 5 = 5a^2 + 7a + 2 + 2/5
     // ```
     //
-    // so `q1*q2*d`, `q1*r2`, `r1*q2` and `floor(r1*r2/d)` are `5a^2`, `4a`, `3a`
-    // and 2, none of them zero.
+    // so `q1*q2*d`, `q1*r2`, `r1*q2` and `floor(r1*r2/d)` are `5a^2`, `4a`,
+    // `3a` and 2, none of them zero.
     let a = two_pow(&e, 126);
     let five = i(&e, 5);
     let x = five.mul(&a).add(&i(&e, 3));
@@ -1322,8 +1334,9 @@ fn checked_family_never_panics_over_extremes() {
     for x in &values {
         for y in &values {
             for d in &values {
-                // Returning at all is the assertion. Zero denominators, `MIN / -1` and
-                // unrepresentable results are all in this grid.
+                // Returning at all is the assertion. Zero denominators, `MIN /
+                // -1` and unrepresentable results are all in
+                // this grid.
                 let _ = checked_mul_div_floor(x, y, d);
                 let _ = checked_mul_div_ceil(x, y, d);
                 let _ = checked_mul_div(x, y, d);
@@ -1340,8 +1353,8 @@ fn prop_checked_family_never_panics() {
     let e = Env::default();
     e.cost_estimate().budget().reset_unlimited();
 
-    // Unconstrained triples over the whole type, including `MIN`, which the byte
-    // route reaches and `from_i128` cannot.
+    // Unconstrained triples over the whole type, including `MIN`, which the
+    // byte route reaches and `from_i128` cannot.
     proptest!(|(xb: [u8; 32], yb: [u8; 32], db: [u8; 32])| {
         let x = from_be(&e, &xb);
         let y = from_be(&e, &yb);
@@ -1356,9 +1369,10 @@ fn prop_checked_family_never_panics() {
 #[test]
 fn checked_mul_div_zero_denominator_with_overflowing_product_returns_none() {
     let e = Env::default();
-    // The product overflows and the denominator is zero, so the fallback runs and
-    // divides by a zero magnitude. This is the case that keeps the core's divisions
-    // checked rather than bare: the checked family owes a `None` here, not a trap.
+    // The product overflows and the denominator is zero, so the fallback runs
+    // and divides by a zero magnitude. This is the case that keeps the
+    // core's divisions checked rather than bare: the checked family owes a
+    // `None` here, not a trap.
     let x = I256::max_value(&e);
     let y = i(&e, 2);
     let zero = i(&e, 0);
@@ -1388,11 +1402,11 @@ fn mul_div_zero_denominator_via_fallback_panics() {
 #[should_panic(expected = "Error(Contract, #1500)")] // SorobanFixedPointError::Overflow
 fn mul_div_ceil_unrepresentable_result_panics() {
     let e = Env::default();
-    // The third unchecked entry point's own `#1500`. The two tests around this one
-    // pin the code for `mul_div_floor` and `mul_div`; without this one, a wrong
-    // error variant in `mul_div_ceil`'s fallback arm alone goes unnoticed,
-    // because the family-agreement test only observes that an abort happened,
-    // not which.
+    // The third unchecked entry point's own `#1500`. The two tests around this
+    // one pin the code for `mul_div_floor` and `mul_div`; without this one,
+    // a wrong error variant in `mul_div_ceil`'s fallback arm alone goes
+    // unnoticed, because the family-agreement test only observes that an
+    // abort happened, not which.
     let max = I256::max_value(&e);
     let one = i(&e, 1);
 
@@ -1419,12 +1433,13 @@ fn checked_and_unchecked_families_agree_on_domain() {
     let e = Env::default();
     e.cost_estimate().budget().reset_unlimited();
 
-    // The two families may report a rejection differently, `None` against a panic,
-    // but they must never disagree about which inputs are acceptable. Divergence is
-    // the realistic outcome of changing one family and forgetting the other.
+    // The two families may report a rejection differently, `None` against a
+    // panic, but they must never disagree about which inputs are
+    // acceptable. Divergence is the realistic outcome of changing one
+    // family and forgetting the other.
     //
-    // A curated list rather than a sweep: every rejected case unwinds a real host
-    // panic, and the host writes its event log on the way out.
+    // A curated list rather than a sweep: every rejected case unwinds a real
+    // host panic, and the host writes its event log on the way out.
     let two_128 = two_pow(&e, 128);
     let inputs = [
         (i(&e, 100), i(&e, 50), i(&e, 10)),         // fast path, succeeds
@@ -1462,16 +1477,17 @@ fn checked_and_unchecked_families_agree_on_domain() {
         }
     }
 
-    // Six of the twelve inputs are rejected, in all three modes. Without this the
-    // test would pass on a list that happened to contain no failures at all.
+    // Six of the twelve inputs are rejected, in all three modes. Without this
+    // the test would pass on a list that happened to contain no failures at
+    // all.
     assert_eq!(rejections, 18, "the rejected half of the input list stopped rejecting");
 }
 
 #[test]
 fn dispatchers_match_leaf_functions_in_fallback_domain_works() {
     let e = Env::default();
-    // The dispatchers stay pure delegation, so the fallback lives in the six leaf
-    // functions and there is exactly one place per behaviour.
+    // The dispatchers stay pure delegation, so the fallback lives in the six
+    // leaf functions and there is exactly one place per behaviour.
     let a = two_pow(&e, 126);
     let five = i(&e, 5);
     let x = five.mul(&a).add(&i(&e, 3));
@@ -1547,8 +1563,8 @@ fn prop_fallback_is_commutative_in_x_and_y() {
     let e = Env::default();
     e.cost_estimate().budget().reset_unlimited();
 
-    // The four-term form is symmetric in `x` and `y` by construction, which was a
-    // stated reason for choosing it over the cheaper three-term form.
+    // The four-term form is symmetric in `x` and `y` by construction, which was
+    // a stated reason for choosing it over the cheaper three-term form.
     proptest!(|(xb: [u8; 32], yb: [u8; 32], db: [u8; 32], sx: bool, sy: bool, sd: bool)| {
         let x = operand(&e, &xb, sx);
         let y = operand(&e, &yb, sy);
@@ -1566,9 +1582,10 @@ fn prop_negating_x_swaps_floor_and_ceil() {
     let e = Env::default();
     e.cost_estimate().budget().reset_unlimited();
 
-    // `floor(-a) == -ceil(a)`, and truncation is odd. `I256::MIN` never reaches a
-    // negated position: the generator caps operand magnitudes below `2^152`, so
-    // negation is defined for every draw rather than filtered afterwards.
+    // `floor(-a) == -ceil(a)`, and truncation is odd. `I256::MIN` never reaches
+    // a negated position: the generator caps operand magnitudes below
+    // `2^152`, so negation is defined for every draw rather than filtered
+    // afterwards.
     proptest!(|(xb: [u8; 32], yb: [u8; 32], db: [u8; 32], sx: bool, sy: bool, sd: bool)| {
         let x = operand(&e, &xb, sx);
         let y = operand(&e, &yb, sy);
