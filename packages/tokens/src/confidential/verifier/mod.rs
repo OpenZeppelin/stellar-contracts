@@ -10,15 +10,16 @@
 //!
 //! # ⚠️ Not Production Ready
 //!
-//! This module is **unfinished**. [`ConfidentialVerifier::verify_proof`] has no
-//! working default implementation because its UltraHonk backend
-//! ([`NethermindEth/rs-soroban-ultrahonk`](https://github.com/NethermindEth/rs-soroban-ultrahonk))
-//! is still under development and **has not been audited**. Do **not** deploy a
-//! contract built on this trait to mainnet or any environment that handles
-//! real value. The trait surface, the [`VerifierStorageKey`] layout, and the
-//! VK-management helpers in [`storage`] are stable enough for the confidential
-//! token to scaffold against, and they are the only part of this
-//! module that is intended to be relied upon today.
+//! [`ConfidentialVerifier::verify_proof`] is backed by the UltraHonk verifier
+//! from
+//! [`NethermindEth/rs-soroban-ultrahonk`](https://github.com/NethermindEth/rs-soroban-ultrahonk),
+//! pinned in the workspace `Cargo.toml` to a fork carrying that upstream commit
+//! plus a `soroban-sdk` 27 bump (see the comment on the pin). That backend is
+//! **pre-release and has not been audited**, and neither have the circuits the
+//! verification keys are derived from. Do **not** deploy a contract built on
+//! this trait to mainnet or any environment that handles real value until both
+//! the backend and the circuits have been audited and the dependency is pinned
+//! to a released, reviewed version.
 //!
 //! ## Why a Separate Contract
 //!
@@ -34,11 +35,18 @@
 //!
 //! ## VK Encoding
 //!
-//! Verification keys are opaque [`Bytes`] blobs from this module's point of
-//! view; structural validation lives in the future UltraHonk backend, not in
-//! the storage layer. The on-disk reference format committed under
-//! `circuits/vks/` is a JSON array of hex-encoded `Fr` field elements (one
-//! file per circuit, produced by `bb write_vk --output_format fields`).
+//! Verification keys are opaque [`Bytes`] blobs from the storage layer's point
+//! of view: [`register_verification_key`] and [`update_verification_key`] store
+//! them verbatim without inspection. Structural validation happens lazily, in
+//! the UltraHonk backend, the first time [`verify_proof`] parses the stored
+//! bytes.
+//!
+//! The bytes registered on-chain must be the backend's packed binary VK
+//! encoding: a fixed-size header followed by the curve-point commitments,
+//! committed per circuit as `circuits/vks/<name>.vk.bin`. The sibling
+//! `<name>.vk.json` is the review-friendly form — a JSON array of hex-encoded
+//! `Fr` field elements produced by `bb write_vk --output_format fields` — and
+//! is **not** accepted by the backend.
 //!
 //! ## Storage
 //!
@@ -87,7 +95,8 @@ mod test;
 
 use soroban_sdk::{contracterror, contractevent, contracttrait, contracttype, Address, Bytes, Env};
 pub use storage::{
-    get_verification_key, register_verification_key, update_verification_key, VerifierStorageKey,
+    get_verification_key, register_verification_key, update_verification_key, verify_proof,
+    VerifierStorageKey,
 };
 
 /// Identifier of a zero-knowledge circuit whose verification key is stored in
@@ -222,16 +231,26 @@ pub trait ConfidentialVerifier {
     ///
     /// * [`VerifierError::VerificationKeyNotRegistered`] - When `circuit_type`
     ///   has no registered key.
+    /// * [`VerifierError::InvalidVerificationKey`] - When the registered key
+    ///   cannot be parsed as a valid UltraHonk verification key.
     ///
     /// # Notes
     ///
-    /// No default implementation is provided. The UltraHonk verification
-    /// backend lives in `NethermindEth/rs-soroban-ultrahonk`, which is still
-    /// under development and has not been audited (see the module-level
-    /// warning). Implementors MUST NOT ship a stub that returns `true`
-    /// unconditionally to any environment that handles real value.
-    fn verify_proof(e: &Env, circuit_type: CircuitType, public_inputs: Bytes, proof: Bytes)
-        -> bool;
+    /// The default implementation delegates to [`storage::verify_proof`], which
+    /// runs the UltraHonk verifier from
+    /// [`NethermindEth/rs-soroban-ultrahonk`](https://github.com/NethermindEth/rs-soroban-ultrahonk).
+    /// That backend and the circuits the verification keys are derived from are
+    /// **not yet audited** (see the module-level warning); the default
+    /// implementation MUST NOT be relied upon in any environment that handles
+    /// real value until they are.
+    fn verify_proof(
+        e: &Env,
+        circuit_type: CircuitType,
+        public_inputs: Bytes,
+        proof: Bytes,
+    ) -> bool {
+        storage::verify_proof(e, circuit_type, &public_inputs, &proof)
+    }
 
     /// Returns the UltraHonk verification key registered under `circuit_type`.
     ///
@@ -261,6 +280,9 @@ pub enum VerifierError {
     VerificationKeyNotRegistered = 3401,
     /// Indicates the proof failed UltraHonk verification.
     InvalidProof = 3402,
+    /// Indicates the registered verification key could not be parsed as a valid
+    /// UltraHonk verification key.
+    InvalidVerificationKey = 3403,
 }
 
 // ################## EVENTS ##################

@@ -14,11 +14,14 @@ cargo_inherit = true
 crate-type = ["lib", "cdylib"]
 doctest = false
 
+# The `alloc` feature provides the global allocator that the UltraHonk verifier
+# backend (`ultrahonk-soroban-verifier`) requires in `no_std` wasm builds.
 [dependencies]
-soroban-sdk = { workspace = true }
+soroban-sdk = { workspace = true, features = ["alloc"] }
 soroban-poseidon = { workspace = true }
 stellar-contract-utils = { workspace = true }
 stellar-governance = { workspace = true }
+ultrahonk-soroban-verifier = { workspace = true }
 
 [dev-dependencies]
 ed25519-dalek = { workspace = true }

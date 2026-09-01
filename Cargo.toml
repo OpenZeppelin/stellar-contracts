@@ -68,6 +68,16 @@ p256 = "0.13.2"
 serde = { version = "1", default-features = false }
 serde-json-core = { version = "0.6.0", default-features = false }
 
+# UltraHonk proof-verification backend for the confidential token. Pinned to a
+# specific commit because the upstream crate is pre-release and unaudited.
+#
+# Points at a fork rather than NethermindEth/rs-soroban-ultrahonk because
+# upstream is still on soroban-sdk 26, which cannot coexist with this
+# workspace's 27 (two SDK majors in one graph make `Env`/`Bytes` distinct
+# types). The fork's `v27` branch is upstream `main` (661db072) with the SDK
+# bump and nothing else. Repoint at upstream once it ships an SDK 27 release.
+ultrahonk-soroban-verifier = { git = "https://github.com/brozorec/rs-soroban-ultrahonk", rev = "5e9b4d995ec43ed1953cf89cfd738df6471e4b93", package = "ultrahonk_soroban_verifier", default-features = false }
+
 # members
 stellar-access = { path = "packages/access", version = "0.7.1" }
 stellar-accounts = { path = "packages/accounts", version = "0.7.1" }
