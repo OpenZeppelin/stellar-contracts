@@ -29,15 +29,16 @@ impl ExampleContract {
         Base::mint(e, &to, token_id)
     }
 
-    // allows either minter or burner role, does not enforce `require_auth` in the
-    // macro
+    // allows either minter or burner role, does not enforce `require_auth` in
+    // the macro
     #[has_any_role(caller, ["minter", "burner"])]
     pub fn multi_role_action(e: &Env, caller: Address) -> String {
         caller.require_auth();
         String::from_str(e, "multi_role_action_success")
     }
 
-    // allows either minter or burner role AND enforces `require_auth` in the macro
+    // allows either minter or burner role AND enforces `require_auth` in the
+    // macro
     #[only_any_role(caller, ["minter", "burner"])]
     pub fn multi_role_auth_action(e: &Env, caller: Address) -> String {
         String::from_str(e, "multi_role_auth_action_success")
@@ -53,8 +54,8 @@ impl NonFungibleToken for ExampleContract {
 // specific people with the `burner` role
 #[contractimpl]
 impl NonFungibleBurnable for ExampleContract {
-    // we DON'T want `require_auth()` provided by the macro, since there is already
-    // `require_auth()` in `Base::burn`
+    // we DON'T want `require_auth()` provided by the macro, since there is
+    // already `require_auth()` in `Base::burn`
     #[has_role(from, "burner")]
     fn burn(e: &Env, from: Address, token_id: u32) {
         Base::burn(e, &from, token_id);

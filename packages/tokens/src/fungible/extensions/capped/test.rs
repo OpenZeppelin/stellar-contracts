@@ -117,7 +117,8 @@ fn test_invalid_cap() {
     let contract_address = e.register(MockContract, ());
 
     e.as_contract(&contract_address, || {
-        // Attempt to set a negative cap value, which should trigger InvalidCap error
+        // Attempt to set a negative cap value, which should trigger InvalidCap
+        // error
         set_cap(&e, -100);
     });
 }
@@ -129,8 +130,8 @@ fn test_cap_not_set() {
     let contract_address = e.register(MockContract, ());
 
     e.as_contract(&contract_address, || {
-        // Try to query cap without setting it first, which should trigger CapNotSet
-        // error
+        // Try to query cap without setting it first, which should trigger
+        // CapNotSet error
         let _ = query_cap(&e);
     });
 }

@@ -464,9 +464,9 @@ impl Wad {
         // Result: x^8 * x^2 = x^10
         //
         // Note: We use checked_mul_div to handle phantom overflow
-        // (where intermediate multiplication overflows i128 but final result fits).
-        // This automatically scales to i256 when needed and returns None if the
-        // result doesn't fit in i128.
+        // (where intermediate multiplication overflows i128 but final result
+        // fits). This automatically scales to i256 when needed and
+        // returns None if the result doesn't fit in i128.
         while exponent > 0 {
             if exponent & 1 == 1 {
                 // result = result * base (in fixed-point)

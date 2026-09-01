@@ -247,7 +247,8 @@ fn remove_signer_shared_across_rules_decrements_count() {
         let contract_a = Address::generate(&e);
         let contract_b = Address::generate(&e);
 
-        // rule_a has two signers so removing shared_signer leaves one remaining.
+        // rule_a has two signers so removing shared_signer leaves one
+        // remaining.
         let extra_signer_a = Signer::Delegated(Address::generate(&e));
         let rule_a = add_context_rule(
             &e,

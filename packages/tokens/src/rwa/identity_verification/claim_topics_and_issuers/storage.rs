@@ -488,8 +488,9 @@ pub fn update_issuer_claim_topics(e: &Env, trusted_issuer: &Address, claim_topic
     // Add issuer to new topics
     for topic_to_add in topics_to_add {
         let mut topic_issuers = get_claim_topic_issuers(e, topic_to_add);
-        // We are sure that the issuer is not in the list, because `topics_to_add` only
-        // consists of the difference between old and new topics
+        // We are sure that the issuer is not in the list, because
+        // `topics_to_add` only consists of the difference between old
+        // and new topics
         topic_issuers.push_back(trusted_issuer.clone());
         let topic_key = ClaimTopicsAndIssuersStorageKey::ClaimTopicIssuers(topic_to_add);
         e.storage().persistent().set(&topic_key, &topic_issuers);

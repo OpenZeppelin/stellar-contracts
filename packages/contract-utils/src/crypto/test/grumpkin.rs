@@ -277,8 +277,8 @@ fn mul_by_two_matches_doubling() {
 #[test]
 fn mul_matches_reference_for_small_scalars() {
     let e = Env::default();
-    // For each k in {3, 7, 13, 100, u128::MAX}, verify Grumpkin::mul(p, k) matches
-    // ark's p * k for an arbitrary base point.
+    // For each k in {3, 7, 13, 100, u128::MAX}, verify Grumpkin::mul(p, k)
+    // matches ark's p * k for an arbitrary base point.
     let p_ark = scalar_mul_g(scalar_from_bytes(&[0xDE; 32]));
     let p = to_point(&e, &p_ark);
     for &k in &[3u128, 7, 13, 100, 1u128 << 64, u128::MAX] {

@@ -18,7 +18,8 @@ impl ExampleContract {
         asset: Address,
         decimals_offset: u32,
     ) {
-        // Asset and decimal offset should be configured once during initialization.
+        // Asset and decimal offset should be configured once during
+        // initialization.
         Vault::set_asset(e, asset);
         Vault::set_decimals_offset(e, decimals_offset);
         // Vault overrides the decimals function by default.

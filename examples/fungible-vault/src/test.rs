@@ -58,7 +58,8 @@ fn create_asset_client<'a>(
 fn test_vault_initialization() {
     let e = Env::default();
     let admin = Address::generate(&e);
-    let initial_supply = 1_000_000_000_000_000_000i128; // 1M tokens with 18 decimals
+    let initial_supply = 1_000_000_000_000_000_000i128; // 1M tokens with 18
+                                                        // decimals
     let decimals_offset = 6;
 
     // Create asset contract
@@ -70,7 +71,8 @@ fn test_vault_initialization() {
 
     // Test vault initialization
     assert_eq!(vault_client.query_asset(), asset_address);
-    assert_eq!(vault_client.decimals(), 18 + decimals_offset); // asset decimals + offset
+    assert_eq!(vault_client.decimals(), 18 + decimals_offset); // asset decimals
+                                                               // + offset
     assert_eq!(vault_client.total_supply(), 0);
     assert_eq!(vault_client.total_assets(), 0);
 }
@@ -306,7 +308,8 @@ fn test_multiple_users_deposit_withdraw() {
     // User1 deposits first
     let shares1 = vault_client.deposit(&deposit_amount, &user1, &user1, &user1);
 
-    // User2 deposits same amount (should get same shares since ratio is still 1:1)
+    // User2 deposits same amount (should get same shares since ratio is still
+    // 1:1)
     let shares2 = vault_client.deposit(&deposit_amount, &user2, &user2, &user2);
 
     assert_eq!(shares1, shares2);

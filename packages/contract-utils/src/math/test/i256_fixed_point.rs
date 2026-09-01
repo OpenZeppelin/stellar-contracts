@@ -95,8 +95,8 @@ fn test_mul_div_floor_large_number() {
 fn test_mul_div_floor_phantom_overflow() {
     let env = Env::default();
     let x: I256 = I256::from_i128(&env, i128::MAX);
-    // 256 bit max ~= 5.8e76, 128 bit max ~= 1.7e38, need to multiply by at least
-    // 10^39
+    // 256 bit max ~= 5.8e76, 128 bit max ~= 1.7e38, need to multiply by at
+    // least 10^39
     let y: I256 = I256::from_i128(&env, 10i128.pow(39));
     let denominator: I256 = I256::from_i128(&env, 10i128.pow(18));
 
@@ -145,8 +145,8 @@ fn test_mul_div_ceil_large_number() {
 fn test_mul_div_ceil_phantom_overflow() {
     let env = Env::default();
     let x: I256 = I256::from_i128(&env, i128::MAX);
-    // 256 bit max ~= 5.8e76, 128 bit max ~= 1.7e38, need to multiply by at least
-    // 10^39
+    // 256 bit max ~= 5.8e76, 128 bit max ~= 1.7e38, need to multiply by at
+    // least 10^39
     let y: I256 = I256::from_i128(&env, 10i128.pow(39));
     let denominator: I256 = I256::from_i128(&env, 10i128.pow(18));
 

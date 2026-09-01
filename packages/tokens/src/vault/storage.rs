@@ -729,18 +729,19 @@ impl Vault {
         from: &Address,
         operator: &Address,
     ) {
-        // This function assumes prior authorization of the operator and validation of
-        // amounts.
+        // This function assumes prior authorization of the operator and
+        // validation of amounts.
         let token_client = token::Client::new(e, &Self::query_asset(e));
-        // `safeTransfer` mechanism is not present in the base module, (will be provided
-        // as an extension)
+        // `safeTransfer` mechanism is not present in the base module, (will be
+        // provided as an extension)
 
         if operator == from {
             // Direct transfer: `operator` is depositing their own assets
             token_client.transfer(from, e.current_contract_address(), &assets);
         } else {
-            // Allowance-based transfer: `operator` is depositing on behalf of `from`
-            // This requires that `from` has approved `operator` on the underlying asset
+            // Allowance-based transfer: `operator` is depositing on behalf of
+            // `from` This requires that `from` has approved
+            // `operator` on the underlying asset
             token_client.transfer_from(operator, from, &e.current_contract_address(), &assets);
         }
 
@@ -781,15 +782,15 @@ impl Vault {
         shares: i128,
         operator: &Address,
     ) {
-        // This function assumes prior authorization of the operator and validation of
-        // amounts.
+        // This function assumes prior authorization of the operator and
+        // validation of amounts.
         if operator != owner {
             Base::spend_allowance(e, owner, operator, shares);
         }
         Base::update(e, Some(owner), None, shares);
         let token_client = token::Client::new(e, &Self::query_asset(e));
-        // `safeTransfer` mechanism is not present in the base module, (will be provided
-        // as an extension)
+        // `safeTransfer` mechanism is not present in the base module, (will be
+        // provided as an extension)
         token_client.transfer(&e.current_contract_address(), receiver, &assets);
     }
 

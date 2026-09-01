@@ -157,8 +157,8 @@ impl RWA {
         let total_balance = Base::balance(e, user_address);
         let frozen_tokens = Self::get_frozen_tokens(e, user_address);
 
-        // frozen tokens cannot be greater than total balance, necessary checks are done
-        // in state changing functions
+        // frozen tokens cannot be greater than total balance, necessary checks
+        // are done in state changing functions
         total_balance - frozen_tokens
     }
 
@@ -485,7 +485,8 @@ impl RWA {
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
         identity_verifier_client.verify_identity(new_account);
 
-        // Verify that the new account is the recovery target for the old account
+        // Verify that the new account is the recovery target for the old
+        // account
         let recovery_target = identity_verifier_client
             .recovery_target(old_account)
             .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityMismatch));
@@ -494,8 +495,8 @@ impl RWA {
             panic_with_error!(e, RWAError::IdentityMismatch);
         }
 
-        // Get the balance of the old account, if there is nothing to transfer, return
-        // false
+        // Get the balance of the old account, if there is nothing to transfer,
+        // return false
         let lost_balance = Base::balance(e, old_account);
         if lost_balance == 0 {
             return false;
