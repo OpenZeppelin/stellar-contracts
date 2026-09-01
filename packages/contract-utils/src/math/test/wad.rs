@@ -504,6 +504,15 @@ fn test_checked_div_int_overflow() {
 }
 
 #[test]
+#[should_panic(expected = "attempt to divide with overflow")]
+fn test_div_int_min_by_negative_one_panics() {
+    // The operator sibling of the case above. `i128` division overflow is
+    // checked in every build profile, so this panic is unconditional.
+    let a = Wad::from_raw(i128::MIN);
+    let _ = a / -1i128;
+}
+
+#[test]
 fn test_neg_positive() {
     let e = Env::default();
     let positive = Wad::from_integer(&e, 5);
@@ -524,6 +533,14 @@ fn test_neg_zero() {
     let zero = Wad::from_raw(0);
     let neg_zero = -zero;
     assert_eq!(neg_zero, Wad::from_raw(0));
+}
+
+#[test]
+#[should_panic(expected = "attempt to negate with overflow")]
+fn test_neg_min_panics() {
+    // `|i128::MIN|` has no `i128` representation.
+    let a = Wad::from_raw(i128::MIN);
+    let _ = -a;
 }
 
 #[test]

@@ -59,6 +59,11 @@ use crate::math::{
 /// | `a / n` (`i128`) | `n == 0`, or `a.raw() == i128::MIN && n == -1` |
 /// | `-a` | `a.raw() == i128::MIN` |
 ///
+/// These panics assume `overflow-checks = true`, which the standard Stellar
+/// release profile sets and `stellar contract build` enforces. In a build
+/// without it, every row except `a / n` wraps silently instead of panicking;
+/// division checks are the only ones rustc emits unconditionally.
+///
 /// Two properties of the `*` bound are worth noting. It constrains the
 /// product rather than either operand, so `Wad(1) * Wad(170)` and
 /// `Wad(17) * Wad(10)` both succeed while `Wad(171) * Wad(1)` does not. And

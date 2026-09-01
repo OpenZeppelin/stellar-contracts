@@ -16,7 +16,7 @@ use crate::math::{
 };
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Error(Object, ArithDomain)")]
 fn test_mul_div_zero_denominator() {
     let env = Env::default();
     let x: I256 = I256::from_i128(&env, 100);
@@ -166,7 +166,7 @@ fn test_mul_div_ceil_phantom_overflow_resolves() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Error(Object, ArithDomain)")]
 fn test_mul_div_floor_zero_denominator() {
     let env = Env::default();
     let x: I256 = I256::from_i128(&env, 100);
@@ -177,7 +177,7 @@ fn test_mul_div_floor_zero_denominator() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Error(Object, ArithDomain)")]
 fn test_mul_div_ceil_zero_denominator() {
     let env = Env::default();
     let x: I256 = I256::from_i128(&env, 100);
@@ -578,13 +578,13 @@ fn test_checked_mul_div_mul_overflow_resolves() {
 }
 
 #[test]
-#[should_panic]
-fn test_mul_div_min_by_negative_one_panics_untyped() {
+#[should_panic(expected = "Error(Object, ArithDomain)")]
+fn test_mul_div_min_by_negative_one_panics() {
     let env = Env::default();
     // `I256::MIN / -1` is `2^255`, which has no `I256` representation.
     // `checked_mul` succeeds and the overflow happens inside the unchecked
-    // division, so this is the one failure the module reports as a native
-    // arithmetic panic rather than a contract error code. Pinned deliberately
+    // division, so this is the one failure the module reports as the host's
+    // arithmetic error rather than a contract error code. Pinned deliberately
     // rather than fixed: the i128 sibling has the identical trap, and routing
     // the fast path through the checked helper would re-price every non-overflowing
     // call.
@@ -1375,8 +1375,8 @@ fn mul_div_zero_denominator_via_fallback_panics() {
     let e = Env::default();
     // A zero denominator is reported two ways depending on operand size, a
     // documented consequence of leaving domain faults to the platform. On the
-    // fast path the host's own arithmetic error surfaces, which the bare
-    // `should_panic` tests above pin; through the fallback it is `#1500`.
+    // fast path the host's own arithmetic error surfaces, which the
+    // zero-denominator tests above pin; through the fallback it is `#1500`.
     let x = I256::max_value(&e);
     let y = i(&e, 2);
     let zero = i(&e, 0);
