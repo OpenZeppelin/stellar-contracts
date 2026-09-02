@@ -1430,6 +1430,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "multisig-account-factory-example"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-accounts",
+]
+
+[[package]]
 name = "multisig-ed25519-verifier-example"
 version = "0.7.1"
 dependencies = [

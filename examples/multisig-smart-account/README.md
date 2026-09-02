@@ -212,6 +212,10 @@ For off-chain clients (e.g., JS SDK), replicate the same concatenation:
 3. Concatenate them and compute SHA-256
 4. Sign the resulting 32-byte digest
 
+## Deploying Accounts Through a Factory
+
+The deployment above uses your own keypair as the deployer. If an application needs to show users their account address before it exists, or to let anyone pay the deployment fee, deploy through the [factory example](factory/README.md) instead: it binds each address to the account's initial configuration and makes the factory the only deployer in its namespace.
+
 ## Next Steps
 
 1. Review the [Smart Accounts documentation](https://docs.openzeppelin.com/stellar-contracts/accounts/smart-account) to learn more about:
