@@ -6,47 +6,13 @@
 //! contract can create in that namespace, and the chain salt hashes the
 //! constructor arguments.
 use soroban_sdk::{
-    contract, contractevent, contractimpl, contracttype, xdr::ToXdr, Address, BytesN, Env, IntoVal,
-    Map, Val, Vec,
+    contract, contractimpl, contracttype, xdr::ToXdr, Address, BytesN, Env, IntoVal, Map, Val, Vec,
 };
 use stellar_accounts::smart_account::Signer;
 
-/// Storage keys for the factory.
 #[contracttype]
-pub enum FactoryStorageKey {
-    /// Hash of the account wasm every deployment instantiates.
+enum DataKey {
     AccountWasmHash,
-}
-
-/// Domain-separation tag; first element of the salt preimage.
-pub const SALT_PREIMAGE_VERSION: u32 = 1;
-
-/// Event emitted when an account is deployed.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AccountDeployed {
-    #[topic]
-    pub account: Address,
-    pub signers: Vec<Signer>,
-    pub policies: Map<Address, Val>,
-    pub salt: u32,
-}
-
-/// Emits an `AccountDeployed` event.
-pub fn emit_account_deployed(
-    e: &Env,
-    account: &Address,
-    signers: &Vec<Signer>,
-    policies: &Map<Address, Val>,
-    salt: u32,
-) {
-    AccountDeployed {
-        account: account.clone(),
-        signers: signers.clone(),
-        policies: policies.clone(),
-        salt,
-    }
-    .publish(e);
 }
 
 #[contract]
@@ -61,7 +27,7 @@ impl AccountFactoryContract {
     /// * `account_wasm_hash` - Hash of an account wasm that is already uploaded
     ///   on this network.
     pub fn __constructor(e: &Env, account_wasm_hash: BytesN<32>) {
-        e.storage().instance().set(&FactoryStorageKey::AccountWasmHash, &account_wasm_hash);
+        e.storage().instance().set(&DataKey::AccountWasmHash, &account_wasm_hash);
     }
 
     /// Returns the hash of the account wasm that every deployment
@@ -69,15 +35,12 @@ impl AccountFactoryContract {
     pub fn pinned_account_wasm_hash(e: &Env) -> BytesN<32> {
         e.storage()
             .instance()
-            .get(&FactoryStorageKey::AccountWasmHash)
+            .get(&DataKey::AccountWasmHash)
             .expect("the account wasm hash is set in __constructor")
     }
 
-    /// Returns the address `deploy_account` creates for this tuple, whether or
+    /// Returns the address `deploy` creates for this tuple, whether or
     /// not the account exists yet.
-    ///
-    /// Does not validate account constructor limits. Funds sent to an address
-    /// that `deploy_account` can never create are lost.
     ///
     /// # Arguments
     ///
@@ -87,7 +50,7 @@ impl AccountFactoryContract {
     ///   parameters.
     /// * `salt` - Caller-chosen value that lets one configuration have several
     ///   accounts.
-    pub fn predict(
+    pub fn predict_address(
         e: &Env,
         signers: Vec<Signer>,
         policies: Map<Address, Val>,
@@ -100,7 +63,7 @@ impl AccountFactoryContract {
     }
 
     /// Deploys the account for this tuple and returns its address, which is
-    /// the address `predict` returns for the same tuple.
+    /// the address `predict_address` returns for the same tuple.
     ///
     /// # Arguments
     ///
@@ -110,23 +73,7 @@ impl AccountFactoryContract {
     ///   parameters.
     /// * `salt` - Caller-chosen value that lets one configuration have several
     ///   accounts.
-    ///
-    /// # Errors
-    ///
-    /// * refer to the account contract's `__constructor` errors, which
-    ///   propagate unchanged (for example `SmartAccountError::TooManySigners`
-    ///   or `SmartAccountError::NoSignersAndPolicies`).
-    /// * `Error(Context, InvalidAction)` - an account for this exact tuple
-    ///   already exists. This is the host's refusal to create a contract at an
-    ///   occupied address, escalated across the contract boundary, so it is not
-    ///   distinguishable from other host failures.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["account_deployed", account: Address]`
-    /// * data - `[signers: Vec<Signer>, policies: Map<Address, Val>, salt:
-    ///   u32]`
-    pub fn deploy_account(
+    pub fn deploy(
         e: &Env,
         signers: Vec<Signer>,
         policies: Map<Address, Val>,
@@ -136,14 +83,7 @@ impl AccountFactoryContract {
         let signers = canonical_signers(e, &signers);
         let chain_salt = chain_salt(e, &signers, &policies, salt);
 
-        let account = e
-            .deployer()
-            .with_current_contract(chain_salt)
-            .deploy_v2(wasm_hash, (signers.clone(), policies.clone()));
-
-        emit_account_deployed(e, &account, &signers, &policies, salt);
-
-        account
+        e.deployer().with_current_contract(chain_salt).deploy_v2(wasm_hash, (signers, policies))
     }
 }
 
@@ -156,16 +96,14 @@ fn canonical_signers(e: &Env, signers: &Vec<Signer>) -> Vec<Signer> {
     set.keys()
 }
 
-/// SHA-256 of the canonical XDR of `(SALT_PREIMAGE_VERSION, signers, policies,
-/// salt)`.
+/// SHA-256 of the canonical XDR of `(signers, policies, salt)`.
 fn chain_salt(
     e: &Env,
     signers: &Vec<Signer>,
     policies: &Map<Address, Val>,
     salt: u32,
 ) -> BytesN<32> {
-    let preimage: Vec<Val> =
-        (SALT_PREIMAGE_VERSION, signers.clone(), policies.clone(), salt).into_val(e);
+    let salt_data: Vec<Val> = (signers.clone(), policies.clone(), salt).into_val(e);
 
-    e.crypto().sha256(&preimage.to_xdr(e)).to_bytes()
+    e.crypto().sha256(&salt_data.to_xdr(e)).to_bytes()
 }

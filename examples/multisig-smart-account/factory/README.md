@@ -14,12 +14,12 @@ For more information about smart accounts and their components, check:
 Soroban derives a contract address from `(network, deployer, salt)`. The factory
 is the deployer (`deployer().with_current_contract(salt)`), so only it can
 create in its namespace. The 32-byte chain salt is `sha256` of the canonical
-XDR of `(version, signers, policies, salt)`, where `signers` and `policies` are
+XDR of `(signers, policies, salt)`, where `signers` and `policies` are
 the account constructor arguments. A different configuration is a different
 address.
 
 The account wasm hash is pinned in the factory constructor, not passed to
-`predict` or `deploy_account`. Wasm is not part of a Stellar address, so a
+`predict_address` or `deploy`. Wasm is not part of a Stellar address, so a
 deploy-time wasm argument would let different code land at a predicted address.
 A different account wasm means a different factory and a disjoint set of
 addresses.
@@ -68,7 +68,7 @@ account example and the threshold policy. The `salt` argument is `0` for the
 first account with this configuration:
 
 ```bash
-stellar contract invoke --id account_factory -- predict \
+stellar contract invoke --id account_factory -- predict_address \
     --signers '[
         {
             "External": [
@@ -87,38 +87,19 @@ stellar contract invoke --id account_factory -- predict \
     --salt 0
 ```
 
-`predict` does not validate account constructor limits. Funds sent to an address
-that `deploy_account` can never create are lost.
-
 ## 5. Deploy the Account
 
-Deploy with the same tuple. The returned address is the one `predict` gave:
+Deploy with the same tuple. The returned address is the one `predict_address` gave:
 
 ```bash
-stellar contract invoke --id account_factory -- deploy_account \
+stellar contract invoke --id account_factory -- deploy \
     --signers '[ ...same as above... ]' \
     --policies '{ ...same as above... }' \
     --salt 0
 ```
 
-Anyone may call `deploy_account`. During construction the account authorizes
+Anyone may call `deploy`. During construction the account authorizes
 its own policy installs as their direct invoker, so the transaction needs no
 authorization entries beyond the fee payer's signature.
 
 To give the same signers a second account, change only `salt`.
-
-## Notes
-
-- **Collisions fail.** Deploying the same tuple twice fails as an untyped
-  `Error(Context, InvalidAction)`. Probe the predicted address off-chain before
-  submitting.
-- **Simulation does not enforce contract authorization.** A direct
-  `CreateContract` operation naming the factory as deployer simulates cleanly
-  and is rejected only when the ledger applies it. Wait for the ledger result
-  rather than trusting the simulation.
-- **Keep the factory alive.** Extend TTL on the factory instance and the
-  uploaded account wasm with `stellar contract extend`. The factory does not do
-  this itself.
-- **The account contract sets the ceiling.** The account's `__constructor`
-  creates one default rule named `multisig`. The factory cannot create richer
-  initial configurations than the account constructor accepts.
