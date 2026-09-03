@@ -100,6 +100,57 @@ impl RWAToken for RWATokenContract {
     }
 
     #[only_role(operator, "manager")]
+    fn batch_forced_transfer(
+        e: &Env,
+        from_list: Vec<Address>,
+        to_list: Vec<Address>,
+        amounts: Vec<i128>,
+        operator: Address,
+    ) {
+        RWA::batch_forced_transfer(e, &from_list, &to_list, &amounts);
+    }
+
+    #[only_role(operator, "manager")]
+    fn batch_mint(e: &Env, to_list: Vec<Address>, amounts: Vec<i128>, operator: Address) {
+        RWA::batch_mint(e, &to_list, &amounts);
+    }
+
+    #[only_role(operator, "manager")]
+    fn batch_burn(e: &Env, user_addresses: Vec<Address>, amounts: Vec<i128>, operator: Address) {
+        RWA::batch_burn(e, &user_addresses, &amounts);
+    }
+
+    #[only_role(operator, "manager")]
+    fn batch_set_address_frozen(
+        e: &Env,
+        user_addresses: Vec<Address>,
+        freeze_list: Vec<bool>,
+        operator: Address,
+    ) {
+        RWA::batch_set_address_frozen(e, &user_addresses, &freeze_list);
+    }
+
+    #[only_role(operator, "manager")]
+    fn batch_freeze_partial_tokens(
+        e: &Env,
+        user_addresses: Vec<Address>,
+        amounts: Vec<i128>,
+        operator: Address,
+    ) {
+        RWA::batch_freeze_partial_tokens(e, &user_addresses, &amounts);
+    }
+
+    #[only_role(operator, "manager")]
+    fn batch_unfreeze_partial_tokens(
+        e: &Env,
+        user_addresses: Vec<Address>,
+        amounts: Vec<i128>,
+        operator: Address,
+    ) {
+        RWA::batch_unfreeze_partial_tokens(e, &user_addresses, &amounts);
+    }
+
+    #[only_role(operator, "manager")]
     fn set_compliance(e: &Env, compliance: Address, operator: Address) {
         RWA::set_compliance(e, &compliance);
     }

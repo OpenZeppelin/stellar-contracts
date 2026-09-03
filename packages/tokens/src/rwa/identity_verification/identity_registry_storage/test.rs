@@ -9,10 +9,11 @@ use soroban_sdk::{
 use crate::rwa::{
     identity_verification::identity_registry_storage::{
         storage::{
-            add_country_data_entries, add_identity, delete_country_data, get_country_data,
-            get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
-            recover_identity, remove_identity, stored_identity, validate_country_data, CountryData,
-            CountryRelation, IdentityType, IndividualCountryRelation, OrganizationCountryRelation,
+            add_country_data_entries, add_identity, batch_add_identity, delete_country_data,
+            get_country_data, get_country_data_entries, get_identity_profile, get_recovered_to,
+            modify_country_data, recover_identity, remove_identity, stored_identity,
+            validate_country_data, CountryData, CountryRelation, IdentityType,
+            IndividualCountryRelation, OrganizationCountryRelation,
         },
         MAX_COUNTRY_ENTRIES, MAX_METADATA_ENTRIES, MAX_METADATA_STRING_LEN,
     },
@@ -1204,5 +1205,120 @@ fn validate_country_data_catches_invalid_metadata_value_types() {
         // Iterating the map forces value deserialization as String, which
         // panics because the actual values are i128.
         validate_country_data(&e, &country_data);
+    });
+}
+
+// ################## BATCH OPERATIONS ##################
+
+fn residence(country: u32) -> CountryRelation {
+    CountryRelation::Individual(IndividualCountryRelation::Residence(country))
+}
+
+#[test]
+fn batch_add_identity_stores_every_registration() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let first_account = Address::generate(&e);
+        let second_account = Address::generate(&e);
+        let first_identity = Address::generate(&e);
+        let second_identity = Address::generate(&e);
+
+        let usa = CountryData { country: residence(840), metadata: None };
+        let france = CountryData { country: residence(250), metadata: None };
+
+        batch_add_identity(
+            &e,
+            &vec![&e, first_account.clone(), second_account.clone()],
+            &vec![&e, first_identity.clone(), second_identity.clone()],
+            IdentityType::Individual,
+            &vec![&e, vec![&e, usa.clone()], vec![&e, france.clone()]],
+        );
+
+        assert_eq!(stored_identity(&e, &first_account), first_identity);
+        assert_eq!(stored_identity(&e, &second_account), second_identity);
+
+        let profile = get_identity_profile(&e, &second_account);
+        assert_eq!(profile.identity_type, IdentityType::Individual);
+        assert_eq!(profile.countries, vec![&e, france]);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #329)")]
+fn batch_add_identity_rejects_mismatched_identities() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let country = CountryData { country: residence(840), metadata: None };
+
+        batch_add_identity(
+            &e,
+            &vec![&e, Address::generate(&e), Address::generate(&e)],
+            &vec![&e, Address::generate(&e)],
+            IdentityType::Individual,
+            &vec![&e, vec![&e, country.clone()], vec![&e, country]],
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #329)")]
+fn batch_add_identity_rejects_mismatched_country_lists() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let country = CountryData { country: residence(840), metadata: None };
+
+        batch_add_identity(
+            &e,
+            &vec![&e, Address::generate(&e)],
+            &vec![&e, Address::generate(&e)],
+            IdentityType::Individual,
+            &vec![&e, vec![&e, country.clone()], vec![&e, country]],
+        );
+    });
+}
+
+/// An account repeated inside one batch hits the overwrite guard on its second
+/// occurrence, which aborts the whole call.
+#[test]
+#[should_panic(expected = "Error(Contract, #320)")]
+fn batch_add_identity_rejects_a_repeated_account() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let country = CountryData { country: residence(840), metadata: None };
+
+        batch_add_identity(
+            &e,
+            &vec![&e, account.clone(), account.clone()],
+            &vec![&e, Address::generate(&e), Address::generate(&e)],
+            IdentityType::Individual,
+            &vec![&e, vec![&e, country.clone()], vec![&e, country]],
+        );
+    });
+}
+
+#[test]
+fn batch_add_identity_accepts_an_empty_batch() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        batch_add_identity(
+            &e,
+            &Vec::new(&e),
+            &Vec::new(&e),
+            IdentityType::Individual,
+            &Vec::new(&e),
+        );
+
+        assert_eq!(e.events().all().events().len(), 0);
     });
 }
