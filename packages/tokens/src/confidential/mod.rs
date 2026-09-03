@@ -87,9 +87,11 @@
 //! `amount` units between the two accounts, with no fees deducted in transit
 //! and no rebasing applied. [`storage::deposit`] credits the
 //! confidential receiving balance with `amount · G` after the SEP-41
-//! transfer, and [`storage::withdraw`] debits the confidential
-//! spendable balance by `amount` before transferring the same amount out;
-//! neither call re-measures the contract's own balance. With a
+//! transfer, [`storage::withdraw`] debits the confidential
+//! spendable balance by `amount` before transferring the same amount out,
+//! and [`compliance::storage::clawback`] does the same on its
+//! `Some(destination)` branch; none of the three re-measures the contract's
+//! own balance. With a
 //! fee-on-transfer, rebasing, or otherwise malicious token implementation,
 //! the confidential ledger would drift from the on-chain reserves —
 //! credit a higher amount than was actually received, or pay out less than
@@ -125,6 +127,17 @@
 //! clawback empties the pool, leaving all holders' confidential balances
 //! unbacked and unwithdrawable. Issuer-led SAC deployments must weigh both
 //! powers explicitly alongside the exact-transfer assumption.
+//!
+//! The compliance extension's
+//! [`clawback`](compliance::ConfidentialClawback::clawback) gives the issuer a
+//! *legitimate* reason to make such a call. A seizure with `destination: None`
+//! reduces the target's confidential claim without moving any underlying, so
+//! the pool ends up over-collateralized by exactly that amount, which the
+//! issuer's own SAC clawback against this contract's address then extracts.
+//! The order matters: seizing first passes through surplus, while extracting
+//! first passes through a deficit borne by every other holder. An issuer
+//! extracting more than the accumulated surplus creates the shortfall
+//! described above.
 
 pub mod auditor;
 pub mod compliance;
@@ -838,7 +851,9 @@ pub fn emit_set_spender(
 }
 
 /// Event emitted when a delegation's escrowed allowance is folded back into
-/// the owner's spendable balance and the delegation is deleted.
+/// the owner's spendable balance and the delegation deleted — by the owner
+/// through [`ConfidentialToken::revoke_spender`], or by the compliance module
+/// through `ConfidentialClawback::force_revoke_spender`.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RevokeSpender {

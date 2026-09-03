@@ -1127,6 +1127,35 @@ pub fn set_address_as_field_element(e: &Env) {
     emit_address_as_field_set(e, &computed);
 }
 
+/// Overwrites both balance commitments of `account`.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `account` - The owner address.
+/// * `c_spend` - The new spendable commitment.
+/// * `c_receive` - The new receiving commitment.
+///
+/// # Errors
+///
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` is not
+///   registered.
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function performs no authorization check, consumes no
+/// proof, and verifies no conservation property. Establishing that the write
+/// preserves balance conservation (DESIGN_cont §9.3) is the caller's
+/// obligation. It exists for the compliance module's clawback flow
+/// ([`crate::confidential::compliance::storage::clawback`]), which discharges
+/// that obligation in-circuit before calling.
+pub(crate) fn set_commitments(e: &Env, account: &Address, c_spend: &Point, c_receive: &Point) {
+    let mut data = get_account(e, account);
+    data.spendable_commitment = c_spend.clone();
+    data.receiving_commitment = c_receive.clone();
+    e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &data);
+}
+
 // ################## LOW-LEVEL HELPERS ##################
 
 /// Overwrites `account.spendable_commitment` with `c_spend_new`.
@@ -1245,7 +1274,7 @@ where
 /// Cross-contract proof verification through [`ConfidentialVerifierClient`].
 /// Panics with [`ConfidentialTokenError::InvalidProof`] if the verifier returns
 /// `false`.
-fn verify(e: &Env, circuit_type: CircuitType, public_inputs: &Bytes, proof: &Bytes) {
+pub(crate) fn verify(e: &Env, circuit_type: CircuitType, public_inputs: &Bytes, proof: &Bytes) {
     let verifier = ConfidentialVerifierClient::new(e, &get_verifier(e));
     if !verifier.verify_proof(&circuit_type, public_inputs, proof) {
         panic_with_error!(e, ConfidentialTokenError::InvalidProof);
@@ -1266,7 +1295,7 @@ fn verify(e: &Env, circuit_type: CircuitType, public_inputs: &Bytes, proof: &Byt
 ///
 /// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When either coordinate
 ///   is `≥ r`.
-fn append_point(pi: &mut Bytes, p: &Point) {
+pub(crate) fn append_point(pi: &mut Bytes, p: &Point) {
     if !Grumpkin::is_canonical_point(p) {
         panic_with_error!(pi.env(), ConfidentialTokenError::NonCanonicalEncoding);
     }
@@ -1281,7 +1310,7 @@ fn append_point(pi: &mut Bytes, p: &Point) {
 ///
 /// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When the value is `≥
 ///   r`.
-fn append_field(pi: &mut Bytes, f: &BytesN<32>) {
+pub(crate) fn append_field(pi: &mut Bytes, f: &BytesN<32>) {
     if !Grumpkin::is_canonical_field(f) {
         panic_with_error!(pi.env(), ConfidentialTokenError::NonCanonicalEncoding);
     }
@@ -1290,7 +1319,7 @@ fn append_field(pi: &mut Bytes, f: &BytesN<32>) {
 
 /// Appends a non-negative `i128` amount as a canonical 32-byte big-endian
 /// `Bn254Fr` representative.
-fn append_amount(pi: &mut Bytes, e: &Env, amount: i128) {
+pub(crate) fn append_amount(pi: &mut Bytes, e: &Env, amount: i128) {
     let mut buf = [0u8; 32];
     buf[16..].copy_from_slice(&amount.to_be_bytes());
     pi.append(&Bytes::from_array(e, &buf));

@@ -238,8 +238,8 @@ fn sponge_squeeze_3_agrees_with_squeeze_2_on_shared_lanes() {
     // The widening from two lanes to three must be observationally identical
     // on lane[0] and lane[1] for every domain tag: both squeezes read the same
     // post-permutation state, and the absorb occupies a single rate-3 block.
-    // This is what lets `delta_aud_s` be widened everywhere it appears
-    // without renumbering a single existing constraint.
+    // It lets `delta_aud_s` be widened everywhere it appears without
+    // renumbering a single existing constraint.
     let s: Field = 0x12345;
     let sigma: Field = 0x6789;
     for d in [domain::AUDITOR_SENDER, domain::AUDITOR_RECIPIENT] {
@@ -270,8 +270,8 @@ fn esc_allow_r_auditor_is_domain_separated_from_the_spender_escrow() {
     // additive pads over the same shape, so a shared tag would let a
     // coincidence of inputs collapse one onto the other. Reusing one tag for
     // both would be secure in practice, since the shared scalars differ (Y_op
-    // and K_aud_s are independent points), but the separation is what keeps
-    // Section 5.3's r_e-reuse argument whole, so it must be observable here.
+    // and K_aud_s are independent points), but the separation keeps Section
+    // 5.3's r_e-reuse argument whole, so it must be observable here.
     let x: Field = 0xd0d0;
     let s: Field = 0x12345;
     let op_i: Field = 0xabcd;

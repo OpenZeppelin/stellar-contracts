@@ -1477,7 +1477,7 @@ fn rejects_escrow_of_blinding_for_the_wrong_sigma_a() {
     // correctly tagged, derived from the right dvk_i -- while every other
     // public stays canonical at SIGMA_A. S14 fires.
     //
-    // This is what makes the escrow useful: the auditor opens the on-chain C_a
+    // That pinning makes the escrow useful: the auditor opens the on-chain C_a
     // with what it decrypts. An escrow that floated free of sigma_a would let
     // a prover hand the auditor an opening of some other allowance state, and
     // the mismatch would only surface when the auditor checked the commitment.

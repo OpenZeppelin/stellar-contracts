@@ -860,9 +860,8 @@ fn auditor_key_rotation_rescopes_the_escrowed_allowance_opening() {
     let before = h.token.get_spender_delegation(&alice, &spender);
 
     // Step 3 -- the first post-rotation state change re-anchors K2. O_a9's
-    // escrow of r_a' is verified against K2, so this single event is what
-    // gives the rotated-in key an opening of the allowance it did not see
-    // created.
+    // escrow of r_a' is verified against K2, so this single event gives the
+    // rotated-in key an opening of the allowance it did not see created.
     h.token.confidential_transfer_from(&spender, &alice, &bob, &spender_transfer_data(&h.e));
     let xfer_events = h.e.events().all();
     assert_eq!(
@@ -886,7 +885,7 @@ fn auditor_key_rotation_rescopes_the_escrowed_allowance_opening() {
     // The delegation moved to a new state, so the opening K2 just received is
     // an opening of the CURRENT C_a, not of the one K1 saw. (The commitments
     // themselves are the same canonical fixture point under a mocked verifier;
-    // the salt is what distinguishes the two states here.)
+    // the salt distinguishes the two states here.)
     let after = h.token.get_spender_delegation(&alice, &spender);
     assert_ne!(before.allowance_salt, after.allowance_salt);
 

@@ -92,7 +92,8 @@ pub use storage::{
 
 /// Identifier of a zero-knowledge circuit whose verification key is stored in
 /// the registry. The numeric values are part of the on-chain interface and
-/// MUST NOT change.
+/// MUST NOT change. Core token circuits occupy `0..=4`; circuits shipped by
+/// optional extensions start at `100`.
 #[contracttype]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
@@ -102,6 +103,7 @@ pub enum CircuitType {
     Transfer = 2,
     SpenderTransfer = 3,
     SetSpender = 4,
+    Clawback = 100,
 }
 
 /// Trait for managing UltraHonk verification keys used by the confidential
