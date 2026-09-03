@@ -68,31 +68,36 @@ stellar contract invoke --id account_factory -- pinned_account_wasm_hash
 ## 4. Predict the Account Address
 
 Compute the address for a 2-of-2 account with the two Ed25519 keys from the
-account example and the threshold policy. In the command below,
-`CDLDYJWEZSM6IAI4HHPEZTTV65WX4OVN3RZD3U6LQKYAVIZTEK7XYAYT` is the Ed25519
-verifier contract address, the two 32-byte hex strings are the Ed25519 public
-keys, and `CA7IJLIHDBTE5S5EIMTIWRKKTSJP6KPH2VOU255CB2RNTWXQGYJRKKC3` is the
-threshold policy contract address (replace these with your own deployed
-addresses and keys when testing). The `salt` argument is `0` for the
+account example and the threshold policy. Set `SIGNERS` and `POLICIES` once
+(replace the sample values with your own deployed addresses and keys), then
+pass them to both `predict_address` and `deploy`.
+
+In the example below, `CDLDYJWEZSM6IAI4HHPEZTTV65WX4OVN3RZD3U6LQKYAVIZTEK7XYAYT`
+is the Ed25519 verifier contract address, the two 32-byte hex strings are the
+Ed25519 public keys, and `CA7IJLIHDBTE5S5EIMTIWRKKTSJP6KPH2VOU255CB2RNTWXQGYJRKKC3`
+is the threshold policy contract address. The `salt` argument is `0` for the
 first account with this configuration:
 
 ```bash
+SIGNERS='[
+    {
+        "External": [
+            "CDLDYJWEZSM6IAI4HHPEZTTV65WX4OVN3RZD3U6LQKYAVIZTEK7XYAYT",
+            "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29"
+        ]
+    },
+    {
+        "External": [
+            "CDLDYJWEZSM6IAI4HHPEZTTV65WX4OVN3RZD3U6LQKYAVIZTEK7XYAYT",
+            "4cb5abf6ad79fbf5abbccafcc269d85cd2651ed4b885b5869f241aedf0a5ba29"
+        ]
+    }
+]'
+POLICIES='{"CA7IJLIHDBTE5S5EIMTIWRKKTSJP6KPH2VOU255CB2RNTWXQGYJRKKC3": {"map": [{"key": {"symbol": "threshold"}, "val": {"u32": 2}}]}}'
+
 stellar contract invoke --id account_factory -- predict_address \
-    --signers '[
-        {
-            "External": [
-                "CDLDYJWEZSM6IAI4HHPEZTTV65WX4OVN3RZD3U6LQKYAVIZTEK7XYAYT",
-                "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29"
-            ]
-        },
-        {
-            "External": [
-                "CDLDYJWEZSM6IAI4HHPEZTTV65WX4OVN3RZD3U6LQKYAVIZTEK7XYAYT",
-                "4cb5abf6ad79fbf5abbccafcc269d85cd2651ed4b885b5869f241aedf0a5ba29"
-            ]
-        }
-    ]' \
-    --policies '{"CA7IJLIHDBTE5S5EIMTIWRKKTSJP6KPH2VOU255CB2RNTWXQGYJRKKC3": {"map": [{"key": {"symbol": "threshold"}, "val": {"u32": 2}}]}}' \
+    --signers "$SIGNERS" \
+    --policies "$POLICIES" \
     --salt 0
 ```
 
@@ -102,8 +107,8 @@ Deploy with the same tuple. The returned address is the one `predict_address` ga
 
 ```bash
 stellar contract invoke --id account_factory -- deploy \
-    --signers '[ ...same as above... ]' \
-    --policies '{ ...same as above... }' \
+    --signers "$SIGNERS" \
+    --policies "$POLICIES" \
     --salt 0
 ```
 
