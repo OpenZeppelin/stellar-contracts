@@ -27,6 +27,7 @@ CIRCUITS=(
     "transfer"
     "set_spender"
     "spender_transfer"
+    "clawback"
 )
 
 OUT_DIR="vks"

@@ -361,20 +361,21 @@ $$W\_{\text{receive}} = (v\_r, r\_r) \quad \text{such that} \quad C\_{\text{rece
 | Merge | $$W\_{\text{spend}} \leftarrow (v\_s + v\_r, \\; r\_s + r\_r)$$; $$W\_{\text{receive}} \leftarrow (0, 0)$$ |
 | Set spender (escrow amount $$a$$) | Proof outputs new commitment. $$W\_{\text{spend}} \leftarrow (v\_s - a, \\; \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk, \sigma))$$ |
 | Revoke spender | Proofless fold. $$W\_{\text{spend}} \mathrel{+}= (v\_a, r\_a)$$, the escrow opening recovered from the event per §7.9 |
+| Clawback (compliance extension) | The Merge row, then the event's public `amount` is subtracted from the spendable value ([COMPLIANCE.md](./COMPLIANCE.md) §5.4) |
 
-The Merge and Revoke spender rows use exact integer addition; $$W\_{\text{spend}}.r$$ is not reduced modulo $$r$$ or $$q$$ as folds accumulate. At proof-construction time the wallet reduces $$W\_{\text{spend}}.r$$ modulo $$q$$ and encodes the canonical $$\mathbb{F}\_q$$ representative as a single $$\mathbb{F}\_r$$ `Field`; the case where that encoding is unavailable is specified in [DESIGN_cont.md](./DESIGN_cont.md) §10.4 *Post-merge witness availability*.
+The Merge, Revoke spender, and Clawback rows fold openings the wallet already holds, leaving $$W\_{\text{spend}}.r$$ a sum; [DESIGN_cont.md](./DESIGN_cont.md) §10.4 *Post-merge witness availability* covers the case where no circuit can witness it.
 
-After every owner-initiated operation that produces a proof, $$r\_s$$ resets to a deterministic value. This is the **normalization** property: the spendable balance's blinding factor is always recoverable from $$(vk, \sigma)$$ at spend boundaries. Together with $$\tilde{b}$$, both emitted in the spend-boundary event, each spend boundary forms a **checkpoint** from which the spendable opening $$(v\_s, r\_s)$$ *as of that boundary* is recoverable via a single event lookup, with no replay of the spend history preceding it. $$W\_{\text{receive}}$$ has no such anchor: a checkpoint leaves $$C\_{\text{receive}}$$ untouched, which only `Merge` (§7.4) resets, so recovering it requires a replay (see Recovery below).
+After every owner-initiated operation that produces a proof, $$r\_s$$ resets to a deterministic value. This is the **normalization** property: the spendable balance's blinding factor is always recoverable from $$(vk, \sigma)$$ at spend boundaries. Together with $$\tilde{b}$$, both emitted in the spend-boundary event, each spend boundary forms a **checkpoint** from which the spendable opening $$(v\_s, r\_s)$$ *as of that boundary* is recoverable via a single event lookup, with no replay of the spend history preceding it. $$W\_{\text{receive}}$$ has no such anchor: a checkpoint leaves $$C\_{\text{receive}}$$ untouched, which only `Merge` (§7.4) and `Clawback` reset, so recovering it requires a replay (see Recovery below).
 
 **Consistency check.** At any time, the wallet can verify its state: $$C\_{\text{spend}} \stackrel{?}{=} v\_s \cdot G + r\_s \cdot H$$ and $$C\_{\text{receive}} \stackrel{?}{=} v\_r \cdot G + r\_r \cdot H$$, where $$C\_{\text{spend}}$$ and $$C\_{\text{receive}}$$ are read from on-chain state.
 
-**Recovery.** If the wallet loses local state, it recovers from **two anchors**: the account's last **checkpoint** for the spendable side (steps 1-4), and $$T\_0$$ -- its most recent `Merge` at or before that checkpoint -- for the receiving side (step 5). Since $$W\_{\text{receive}}$$ restarts at $$(0, 0)$$ as of $$T\_0$$, one replay window $$(T\_0, \text{now}]$$ serves both: it rebuilds the receiving side and carries the post-checkpoint proofless folds onto the spendable one (step 6). [DESIGN_cont.md](./DESIGN_cont.md) §9.5 *Why the two anchors compose* gives the argument that they do:
+**Recovery.** If the wallet loses local state, it recovers from **two anchors**: the account's last **checkpoint** for the spendable side (steps 1-4), and $$T\_0$$ -- its most recent `Merge` or `Clawback` at or before that checkpoint -- for the receiving side (step 5). Since $$W\_{\text{receive}}$$ restarts at $$(0, 0)$$ as of $$T\_0$$, one replay window $$(T\_0, \text{now}]$$ serves both: it rebuilds the receiving side and carries the post-checkpoint proofless folds onto the spendable one (step 6). [DESIGN_cont.md](./DESIGN_cont.md) §9.5 *Why the two anchors compose* gives the argument that they do:
 
-1. Fetch $$(\tilde{b}, \sigma)$$ from the most recent **checkpoint event** for this account: exactly one of `Withdraw`, `Transfer` (where the account is the `from`), or `SetSpender` -- the three event types carrying a proof-bound $$(\tilde{b}, \sigma)$$ for this account's spendable balance. `Merge` and `RevokeSpender` do change $$C\_{\text{spend}}$$ but are not checkpoints: carrying no proof, they cannot bind a $$\tilde{b}$$ to the resulting commitment (§7.4 *Encrypted balance*, §7.9 *Encrypted balance*), and their effect is absorbed into the next checkpoint. **No-checkpoint case:** if the account has no checkpoint event since `Register`, initialize $$W\_{\text{spend}} \leftarrow (0, 0)$$ and skip to step 5 with $$T\_0$$ = the `Register` event.
+1. Fetch $$(\tilde{b}, \sigma)$$ from the most recent **checkpoint event** for this account: exactly one of `Withdraw`, `Transfer` (where the account is the `from`), or `SetSpender` -- the three event types carrying a proof-bound $$(\tilde{b}, \sigma)$$ for this account's spendable balance. `Merge`, `RevokeSpender`, and `Clawback` do change $$C\_{\text{spend}}$$ but are not checkpoints: none binds a $$\tilde{b}$$ to the resulting commitment (§7.4 *Encrypted balance*, §7.9 *Encrypted balance*, [COMPLIANCE.md](./COMPLIANCE.md) §5.7), and their effect is absorbed into the next checkpoint. **No-checkpoint case:** if the account has no checkpoint event since `Register`, initialize $$W\_{\text{spend}} \leftarrow (0, 0)$$ and skip to step 5 with $$T\_0$$ = the `Register` event.
 2. Recover the spendable balance value: $$v\_s = \tilde{b} - \text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk, \sigma)$$.
 3. Recover the spendable balance blinding: $$r\_s = \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk, \sigma)$$.
 4. Set $$W\_{\text{spend}} \leftarrow (v\_s, r\_s)$$.
-5. Locate $$T\_0$$: the account's most recent `Merge` event at or before the checkpoint of step 1, or its `Register` event if no such `Merge` exists. Set $$W\_{\text{receive}} \leftarrow (0, 0)$$ as of $$T\_0$$.
+5. Locate $$T\_0$$: the account's most recent `Merge` or `Clawback` event at or before the checkpoint of step 1, or its `Register` event if neither exists. Set $$W\_{\text{receive}} \leftarrow (0, 0)$$ as of $$T\_0$$.
 6. Replay every event after $$T\_0$$ in ledger order, applying the *Update rules* above with three replay-specific amendments:
    - **Checkpoint event**: skip the spendable side -- step 1 already captured it.
    - **Revoke spender**: skip if at or before the checkpoint of step 1, which absorbed it; otherwise fold as the table specifies.
@@ -452,12 +453,12 @@ $$\text{PVK} = vk \cdot H$$. Set once at registration. Used by senders for ECDH 
 
 **`spendable_commitment`**
 
-The commitment the owner can spend from. Modified by owner-authorized operations and, in a deployment that enables the optional compliance extension, by its clawback ([COMPLIANCE.md](./COMPLIANCE.md) §5, outline only). Encoded as a single Grumpkin affine point (64 bytes).
+The commitment the owner can spend from. Modified by owner-authorized operations and, in a deployment that enables the optional compliance extension, by its clawback ([COMPLIANCE.md](./COMPLIANCE.md) §5.4). Encoded as a single Grumpkin affine point (64 bytes).
 
 
 **`receiving_commitment`**
 
-Accumulates incoming deposits and transfers via homomorphic addition. The contract adds to this without any proof from the recipient. Reset to $$\mathcal{O}$$ on merge (§7.4). Encoded as a single Grumpkin affine point (64 bytes).
+Accumulates incoming deposits and transfers via homomorphic addition. The contract adds to this without any proof from the recipient. Reset to $$\mathcal{O}$$ on merge (§7.4) and on clawback ([COMPLIANCE.md](./COMPLIANCE.md) §5.4). Encoded as a single Grumpkin affine point (64 bytes).
 
 **`auditor_id`**
 
