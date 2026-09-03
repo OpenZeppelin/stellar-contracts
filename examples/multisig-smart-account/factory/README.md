@@ -1,5 +1,9 @@
 # Smart Account Factory Example
 
+Use this factory if you want to deploy accounts to deterministic addresses
+derived from their initial signers and policies, or predict an address before
+deployment.
+
 This guide deploys the multisig smart account from the
 [account example](../account) through a factory. Like the verifier and policy
 examples, the factory is deployed once per network and referenced by address.
@@ -13,7 +17,9 @@ For more information about smart accounts and their components, check:
 
 Soroban derives a contract address from `(network, deployer, salt)`. The factory
 is the deployer (`deployer().with_current_contract(salt)`), so only it can
-create in its namespace. The 32-byte chain salt is `sha256` of the canonical
+create in its namespace. Because the deployer is the factory rather than the
+transaction caller, the account address is independent of who submits or pays
+for the deployment transaction. The 32-byte chain salt is `sha256` of the canonical
 XDR of `(signers, policies, salt)`, where `signers` and `policies` are
 the account constructor arguments. A different configuration is a different
 address.
