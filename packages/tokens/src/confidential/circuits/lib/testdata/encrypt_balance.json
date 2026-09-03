@@ -1,6 +1,6 @@
 {
   "primitive": "encrypt_balance",
-  "design_doc_refs": ["Constraint W7", "Constraint T12", "Constraint S11", "Constraint V8"],
+  "design_doc_refs": ["Constraint W7", "Constraint T12", "Constraint S11"],
   "description": "Encrypted balance scalar: b_tilde = v_new + Poseidon2(ENC_BAL, vk, sigma).",
   "vectors": [
     {

@@ -102,7 +102,6 @@ pub enum CircuitType {
     Transfer = 2,
     SpenderTransfer = 3,
     SetSpender = 4,
-    RevokeSpender = 5,
 }
 
 /// Trait for managing UltraHonk verification keys used by the confidential
