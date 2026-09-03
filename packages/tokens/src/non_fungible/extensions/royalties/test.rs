@@ -1,8 +1,11 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Env};
+use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
 
-use crate::non_fungible::{extensions::enumerable::Enumerable, Base};
+use crate::non_fungible::{
+    consecutive::Consecutive, extensions::enumerable::Enumerable, royalties::NonFungibleRoyalties,
+    Base, NonFungibleToken,
+};
 
 #[contract]
 struct MockContract;
@@ -217,4 +220,66 @@ fn test_remove_token_royalty_no_default() {
         assert_eq!(royalty_receiver, e.current_contract_address());
         assert_eq!(royalty_amount, 0);
     });
+}
+
+// A contract that pairs the royalties extension with `Consecutive`, whose
+// ownership is stored sparsely: only the last token of a batch gets a
+// materialised `Owner` entry, and the rest are resolved by walking back
+// through the bucket. `royalty_info` must therefore establish existence
+// through `Self::owner_of` rather than `Base::owner_of`.
+#[contract]
+struct ConsecutiveRoyaltiesContract;
+
+#[contractimpl(contracttrait)]
+impl NonFungibleToken for ConsecutiveRoyaltiesContract {
+    type ContractType = Consecutive;
+}
+
+#[contractimpl(contracttrait)]
+impl NonFungibleRoyalties for ConsecutiveRoyaltiesContract {
+    fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32, _operator: Address) {
+        Base::set_default_royalty(e, &receiver, basis_points);
+    }
+
+    fn set_token_royalty(
+        e: &Env,
+        token_id: u32,
+        receiver: Address,
+        basis_points: u32,
+        _operator: Address,
+    ) {
+        Base::set_token_royalty(e, token_id, &receiver, basis_points);
+    }
+
+    fn remove_token_royalty(e: &Env, token_id: u32, _operator: Address) {
+        Base::remove_token_royalty(e, token_id);
+    }
+}
+
+#[test]
+fn test_royalty_info_resolves_every_token_under_consecutive() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(ConsecutiveRoyaltiesContract, ());
+    let client = ConsecutiveRoyaltiesContractClient::new(&e, &address);
+
+    let owner = Address::generate(&e);
+    let receiver = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Consecutive::batch_mint(&e, &owner, 10);
+        Base::set_default_royalty(&e, &receiver, 500); // 5%
+    });
+
+    // Every token in the batch exists and resolves an owner, so every token
+    // must also resolve royalty information. Before this was fixed, only
+    // token 9 answered: it is the batch boundary and therefore the only id
+    // with a materialised `Owner` entry.
+    for token_id in 0..10u32 {
+        assert_eq!(client.owner_of(&token_id), owner);
+
+        let (royalty_receiver, royalty_amount) = client.royalty_info(&token_id, &1_000_000);
+        assert_eq!(royalty_receiver, receiver);
+        assert_eq!(royalty_amount, 50_000); // 5% of 1_000_000
+    }
 }
