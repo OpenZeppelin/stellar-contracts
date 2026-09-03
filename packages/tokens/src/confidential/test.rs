@@ -7,16 +7,16 @@ use soroban_sdk::{
     xdr::ToXdr,
     Address, Bytes, BytesN, Env, Event,
 };
+use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
 use crate::confidential::{
     auditor::{storage as auditor_storage, ConfidentialAuditor},
     storage as token_storage,
     verifier::{CircuitType, ConfidentialVerifier},
     ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, NoHooks, RegisterData,
-    RegisterPayload, RevokeSpender, RevokeSpenderData, RevokeSpenderPayload, SetSpender,
-    SetSpenderData, SetSpenderPayload, SpenderDelegation, SpenderTransfer, SpenderTransferData,
-    SpenderTransferPayload, Transfer, TransferData, TransferPayload, Withdraw, WithdrawData,
-    WithdrawPayload,
+    RegisterPayload, RevokeSpender, SetSpender, SetSpenderData, SetSpenderPayload,
+    SpenderDelegation, SpenderTransfer, SpenderTransferData, SpenderTransferPayload, Transfer,
+    TransferData, TransferPayload, Withdraw, WithdrawData, WithdrawPayload,
 };
 
 // ################## TEST FIXTURES ##################
@@ -166,8 +166,8 @@ impl ConfidentialVerifier for ReplayGuardVerifier {
 /// registered at the moment of the operation, so "which key version can read
 /// this event" reduces, at the contract level, to "which `K_aud_s` went into
 /// the public-input blob". This mock captures exactly that. `K_aud_s` sits at
-/// limb 8 of the SetSpender blob and limb 9 of the SpenderTransfer and
-/// RevokeSpender blobs (DESIGN §7.7 - §7.9).
+/// limb 8 of the SetSpender blob and limb 9 of the SpenderTransfer blob
+/// (DESIGN §7.7 - §7.8).
 #[contract]
 struct KeyRecordingVerifier;
 
@@ -181,7 +181,6 @@ impl ConfidentialVerifier for KeyRecordingVerifier {
         let (key, offset) = match ct {
             CircuitType::SetSpender => (symbol_short!("k_set"), 8u32 * 32),
             CircuitType::SpenderTransfer => (symbol_short!("k_xfer"), 9u32 * 32),
-            CircuitType::RevokeSpender => (symbol_short!("k_revoke"), 9u32 * 32),
             _ => return true,
         };
         e.storage().instance().set(&key, &pi.slice(offset..offset + 64));
@@ -328,21 +327,6 @@ fn spender_transfer_data(e: &Env) -> Bytes {
             v_tilde_aud_s: fixture_field(e, 0x36),
             a_tilde_aud_s: fixture_field(e, 0x37),
             r_tilde_aud_s: fixture_field(e, 0x38),
-        },
-        proof: Bytes::new(e),
-    }
-    .to_xdr(e)
-}
-
-fn revoke_spender_data(e: &Env) -> Bytes {
-    RevokeSpenderData {
-        payload: RevokeSpenderPayload {
-            c_spend_new: fixture_point(e),
-            b_tilde: fixture_field(e, 0x41),
-            r_e_point: fixture_point(e),
-            sigma: fixture_field(e, 0x42),
-            v_tilde_aud_s: fixture_field(e, 0x43),
-            b_tilde_aud_s: fixture_field(e, 0x44),
         },
         proof: Bytes::new(e),
     }
@@ -739,10 +723,60 @@ fn revoke_spender_deletes_delegation() {
     h.token.register(&spender, &1u32, &register_data(&h.e));
     h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
 
-    h.token.revoke_spender(&alice, &spender, &revoke_spender_data(&h.e));
+    h.token.revoke_spender(&alice, &spender);
     assert_eq!(h.e.events().all().events().len(), 1);
 
     assert!(!h.token.is_spender(&alice, &spender));
+}
+
+#[test]
+fn revoke_spender_folds_allowance_into_spendable() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
+
+    let pre = h.token.confidential_balance(&alice);
+    let delegation = h.token.get_spender_delegation(&alice, &spender);
+    let expected = h.e.as_contract(&h.token.address, || {
+        Grumpkin::add(&h.e, &pre.spendable_commitment, &delegation.allowance_commitment)
+    });
+
+    h.token.revoke_spender(&alice, &spender);
+
+    let post = h.token.confidential_balance(&alice);
+    assert_eq!(post.spendable_commitment, expected);
+    assert_eq!(post.receiving_commitment, pre.receiving_commitment);
+}
+
+#[test]
+fn revoke_spender_after_expiry_folds_allowance() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.set_spender(&alice, &spender, &10u32, &set_spender_data(&h.e));
+
+    let pre = h.token.confidential_balance(&alice);
+    let delegation = h.token.get_spender_delegation(&alice, &spender);
+    let expected = h.e.as_contract(&h.token.address, || {
+        Grumpkin::add(&h.e, &pre.spendable_commitment, &delegation.allowance_commitment)
+    });
+
+    h.e.ledger().set_sequence_number(100);
+    assert!(!h.token.is_spender(&alice, &spender));
+
+    h.token.revoke_spender(&alice, &spender);
+
+    assert_eq!(h.token.confidential_balance(&alice).spendable_commitment, expected);
+    assert!(!h.e.as_contract(&h.token.address, || token_storage::delegation_exists(
+        &h.e, &alice, &spender
+    )));
 }
 
 #[test]
@@ -752,7 +786,7 @@ fn revoke_unknown_spender_panics() {
     let alice = Address::generate(&h.e);
     let spender = Address::generate(&h.e);
     h.token.register(&alice, &1u32, &register_data(&h.e));
-    h.token.revoke_spender(&alice, &spender, &revoke_spender_data(&h.e));
+    h.token.revoke_spender(&alice, &spender);
 }
 
 #[test]
@@ -856,27 +890,23 @@ fn auditor_key_rotation_rescopes_the_escrowed_allowance_opening() {
     let after = h.token.get_spender_delegation(&alice, &spender);
     assert_ne!(before.allowance_salt, after.allowance_salt);
 
-    // Step 4 -- revocation runs under K2 too, but RevokeSpender reads only two
-    // sponge lanes (V_a3): its event carries no allowance escrow at all. An
-    // auditor that missed step 3 gets no second chance here -- it has to fold
-    // the allowance it already holds into C_spend, or wait for the owner's
-    // next checkpoint. This is the field list, and the absence is the point.
-    h.token.revoke_spender(&alice, &spender, &revoke_spender_data(&h.e));
+    // Step 4 -- revocation is a proofless fold (§7.9), so it opens no auditor
+    // channel: the event republishes the two delegation fields the fold
+    // deletes and nothing else. An auditor that missed step 3 folds the
+    // allowance it already holds into C_spend, or waits for the owner's next
+    // checkpoint.
+    h.token.revoke_spender(&alice, &spender);
     let revoke_events = h.e.events().all();
     assert_eq!(
         revoke_events.events().first().unwrap(),
         &RevokeSpender {
             account: alice.clone(),
             spender: spender.clone(),
-            r_e_point: fixture_point(&h.e),
-            sigma: fixture_field(&h.e, 0x42),
-            b_tilde: fixture_field(&h.e, 0x41),
-            v_tilde_aud_s: fixture_field(&h.e, 0x43),
-            b_tilde_aud_s: fixture_field(&h.e, 0x44),
+            a_tilde: after.a_tilde.clone(),
+            allowance_salt: after.allowance_salt.clone(),
         }
         .to_xdr(&h.e, &h.token_addr)
     );
-    assert_eq!(recorded(symbol_short!("k_revoke")), k2.into());
     assert!(!h.token.is_spender(&alice, &spender));
 }
 

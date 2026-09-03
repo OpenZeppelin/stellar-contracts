@@ -101,7 +101,7 @@ The sponge construction, its width and rate, the IV placement, the padding rule,
 
 $$\text{poseidon\\\_with\\\_domain}(\delta, [x_1, \ldots, x_n]) = \text{sponge}([\delta, x_1, \ldots, x_n])$$
 
-Squeeze-slot assignment is canonical and MUST be followed: `lane[0]` is always an amount mask, `lane[1]` is always a balance, allowance, or per-transfer-randomness mask, and `lane[2]` is always the sender-auditor blinding-escrow slot — the new spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`, the new allowance blinding $$r_a'$$ on `SpenderTransfer` (DESIGN.md §2.5). `lane[2]` never carries a key. Only the sender-auditor channel ($$\delta_{\text{aud\\\_s}}$$) is squeezed three-wide; the recipient channel ($$\delta_{\text{aud\\\_r}}$$) stays at two lanes. `Withdraw`, whose amount is public, takes `lane[1]` and `lane[2]` and leaves `lane[0]` unused (DESIGN.md W_a3–W_a5), so a checkpoint pad can never coincide with an amount pad.
+Squeeze-slot assignment is canonical and MUST be followed: `lane[0]` is always an amount mask, `lane[1]` is always a balance, allowance, or per-transfer-randomness mask, and `lane[2]` is always the sender-auditor blinding-escrow slot — the new spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`, the new allowance blinding $$r_a'$$ on `SpenderTransfer` (DESIGN.md §2.5). Only the sender-auditor channel ($$\delta_{\text{aud\\\_s}}$$) is squeezed three-wide; the recipient channel ($$\delta_{\text{aud\\\_r}}$$) stays at two lanes. `Withdraw`, whose amount is public, takes `lane[1]` and `lane[2]` and leaves `lane[0]` unused (DESIGN.md W_a3–W_a5), so a checkpoint pad can never coincide with an amount pad.
 
 ### 4.4 Generators and commitments
 
@@ -161,7 +161,7 @@ Secret scalars — $$\sigma$$, $$\sigma_a$$ — MUST be produced by the rejectio
 
 DESIGN_cont.md §13 assigns all seventeen values and is their only source; the right-hand column is this document's addition. $$\delta_{\text{disc\\\_bind}}$$ and $$\delta_{\text{disc}}$$ belong to the off-chain disclosure layer (SELECTIVE_DISCLOSURE.md §2.2). Tag 1 is absorbed by the contract rather than by a circuit — the contract derives $$\text{addr\\\_f}$$ and $$\text{op}_i$$ on-chain and the circuits receive them as opaque public inputs (DESIGN.md §2.7 *Usage sites*) — so it is part of the on-chain wire contract all the same. None of 14–16 is absorbed either in a circuit or on-chain, so none is part of the on-chain wire contract, but all three are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
 
-All seventeen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tags 11 and 12 are the multi-lane tags — 11 read three-wide wherever `lane[2]` is escrowed and two-wide on `RevokeSpender`, 12 always two-wide; the remaining fifteen, including 1, 14–16, and 17, are single-output tags. Tag 17 is absorbed only by the `SetSpender` circuit (DESIGN.md S14), which escrows the allowance blinding $$r_a$$ to the owner's auditor under a single-output pad rather than over `lane[2]`, that lane being taken by the spendable blinding; its fixture is `circuits/lib/testdata/encrypt_esc_allow_r_auditor.json`.
+All seventeen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tags 11 and 12 are the multi-lane tags — 11 read three-wide wherever the sender / owner channel is instantiated, 12 always two-wide; the remaining fifteen, including 1, 14–16, and 17, are single-output tags. Tag 17 is absorbed only by the `SetSpender` circuit (DESIGN.md S14, DESIGN_cont.md §8.5); its fixture is `circuits/lib/testdata/encrypt_esc_allow_r_auditor.json`.
 
 ### 4.9 Address compression
 
@@ -291,7 +291,7 @@ Three derivations this document specifies or relies on are computed outside the 
 
 ## 7. Witness Assembly
 
-An implementation MUST provide witness assembly for each circuit it supports, covering the six core circuits of DESIGN_cont.md §10.1: `Register`, `Withdraw`, `Transfer`, `SpenderTransfer`, `SetSpender`, `RevokeSpender`.
+An implementation MUST provide witness assembly for each circuit it supports, covering the five circuits of DESIGN_cont.md §10.1: `Register`, `Withdraw`, `Transfer`, `SpenderTransfer`, `SetSpender`.
 
 **Public-input order is a wire contract.** The verifier sees an ordered vector of field elements with no knowledge of what they denote (DESIGN.md §7.1), so a permutation of two same-typed inputs produces a well-formed vector that verifies a different statement. Each builder MUST assemble public inputs in exactly the order the contract assembles them, and MUST cite the contract function it mirrors at the site of the ordering. The per-operation public-input tables in DESIGN.md §7.2–§7.9 are authoritative for *membership*; the contract's assembly is authoritative for *order*.
 
@@ -385,7 +385,8 @@ Event application MUST be ordered, deduplicated, and idempotent in combination, 
 
 Application rules are DESIGN.md §5.2's update table and are not restated here. Two properties worth making explicit:
 
-- `Withdraw`, sender-side `Transfer`, `SetSpender`, and `RevokeSpender` **overwrite** $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$ rather than adjusting it, so a wallet that missed intervening events still converges on the spendable side.
+- `Withdraw`, sender-side `Transfer`, and `SetSpender` **overwrite** $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$ rather than adjusting it, so a wallet that missed intervening events still converges on the spendable side.
+- `RevokeSpender` is not a checkpoint — it carries no $$\tilde{b}$$ — and is **folded**, like `Merge`. `RevokeSpender` adds the reclaimed allowance opening to $$W_{\text{spend}}$$, with $$v_a$$ and $$r_a$$ recovered from the event's $$\tilde{a}$$ and `allowance_salt` under the owner-derived $$dvk_i$$ (DESIGN.md §7.9). A wallet that misses either event diverges until the next checkpoint and MUST rely on §10.6 to detect that.
 - A self-transfer — a `Transfer` whose `from` and `to` are the same account — MUST be applied in both roles: the sender side overwrites $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$, and the recipient side credits $$W_{\text{receive}}$$ from the same event's recipient-channel ciphertexts. The two roles act on different accumulators, so their relative order does not affect the result; applying only one loses the other accumulator's update.
 
 ### 10.3 In-flight operations
@@ -398,7 +399,7 @@ The projection MUST still be reconciled against the event, and MUST NOT be treat
 
 A fresh salt MUST be sampled for every **attempt**, including retries after a reverted or dropped transaction. The salt that must be fresh is the one the operation's pads absorb: $$\sigma$$ for owner-initiated operations, and $$\sigma_a'$$ — the replacement allowance salt — for spender transfers (DESIGN.md §6.2 *Transfer nonce*).
 
-DESIGN_cont.md §9.6 motivates this as unlinkability: a fresh salt prevents an observer correlating a reverted attempt with its retry. It is equally a confidentiality requirement, because the salt is the sole freshness input to every derived pad in the operation, the ephemeral scalar included (DESIGN.md §2.5, §5.3). Reuse therefore repeats the ephemeral key and every channel mask that depends on it, and two attempts that differ only in amount publish that difference in the clear.
+DESIGN_cont.md §9.6 motivates this as unlinkability: a fresh salt prevents an observer correlating a reverted attempt with its retry. It is equally a confidentiality requirement, because the salt is the sole freshness input to every derived pad in the operation, the ephemeral scalar included (DESIGN.md §2.5, §5.3). Reuse therefore repeats the ephemeral key and every channel mask that depends on it.
 
 An implementation MUST NOT cache or reuse a salt across attempts, and MUST NOT derive it from anything an observer can predict.
 
@@ -444,18 +445,18 @@ Merge is proof-less and owner-authorized, and neither a merge nor an in-flight s
 
 ### 10.9 Recovery
 
-Recovery follows the procedure of DESIGN.md §5.2 *Recovery*, with the reconstructed state verified per §10.6. Its two anchors differ: the latest checkpoint event pins $$W_{\text{spend}}$$ in one lookup, while $$W_{\text{receive}}$$ restarts at $$T_0$$ — the account's last `Merge` at or before that checkpoint — from which the replay window runs.
+Recovery follows the procedure of DESIGN.md §5.2 *Recovery*, with the reconstructed state verified per §10.6. Its two anchors differ: the latest checkpoint event pins $$W_{\text{spend}}$$ as of that checkpoint in one lookup, with the `Merge` and `RevokeSpender` folds that follow it applied over the replay window per §10.2, while $$W_{\text{receive}}$$ restarts at $$T_0$$ — the account's last `Merge` at or before that checkpoint — from which that window runs.
 
 Two further obligations follow from data availability:
 
 - Recovery from a root alone depends on a conforming indexer (INDEXER.md). Without one, a client can see that funds exist but cannot reconstruct the opening needed to spend them.
-- **With RPC-only event access, a client MUST sync at least once per RPC retention window**, and MUST warn when it has not. The spendable side is robust, since each checkpoint is self-contained, but the receiving side is a running sum from $$T_0$$, so a crediting event that ages out before it is applied takes its opening with it permanently.
+- **With RPC-only event access, a client MUST sync at least once per RPC retention window**, and MUST warn when it has not. Any event that ages out before it is applied takes its opening with it permanently: a crediting event on the receiving side, which is a running sum from $$T_0$$, and a `RevokeSpender` after the latest checkpoint, whose $$\tilde{a}$$ and `allowance_salt` survive nowhere else once the delegation entry is deleted (DESIGN.md §7.9). Only the spend history preceding the checkpoint is expendable, each checkpoint being self-contained.
 
 ### 10.10 Spender-side wallet
 
 A spender reconstructs its allowance state from the on-chain delegation entry rather than from event replay: it recovers $$dvk_i$$ from the escrowed value by ECDH (DESIGN.md §7.11), then reads the current allowance from the entry's encrypted allowance and salt (DESIGN_cont.md §11.3).
 
-Implementations MUST surface the delegation's expiry ledger and SHOULD warn ahead of it. They MUST represent expired-but-unrevoked delegations as still holding escrowed value (DESIGN.md §6.2).
+Implementations MUST surface the delegation's expiry ledger and SHOULD warn ahead of it. They MUST represent expired-but-unrevoked delegations as still holding escrowed value (DESIGN.md §6.2). A `RevokeSpender` event with the entry gone means the owner folded the delegation back.
 
 A spender MUST NOT be able to reach the owner's spendable balance through any interface (§3).
 
@@ -463,24 +464,24 @@ A spender MUST NOT be able to reach the owner's spendable balance through any in
 
 ## 11. Auditor Client
 
-An auditor decrypts from the public event and its own secret $$k$$ alone, with no viewing key, holder cooperation, or extra on-chain read. The allowance opening comes straight out of the event: the blinding of the $$C_a$$ that operation writes is escrowed in the event itself -- tag 17 on `SetSpender`, `lane[2]` on `SpenderTransfer` -- and the matching value is in the sender-channel ciphertext (DESIGN_cont.md §8.5). An auditor that did not observe the event holds no opening for that state and cannot derive one; there is no key from which the openings follow. For each channel it computes the shared scalar against the event's ephemeral point, derives that channel's lane masks (§4.3) — three on the sender / owner channel, two on the recipient channel — and subtracts.
+An auditor decrypts from the public event and its own secret $$k$$ alone, with no viewing key, holder cooperation, or extra on-chain read. For each channel it computes the shared scalar against the event's ephemeral point, derives that channel's lane masks (§4.3) — three on the sender / owner channel, two on the recipient channel — and subtracts. The allowance opening comes straight out of the event: the blinding of the $$C_a$$ that operation writes is escrowed in the event itself — tag 17 on `SetSpender`, `lane[2]` on `SpenderTransfer` — and the matching value is in the sender-channel ciphertext (DESIGN_cont.md §8.5). An auditor that did not observe the event holds no opening for that state.
 
 The two channels differ in what they yield (DESIGN_cont.md §8.1):
 
 | Channel | `lane[0]` | `lane[1]` | `lane[2]` |
 |:--|:--|:--|:--|
-| Sender / owner ($$\delta_{\text{aud\\\_s}}$$) | Transfer amount, or the escrowed amount for `SetSpender` and the reclaimed amount for `RevokeSpender` | Sender's post-operation balance, or post-operation allowance for a spender transfer | Post-operation spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`; post-transfer allowance blinding $$r_a'$$ on `SpenderTransfer`; nothing on `RevokeSpender`, which stays two-lane |
+| Sender / owner ($$\delta_{\text{aud\\\_s}}$$) | Transfer amount, or the escrowed amount for `SetSpender` | Sender's post-operation balance, or post-operation allowance for a spender transfer | Post-operation spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`; post-transfer allowance blinding $$r_a'$$ on `SpenderTransfer` |
 | Recipient ($$\delta_{\text{aud\\\_r}}$$) | Transfer amount | Per-transfer Pedersen randomness $$r_{\text{transfer}}$$ | — (channel is two-lane) |
 
-`Withdraw`, `SetSpender`, and `RevokeSpender` carry a sender-channel balance checkpoint whose pad is `lane[1]`. Only `Withdraw` leaves `lane[0]` unused, its amount being public (DESIGN.md W_a3, §4.3); `SetSpender` and `RevokeSpender` read `lane[0]` as well, for the escrowed and reclaimed amounts respectively (DESIGN.md S_a4, V_a4).
+`Withdraw` and `SetSpender` carry a sender-channel balance checkpoint whose pad is `lane[1]`. Only `Withdraw` leaves `lane[0]` unused, its amount being public (DESIGN.md W_a3, §4.3); `SetSpender` reads `lane[0]` as well, for the escrowed amount (DESIGN.md S_a4).
 
-An implementation MUST squeeze the sender / owner channel three-wide and MUST NOT widen the recipient channel. Reading `lane[2]` on `RevokeSpender` yields a pad over no ciphertext (V_a3 is two-lane, DESIGN.md §7.9); an implementation MUST treat a `RevokeSpender` event as carrying no escrowed blinding rather than substituting a stale one. Because the first two lanes of $$\text{SpongeSqueeze}_3$$ coincide with $$\text{SpongeSqueeze}_2$$ (§4.3), a client that already reads `lane[0]` and `lane[1]` keeps every value it decrypted before.
+An implementation MUST squeeze the sender / owner channel three-wide and MUST NOT widen the recipient channel. `RevokeSpender` opens no auditor channel, the fold being proofless (DESIGN.md §7.9); an implementation MUST treat that event as carrying no escrowed blinding rather than substituting a stale one.
 
 **Cross-channel agreement.** Where an auditor holds the key for both parties, the amount decrypts independently on each channel and the circuit constrains both to the same value, so the two MUST agree. An implementation SHOULD perform this comparison and treat disagreement as evidence that $$k$$ is not the auditor key for both parties of that event.
 
-**Scope MUST be represented, not implied.** The recipient-channel capability is forward-only, receiving-side only, and reset by merge (DESIGN_cont.md §8.1). The `lane[2]` opening of the sender channel is forward-only and **standing**: it opens the spendable commitment as of the checkpoint that escrowed it and stays valid through merges, because one account key serves both channels (DESIGN_cont.md §8.1 *Sender-auditor opening capability*). Maintaining it is the client's job, not the protocol's: an implementation MUST add the `lane[0]` amount and `lane[1]` $$r_{\text{transfer}}$$ of every inbound `Transfer` and `SpenderTransfer` to its stored $$(v, r)$$, and MUST treat each `Deposit` as $$(\text{amount}, 0)$$ (DESIGN.md §7.3). It MUST invalidate the stored opening on a `RevokeSpender` event, which rewrites the spendable commitment under a blinding no channel carries, until the next `lane[2]` escrow. Across a key rotation an implementation MUST either carry the accumulated opening forward from the prior key or treat the account as unopened until the next checkpoint under the new key; the value side needs no replay either way, since the next owner-initiated proof publishes a fresh balance checkpoint.
+**Scope MUST be represented, not implied.** The recipient-channel capability is forward-only, reset by merge, and yields no opening of the spendable commitment (DESIGN_cont.md §8.1). The `lane[2]` opening of the sender channel is forward-only and **standing**: it opens the spendable commitment as of the checkpoint that escrowed it and stays valid through merges provided the client folded in every inbound flow since the previous merge, one account key serving both channels (DESIGN_cont.md §8.1 *Sender-auditor opening capability*). Maintaining it is the client's job: an implementation MUST add the `lane[0]` amount and `lane[1]` $$r_{\text{transfer}}$$ of every inbound `Transfer` and `SpenderTransfer` to its stored $$(v, r)$$, and MUST treat each `Deposit` as $$(\text{amount}, 0)$$ (DESIGN.md §7.3). On a `RevokeSpender` event it MUST add the $$(v_a, r_a)$$ it recorded for that delegation, the fold being public and the addend already escrowed (DESIGN_cont.md §8.5); where it holds no such record it MUST mark the opening unavailable until the next `lane[2]` escrow rather than carry a stale one. Across a key rotation, what an implementation may carry forward and what it MUST treat as unopened are fixed by DESIGN_cont.md §8.3.
 
-An auditor facade MUST NOT be able to construct a spending witness. It *can*, however, open the spendable balance past a merge -- the inbound $$r_{\text{transfer}}$$ reaches the same key on the recipient channel -- so a facade that exposes openings exposes them for the account's whole history under the active key, not for isolated events.
+An auditor facade MUST NOT be able to construct a spending witness. It can open the spendable balance past a merge — the inbound $$r_{\text{transfer}}$$ reaches the same key on the recipient channel — so a facade that exposes openings exposes them for the account's whole history under the active key.
 
 ---
 

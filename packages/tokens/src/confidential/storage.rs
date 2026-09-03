@@ -208,27 +208,6 @@ pub struct SetSpenderData {
     pub proof: Bytes,
 }
 
-/// Payload for [`crate::confidential::ConfidentialToken::revoke_spender`].
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RevokeSpenderPayload {
-    pub c_spend_new: Point,
-    pub b_tilde: BytesN<32>,
-    pub r_e_point: Point,
-    pub sigma: BytesN<32>,
-    pub v_tilde_aud_s: BytesN<32>,
-    pub b_tilde_aud_s: BytesN<32>,
-}
-
-/// Envelope decoded from the `data: Bytes` argument of
-/// [`crate::confidential::ConfidentialToken::revoke_spender`].
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RevokeSpenderData {
-    pub payload: RevokeSpenderPayload,
-    pub proof: Bytes,
-}
-
 // ################## QUERY STATE ##################
 
 /// Returns the SEP-41 token address bound at construction.
@@ -961,87 +940,44 @@ pub fn set_spender(
     );
 }
 
-/// Revokes the `(account, spender)` delegation and folds the remaining
-/// escrowed allowance back into `account`'s spendable balance.
-/// Works for both active and expired-but-not-revoked delegations.
+/// Revokes the `(owner, spender)` delegation: folds the escrowed allowance
+/// commitment `C_a` back into `owner`'s spendable commitment and deletes the
+/// delegation entry. Works for both active and expired-but-not-revoked
+/// delegations. The fold and the openings it yields to the owner and the
+/// auditor are specified in DESIGN §7.9 and DESIGN_cont §8.5.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `account` - The owner reclaiming the allowance.
+/// * `owner` - The owner whose allowance is being reclaimed.
 /// * `spender` - The previously-delegated spender.
-/// * `payload` - The decoded [`RevokeSpenderPayload`].
-/// * `proof` - The raw UltraHonk proof bytes.
 ///
 /// # Errors
 ///
-/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` is not
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `owner` is not
 ///   registered.
-/// * [`ConfidentialTokenError::DelegationNotFound`] - When `(account, spender)`
+/// * [`ConfidentialTokenError::DelegationNotFound`] - When `(owner, spender)`
 ///   has no delegation.
-/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
-///   or fields from the proof are non-canonical.
-/// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
-///   verification.
-/// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
-///   errors.
 ///
 /// # Events
 ///
 /// * topics - `["revoke_spender", account: Address, spender: Address]`
-/// * data - `[r_e_point, sigma, b_tilde, v_tilde_aud_s, b_tilde_aud_s]`
+/// * data - `[a_tilde: BytesN<32>, allowance_salt: BytesN<32>]`
 ///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait
 /// entry point is responsible for calling `account.require_auth()`.
-pub fn revoke_spender(
-    e: &Env,
-    account: &Address,
-    spender: &Address,
-    payload: &RevokeSpenderPayload,
-    proof: &Bytes,
-) {
-    let owner = get_account(e, account);
-    let delegation = get_spender_delegation(e, account, spender);
-    let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
-    let k_aud_s = auditor.get_key(&owner.auditor_id);
-    let addr_f = get_address_as_field_element(e);
-    let spender_id = address_to_field(e, spender);
+pub fn revoke_spender(e: &Env, owner: &Address, spender: &Address) {
+    let mut account = get_account(e, owner);
+    let delegation = get_spender_delegation(e, owner, spender);
 
-    // PI order (DESIGN §7.9):
-    //   C_spend, C_a, sigma_a, Y, spender_id (op_i), addr_f, K_aud_s,
-    //   C_spend', b_tilde, sigma, R_e, v_tilde_aud_s, b_tilde_aud_s
-    let mut pi = Bytes::new(e);
-    append_point(&mut pi, &owner.spendable_commitment);
-    append_point(&mut pi, &delegation.allowance_commitment);
-    append_field(&mut pi, &delegation.allowance_salt);
-    append_point(&mut pi, &owner.spending_public_key);
-    append_field(&mut pi, &spender_id);
-    append_field(&mut pi, &addr_f);
-    append_point(&mut pi, &k_aud_s);
-    append_point(&mut pi, &payload.c_spend_new);
-    append_field(&mut pi, &payload.b_tilde);
-    append_field(&mut pi, &payload.sigma);
-    append_point(&mut pi, &payload.r_e_point);
-    append_field(&mut pi, &payload.v_tilde_aud_s);
-    append_field(&mut pi, &payload.b_tilde_aud_s);
+    account.spendable_commitment =
+        Grumpkin::add(e, &account.spendable_commitment, &delegation.allowance_commitment);
+    e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(owner.clone()), &account);
+    delete_delegation(e, owner, spender);
 
-    verify(e, CircuitType::RevokeSpender, &pi, proof);
-
-    set_spendable(e, account, &payload.c_spend_new);
-    delete_delegation(e, account, spender);
-
-    emit_revoke_spender(
-        e,
-        account,
-        spender,
-        &payload.r_e_point,
-        &payload.sigma,
-        &payload.b_tilde,
-        &payload.v_tilde_aud_s,
-        &payload.b_tilde_aud_s,
-    );
+    emit_revoke_spender(e, owner, spender, &delegation.a_tilde, &delegation.allowance_salt);
 }
 
 /// Sets the SEP-41 token address.

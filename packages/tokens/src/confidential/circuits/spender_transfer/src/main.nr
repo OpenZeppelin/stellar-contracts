@@ -104,38 +104,9 @@ mod tests;
 //                                                           post-transfer
 //                                                           allowance.
 //   O_a9 r_tilde_aud_s = r_a' + m_r_s                       Owner-auditor
-//                                                           escrow of the NEW
-//                                                           allowance blinding
-//                                                           -- O10's r_a',
-//                                                           which O11 commits
-//                                                           under. Already a
-//                                                           witness, so this is
-//                                                           one field addition.
-//                                                           With a_tilde_aud_s
-//                                                           (O_a8) it hands the
-//                                                           owner's auditor the
-//                                                           opening of the C_a'
-//                                                           this operation
-//                                                           writes. Pad and
-//                                                           plaintext both key
-//                                                           off sigma_a', under
-//                                                           different domain
-//                                                           tags and different
-//                                                           secrets (s_{a,s}
-//                                                           vs dvk_i).
-//                                                           Buys one-operation
-//                                                           convergence for a
-//                                                           live delegation
-//                                                           whose auditor key
-//                                                           rotated after
-//                                                           set_spender -- the
-//                                                           same property every
-//                                                           other auditor
-//                                                           ciphertext has. It
-//                                                           does nothing for a
-//                                                           frozen account,
-//                                                           which emits no
-//                                                           ciphertext at all.
+//                                                           escrow of the new
+//                                                           allowance blinding,
+//                                                           over O10's r_a'.
 //
 // Contract binding (Section 7.8 final paragraph)
 // ---------------------------------------------
@@ -154,10 +125,8 @@ mod tests;
 // Every pad this circuit derives absorbs the prover-chosen replacement
 // `sigma_a'` instead: the recipient ECDH chain (O7 / O9), both auditor-channel
 // sponges (O_a2 / O_a6, hence O_a9's lane[2] pad), and the new-allowance
-// derivations (O10 / O12). A reverted call leaves the delegation entry
-// untouched, so `sigma_a` is forced on the retry; keying the pads to it would
-// repeat r_e and every mask, and a retry that changed the amount would publish
-// the difference in the clear. `sigma_a'` is constrained only against
+// derivations (O10 / O12). Section 6.2 *Transfer nonce* states why the
+// stored salt cannot key the pads. `sigma_a'` is constrained only against
 // prover-supplied state, so a retry re-samples it freely. O14 rejects the one
 // adjacent collision; global non-repetition of `sigma_a'` over the
 // delegation's lifetime is a client obligation (SDK.md Section 10.4).
@@ -367,9 +336,6 @@ fn main(
     // O_a8
     assert(v_a_new + m_s[1] == a_tilde_aud_s);
 
-    // O_a9 -- r_a_new is already constrained by O10 and committed by O11, so
-    // this is one field addition: zero scalar muls, no new domain tag. The
-    // escrowed blinding is the one the operation WRITES, not the one it
-    // consumes, so the auditor's opening matches the C_a' left on-chain.
+    // O_a9
     assert(r_a_new + m_s[2] == r_tilde_aud_s);
 }

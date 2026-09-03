@@ -115,7 +115,7 @@ fn on_curve_non_identity_rejects_off_curve() {
 #[test]
 fn vk_addr_f_binding() {
     // vk_from_sk(sk, w1) != vk_from_sk(sk, w2). This is the property that
-    // makes R2/W2/T2/S2/V2 contract-bound -- if it ever fails, a proof made
+    // makes R2/W2/T2/S2 contract-bound -- if it ever fails, a proof made
     // against one contract could verify against another.
     let sk: Field = 0xdeadbeef;
     let vk_a = vk_from_sk(sk, 0x111);

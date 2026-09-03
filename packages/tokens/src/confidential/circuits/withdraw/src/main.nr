@@ -48,21 +48,14 @@ mod tests;
 //                                                      The lane[0] amount
 //                                                      slot is unused -- the
 //                                                      withdrawal amount is
-//                                                      public -- and skipping
-//                                                      it keeps the checkpoint
-//                                                      pad distinct from every
-//                                                      amount pad.
+//                                                      public.
 //   W_a4 b_tilde_aud_s = (v - a) + m_b                  Sender-auditor
 //                                                      encrypted balance
 //                                                      checkpoint (emitted).
 //   W_a5 r_tilde_aud_s = r' + m_r                       Sender-auditor escrow
 //                                                      of the new spendable
 //                                                      blinding, over W5's r'
-//                                                      (emitted). This is what
-//                                                      lets the auditor track
-//                                                      the full Pedersen
-//                                                      opening of C_spend
-//                                                      forward.
+//                                                      (emitted).
 //
 // Point-validation doctrine (Section 10.8)
 // ----------------------------------------

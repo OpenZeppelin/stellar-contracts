@@ -110,7 +110,7 @@ Spenders enable use cases like automated trading bots, payment processors, or cu
 | 4 | Spender | Initiates a confidential transfer from the escrowed allowance to any registered recipient. A proof accompanies each transfer, covering allowance sufficiency, ECDH-derived encryption for the recipient, and dual-auditor ciphertexts for the recipient's and owner's auditors. |
 | 5 | Contract | Verifies the proof, updates the allowance commitment, and adds the transfer commitment to the recipient's receiving balance. The owner's spendable balance is not involved. Emits an event with the ephemeral public key, the salt, and the auditor ciphertexts. |
 | **Revocation** | | |
-| 6 | Owner | Revokes the delegation at any time via a proof. The remaining escrowed allowance is folded back into the owner's spendable balance, and the proof produces ciphertexts for the owner's auditor (reclaimed amount and post-revocation balance checkpoint). The contract emits an event carrying these ciphertexts alongside the owner's balance checkpoint. |
+| 6 | Owner | Revokes the delegation at any time. No proof is required: the remaining escrowed allowance is folded back into the owner's spendable balance by public homomorphic addition. The contract emits an event carrying the delegation's allowance ciphertext and salt, from which the owner opens its new spendable balance. |
 
 Spenders never access the owner's spendable balance directly. Exposure from a compromised or malicious spender is bounded by the granted allowance amount.
 
@@ -120,7 +120,7 @@ Spenders never access the owner's spendable balance directly. Exposure from a co
 
 ### How Auditing Works
 
-The system supports **real-time auditing** via a dual-auditor model. Each account selects an auditor at registration. Every confidential transfer produces encrypted ciphertexts for both the sender's and recipient's auditors. Withdrawals, spender setup, and spender revocation also produce ciphertexts for the sender's (or owner's) auditor. All ciphertexts are enforced by the zero-knowledge proof of each operation.
+The system supports **real-time auditing** via a dual-auditor model. Each account selects an auditor at registration. Every confidential transfer produces encrypted ciphertexts for both the sender's and recipient's auditors. Withdrawals and spender setup also produce ciphertexts for the sender's (or owner's) auditor. All ciphertexts are enforced by the zero-knowledge proof of each operation.
 
 | What | Recipient's auditor sees | Sender's auditor sees |
 |:-----|:------------------------|:---------------------|
@@ -129,12 +129,11 @@ The system supports **real-time auditing** via a dual-auditor model. Each accoun
 | Sender's post-transfer balance | No | Yes |
 | Withdrawal amount | n/a | Yes (publicly visible) |
 | Post-withdrawal balance | n/a | Yes |
-| Post-operation spendable blinding factor | No | Yes, at withdrawal, outgoing transfer, and spender setup (enables opening the sender's spendable balance from that event onward, since the same key also receives every inbound transfer's blinding; not renewed at spender revocation) |
-| Spender escrow / reclaim amount | n/a | Yes (owner's auditor) |
+| Post-operation spendable blinding factor | No | Yes, at withdrawal, outgoing transfer, and spender setup |
+| Spender escrow amount | n/a | Yes (owner's auditor) |
 | Post-transfer spender allowance | No (for spender transfers) | Yes (owner's auditor) |
-| Post-escrow / post-reclaim balance | n/a | Yes (owner's auditor), at spender setup and revocation respectively |
-| Delegation viewing key `dvk` | No | No |
-| Allowance blinding $r_a$ | No | Yes (owner's auditor), at spender setup and on every spender transfer — one state's blinding per event, which with the amount opens that event's allowance commitment |
+| Post-escrow balance | n/a | Yes (owner's auditor), at spender setup |
+| Allowance blinding $r_a$ | No | Yes (owner's auditor), at spender setup and every spender transfer |
 
 The table covers every auditor ciphertext the protocol produces; `DESIGN_cont.md` §8.1-§8.5 is the normative account, including the bounds on each opening capability.
 
@@ -146,9 +145,9 @@ Each auditor decrypts its ciphertexts by running the channel sponge (recipient-a
 - **Dual-auditor ciphertexts.** The ciphertexts each operation produces are enforced by its zero-knowledge proof, so they cannot be omitted or malformed, and no extra action is needed from users.
 - **Per-account scope.** Auditing one account reveals nothing about any other account.
 - **Recipient-side opening capability.** The recipient's auditor holds the per-transfer Pedersen blinding $r_{\text{transfer}}$, hence the full Pedersen opening of the recipient's receiving balance between merges, which is what enables the seizure/clawback flow specified in `COMPLIANCE.md` §5; the capability and its bounds are specified in `DESIGN_cont.md` §8.1.
-- **Sender-side opening capability.** The sender's auditor holds the opening of the account's spendable balance as of each withdrawal, outgoing transfer, and spender setup, because those operations also encrypt the post-operation blinding factor to it. Because one key serves both of an account's auditor channels, the capability survives merges rather than expiring with the event; its bounds are specified in `DESIGN_cont.md` §8.1.
-- **Seamless auditor rotation.** When an auditor key is rotated, the new key immediately receives ciphertexts on subsequent operations. For the sender's auditor, the balance checkpoint at the next owner-initiated proof operation (transfer, withdrawal, set spender, or revoke spender) provides the current balance with no event replay or bootstrapping.
-- **Spender visibility.** The owner's auditor sees spender transfer amounts and post-transfer allowances via the same dual-auditor mechanism, and additionally sees escrowed and reclaimed amounts at `set_spender` and `revoke_spender`.
+- **Sender-side opening capability.** The sender's auditor holds the opening of the account's spendable balance as of each withdrawal, outgoing transfer, and spender setup, because those operations also encrypt the post-operation blinding factor to it. Because one key serves both of an account's auditor channels, the capability survives merges; its bounds are specified in `DESIGN_cont.md` §8.1.
+- **Seamless auditor rotation.** When an auditor key is rotated, the new key immediately receives ciphertexts on subsequent operations. For the sender's auditor, the balance checkpoint at the next owner-initiated proof operation (transfer, withdrawal, or set spender) provides the current balance with no event replay; `DESIGN_cont.md` §8.3 bounds what a rotated key can open beyond that checkpoint.
+- **Spender visibility.** The owner's auditor sees spender transfer amounts and post-transfer allowances via the same dual-auditor mechanism, and additionally sees the escrowed amount at `set_spender`.
 - **Viewing vs. spending separation.** A viewing key cannot move or spend funds. Spending requires the separate spending key, which is never shared.
 
 ### Auditor Configuration
@@ -172,7 +171,7 @@ The wallet must:
 - **Generate and store keys** - derive the full key hierarchy (spending key, viewing key, public viewing key, delegation viewing keys) from a single master secret.
 - **Produce zero-knowledge proofs** - the heaviest client-side computation. Proof generation time depends on the circuit complexity but targets single-digit seconds on modern hardware. The Transfer circuit involves 8 elliptic-curve scalar multiplications (including two auditor ECDH exchanges); the Register circuit needs 2. `DESIGN_cont.md` §10.3 lists the per-circuit totals.
 - **Track local state** - maintain running commitment openings (value and blinding factor pairs) for the spendable and receiving balances by processing on-chain events. This is comparable to wallet sync in UTXO-based privacy systems (Zcash, Monero).
-- **Handle recovery** - if local state is lost, reconstruct balances from on-chain data using the viewing key: fetch the encrypted balance scalar and salt from the most recent spend-boundary event, derive the deterministic blinding factor, and replay the events emitted after the last merge preceding that spend boundary, since only a merge clears the receiving balance. Recovery requires the master secret plus access to a durable event archive (Stellar RPC retains only 7 days of history); the indexer this archive must satisfy is specified in the companion [Indexing and Off-Chain State Recovery](./INDEXER.md) document.
+- **Handle recovery** - if local state is lost, reconstruct balances from on-chain data using the viewing key: fetch the encrypted balance scalar and salt from the most recent spend-boundary event, derive the deterministic blinding factor, and replay the events emitted after the last merge preceding that spend boundary, since only a merge clears the receiving balance and since merges and spender revocations in that window fold into the spendable balance too. Recovery requires the master secret plus access to a durable event archive (Stellar RPC retains only 7 days of history); the indexer this archive must satisfy is specified in the companion [Indexing and Off-Chain State Recovery](./INDEXER.md) document.
 
 ### For Developers (Integration)
 
@@ -181,7 +180,7 @@ The wallet must:
 | **Token contract** | The main Soroban contract that holds SEP-41 tokens and manages encrypted account state. |
 | **Verifier contract** | Validates zero-knowledge proofs on-chain. Stores one verification key per operation type. |
 | **Auditor contract** | Manages auditor public keys. Shared across tokens. |
-| **Noir circuits** | Six proof circuits (register, withdraw, transfer, spender transfer, set spender, revoke spender). Written in Noir, compiled to UltraHonk. |
+| **Noir circuits** | Five proof circuits (register, withdraw, transfer, spender transfer, set spender). Written in Noir, compiled to UltraHonk. |
 | **Client library** | SDK for wallets: key management, proof generation, event processing, balance tracking, encryption/decryption. Specified in [SDK.md](./SDK.md). |
 
 ---
@@ -207,7 +206,7 @@ If the wallet is lost or reinstalled on a new device:
 
 1. The account holder restores from the master secret (seed phrase or equivalent).
 2. The wallet re-derives the full key hierarchy.
-3. The wallet fetches the latest spend-boundary event for the account, reads the encrypted balance scalar and salt from it, recovers the spendable balance opening using the viewing key, then reconstructs the receiving balance by replaying the deposits, incoming transfers, and merges emitted after the last merge preceding that spend boundary. A spend boundary does not clear the receiving balance — only a merge does — so the replay starts at that merge rather than at the spend boundary.
+3. The wallet fetches the latest spend-boundary event for the account, reads the encrypted balance scalar and salt from it, recovers the spendable balance opening as of that boundary using the viewing key, then replays the deposits, incoming transfers, merges, and spender revocations emitted after the last merge preceding that spend boundary — rebuilding the receiving balance and folding the merges and revocations onto the spendable one. A spend boundary does not clear the receiving balance — only a merge does — so the replay starts at that merge rather than at the spend boundary.
 
 The recovery process is fully deterministic given the master secret and access to the account's event history from that merge onward. Because Stellar RPC retains only the last 7 days of events, recovery from seed alone depends on a durable indexer ([INDEXER.md](./INDEXER.md)) that retains the per-account event log; without one, the on-chain commitments remain visible but their openings cannot be reconstructed.
 
