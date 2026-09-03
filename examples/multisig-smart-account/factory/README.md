@@ -15,28 +15,26 @@ For more information about smart accounts and their components, check:
 
 ## Why a factory?
 
-Soroban derives a contract address from `(network, deployer, salt)`. The factory
-is the deployer (`deployer().with_current_contract(salt)`), so only it can
-create in its namespace. Because the deployer is the factory rather than the
-transaction caller, the account address is independent of who submits or pays
-for the deployment transaction. The 32-byte chain salt is `sha256` of the canonical
-XDR of `(signers, policies, salt)`, where `signers` and `policies` are
-the account constructor arguments. A different configuration is a different
-address.
+Soroban derives a contract address from `(network, deployer, chain_salt)`. The
+factory is the deployer (`deployer().with_current_contract(chain_salt)`), so
+only it can create in its namespace. Because the deployer is the factory rather
+than the transaction caller, the account address is independent of who submits
+or pays for the deployment transaction. The 32-byte `chain_salt` is computed as
+`sha256` of the canonical XDR of `(signers, policies, salt)`, where `signers`
+and `policies` are the account constructor arguments and `salt` is a
+caller-chosen `u32`.
 
-The account wasm hash is pinned in the factory constructor, not passed to
-`predict_address` or `deploy`. Wasm is not part of a Stellar address, so a
-deploy-time wasm argument would let different code land at a predicted address.
-A different account wasm means a different factory and a disjoint set of
-addresses.
+The account wasm hash is pinned on the factory instance during
+`__constructor`. Because code hash is not part of a Stellar contract address,
+pinning the wasm at factory construction prevents arbitrary bytecode from
+landing at a predicted address.
 
 ## 1. Setup
 
-Follow the [Setup](../README.md#1-setup) and [Verifier Contracts](../README.md#2-verifier-contracts)
-steps of the account example so that you have built the WASM binaries,
-configured testnet, funded a `feepayer` identity, and deployed the verifier and
-policy contracts you intend to use. The addresses below are the ones from that
-guide.
+Follow the [account example](../README.md) prerequisites to configure the
+network, fund a `feepayer` identity, deploy the verifier and policy contracts,
+and generate signer keys. The addresses and keys below are the sample ones from
+that guide.
 
 ## 2. Upload the Account Wasm
 
@@ -70,7 +68,12 @@ stellar contract invoke --id account_factory -- pinned_account_wasm_hash
 ## 4. Predict the Account Address
 
 Compute the address for a 2-of-2 account with the two Ed25519 keys from the
-account example and the threshold policy. The `salt` argument is `0` for the
+account example and the threshold policy. In the command below,
+`CDLDYJWEZSM6IAI4HHPEZTTV65WX4OVN3RZD3U6LQKYAVIZTEK7XYAYT` is the Ed25519
+verifier contract address, the two 32-byte hex strings are the Ed25519 public
+keys, and `CA7IJLIHDBTE5S5EIMTIWRKKTSJP6KPH2VOU255CB2RNTWXQGYJRKKC3` is the
+threshold policy contract address (replace these with your own deployed
+addresses and keys when testing). The `salt` argument is `0` for the
 first account with this configuration:
 
 ```bash
@@ -104,8 +107,7 @@ stellar contract invoke --id account_factory -- deploy \
     --salt 0
 ```
 
-Anyone may call `deploy`. During construction the account authorizes
-its own policy installs as their direct invoker, so the transaction needs no
-authorization entries beyond the fee payer's signature.
+Anyone may call `deploy`. The transaction requires only the fee payer's signature.
 
-To give the same signers a second account, change only `salt`.
+To create another account using the same initial signers and policies, use a
+different `salt`.
