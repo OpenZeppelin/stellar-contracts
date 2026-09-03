@@ -214,7 +214,7 @@ For off-chain clients (e.g., JS SDK), replicate the same concatenation:
 
 ## Deploying Accounts Through a Factory
 
-The deployment above uses your own keypair as the deployer. If an application needs to show users their account address before it exists, or to let anyone pay the deployment fee, deploy through the [factory example](factory/README.md) instead: it binds each address to the account's initial configuration and makes the factory the only deployer in its namespace.
+The deployment above uses your own keypair as the deployer. To predict the account address before it exists, or to let anyone pay the deployment fee, use the [factory example](factory/README.md) instead.
 
 ## Next Steps
 
