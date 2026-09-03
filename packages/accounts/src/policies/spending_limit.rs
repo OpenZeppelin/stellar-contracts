@@ -158,14 +158,15 @@ pub const SPENDING_LIMIT_TTL_THRESHOLD: u32 = SPENDING_LIMIT_EXTEND_AMOUNT - DAY
 ///
 /// # Notes
 ///
-/// This cap is currently **unreachable**. A `SpendingLimitData` holding 816
-/// entries serializes to 65,592 bytes, past the mainnet
-/// `contractDataEntrySizeBytes` limit of 65,536, so [`enforce`] fails with a
-/// host budget error at 816 and [`SpendingLimitError::HistoryCapacityExceeded`]
-/// is never returned. The measured ceiling is 815 entries.
-/// `spending_history_ledger_entry_ceiling` in the test module pins both
-/// boundaries.
-pub const MAX_HISTORY_ENTRIES: u32 = 1000;
+/// The cap is the largest history that still fits in a single ledger entry. A
+/// `SpendingLimitData` holding 816 entries serializes to 65,592 bytes, past the
+/// mainnet `contractDataEntrySizeBytes` limit of 65,536, so a higher cap could
+/// never be enforced: [`enforce`] would fail with an untyped host budget error
+/// before [`SpendingLimitError::HistoryCapacityExceeded`] could be returned.
+/// Raising this value therefore requires a smaller entry or a larger network
+/// limit, which
+/// `spending_history_past_the_cap_exceeds_the_ledger_entry_limit` pins.
+pub const MAX_HISTORY_ENTRIES: u32 = 815;
 
 // ################## QUERY STATE ##################
 
