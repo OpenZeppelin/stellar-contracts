@@ -14,7 +14,7 @@ cargo test --manifest-path bench/rwa-batch/Cargo.toml -- --nocapture
 
 The real library stack, not mocks:
 
-```
+```text
 BenchToken ──> BenchCompliance ──> BenchSupplyLimit          (storage only)
      │                        └──> BenchMaxBalance ──> BenchIrs
      └───────> BenchVerifier ──┬──> BenchIrs                 (wallet -> identity)
@@ -53,10 +53,10 @@ possible.
 | n | naive (1 topic) | shipped (1 topic) | saving | saving, 2 topics |
 | --- | --- | --- | --- | --- |
 | 1 | 1,960,401 | 1,960,504 | 0% | 0% |
-| 2 | 3,883,461 | 3,208,635 | -17% | -20% |
-| 5 | 10,077,882 | 7,336,557 | -27% | -31% |
-| 10 | 21,600,751 | 15,360,997 | -29% | -33% |
-| 20 | 49,029,314 | 35,561,762 | -27% | -31% |
+| 2 | 3,883,461 | 3,208,635 | 17% | 20% |
+| 5 | 10,077,882 | 7,336,557 | 27% | 31% |
+| 10 | 21,600,751 | 15,360,997 | 29% | 33% |
+| 20 | 49,029,314 | 35,561,762 | 27% | 31% |
 
 A batch of one costs the same as a single transfer, since the one sender
 verification happens either way.
