@@ -387,6 +387,69 @@ pub fn add_identity(
     }
 }
 
+/// Stores several identities in one invocation, associating `accounts[i]` with
+/// `identities[i]` and `country_data_lists[i]`.
+///
+/// The batch is atomic: an item that fails reverts every item before it.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `accounts` - The account addresses to associate with the identities.
+/// * `identities` - The identity addresses to store.
+/// * `identity_type` - Whether the batch registers individuals or
+///   organizations.
+/// * `country_data_lists` - The initial country data entries for each account.
+///
+/// # Errors
+///
+/// * [`IRSError::BatchSizeMismatch`] - When the three arrays do not all have
+///   the same length.
+/// * refer to [`add_identity`] errors.
+///
+/// # Events
+///
+/// For each registration:
+/// * topics - `["identity_stored", account: Address, identity: Address]`
+/// * data - `[]`
+///
+/// And for each of its country data entries:
+/// * topics - `["country_data_added", account: Address]`
+/// * data - `[country_data: Val]`
+///
+/// # Notes
+///
+/// One `identity_type` applies to the whole batch, so a cohort that mixes
+/// individuals and organizations takes one call per type.
+///
+/// An account repeated across the batch fails on its second occurrence with
+/// [`IRSError::IdentityOverwrite`], which reverts the whole batch.
+///
+/// The caller is responsible for sizing the batch to fit the per-transaction
+/// network limits. Refer to the batch operations section of the
+/// [RWA module documentation](crate::rwa).
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
+pub fn batch_add_identity(
+    e: &Env,
+    accounts: &Vec<Address>,
+    identities: &Vec<Address>,
+    identity_type: IdentityType,
+    country_data_lists: &Vec<Vec<CountryData>>,
+) {
+    if accounts.len() != identities.len() || accounts.len() != country_data_lists.len() {
+        panic_with_error!(e, IRSError::BatchSizeMismatch);
+    }
+
+    for ((account, identity), countries) in
+        accounts.iter().zip(identities.iter()).zip(country_data_lists.iter())
+    {
+        add_identity(e, &account, &identity, identity_type.clone(), &countries);
+    }
+}
+
 /// Removes an identity and all associated country data.
 ///
 /// The account must not hold a balance in any linked token. Compliance

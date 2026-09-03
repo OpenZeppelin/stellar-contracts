@@ -84,6 +84,25 @@
 //! below. These modules act as the default implementations for the most common
 //! needs.
 //!
+//! ## Batch Operations
+//!
+//! The operator-gated entry points have `batch_` siblings that apply the same
+//! operation across a list of accounts in a single invocation, mirroring the
+//! batch functions of the ERC-3643 standard. A batch is atomic: an item that
+//! fails reverts the whole call, and every item emits the same event its
+//! single-account counterpart would.
+//!
+//! Batch size is bounded by the per-transaction network limits rather than by
+//! the library, which cannot know how many compliance modules are registered
+//! or how far an identity check has to walk. Measured against the default
+//! stack (two compliance modules, one required claim topic), the footprint
+//! limit is reached at roughly 35 accounts for [`RWA::batch_mint`] and
+//! [`RWA::batch_transfer`], and the event size limit at roughly 35 for
+//! identity registration and 99 for the freezing functions. Every additional
+//! required claim topic or compliance module lowers those numbers, so a
+//! deployment is expected to measure against its own configuration. Current
+//! limits are listed at <https://lab.stellar.org/network-limits>.
+//!
 //! ## Modules
 //!
 //! - **Identity Verification**: Claim issuers, claim topic registries, identity
@@ -108,9 +127,9 @@ pub use identity_verification::{
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, String};
+use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, String, Vec};
 use stellar_contract_utils::pausable::Pausable;
-pub use storage::{RWAStorageKey, RWA};
+pub use storage::{FromVerification, RWAStorageKey, RWA};
 
 use crate::fungible::FungibleToken;
 
@@ -131,6 +150,38 @@ use crate::fungible::FungibleToken;
 #[contracttrait]
 pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     // ################## CORE TOKEN FUNCTIONS ##################
+
+    /// Transfers tokens to several recipients in a single call, moving
+    /// `amounts[i]` to `recipients[i]`. The batched form of
+    /// [`FungibleToken::transfer`], authorized once by `from`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The address of the sender.
+    /// * `recipients` - The addresses of the receivers.
+    /// * `amounts` - The number of tokens to transfer to each recipient.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`RWA::batch_transfer`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each recipient:
+    /// * topics - `["transfer", from: Address, to: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// The sender's identity is verified once for the whole batch instead of
+    /// once per recipient, which is where the saving over repeated single
+    /// transfers comes from. Refer to [`RWA::batch_transfer`] for the mechanics
+    /// and the assumption that rests on, and to the batch operations section of
+    /// the [module documentation](crate::rwa) for how to size a batch.
+    fn batch_transfer(e: &Env, from: Address, recipients: Vec<Address>, amounts: Vec<i128>) {
+        RWA::batch_transfer(e, &from, &recipients, &amounts);
+    }
 
     /// Forces a transfer of tokens from `from` to `to`.
     /// This function can only be called by the operator with necessary
@@ -172,6 +223,46 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// implementation.
     fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128, operator: Address);
 
+    /// Forces a transfer for each `(from_list[i], to_list[i], amounts[i])`
+    /// triple in a single call. The batched form of
+    /// [`RWAToken::forced_transfer`], with the same privileges and the same
+    /// exemption from `from` verification.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from_list` - The addresses of the senders.
+    /// * `to_list` - The addresses of the receivers.
+    /// * `amounts` - The number of tokens to transfer for each pair.
+    /// * `operator` - The address of the operator.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`RWA::batch_forced_transfer`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each triple:
+    /// * topics - `["transfer", from: Address, to: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`RWA::batch_forced_transfer`] for
+    /// the implementation.
+    ///
+    /// Refer to the batch operations section of the
+    /// [module documentation](crate::rwa) for how to size a batch.
+    fn batch_forced_transfer(
+        e: &Env,
+        from_list: Vec<Address>,
+        to_list: Vec<Address>,
+        amounts: Vec<i128>,
+        operator: Address,
+    );
+
     /// Mints tokens to a wallet. Tokens can only be minted to verified
     /// addresses. This function can only be called by the operator with
     /// necessary privileges. RBAC checks are expected to be enforced on the
@@ -206,6 +297,38 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// checks).
     fn mint(e: &Env, to: Address, amount: i128, operator: Address);
 
+    /// Mints `amounts[i]` tokens to `to_list[i]` in a single call. The batched
+    /// form of [`RWAToken::mint`], with the same privileges and the same
+    /// identity and compliance checks per recipient.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to_list` - The addresses to mint the tokens to.
+    /// * `amounts` - The amount of tokens to mint to each address.
+    /// * `operator` - The address of the operator.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`RWA::batch_mint`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each address:
+    /// * topics - `["mint", to: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`RWA::batch_mint`] for the
+    /// implementation.
+    ///
+    /// Refer to the batch operations section of the
+    /// [module documentation](crate::rwa) for how to size a batch.
+    fn batch_mint(e: &Env, to_list: Vec<Address>, amounts: Vec<i128>, operator: Address);
+
     /// Burns tokens from a wallet.
     /// This function can only be called by the operator with necessary
     /// privileges. RBAC checks are expected to be enforced on the
@@ -237,6 +360,37 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// enforced on `operator` before calling [`RWA::burn`] for the
     /// implementation.
     fn burn(e: &Env, user_address: Address, amount: i128, operator: Address);
+
+    /// Burns `amounts[i]` tokens from `user_addresses[i]` in a single call. The
+    /// batched form of [`RWAToken::burn`], with the same privileges.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user_addresses` - The addresses to burn the tokens from.
+    /// * `amounts` - The amount of tokens to burn from each address.
+    /// * `operator` - The address of the operator.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`RWA::batch_burn`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each address:
+    /// * topics - `["burn", user_address: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`RWA::batch_burn`] for the
+    /// implementation.
+    ///
+    /// Refer to the batch operations section of the
+    /// [module documentation](crate::rwa) for how to size a batch.
+    fn batch_burn(e: &Env, user_addresses: Vec<Address>, amounts: Vec<i128>, operator: Address);
 
     /// Recovery function used to force transfer tokens from a old account
     /// to a new account for an investor.
@@ -303,6 +457,43 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// the implementation.
     fn set_address_frozen(e: &Env, user_address: Address, freeze: bool, operator: Address);
 
+    /// Sets the frozen status of `user_addresses[i]` to `freeze_list[i]` in a
+    /// single call. The batched form of [`RWAToken::set_address_frozen`], with
+    /// the same privileges.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user_addresses` - The addresses for which to update frozen status.
+    /// * `freeze_list` - The frozen status to apply to each address.
+    /// * `operator` - The address of the operator.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`RWA::batch_set_address_frozen`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each address:
+    /// * topics - `["address_frozen", user_address: Address, is_frozen: bool]`
+    /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`RWA::batch_set_address_frozen`] for the implementation.
+    ///
+    /// Refer to the batch operations section of the
+    /// [module documentation](crate::rwa) for how to size a batch.
+    fn batch_set_address_frozen(
+        e: &Env,
+        user_addresses: Vec<Address>,
+        freeze_list: Vec<bool>,
+        operator: Address,
+    );
+
     /// Freezes a specified amount of tokens for a given address.
     /// This function can only be called by the operator with necessary
     /// privileges. RBAC checks are expected to be enforced on the
@@ -334,6 +525,43 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// for the implementation.
     fn freeze_partial_tokens(e: &Env, user_address: Address, amount: i128, operator: Address);
 
+    /// Freezes `amounts[i]` tokens on `user_addresses[i]` in a single call. The
+    /// batched form of [`RWAToken::freeze_partial_tokens`], with the same
+    /// privileges.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user_addresses` - The addresses for which to freeze tokens.
+    /// * `amounts` - The amount of tokens to freeze on each address.
+    /// * `operator` - The address of the operator.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`RWA::batch_freeze_partial_tokens`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each address:
+    /// * topics - `["tokens_frozen", user_address: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`RWA::batch_freeze_partial_tokens`] for the implementation.
+    ///
+    /// Refer to the batch operations section of the
+    /// [module documentation](crate::rwa) for how to size a batch.
+    fn batch_freeze_partial_tokens(
+        e: &Env,
+        user_addresses: Vec<Address>,
+        amounts: Vec<i128>,
+        operator: Address,
+    );
+
     /// Unfreezes a specified amount of tokens for a given address.
     /// This function can only be called by the operator with necessary
     /// privileges. RBAC checks are expected to be enforced on the
@@ -364,6 +592,43 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// enforced on `operator` before calling [`RWA::unfreeze_partial_tokens`]
     /// for the implementation.
     fn unfreeze_partial_tokens(e: &Env, user_address: Address, amount: i128, operator: Address);
+
+    /// Unfreezes `amounts[i]` tokens on `user_addresses[i]` in a single call.
+    /// The batched form of [`RWAToken::unfreeze_partial_tokens`], with the same
+    /// privileges.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user_addresses` - The addresses for which to unfreeze tokens.
+    /// * `amounts` - The amount of tokens to unfreeze on each address.
+    /// * `operator` - The address of the operator.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`RWA::batch_unfreeze_partial_tokens`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each address:
+    /// * topics - `["tokens_unfrozen", user_address: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`RWA::batch_unfreeze_partial_tokens`] for the implementation.
+    ///
+    /// Refer to the batch operations section of the
+    /// [module documentation](crate::rwa) for how to size a batch.
+    fn batch_unfreeze_partial_tokens(
+        e: &Env,
+        user_addresses: Vec<Address>,
+        amounts: Vec<i128>,
+        operator: Address,
+    );
 
     /// Returns the freezing status of a wallet.
     ///
@@ -509,6 +774,8 @@ pub enum RWAError {
     IdentityVerifierNotSet = 312,
     /// Indicates the old account and new account have different identities.
     IdentityMismatch = 313,
+    /// Indicates the parallel arrays of a batch call have different lengths.
+    BatchSizeMismatch = 314,
 }
 
 // ################## CONSTANTS ##################
