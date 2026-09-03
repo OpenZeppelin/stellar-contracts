@@ -71,14 +71,96 @@ fn collect_fee_with_eager_approval_overwrites_allowance() {
     });
 
     let events = e.events().all();
-    // approval, transfer and collect fee
+    // approval, fee transfer, residual refund and collect fee
+    assert_eq!(events.events().len(), 4);
+
+    // the unspent allowance is consumed back to the user in eager mode
+    let allowance = token_client.allowance(&user, &contract_address);
+    assert_eq!(allowance, 0);
+
+    let balance = token_client.balance(&recipient);
+    assert_eq!(balance, 20);
+}
+
+#[test]
+fn collect_fee_with_eager_approval_consumes_only_the_affordable_residual() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+    let other = Address::generate(&e);
+
+    let max_fee_amount = 50;
+
+    let token_client = TokenClient::new(&e, &token_address);
+    // the user keeps 25, which covers the fee but not the whole residual
+    token_client.transfer(&user, &other, &975);
+
+    e.as_contract(&contract_address, || {
+        // approve 50, spend 20
+        collect_fee(
+            &e,
+            &token_address,
+            20,
+            max_fee_amount,
+            100,
+            &user,
+            &recipient,
+            FeeAbstractionApproval::Eager,
+        );
+    });
+
+    // only the 5 left after the fee are consumed, the rest of the allowance stays
+    let allowance = token_client.allowance(&user, &contract_address);
+    assert_eq!(allowance, 25);
+
+    assert_eq!(token_client.balance(&user), 5);
+    assert_eq!(token_client.balance(&recipient), 20);
+}
+
+#[test]
+fn collect_fee_with_eager_approval_and_no_residual_balance() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+    let other = Address::generate(&e);
+
+    let max_fee_amount = 50;
+
+    let token_client = TokenClient::new(&e, &token_address);
+    // the user keeps exactly the fee, so nothing is left to consume
+    token_client.transfer(&user, &other, &980);
+
+    e.as_contract(&contract_address, || {
+        // approve 50, spend 20
+        collect_fee(
+            &e,
+            &token_address,
+            20,
+            max_fee_amount,
+            100,
+            &user,
+            &recipient,
+            FeeAbstractionApproval::Eager,
+        );
+    });
+
+    let events = e.events().all();
+    // approval, fee transfer and collect fee, without a residual refund
     assert_eq!(events.events().len(), 3);
 
     let allowance = token_client.allowance(&user, &contract_address);
     assert_eq!(allowance, 30);
 
-    let balance = token_client.balance(&recipient);
-    assert_eq!(balance, 20);
+    assert_eq!(token_client.balance(&user), 0);
+    assert_eq!(token_client.balance(&recipient), 20);
 }
 
 #[test]
