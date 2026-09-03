@@ -226,11 +226,11 @@ pub enum CircuitType {
     Transfer = 2,
     SpenderTransfer = 3,
     SetSpender = 4,
-    Clawback = 6,
+    Clawback = 100,
 }
 ```
 
-`deposit`, `merge`, and `revoke_spender` carry no proof and have no circuit (Sections 7.3, 7.4, 7.9). The discriminants are part of the on-chain interface and are never renumbered; 5 is retired — it was `RevokeSpender` before revocation became proofless — and is never reassigned.
+`deposit`, `merge`, and `revoke_spender` carry no proof and have no circuit (Sections 7.3, 7.4, 7.9). The discriminants are part of the on-chain interface and are never renumbered; core circuits occupy `0..=4` and extension circuits start at `100`.
 
 ### 10.2 Circuit Summary
 

@@ -92,11 +92,8 @@ pub use storage::{
 
 /// Identifier of a zero-knowledge circuit whose verification key is stored in
 /// the registry. The numeric values are part of the on-chain interface and
-/// MUST NOT change. Discriminant 5 is retired — it belonged to a
-/// `RevokeSpender` circuit before revocation became proofless — and is never
-/// reassigned: a registry that still holds a key under it would otherwise hand
-/// that key to a new circuit, and nothing in this module can detect the
-/// mismatch (see the module-level warning on wrong keys).
+/// MUST NOT change. Core token circuits occupy `0..=4`; circuits shipped by
+/// optional extensions start at `100`.
 #[contracttype]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
@@ -106,7 +103,7 @@ pub enum CircuitType {
     Transfer = 2,
     SpenderTransfer = 3,
     SetSpender = 4,
-    Clawback = 6,
+    Clawback = 100,
 }
 
 /// Trait for managing UltraHonk verification keys used by the confidential

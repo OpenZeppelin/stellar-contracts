@@ -181,7 +181,8 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 /// # Security Warning
 ///
 /// **The freeze precondition is only meaningful when the deployment's `Hooks`
-/// impl gates on it, and this trait's bounds do not force that.**
+/// impl rejects operations from frozen accounts. `ConfidentialClawback`'s
+/// bounds do not require a `Hooks` impl that does.**
 /// `ConfidentialClawback: ConfidentialCompliance` obliges the deployment to
 /// implement `freeze` / `unfreeze`, but it places no constraint on
 /// `<Self as ConfidentialToken>::Hooks`. A contract that wires
@@ -199,11 +200,12 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// Reduces `account`'s confidential claim by `amount` and settles the
     /// corresponding underlying according to `destination`.
     ///
-    /// With `None`, no underlying is transferred: the pool is left
-    /// over-collateralized by `amount`, and extraction is the issuer's own SAC
-    /// `clawback` against this contract's address. With `Some(d)`, exactly
-    /// `amount` is transferred to `d` in this invocation and the pool stays
-    /// in step with the sum of confidential claims.
+    /// With `destination = None`, no underlying is transferred: the pool is
+    /// left over-collateralized by `amount`, and extraction is the issuer's
+    /// own SAC `clawback` against this contract's address. With
+    /// `destination = Some(d)`, exactly `amount` is transferred to `d` in
+    /// this invocation and the pool stays in step with the sum of
+    /// confidential claims.
     ///
     /// `destination` is bound into the proof, so a proof built for one
     /// destination cannot be submitted against another, and `Some` naming this
@@ -211,9 +213,9 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     ///
     /// `account` MUST be frozen: the freeze holds `C_spend` and `C_receive`
     /// still between proof construction and submission, which the proof's
-    /// bindings rely on. Note that the freeze only immobilizes the target if
-    /// the deployment's [`Hooks`] impl gates on it — see the trait-level
-    /// warning.
+    /// bindings rely on. The freeze only immobilizes the target if the
+    /// deployment's [`Hooks`] impl rejects operations from frozen accounts —
+    /// see the trait-level warning.
     ///
     /// # Arguments
     ///
