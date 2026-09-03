@@ -77,7 +77,7 @@ $$\text{base}(\mathbb{G}) = \mathbb{F}\_r^{\text{BN254}}, \qquad \text{scalar}(\
 
 A Grumpkin point is a pair $$(x, y) \in \mathbb{F}\_r^2$$. Noir's native `Field` type is $$\mathbb{F}\_r$$, so Grumpkin point arithmetic inside UltraHonk circuits incurs no non-native field emulation. On-chain, the Soroban host provides BN254 $$\mathbb{F}\_r$$ arithmetic (`bn254_fr_{add, sub, mul, inv}` via CAP-80), which suffices for Grumpkin affine point operations.
 
-**Scalar sampling.** Grumpkin scalars live in $$\mathbb{F}\_q$$, which is slightly larger than $$\mathbb{F}\_r$$. Every secret scalar in the core protocol that is drawn rather than derived ($$\sigma$$, $$\sigma\_a$$) is produced by the **rejection sampling** procedure, which yields a uniform draw from $$\mathbb{F}\_r$$; the extension layers draw two further scalars the same way, $$r\_{\text{disc}}$$ ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §4) and the auditor-sampled $$r\_e^{\text{new}}$$ ([COMPLIANCE.md](./COMPLIANCE.md) §5.3).
+**Scalar sampling.** Grumpkin scalars live in $$\mathbb{F}\_q$$, which is slightly larger than $$\mathbb{F}\_r$$. Every secret scalar in the core protocol that is drawn rather than derived ($$\sigma$$, $$\sigma\_a$$) is produced by the **rejection sampling** procedure, which yields a uniform draw from $$\mathbb{F}\_r$$; the extension layers draw one further scalar the same way, $$r\_{\text{disc}}$$ ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §4).
 
 1. Draw 32 bytes (256 bits) from a CSPRNG.
 2. Mask the top 2 bits to zero, yielding a 254-bit candidate $$x \in [0, 2^{254})$$.
@@ -143,17 +143,17 @@ The domain tag is always the first element absorbed, so $$\text{Poseidon2}(\delt
 - Symmetric encryption: $$\tilde{v} = v + \text{Poseidon2}(\delta\_{\text{transfer\\\_amount}}, s, \sigma)$$
 - Domain separation: each invocation includes a leading constant $$\delta$$ to prevent cross-context collisions
 
-**Two-mask mode for auditor channels.** The per-transfer auditor ciphertexts (Section 8) need two masks from one absorb. Since $$(\delta\_{\text{channel}}, s, \sigma)$$ is exactly one rate-3 block, the two masks are taken as **two lanes of a single permutation output**, not as two sequential squeezes:
+**Multi-lane mode for auditor channels.** The per-transfer auditor ciphertexts (Section 8) need several masks from one absorb. Since $$(\delta\_{\text{channel}}, s, \sigma)$$ is exactly one rate-3 block, the masks are taken as **lanes of a single permutation output**, not as sequential squeezes:
 
-$$\text{SpongeSqueeze}\_2(\delta\_{\text{channel}}, s, \sigma) = \bigl(\text{state}[0], \\, \text{state}[1]\bigr), \qquad \text{state} = \text{permute}\bigl([\delta\_{\text{channel}}, \\, s, \\, \sigma, \\, 3 \cdot 2^{64}]\bigr)$$
+$$\text{SpongeSqueeze}\_n(\delta\_{\text{channel}}, s, \sigma) = \bigl(\text{state}[0], \\, \ldots, \\, \text{state}[n-1]\bigr), \qquad \text{state} = \text{permute}\bigl([\delta\_{\text{channel}}, \\, s, \\, \sigma, \\, 3 \cdot 2^{64}]\bigr)$$
 
-where $$s$$ is the ECDH shared scalar of Section 2.4. Two channel tags are used: $$\delta\_{\text{aud\\\_s}}$$ for the sender-auditor channel keyed by $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$, and $$\delta\_{\text{aud\\\_r}}$$ for the recipient-auditor channel keyed by $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$. No other arity is instantiated; $$n = 2$$ everywhere this notation appears.
+where $$s$$ is the ECDH shared scalar of Section 2.4 and $$n \in \\{2, 3\\}$$ is the number of rate lanes read; the capacity lane $$\text{state}[3]$$ is never squeezed. Two channel tags are used: $$\delta\_{\text{aud\\\_s}}$$ for the sender-auditor channel keyed by $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$, squeezed three-wide, and $$\delta\_{\text{aud\\\_r}}$$ for the recipient-auditor channel keyed by $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$, squeezed two-wide. No other arity is instantiated. Because the absorb is one block, $$\text{SpongeSqueeze}\_3(\delta, s, \sigma)[i] = \text{SpongeSqueeze}\_2(\delta, s, \sigma)[i]$$ for $$i \in \\{0, 1\\}$$: widening a channel adds a lane without changing the value of any existing one.
 
-Squeeze order is canonical. Lane 0 is always an amount mask and lane 1 is always a balance, allowance, or randomness mask, fixed per operation by the formulas in Sections 7 and 8. Single-ciphertext channels (the Withdraw balance checkpoint, W\_a3) take **lane 1** and leave the amount lane unused, so a checkpoint pad can never coincide with an amount pad.
+**Lane assignment.** Squeeze order is canonical. Lanes are named by their zero-based index into the squeeze output: `lane[i]` is $$\text{SpongeSqueeze}\_n(\delta, s, \sigma)[i]$$, so a three-wide squeeze yields `lane[0]`, `lane[1]`, and `lane[2]`. `lane[0]` is always an amount mask and `lane[1]` is always a balance, allowance, or randomness mask, fixed per operation by the formulas in Sections 7 and 8. `lane[2]`, present only on the sender-auditor channel, is the **blinding-escrow slot**: it always carries the blinding of a commitment the operation writes, never a key. Which commitment per operation is specified in Section 8.1 *The `lane[2]` slot*. The Withdraw checkpoint (W\_a3, W\_a5) takes `lane[1]` and `lane[2]` and leaves the amount lane unused, so a checkpoint pad can never coincide with an amount pad.
 
-**Mode exclusivity.** Because the absorb occupies a single block, $$\text{SpongeSqueeze}\_2(\delta, s, \sigma)[0]$$ is the same field element as $$\text{Poseidon2}(\delta, s, \sigma)$$. Distinct domain tags (Section 13) are therefore not sufficient on their own: each tag MUST additionally be used in exactly one of the two modes, or the same $$(\delta, s, \sigma)$$ would yield one mode's mask as the other's output. $$\delta\_{\text{aud\\\_s}}$$ and $$\delta\_{\text{aud\\\_r}}$$ are the two-mask tags; every other tag in Section 13 is used only with the single-output form above.
+**Mode exclusivity.** Because the absorb occupies a single block, $$\text{SpongeSqueeze}\_n(\delta, s, \sigma)[0]$$ is the same field element as $$\text{Poseidon2}(\delta, s, \sigma)$$. Distinct domain tags (Section 13) are therefore not sufficient on their own: each tag MUST additionally be used in exactly one sponge mode, or the same $$(\delta, s, \sigma)$$ would yield one mode's mask as the other's output. $$\delta\_{\text{aud\\\_s}}$$ and $$\delta\_{\text{aud\\\_r}}$$ are the two multi-lane tags; every other tag in Section 13 is used only with the single-output form above. Reading one multi-lane tag at two different widths is not a mode violation, by the prefix property above: the sender-auditor tag is squeezed three-wide on every operation that escrows `lane[2]` and two-wide on `RevokeSpender` (V\_a3), while the recipient-auditor tag is always two-wide.
 
-The sponge masks are deterministic in $$(s, \sigma)$$, where $$s$$ is the ECDH shared scalar of Section 2.4, so reusing the pair across two operations reuses every pad slot they share, and a slot whose plaintext is known in one operation (e.g. a transfer amount known to its recipient) decrypts the other operation's ciphertext in that slot. The canonical slot assignment above limits the blast radius of such reuse to same-slot pairs, but does not eliminate it; provers and wallets MUST use a fresh $$(r\_e, \sigma)$$ for every proof. Because $$r\_e$$ is derived from the originator's viewing key and the salt rather than drawn independently (§5.3), a fresh salt is the only thing that makes the pair fresh: the salt carries the entire requirement, and Section 9.6's retry rule is what discharges it.
+The sponge masks are deterministic in $$(s, \sigma)$$, where $$s$$ is the ECDH shared scalar of Section 2.4, so reusing the pair across two operations reuses every pad slot they share, and a slot whose plaintext is known in one operation (e.g. a transfer amount known to its recipient) decrypts the other operation's ciphertext in that slot. The canonical slot assignment above limits the blast radius of such reuse to same-slot pairs, but does not eliminate it; provers and wallets MUST use a fresh $$(r\_e, \sigma)$$ for every proof. Because $$r\_e$$ is derived from the originator's viewing key and the salt rather than drawn independently (§5.3), a fresh salt is the only thing that makes the pair fresh: the salt carries the entire requirement, and Section 9.6's retry rule is what discharges it. The salt that carries it is whichever one the operation's pads absorb -- $$\sigma$$ for owner-initiated operations, the prover-chosen $$\sigma\_a'$$ for spender transfers (§6.2 *Transfer nonce*) -- never a salt loaded from storage, which a revert leaves unchanged.
 
 All references to "Poseidon" in this document denote this Poseidon2 instantiation.
 
@@ -351,7 +351,7 @@ $$W\_{\text{receive}} = (v\_r, r\_r) \quad \text{such that} \quad C\_{\text{rece
 
 **Initialization.** At registration, $$C\_{\text{spend}} = C\_{\text{receive}} = \mathcal{O}$$. The wallet sets $$W\_{\text{spend}} = W\_{\text{receive}} = (0, 0)$$.
 
-**Update rules.** Each balance-modifying event updates exactly one accumulator:
+**Update rules.** Each balance-modifying event updates the accumulators as follows:
 
 | Event | Accumulator update |
 |:---|:---|
@@ -409,7 +409,7 @@ Because $$\sigma$$ is published in the event and $$vk$$ is held by the originato
 
 **Note.** Each transfer involves two auditor ECDH exchanges: one with the recipient's auditor key ($$S\_{a,r} = r\_e \cdot K\_{\text{aud,r}}$$) and one with the sender's auditor key ($$S\_{a,s} = r\_e \cdot K\_{\text{aud,s}}$$). Both reuse the ephemeral scalar $$r\_e$$, as does the $$dvk\_i$$ escrow ECDH in `set_spender` (§7.11) when one is present. Neither auditor recovers any account's viewing key.
 
-**Why reusing $$r\_e$$ is safe.** Each ECDH channel keyed from the same $$r\_e$$ produces a distinct shared scalar because the counterparty public keys are distinct ($$\text{PVK}\_B$$, $$K\_{\text{aud,r}}$$, $$K\_{\text{aud,s}}$$, $$Y\_{\text{op}}$$ are independent Grumpkin points, none derivable from one another). Each channel further uses a distinct Poseidon domain tag ($$\delta\_{\text{transfer\\\_blind}}/\delta\_{\text{transfer\\\_amount}}$$ for the recipient channel, $$\delta\_{\text{aud\\\_r}}$$ and $$\delta\_{\text{aud\\\_s}}$$ for the two auditor channels, $$\delta\_{\text{esc\\\_dvk}}$$ for the spender escrow), so masks across channels are independent under the PRF assumption on Poseidon (§3.2). The channel masks are used as one-time pads against fresh per-transfer randomness ($$\sigma$$ or $$\sigma\_a$$), and each per-channel sponge re-absorbs that nonce, so a given mask is never reused even for the same counterparty across two operations. Together these three properties (distinct shared scalars, distinct domains, fresh per-operation nonce) close the standard ECDH key-reuse attack surface; the contract's enumeration of channels in §13 satisfies the domain-distinctness condition.
+**Why reusing $$r\_e$$ is safe.** Each ECDH channel keyed from the same $$r\_e$$ produces a distinct shared scalar because the counterparty public keys are distinct ($$\text{PVK}\_B$$, $$K\_{\text{aud,r}}$$, $$K\_{\text{aud,s}}$$, $$Y\_{\text{op}}$$ are independent Grumpkin points, none derivable from one another). Each channel further uses a distinct Poseidon domain tag ($$\delta\_{\text{transfer\\\_blind}}/\delta\_{\text{transfer\\\_amount}}$$ for the recipient channel, $$\delta\_{\text{aud\\\_r}}$$ and $$\delta\_{\text{aud\\\_s}}$$ for the two auditor channels, $$\delta\_{\text{esc\\\_dvk}}$$ for the spender escrow), so masks across channels are independent under the PRF assumption on Poseidon (§3.2). The auditor-side allowance-blinding escrow (S14, $$\delta\_{\text{esc\\\_allow\\\_r\\\_aud}}$$) is the one derivation that does *not* open a channel of its own. It reuses the S\_a2 shared scalar, so it drops the distinct-scalar leg, and it absorbs $$\text{op}\_i$$, a per-delegation constant, rather than a per-operation nonce, so it drops the freshness leg too. Its separation therefore rests on the distinct-tag leg alone, plus the freshness of the shared scalar itself, inherited from $$r\_e$$ and hence from the salt. This is the thinnest construction in the system, and [DESIGN_cont.md](./DESIGN_cont.md) §8.5 states what it does and does not buy. The channel masks are used as one-time pads against fresh per-transfer randomness ($$\sigma$$, or $$\sigma\_a'$$ for spender transfers), and each per-channel sponge re-absorbs that nonce, so a given mask is never reused even for the same counterparty across two operations. Together these three properties (distinct shared scalars, distinct domains, fresh per-operation nonce) close the standard ECDH key-reuse attack surface for every channel; the contract's enumeration of channels in §13 satisfies the domain-distinctness condition. S14 is the single derivation that stands on one of the three, as noted above.
 
 ### 5.4 Anti-Poisoning Constraint
 
@@ -494,9 +494,11 @@ $$dvk\_i$$ encrypted under the spender's spending key via ECDH. (64 bytes)
 
 **`allowance_salt`**
 
-Per-delegation salt for allowance randomness derivation, encoded as `BytesN<32>` (canonical $$\mathbb{F}\_r$$ representative). $$\sigma\_a$$ is sampled by the rejection sampling procedure of §2.2 (same as $$\sigma$$) and is the sole freshness input to all allowance Poseidon derivations. Set by the owner at `set_spender` and replaced by the spender on every `confidential_transfer_from` (the spender samples a fresh `new_allowance_salt` and that becomes the stored value alongside the updated `allowance_commitment`). The salt is bound to the current commitment: when the commitment changes, the salt changes with it. It is stored on-chain so the owner can decrypt the allowance at revocation without depending on event history.
+Per-delegation salt for allowance randomness derivation, encoded as `BytesN<32>` (canonical $$\mathbb{F}\_r$$ representative). $$\sigma\_a$$ is sampled by the rejection sampling procedure of §2.2 (same as $$\sigma$$) and is the sole freshness input to all allowance Poseidon derivations. Set by the owner at `set_spender` and replaced by the spender on every `confidential_transfer_from` (the spender samples a fresh $$\sigma\_a'$$ and that becomes the stored value alongside the updated `allowance_commitment`). The salt is bound to the current commitment: when the commitment changes, the salt changes with it. It is stored on-chain so the owner can decrypt the allowance at revocation without depending on event history.
 
-**Dual role.** In spender transfers, $$\sigma\_a$$ also serves as the nonce for the recipient ECDH encryption (O7, O9) and the auditor channel sponges (O\_a2 and O\_a6, which absorb $$\sigma\_a$$ alongside the channel shared scalar). This is safe because ECDH confidentiality derives from the shared scalar $$s$$ (or $$s\_{a,r}$$, $$s\_{a,s}$$, §2.4), not from $$\sigma\_a$$ being secret. However, this couples the allowance salt to the transfer event: the event must emit $$\sigma\_a$$ so that the recipient and auditor can decrypt. Any change to how the salt is stored or exposed must preserve this invariant.
+**Transfer nonce.** The stored $$\sigma\_a$$ opens the current allowance (O3) and nothing else. Every pad a spender transfer derives absorbs the prover-chosen replacement $$\sigma\_a'$$ instead: the recipient ECDH encryption (O7, O9), both auditor channel sponges (O\_a2, O\_a6, and with the latter the lane[2] escrow O\_a9), and the ephemeral scalar (§7.8). $$\sigma\_a'$$ is therefore the nonce the `SpenderTransfer` event emits, and the salt it replaces is never emitted.
+
+The split is what makes a retry safe. A reverted call leaves the delegation entry untouched, so the stored $$\sigma\_a$$ is forced on the retry; keying the pads to it would repeat $$r\_e$$ and every mask, and a retry that changed the amount would publish the difference in the clear (§2.5). $$\sigma\_a'$$ is constrained only against prover-supplied state, so a retry re-samples it freely. Constraint O14 rejects $$\sigma\_a' = \sigma\_a$$, which would key the pads to the salt the previous transfer already used; it cannot see older salts, so **global non-repetition of $$\sigma\_a'$$ across the delegation's lifetime is a client obligation** ([SDK.md](./SDK.md) §10.4), not an enforced property.
 
 **`live_until_ledger`**
 
@@ -600,10 +602,11 @@ The owner withdraws a public amount $$a$$ (typed `i128`) from their spendable ba
 | W8 | $$r\_e \neq 0$$ (rules out $$R\_e = \mathcal{O}$$ and $$S\_{a,s} = \mathcal{O}$$, which would reduce $$m\_b$$ to a constant function of $$\sigma$$) |
 | W\_a1 | $$R\_e = r\_e \cdot H$$ (ephemeral key for auditor ECDH) |
 | W\_a2 | $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$ (sender-auditor ECDH shared scalar, §2.4) |
-| W\_a3 | $$(\cdot, m\_b) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$ (sender-auditor channel sponge; $$m\_b$$ is the second squeeze — the balance slot, matching T\_a6/S\_a3/V\_a3. The first-squeeze amount slot is unused: the withdrawal amount is public, and skipping the slot keeps the checkpoint pad distinct from every amount pad even under $$(r\_e, \sigma)$$ reuse, Section 2.5) |
+| W\_a3 | $$(\cdot, m\_b, m\_r) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$ (sender-auditor channel sponge; $$m\_b$$ is `lane[1]` — the balance slot, matching T\_a6/S\_a3 — and $$m\_r$$ is `lane[2]`, the secret-escrow slot. `lane[0]`, the amount slot, is unused: the withdrawal amount is public, and skipping the slot keeps the checkpoint pad distinct from every amount pad even under $$(r\_e, \sigma)$$ reuse, Section 2.5) |
 | W\_a4 | $$\tilde{b}\_{\text{aud,s}} = (v - a) + m\_b$$ (sender-auditor encrypted balance checkpoint) |
+| W\_a5 | $$\tilde{r}\_{\text{aud,s}} = r' + m\_r$$ (sender-auditor escrow of the new spendable blinding, over W5's $$r'$$; with W\_a4 this hands the sender's auditor the opening of $$C\_{\text{spend}}'$$, Section 8.1) |
 
-**Public inputs (15 fields):**
+**Public inputs (16 fields):**
 
 | Input | Notes |
 |:---|:---|
@@ -612,13 +615,13 @@ The owner withdraws a public amount $$a$$ (typed `i128`) from their spendable ba
 | $$\text{addr\\\_f}$$ | Loaded from instance storage; set once at construction (§3.5) |
 | $$K\_{\text{aud,s}}$$ | Fetched from the auditor contract using `from.auditor_id` |
 | $$a$$ | Public withdrawal amount from invocation inputs |
-| $$C\_{\text{spend}}'$$, $$\sigma$$, $$\tilde{b}$$, $$R\_e$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to `from.spendable_commitment`, the rest emitted in event |
+| $$C\_{\text{spend}}'$$, $$\sigma$$, $$\tilde{b}$$, $$R\_e$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ | Prover-supplied, in this order; $$C\_{\text{spend}}'$$ written to `from.spendable_commitment`, the rest emitted in event |
 
 $$\text{to}$$ is bound under `from.require_auth()` and does not appear in the proof.
 
 **Private witnesses:** $$sk$$, $$vk$$, $$v$$, $$r$$, $$r\_e$$.
 
-**Post-verification:** The contract verifies the proof, sets `from`.`spendable_commitment` $$= C\_{\text{spend}}'$$, and calls `token.transfer(self, to, a)`. Emits event with $$(R\_e, \sigma, \tilde{b}, \tilde{b}\_{\text{aud,s}})$$.
+**Post-verification:** The contract verifies the proof, sets `from`.`spendable_commitment` $$= C\_{\text{spend}}'$$, and calls `token.transfer(self, to, a)`. Emits event with $$(R\_e, \sigma, \tilde{b}, \tilde{b}\_{\text{aud,s}}, \tilde{r}\_{\text{aud,s}})$$.
 
 ### 7.6 Confidential Transfer
 
@@ -648,11 +651,12 @@ The sender (account $$A$$, spending key $$sk\_A$$) transfers a hidden amount $$v
 | T\_a3 | $$\tilde{v}\_{\text{aud,r}} = v\_{\text{transfer}} + m\_{v,r}$$ (recipient-auditor encrypted transfer amount) |
 | T\_a4 | $$\tilde{r}\_{\text{aud,r}} = r\_{\text{transfer}} + m\_{r,r}$$ (recipient-auditor encrypted transfer randomness, enables Pedersen-opening reconstruction of $$C\_{\text{receive}}$$, see Section 8.1) |
 | T\_a5 | $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$ (sender-auditor ECDH shared scalar, reuses ephemeral scalar) |
-| T\_a6 | $$(m\_{v,s}, m\_{b,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$ (sender-auditor channel masks) |
+| T\_a6 | $$(m\_{v,s}, m\_{b,s}, m\_{r,s}) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$ (sender-auditor channel masks) |
 | T\_a7 | $$\tilde{v}\_{\text{aud,s}} = v\_{\text{transfer}} + m\_{v,s}$$ (sender-auditor encrypted transfer amount) |
 | T\_a8 | $$\tilde{b}\_{\text{aud,s}} = (v\_A - v\_{\text{transfer}}) + m\_{b,s}$$ (sender-auditor encrypted balance checkpoint) |
+| T\_a9 | $$\tilde{r}\_{\text{aud,s}} = r\_A' + m\_{r,s}$$ (sender-auditor escrow of the new spendable blinding, over T10's $$r\_A'$$; with T\_a8 this hands the sender's auditor the opening of $$C\_{\text{spend}}'$$, Section 8.1) |
 
-**Public inputs (24 fields, counting each Grumpkin point as two $$\mathbb{F}\_r$$ coordinates):**
+**Public inputs (25 fields, counting each Grumpkin point as two $$\mathbb{F}\_r$$ coordinates):**
 
 | Input | Notes |
 |:---|:---|
@@ -662,14 +666,14 @@ The sender (account $$A$$, spending key $$sk\_A$$) transfers a hidden amount $$v
 | $$\text{addr\\\_f}$$ | Loaded from instance storage; set once at construction (§3.5) |
 | $$K\_{\text{aud,r}}$$ | Fetched from the auditor contract using recipient's `auditor_id` |
 | $$K\_{\text{aud,s}}$$ | Fetched from the auditor contract using sender's `auditor_id` |
-| $$C\_{\text{spend}}'$$, $$C\_{\text{transfer}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\sigma$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to sender's `spendable_commitment`, $$C\_{\text{transfer}}$$ added to recipient's `receiving_commitment`, the rest emitted in event |
+| $$C\_{\text{spend}}'$$, $$C\_{\text{transfer}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\sigma$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ | Prover-supplied, in this order; $$C\_{\text{spend}}'$$ written to sender's `spendable_commitment`, $$C\_{\text{transfer}}$$ added to recipient's `receiving_commitment`, the rest emitted in event |
 
 **Private witnesses:** $$sk\_A$$, $$vk\_A$$, $$v\_A$$, $$r\_A$$, $$v\_{\text{transfer}}$$, $$r\_e$$.
 
 **Post-verification:** The contract verifies the proof, then:
 - Sets $$A$$`.spendable_commitment` $$= C\_{\text{spend}}'$$
 - Adds to recipient: $$B$$`.receiving_commitment` $$\mathrel{+}= C\_{\text{transfer}}$$
-- Emits event with $$(R\_e, \tilde{v}, \sigma, \tilde{b}, \tilde{v}\_{\text{aud,r}}, \tilde{r}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}, \tilde{b}\_{\text{aud,s}})$$
+- Emits event with $$(R\_e, \tilde{v}, \sigma, \tilde{b}, \tilde{v}\_{\text{aud,r}}, \tilde{r}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}, \tilde{b}\_{\text{aud,s}}, \tilde{r}\_{\text{aud,s}})$$
 
 **Recipient processing.** Upon observing the event, the recipient computes $$s = \text{ECDH}(vk, R\_e)$$, derives amount and blinding. The decryption flow is independent of whether the sender was the owner or a spender.
 
@@ -694,13 +698,15 @@ The owner locks funds from their spendable balance into a per-spender escrow. Th
 | S11 | $$\tilde{b} = (v - v\_a) + \text{Poseidon}(\delta\_{\text{enc\\\_bal}}, vk, \sigma)$$ (encrypted balance) |
 | S12 | Escrowed $$dvk\_i$$ correctly encrypts under $$Y\_{\text{op}}$$ via ECDH |
 | S13 | $$r\_e \neq 0$$ (rules out $$R\_e = \mathcal{O}$$ and $$S\_{a,s} = \mathcal{O}$$; the same $$r\_e$$ is reused for the $$dvk\_i$$ escrow ECDH in Section 7.11, so this also rules out a trivial escrow shared secret) |
+| S14 | $$\tilde{r}\_{a,\text{aud,s}} = \text{Poseidon}(\delta\_{\text{esc\\\_allow\\\_r\\\_aud}}, s\_{a,s}, \text{op}\_i) + r\_a$$ (auditor-side escrow of S6's allowance blinding over the S\_a2 shared scalar, Section 8.5; the blinding is already a witness by S6, so this is one Poseidon and no new scalar multiplication) |
 | S\_a1 | $$R\_e = r\_e \cdot H$$ (ephemeral key for auditor ECDH) |
 | S\_a2 | $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$ (owner-auditor ECDH shared scalar, §2.4) |
-| S\_a3 | $$(m\_v, m\_b) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$ (owner-auditor channel masks) |
+| S\_a3 | $$(m\_v, m\_b, m\_r) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$ (owner-auditor channel masks) |
 | S\_a4 | $$\tilde{v}\_{\text{aud,s}} = v\_a + m\_v$$ (owner-auditor encrypted escrow amount) |
 | S\_a5 | $$\tilde{b}\_{\text{aud,s}} = (v - v\_a) + m\_b$$ (owner-auditor encrypted balance checkpoint) |
+| S\_a6 | $$\tilde{r}\_{\text{aud,s}} = r' + m\_r$$ (owner-auditor escrow of the new spendable blinding, over S9's $$r'$$; with S\_a5 this hands the owner's auditor the opening of $$C\_{\text{spend}}'$$, Section 8.1) |
 
-**Public inputs (24 fields):**
+**Public inputs (26 fields):**
 
 | Input | Notes |
 |:---|:---|
@@ -710,11 +716,11 @@ The owner locks funds from their spendable balance into a per-spender escrow. Th
 | $$\text{op}\_i$$ | $$\text{address\\\_to\\\_field}$$(`spender` argument), computed per-call by the contract (§2.7) |
 | $$\text{addr\\\_f}$$ | Loaded from instance storage; set once at construction (§3.5) |
 | $$K\_{\text{aud,s}}$$ | Fetched from the auditor contract using owner's `auditor_id` |
-| $$C\_{\text{spend}}'$$, $$C\_a$$, escrowed\_dvk, $$\tilde{b}$$, $$\tilde{a}$$, $$\sigma$$, $$\sigma\_a$$, $$R\_e$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$ | Prover-supplied; $$C\_{\text{spend}}'$$ written to owner's `spendable_commitment`, the delegation fields written to storage, the rest emitted in event |
+| $$C\_{\text{spend}}'$$, $$C\_a$$, escrowed\_dvk, $$\tilde{b}$$, $$\tilde{a}$$, $$\sigma$$, $$\sigma\_a$$, $$R\_e$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, $$\tilde{r}\_{a,\text{aud,s}}$$ | Prover-supplied, in this order; $$C\_{\text{spend}}'$$ written to owner's `spendable_commitment`, the delegation fields written to storage, the rest emitted in event |
 
 **Private witnesses:** $$sk$$, $$vk$$, $$v$$, $$r$$, $$v\_a$$, $$r\_e$$.
 
-**Post-verification:** The contract verifies the proof, sets `spendable_commitment` $$= C\_{\text{spend}}'$$ and stores the `SpenderDelegation`. Emits event with $$(R\_e, \sigma, \tilde{b}, \tilde{v}\_{\text{aud,s}}, \tilde{b}\_{\text{aud,s}})$$.
+**Post-verification:** The contract verifies the proof, sets `spendable_commitment` $$= C\_{\text{spend}}'$$ and stores the `SpenderDelegation`. Emits event with $$(R\_e, \sigma, \tilde{b}, \tilde{v}\_{\text{aud,s}}, \tilde{b}\_{\text{aud,s}}, \tilde{r}\_{\text{aud,s}}, \tilde{r}\_{a,\text{aud,s}})$$.
 
 ### 7.8 Spender Transfer
 
@@ -730,23 +736,25 @@ The spender transfers from the owner's escrowed allowance to a recipient.
 | O4 | $$v\_a \in [0, 2^{127})$$, $$v\_{\text{transfer}} \in [0, 2^{127})$$, $$v\_a - v\_{\text{transfer}} \in [0, 2^{127})$$ (range validity, Section 2.6) |
 | O5 | $$s = \text{ECDH}(r\_e, \text{PVK}\_{\text{recipient}})$$ (recipient ECDH shared scalar, §2.4) |
 | O6 | $$R\_e = r\_e \cdot H$$ |
-| O7 | $$r\_{\text{transfer}} = \text{Poseidon}(\delta\_{\text{transfer\\\_blind}}, s, \sigma\_a)$$ (transfer blinding) |
+| O7 | $$r\_{\text{transfer}} = \text{Poseidon}(\delta\_{\text{transfer\\\_blind}}, s, \sigma\_a')$$ (transfer blinding) |
 | O8 | $$C\_{\text{transfer}} = v\_{\text{transfer}} \cdot G + r\_{\text{transfer}} \cdot H$$ |
-| O9 | $$\tilde{v} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s, \sigma\_a)$$ (encrypted amount) |
+| O9 | $$\tilde{v} = v\_{\text{transfer}} + \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s, \sigma\_a')$$ (encrypted amount) |
 | O10 | $$r\_a' = \text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a')$$ (new allowance randomness) |
 | O11 | $$C\_a' = (v\_a - v\_{\text{transfer}}) \cdot G + r\_a' \cdot H$$ (new allowance) |
 | O12 | $$\tilde{a}' = (v\_a - v\_{\text{transfer}}) + \text{Poseidon}(\delta\_{\text{enc\\\_allow}}, dvk\_i, \sigma\_a')$$ (encrypted allowance) |
-| O13 | $$r\_e \neq 0$$ (rules out $$R\_e = \mathcal{O}$$ and $$S, S\_{a,r}, S\_{a,s} = \mathcal{O}$$; otherwise every ECDH mask in this transfer collapses to a constant function of $$\sigma\_a$$) |
+| O13 | $$r\_e \neq 0$$ (rules out $$R\_e = \mathcal{O}$$ and $$S, S\_{a,r}, S\_{a,s} = \mathcal{O}$$; otherwise every ECDH mask in this transfer collapses to a constant function of $$\sigma\_a'$$) |
+| O14 | $$\sigma\_a' \neq \sigma\_a$$ (nonce rotation; rejects the one-step pad reuse, §6.2 *Transfer nonce*) |
 | O\_a1 | $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$ (recipient-auditor ECDH shared scalar, reuses ephemeral scalar) |
-| O\_a2 | $$(m\_{v,r}, m\_{r,r}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_r}}, s\_{a,r}, \sigma\_a)$$ (recipient-auditor channel masks) |
+| O\_a2 | $$(m\_{v,r}, m\_{r,r}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_r}}, s\_{a,r}, \sigma\_a')$$ (recipient-auditor channel masks) |
 | O\_a3 | $$\tilde{v}\_{\text{aud,r}} = v\_{\text{transfer}} + m\_{v,r}$$ (recipient-auditor encrypted transfer amount) |
 | O\_a4 | $$\tilde{r}\_{\text{aud,r}} = r\_{\text{transfer}} + m\_{r,r}$$ (recipient-auditor encrypted transfer randomness, enables Pedersen-opening reconstruction of $$C\_{\text{receive}}$$, see Section 8.1) |
 | O\_a5 | $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$ (owner-auditor ECDH shared scalar, reuses ephemeral scalar) |
-| O\_a6 | $$(m\_{v,s}, m\_{a,s}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma\_a)$$ (owner-auditor channel masks) |
+| O\_a6 | $$(m\_{v,s}, m\_{a,s}, m\_{r,s}) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma\_a')$$ (owner-auditor channel masks) |
 | O\_a7 | $$\tilde{v}\_{\text{aud,s}} = v\_{\text{transfer}} + m\_{v,s}$$ (owner-auditor encrypted transfer amount) |
 | O\_a8 | $$\tilde{a}\_{\text{aud,s}} = (v\_a - v\_{\text{transfer}}) + m\_{a,s}$$ (owner-auditor encrypted post-transfer allowance) |
+| O\_a9 | $$\tilde{r}\_{\text{aud,s}} = r\_a' + m\_{r,s}$$ (owner-auditor escrow of the NEW allowance blinding, the one O11 commits under, Section 8.5; already a witness by O10, so this is one field addition. Pad and plaintext both key off $$\sigma\_a'$$, under distinct domain tags and distinct secrets) |
 
-**Public inputs (24 fields):**
+**Public inputs (25 fields):**
 
 | Input | Notes |
 |:---|:---|
@@ -755,13 +763,13 @@ The spender transfers from the owner's escrowed allowance to a recipient.
 | $$\text{PVK}\_{\text{recipient}}$$ | Loaded from recipient's `viewing_public_key` |
 | $$K\_{\text{aud,r}}$$ | Fetched from the auditor contract using recipient's `auditor_id` |
 | $$K\_{\text{aud,s}}$$ | Fetched from the auditor contract using **owner's** `auditor_id`, not spender's. The visibility model points balance- and allowance-checkpoint ciphertexts at the funds' owner. |
-| $$C\_a'$$, $$C\_{\text{transfer}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{a}'$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$ | Prover-supplied; allowance fields written to delegation storage, $$C\_{\text{transfer}}$$ added to recipient's `receiving_commitment`, the rest emitted in event |
+| $$C\_a'$$, $$C\_{\text{transfer}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{a}'$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ | Prover-supplied, in this order; allowance fields written to delegation storage, $$C\_{\text{transfer}}$$ added to recipient's `receiving_commitment`, the rest emitted in event |
 
 **Private witnesses:** $$sk\_{\text{op}}$$, $$dvk\_i$$, $$v\_a$$, $$r\_a$$ (single-limb $$\mathbb{F}\_r$$; pinned by O3 to $$\text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a)$$), $$v\_{\text{transfer}}$$, $$r\_e$$.
 
-**Post-verification:** The contract checks `ledger.sequence() <= live_until_ledger`, updates `allowance_commitment`, `a_tilde`, stores `new_allowance_salt`, and adds $$C\_{\text{transfer}}$$ to the recipient's `receiving_commitment`. Emits event with $$(R\_e, \tilde{v}, \sigma\_a, \tilde{v}\_{\text{aud,r}}, \tilde{r}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}, \tilde{a}\_{\text{aud,s}})$$.
+**Post-verification:** The contract checks `ledger.sequence() <= live_until_ledger`, updates `allowance_commitment`, `a_tilde`, stores $$\sigma\_a'$$ as the new `allowance_salt`, and adds $$C\_{\text{transfer}}$$ to the recipient's `receiving_commitment`. Emits event with $$(R\_e, \tilde{v}, \sigma\_a', \tilde{v}\_{\text{aud,r}}, \tilde{r}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}, \tilde{a}\_{\text{aud,s}}, \tilde{r}\_{\text{aud,s}})$$.
 
-**Ephemeral scalar.** The spender derives $$r\_e = \text{Poseidon}(\delta\_{\text{eph}}, vk\_{\text{op}}, \sigma\_a)$$ (§5.3) from its *own* viewing key rather than the owner's, so that the spender can later disclose it ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §7). The circuit does not constrain the derivation; it does not constrain $$vk\_{\text{op}}$$ at all, per *Contract binding* below. One consequence follows for the owner: since the owner does not hold $$vk\_{\text{op}}$$, the owner cannot recompute $$r\_e$$ for a spender transfer and cannot disclose it without the spender's cooperation ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §7, *Coverage asymmetry*).
+**Ephemeral scalar.** The spender derives $$r\_e = \text{Poseidon}(\delta\_{\text{eph}}, vk\_{\text{op}}, \sigma\_a')$$ (§5.3, §6.2 *Transfer nonce*) from its *own* viewing key rather than the owner's, so that the spender can later disclose it ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §7). The circuit does not constrain the derivation; it does not constrain $$vk\_{\text{op}}$$ at all, per *Contract binding* below. One consequence follows for the owner: since the owner does not hold $$vk\_{\text{op}}$$, the owner cannot recompute $$r\_e$$ for a spender transfer and cannot disclose it without the spender's cooperation ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §7, *Coverage asymmetry*).
 
 **Recipient uniformity.** The recipient path is identical to the direct-transfer path of §7.6 *Recipient processing*.
 
@@ -829,9 +837,11 @@ The spender decrypts using $$sk\_{\text{op}}$$. The `set_spender` proof enforces
 
 The $$r\_e$$ here is the same scalar S\_a1 commits to ($$R\_e = r\_e \cdot H$$), so the escrow's $$R\_x$$ and the auditor channel's $$R\_e.x$$ are forced equal.
 
+The same proof also escrows to the owner's *auditor* (S14), under its own domain tag and over the auditor shared scalar -- but what it escrows is the allowance blinding $$r\_a$$, not a second copy of $$dvk\_i$$. The auditor needs the opening of $$C\_a$$, not the generator of every opening, and the delegation key is permanent per pair -- it survives revocation and re-delegation to the same address -- so escrowing it would make one leaked ciphertext a permanent capability. That construction, its decryption path, and why it is a single-output pad rather than a sponge lane are specified in [DESIGN_cont.md](./DESIGN_cont.md) §8.5.
+
 ### 7.12 Expiry and Revert Safety
 
-Allowance randomness includes `allowance_salt` to prevent deterministic-randomness reuse after reverted transactions. Delegation storage, expiry, and revocation semantics are specified in §6.2.
+A reverted transaction leaves the delegation entry unchanged, so the stored `allowance_salt` recurs on the retry. Every value a retry could vary is therefore keyed to the prover-chosen $$\sigma\_a'$$ (§6.2 *Transfer nonce*). Delegation storage, expiry, and revocation semantics are specified in §6.2.
 
 ---
 

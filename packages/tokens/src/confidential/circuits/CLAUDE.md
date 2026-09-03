@@ -26,7 +26,7 @@ It appears in all fourteen `Nargo.toml` files and looks like a mistake. Nargo re
 
 ### Do not prune unused public inputs
 
-`_acct_f` in `register/src/main.nr` is referenced by no gate and looks like dead code. It is the replay binding: UltraHonk absorbs every public input into the transcript, so a proof produced for one account fails when the contract assembles the blob for another. Removing it lets anyone replay a legitimate registration's published proof and payload to mint duplicate-key accounts. Each operation circuit declares its exact public-input count in a header comment — withdraw 15, revoke_spender 19, transfer / set_spender / spender_transfer 24 — and the count is part of the contract with the on-chain assembler.
+`_acct_f` in `register/src/main.nr` is referenced by no gate and looks like dead code. It is the replay binding: UltraHonk absorbs every public input into the transcript, so a proof produced for one account fails when the contract assembles the blob for another. Removing it lets anyone replay a legitimate registration's published proof and payload to mint duplicate-key accounts. Each operation circuit declares its exact public-input count in a header comment — withdraw 16, revoke_spender 19, transfer / spender_transfer 25, set_spender 26 — and the count is part of the contract with the on-chain assembler.
 
 ### Package names are load-bearing
 
@@ -34,9 +34,13 @@ Directory `transfer/` is package `circuit_transfer`; `gadgets/commit/` is `gadge
 
 ### Never hash raw
 
-`poseidon_with_domain` is the only Poseidon entry point in `lib/src/lib.nr`; calling the underlying hash directly is a violation of the library contract. The domain tag is always the first absorbed element. The numeric tag values are the cross-language contract with the SDK — see `../CLAUDE.md` and `docs/DESIGN_cont.md` §13, which is their only authoritative source.
+`poseidon_with_domain` is the only Poseidon entry point in `lib/src/lib.nr`; calling the underlying hash directly is a violation of the library contract. The domain tag is always the first absorbed element. The numeric tag values are the cross-language contract with the SDK — see `../CLAUDE.md` and `../docs/DESIGN_cont.md` §13, which is their only authoritative source.
 
-Sponge parameters: width 4, rate 3, capacity 1, `iv = len · 2^64`. Empty input still applies the squeeze permutation, matching the on-chain sponge. The two-lane squeeze order is fixed — **index 0 is always an amount mask, index 1 always a balance/allowance/randomness mask** — and `encrypt_auditor_sender_balance` deliberately takes the second lane so a balance checkpoint can never share a pad with an amount ciphertext under `(r_e, σ)` reuse. `sponge_squeeze_2(d,s,σ)[0]` must stay equal to `poseidon_with_domain(d,[s,σ])`.
+Sponge parameters, the canonical lane assignment, and the mode-exclusivity rule that follows from a single-block absorb are normative in `../docs/DESIGN.md` §2.5; the Noir sponge must match it exactly. The obligations that section places on this code: `sponge_squeeze_2(d,s,σ)[0]` must stay equal to `poseidon_with_domain(d,[s,σ])`, and `sponge_squeeze_3(d,s,σ)[0..2]` must stay equal to `sponge_squeeze_2(d,s,σ)` — which is why `sponge_squeeze_2` is defined as the prefix of `sponge_squeeze_3` rather than as a second permutation. A divergence in either silently changes every existing mask.
+
+`AUDITOR_SENDER` is squeezed three-wide by every circuit that escrows `lane[2]` and two-wide only by RevokeSpender (V_a3); `AUDITOR_RECIPIENT` is always two-wide; every other tag goes through `poseidon_with_domain`. Widening or narrowing a channel is a spec change, not a refactor.
+
+`lane[2]` carries **the blinding of a commitment the operation writes, never a key** — `r'` on W_a5 / T_a9 / S_a6, `r_a'` on O_a9. Tag 17 (`ESCROWED_ALLOWANCE_BLINDING_AUDITOR`) is the same idea off-sponge: SetSpender's `lane[2]` is already taken, so S14 escrows `r_a` under a single-output pad. Do not escrow `dvk_i` here: it is permanent per `(owner, spender)` and survives revoke-then-re-delegate, so one leaked ciphertext would open every allowance state for that pair, past and future (`../docs/DESIGN_cont.md` §8.5).
 
 ECDH must absorb both `S.x` and `S.y`; x-only extraction collapses `P` and `-P`.
 
@@ -56,7 +60,7 @@ LC_ALL=C nargo info | grep '^|' | LC_ALL=C sort > constraints.baseline
 
 `LC_ALL=C` is mandatory on **both** sides of the pipe — byte order is the only ordering stable between macOS and the Ubuntu runner. The redirect overwrites the file's header comments; re-paste them, because CI's failure message asks for them.
 
-Two non-obvious consequences: adding or removing a **gadget** changes the baseline even when no circuit logic changed, and the ACIR opcode counts are quoted in prose at `../docs/DESIGN_cont.md` §10.3 (Register 33, Withdraw 94, RevokeSpender 123, SetSpender 131, Transfer 133, SpenderTransfer 135). Nothing enforces that second copy — update it in the same PR.
+Two non-obvious consequences: adding or removing a **gadget** changes the baseline even when no circuit logic changed, and the ACIR opcode counts are quoted in prose at `../docs/DESIGN_cont.md` §10.3 (Register 33, Withdraw 95, RevokeSpender 123, Transfer 134, SetSpender 135, SpenderTransfer 136). Nothing enforces that second copy — update it in the same PR.
 
 ### `vks/`
 
@@ -76,7 +80,7 @@ Fixtures are not auto-generated. Changing a primitive is a three-step lockstep:
 2. Update the matching `testdata/*.json`
 3. Update the hardcoded expected values in the `fixtures_match_testdata` test in `lib/src/tests.nr`
 
-`fixtures_match_testdata` is the in-Noir guard that fails CI. The sponge vectors are additionally hoisted into `global SPONGE_SQUEEZE_2_*` constants in the same file — a fourth site.
+`fixtures_match_testdata` is the in-Noir guard that fails CI. The sponge vectors are additionally hoisted into `global SPONGE_SQUEEZE_2_*` / `SPONGE_SQUEEZE_3_*` constants in the same file — a fourth site.
 
 `address_to_field.json` is the exception. That derivation has no Noir implementation at all (circuits take `addr_f` as an opaque public input), so it is the one primitive with two independent implementations. Its guard is the Rust test `address_to_field_matches_testdata_vectors` in `../test.rs`, which **transcribes the hex values as string literals** rather than reading the JSON — update both together or neither. Its inputs are 56-character SEP-23 strkeys, and the lo/hi 28-byte limbs are little-endian.
 

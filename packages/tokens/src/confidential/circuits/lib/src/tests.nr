@@ -1,8 +1,8 @@
 use crate::{
     assert_on_curve_non_identity, commit, derive_allow_r, derive_spend_r, derive_transfer_blind, domain,
-    dvk_from_vk_op, ecdh, encrypt_allowance, encrypt_amount, encrypt_auditor_sender_balance,
-    encrypt_balance, encrypt_esc_dvk, G, H, poseidon_with_domain, pvk_from_vk, scalar_mul, sponge,
-    sponge_squeeze_2, vk_from_sk,
+    dvk_from_vk_op, ecdh, encrypt_allowance, encrypt_amount,
+    encrypt_balance, encrypt_esc_allow_r_auditor, encrypt_esc_dvk, G, H, poseidon_with_domain,
+    pvk_from_vk, scalar_mul, sponge, sponge_squeeze_2, sponge_squeeze_3, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 use std::hash::{derive_generators, pedersen_commitment, poseidon2_permutation};
@@ -207,12 +207,6 @@ fn encrypt_decrypt_round_trip() {
     let dvk_escrowed = encrypt_esc_dvk(v, s, sigma);
     let mask_esc = poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, sigma]);
     assert(dvk_escrowed - mask_esc == v);
-
-    // The auditor balance checkpoint pads with the sponge's second squeeze
-    // (the balance slot), not the single-squeeze funnel.
-    let b_tilde_aud_s = encrypt_auditor_sender_balance(v, s, sigma);
-    let mask_aud_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s, sigma)[1];
-    assert(b_tilde_aud_s - mask_aud_s == v);
 }
 
 #[test]
@@ -237,6 +231,55 @@ fn sponge_squeeze_2_first_matches_poseidon_with_domain() {
     let sigma: Field = 0x6789;
     let m2 = sponge_squeeze_2(d, s, sigma);
     assert(m2[0] == poseidon_with_domain(d, [s, sigma]));
+}
+
+#[test]
+fn sponge_squeeze_3_agrees_with_squeeze_2_on_shared_lanes() {
+    // The widening from two lanes to three must be observationally identical
+    // on lane[0] and lane[1] for every domain tag: both squeezes read the same
+    // post-permutation state, and the absorb occupies a single rate-3 block.
+    // This is what lets `delta_aud_s` be widened everywhere it appears
+    // without renumbering a single existing constraint.
+    let s: Field = 0x12345;
+    let sigma: Field = 0x6789;
+    for d in [domain::AUDITOR_SENDER, domain::AUDITOR_RECIPIENT] {
+        let m2 = sponge_squeeze_2(d, s, sigma);
+        let m3 = sponge_squeeze_3(d, s, sigma);
+        assert(m3[0] == m2[0]);
+        assert(m3[1] == m2[1]);
+    }
+}
+
+#[test]
+fn sponge_squeeze_3_outputs_distinct() {
+    // The lane[2] mask comes from rate position state[2] and must differ
+    // from both others. A collision would let an observer who
+    // recovers the balance mask also recover the secret-escrow pad -- and
+    // with it the account's spendable blinding, which is exactly what the
+    // slot exists to keep between the sender and its auditor.
+    let m = sponge_squeeze_3(domain::AUDITOR_SENDER, 0x42, 0x07);
+    assert(m[0] != m[1]);
+    assert(m[0] != m[2]);
+    assert(m[1] != m[2]);
+}
+
+#[test]
+fn esc_allow_r_auditor_is_domain_separated_from_the_spender_escrow() {
+    // Tags 10 and 17 escrow different plaintexts -- the delegation key to the
+    // spender, the allowance blinding to the owner's auditor -- but both are
+    // additive pads over the same shape, so a shared tag would let a
+    // coincidence of inputs collapse one onto the other. Reusing one tag for
+    // both would be secure in practice, since the shared scalars differ (Y_op
+    // and K_aud_s are independent points), but the separation is what keeps
+    // Section 5.3's r_e-reuse argument whole, so it must be observable here.
+    let x: Field = 0xd0d0;
+    let s: Field = 0x12345;
+    let op_i: Field = 0xabcd;
+    assert(encrypt_esc_dvk(x, s, op_i) != encrypt_esc_allow_r_auditor(x, s, op_i));
+
+    // Both are additive one-time-pad encryptions and must round-trip.
+    let mask = poseidon_with_domain(domain::ESCROWED_ALLOWANCE_BLINDING_AUDITOR, [s, op_i]);
+    assert(encrypt_esc_allow_r_auditor(x, s, op_i) - mask == x);
 }
 
 #[test]
@@ -346,10 +389,6 @@ fn print_fixtures() {
     let esc = encrypt_esc_dvk(dvk, s_ecdh, op_i);
     println(f"encrypt_esc_dvk = {esc}");
 
-    // encrypt_auditor_sender_balance(v, s, sigma)
-    let b_aud_s = encrypt_auditor_sender_balance(v, s_ecdh, sigma);
-    println(f"encrypt_auditor_sender_balance = {b_aud_s}");
-
     // sponge_squeeze_2(AUDITOR_SENDER, s, sigma) -- (amount, balance) masks
     let ss2_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_ecdh, sigma);
     let ss2_s0 = ss2_s[0];
@@ -363,6 +402,19 @@ fn print_fixtures() {
     let ss2_r1 = ss2_r[1];
     println(f"sponge_squeeze_2_AUDITOR_RECIPIENT_0 = {ss2_r0}");
     println(f"sponge_squeeze_2_AUDITOR_RECIPIENT_1 = {ss2_r1}");
+
+    // sponge_squeeze_3(AUDITOR_SENDER, s, sigma) -- (amount, balance, escrow)
+    let ss3_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_ecdh, sigma);
+    let ss3_s0 = ss3_s[0];
+    let ss3_s1 = ss3_s[1];
+    let ss3_s2 = ss3_s[2];
+    println(f"sponge_squeeze_3_AUDITOR_SENDER_0 = {ss3_s0}");
+    println(f"sponge_squeeze_3_AUDITOR_SENDER_1 = {ss3_s1}");
+    println(f"sponge_squeeze_3_AUDITOR_SENDER_2 = {ss3_s2}");
+
+    // encrypt_esc_allow_r_auditor(r_a, s, op_i)
+    let esc_aud = encrypt_esc_allow_r_auditor(r_a, s_ecdh, op_i);
+    println(f"encrypt_esc_allow_r_auditor = {esc_aud}");
 
     // poseidon_with_domain(VK, [sk, addr_f]) -- direct funnel access, equals vk_from_sk
     let pwd = poseidon_with_domain(domain::VIEWING_KEY, [sk, addr_f]);
@@ -449,19 +501,30 @@ fn fixtures_match_testdata() {
     assert(ss2_r[0] == SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_0);
     assert(ss2_r[1] == SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_1);
 
-    // encrypt_auditor_sender_balance pads with the sponge's *second*
-    // squeeze -- the balance slot, matching the two-ciphertext sender
-    // channels (Transfer T_a6). The first squeeze stays reserved for amount
-    // masks so the checkpoint pad can never collide with an amount pad even
-    // under (r_e, sigma) reuse. Pin against the squeeze_2 vector so the
-    // helper and the raw sponge can't drift apart.
-    assert(
-        encrypt_auditor_sender_balance(v, s_ecdh, sigma)
-            == v + SPONGE_SQUEEZE_2_AUDITOR_SENDER_1,
-    );
+    // The lane[0] output is the single-squeeze funnel: the absorb fits one
+    // rate-3 block, so a tag used in both modes would collapse one onto the
+    // other (Section 2.5 mode exclusivity).
     assert(
         poseidon_with_domain(domain::AUDITOR_SENDER, [s_ecdh, sigma])
             == SPONGE_SQUEEZE_2_AUDITOR_SENDER_0,
+    );
+
+    // The three-lane squeeze must agree with the two-lane one on lane[0]
+    // and lane[1]: the absorb fits one rate-3 block, so both are served from
+    // the same permutation. If this diverges, widening the sender-auditor
+    // channel silently changed every existing mask and every published
+    // ciphertext became undecryptable.
+    let ss3_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_ecdh, sigma);
+    assert(ss3_s[0] == SPONGE_SQUEEZE_2_AUDITOR_SENDER_0);
+    assert(ss3_s[1] == SPONGE_SQUEEZE_2_AUDITOR_SENDER_1);
+    assert(ss3_s[2] == SPONGE_SQUEEZE_3_AUDITOR_SENDER_2);
+    let ss3_r = sponge_squeeze_3(domain::AUDITOR_RECIPIENT, s_ecdh, sigma);
+    assert(ss3_r[0] == SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_0);
+    assert(ss3_r[1] == SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_1);
+
+    assert(
+        encrypt_esc_allow_r_auditor(derive_allow_r(dvk, sigma_a), s_ecdh, op_i)
+            == 0x2d97a37cb8d103eb9231907e292a954e22e7fa56165a6b3b9f639252557bf7a2,
     );
 
     // poseidon_with_domain funnel is the same operation that backs vk_from_sk.
@@ -479,6 +542,10 @@ global SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_0: Field =
     0x0801e6d7184cea11e6225fcfb4e88a90674cb085da8ebc04918c57cc44b9c25d;
 global SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_1: Field =
     0x131187e2ac296c1c54c2be2a5cbe614644f01c754108ce25359212d67b36ecc3;
+// The lane[2] output of the same permutation -- the sender-auditor
+// secret-escrow slot. Mirrored in `testdata/sponge_squeeze_3.json`.
+global SPONGE_SQUEEZE_3_AUDITOR_SENDER_2: Field =
+    0x1c4e67103733b87be6672e0af91fc5416b6d582bf99d5a0f78ea6aaf5fab20b0;
 
 #[test]
 fn derive_helpers_deterministic_and_distinct() {

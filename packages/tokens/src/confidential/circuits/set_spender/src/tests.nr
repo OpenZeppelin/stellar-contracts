@@ -1,7 +1,8 @@
 use crate::main;
 use stellar_confidential_lib::{
     commit, derive_allow_r, derive_spend_r, domain, dvk_from_vk_op, ecdh, encrypt_allowance,
-    encrypt_balance, encrypt_esc_dvk, H, scalar_mul, sponge_squeeze_2, vk_from_sk,
+    encrypt_balance, encrypt_esc_allow_r_auditor, encrypt_esc_dvk, H, scalar_mul,
+    sponge_squeeze_3, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 
@@ -83,6 +84,13 @@ global ESCROWED_DVK_CIPHER: Field =
     0x1ef89e3bd93ec1afed649d150e9d0ff5df72002759e260cb66b06604a4d7ebe0;
 global V_TILDE_AUD_S: Field =
     0x0d0a3aa77960977737f4355093d4672ea9f95556fabf63bda0913ebef52c4397;
+// lane[2] spendable-blinding escrow (S_a6) and the auditor-side allowance-
+// blinding escrow (S14). Both are blindings of commitments this operation
+// writes -- C_spend' and C_a respectively.
+global R_TILDE_AUD_S: Field =
+    0x12bae1b1e1b12493e37d427d3ee28b481c37f7f456c4ab0c022b8ba6262ca57f;
+global R_A_TILDE_AUD_S: Field =
+    0x28991b7df68413693ffe3fd0d47b0793e65f3c6edb6907a7a152fe80d158927f;
 global B_TILDE_AUD_S: Field =
     0x288ff48898f218dbba2a5c9546d0986af3257a4a539e23e4f35c404d6720c07c;
 
@@ -109,9 +117,11 @@ fn print_fixtures() {
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     let v_tilde_aud_s = V_A + m_s[0];
     let b_tilde_aud_s = V_NEW + m_s[1];
+    let r_tilde_aud_s = r_new + m_s[2];
+    let r_a_tilde_aud_s = encrypt_esc_allow_r_auditor(r_a, s_a_s, OP_I);
 
     let yopx = y_op.x;
     let yopy = y_op.y;
@@ -138,6 +148,8 @@ fn print_fixtures() {
     println(f"R_E_Y = {rey}");
     println(f"V_TILDE_AUD_S = {v_tilde_aud_s}");
     println(f"B_TILDE_AUD_S = {b_tilde_aud_s}");
+    println(f"R_TILDE_AUD_S = {r_tilde_aud_s}");
+    println(f"R_A_TILDE_AUD_S = {r_a_tilde_aud_s}");
 }
 
 #[test]
@@ -172,13 +184,15 @@ fn set_spender_fixtures_match_lib() {
 fn set_spender_auditor_fixtures_match_lib() {
     let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
+    let r_a = derive_allow_r(dvk, SIGMA_A);
     let y_op = scalar_mul(SK_OP, H);
     let s_esc = ecdh(R_E, y_op);
     let escrowed_dvk_cipher = encrypt_esc_dvk(dvk, s_esc, OP_I);
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let r_new = derive_spend_r(vk, SIGMA);
 
     assert(k_aud_s.x == K_AUD_S_X);
     assert(k_aud_s.y == K_AUD_S_Y);
@@ -187,9 +201,11 @@ fn set_spender_auditor_fixtures_match_lib() {
     assert(escrowed_dvk_cipher == ESCROWED_DVK_CIPHER);
     assert(V_A + m_s[0] == V_TILDE_AUD_S);
     assert(V_NEW + m_s[1] == B_TILDE_AUD_S);
+    assert(r_new + m_s[2] == R_TILDE_AUD_S);
+    assert(encrypt_esc_allow_r_auditor(r_a, s_a_s, OP_I) == R_A_TILDE_AUD_S);
 }
 
-// `run_main` accepts all 24 public inputs as parameters -- nothing baked in.
+// `run_main` accepts every public input as a parameter -- nothing baked in.
 // Tests that target a specific constraint construct the public tuple so only
 // that constraint can fail: tamper the witness or public input under test
 // AND recompute every downstream public that depends on it, so no cascaded
@@ -224,6 +240,8 @@ fn run_main(
     r_e_y_in: Field,
     v_tilde_aud_s_in: Field,
     b_tilde_aud_s_in: Field,
+    r_tilde_aud_s_in: Field,
+    r_a_tilde_aud_s_in: Field,
 ) {
     main(
         sk_in,
@@ -255,6 +273,8 @@ fn run_main(
         r_e_y_in,
         v_tilde_aud_s_in,
         b_tilde_aud_s_in,
+        r_tilde_aud_s_in,
+        r_a_tilde_aud_s_in,
     );
 }
 
@@ -289,6 +309,8 @@ fn run_fixture() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -316,7 +338,7 @@ fn full_allowance_escrow() {
     let escrowed_dvk_cipher = encrypt_esc_dvk(dvk, s_esc, OP_I);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         V,
@@ -347,6 +369,8 @@ fn full_allowance_escrow() {
         R_E_Y,
         V + m_s[0],
         0 + m_s[1],
+        r_new + m_s[2],
+        encrypt_esc_allow_r_auditor(r_a, s_a_s, OP_I),
     );
 }
 
@@ -369,7 +393,7 @@ fn rejects_under_funded_escrow() {
     let escrowed_dvk_cipher = encrypt_esc_dvk(dvk, s_esc, OP_I);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         V,
@@ -400,6 +424,8 @@ fn rejects_under_funded_escrow() {
         R_E_Y,
         v_a_too_large + m_s[0],
         (V - v_a_too_large) + m_s[1],
+        r_new + m_s[2],
+        encrypt_esc_allow_r_auditor(r_a, s_a_s, OP_I),
     );
 }
 
@@ -421,7 +447,7 @@ fn rejects_v_out_of_range() {
     let b_tilde = encrypt_balance(v_new_huge, vk, SIGMA);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         v_huge,
@@ -452,6 +478,8 @@ fn rejects_v_out_of_range() {
         R_E_Y,
         V_TILDE_AUD_S,
         v_new_huge + m_s[1],
+        r_new + m_s[2],
+        encrypt_esc_allow_r_auditor(derive_allow_r(dvk_from_vk_op(vk, OP_I), SIGMA_A), s_a_s, OP_I),
     );
 }
 
@@ -478,7 +506,7 @@ fn rejects_v_a_out_of_range() {
     let escrowed_dvk_cipher = encrypt_esc_dvk(dvk, s_esc, OP_I);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         V,
@@ -509,6 +537,8 @@ fn rejects_v_a_out_of_range() {
         R_E_Y,
         v_a_huge + m_s[0],
         v_new_huge + m_s[1],
+        r_new + m_s[2],
+        encrypt_esc_allow_r_auditor(r_a, s_a_s, OP_I),
     );
 }
 
@@ -561,6 +591,8 @@ fn rejects_wrong_sk() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -578,7 +610,7 @@ fn rejects_wrong_balance_opening() {
     let b_tilde_bad = encrypt_balance(v_new_bad, vk, SIGMA);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let s_a_s = ecdh(R_E, k_aud_s);
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
     run_main(
         SK,
         v_bad,
@@ -609,6 +641,8 @@ fn rejects_wrong_balance_opening() {
         R_E_Y,
         V_TILDE_AUD_S,
         v_new_bad + m_s[1],
+        r_new + m_s[2],
+        encrypt_esc_allow_r_auditor(derive_allow_r(dvk_from_vk_op(vk, OP_I), SIGMA_A), s_a_s, OP_I),
     );
 }
 
@@ -659,6 +693,8 @@ fn rejects_wrong_addr_f() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -700,6 +736,8 @@ fn rejects_wrong_op_i() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -736,6 +774,8 @@ fn rejects_tampered_c_a() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -773,6 +813,8 @@ fn rejects_tampered_a_tilde() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -809,6 +851,8 @@ fn rejects_tampered_c_spend_new() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -845,6 +889,8 @@ fn rejects_tampered_b_tilde() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -884,6 +930,8 @@ fn rejects_tampered_escrowed_dvk_r_x() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -921,6 +969,8 @@ fn rejects_tampered_escrowed_dvk_cipher() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -962,6 +1012,8 @@ fn rejects_wrong_y_op() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -983,7 +1035,8 @@ fn rejects_r_e_zero() {
     let s_esc_zero = ecdh(0, y_op);
     let escrowed_dvk_cipher_zero = encrypt_esc_dvk(dvk, s_esc_zero, OP_I);
     let s_a_s_zero = ecdh(0, k_aud_s);
-    let m_s_zero = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_zero, SIGMA);
+    let m_s_zero = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s_zero, SIGMA);
+    let r_new = derive_spend_r(vk, SIGMA);
     run_main(
         SK,
         V,
@@ -1014,6 +1067,8 @@ fn rejects_r_e_zero() {
         0,
         V_A + m_s_zero[0],
         V_NEW + m_s_zero[1],
+        r_new + m_s_zero[2],
+        encrypt_esc_allow_r_auditor(derive_allow_r(dvk, SIGMA_A), s_a_s_zero, OP_I),
     );
 }
 
@@ -1035,7 +1090,8 @@ fn rejects_wrong_r_e() {
     let s_esc_bad = ecdh(r_e_bad, y_op);
     let escrowed_dvk_cipher_bad = encrypt_esc_dvk(dvk, s_esc_bad, OP_I);
     let s_a_s_bad = ecdh(r_e_bad, k_aud_s);
-    let m_s_bad = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_bad, SIGMA);
+    let m_s_bad = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s_bad, SIGMA);
+    let r_new = derive_spend_r(vk, SIGMA);
     run_main(
         SK,
         V,
@@ -1066,6 +1122,8 @@ fn rejects_wrong_r_e() {
         R_E_Y,
         V_A + m_s_bad[0],
         V_NEW + m_s_bad[1],
+        r_new + m_s_bad[2],
+        encrypt_esc_allow_r_auditor(derive_allow_r(dvk, SIGMA_A), s_a_s_bad, OP_I),
     );
 }
 
@@ -1103,6 +1161,8 @@ fn rejects_off_curve_k_aud_s() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -1140,6 +1200,8 @@ fn rejects_identity_k_aud_s() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -1177,6 +1239,8 @@ fn rejects_wrong_k_aud_s() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -1213,6 +1277,8 @@ fn rejects_tampered_v_tilde_aud_s() {
         R_E_Y,
         V_TILDE_AUD_S + 1,
         B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
     );
 }
 
@@ -1249,5 +1315,247 @@ fn rejects_tampered_b_tilde_aud_s() {
         R_E_Y,
         V_TILDE_AUD_S,
         B_TILDE_AUD_S + 1,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S,
+    );
+}
+
+#[test(should_fail)]
+fn rejects_tampered_r_a_tilde_aud_s() {
+    // r_a_tilde_aud_s mutated by +1: S14 fails because the auditor-side escrow
+    // is pinned to r_a + Poseidon(delta_esc_allow_r_aud, s_a_s, op_i), which
+    // the prover's claim no longer matches.
+    run_main(
+        SK,
+        V,
+        R,
+        V_A,
+        R_E,
+        C_SPEND_X,
+        C_SPEND_Y,
+        Y_X,
+        Y_Y,
+        Y_OP_X,
+        Y_OP_Y,
+        OP_I,
+        ADDR_F,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        C_SPEND_NEW_X,
+        C_SPEND_NEW_Y,
+        C_A_X,
+        C_A_Y,
+        R_E_X,
+        ESCROWED_DVK_CIPHER,
+        B_TILDE,
+        A_TILDE,
+        SIGMA,
+        SIGMA_A,
+        R_E_X,
+        R_E_Y,
+        V_TILDE_AUD_S,
+        B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        R_A_TILDE_AUD_S + 1,
+    );
+}
+
+// Salt and ephemeral reuse (characterization)
+// -------------------------------------------
+// Nothing in this circuit constrains `sigma`, `sigma_a`, or `r_e` to be fresh
+// -- all three are prover-supplied and unchecked. The tests below pin what
+// actually happens under reuse rather than asserting that it is prevented. If
+// a future change starts enforcing uniqueness, they have to be updated
+// deliberately.
+
+#[test]
+fn repeated_sigma_a_republishes_the_same_allowance_state() {
+    // Two delegations to the same spender under the same sigma_a and the same
+    // v_a write a byte-identical C_a and a_tilde, even with a different owner
+    // balance, a different sigma, and a fresh r_e -- r_a and a_tilde are pure
+    // functions of (dvk_i, sigma_a) and v_a. An observer learns the allowance
+    // was reset to a value it has seen before, and no more: equal ciphertexts
+    // carry no differential.
+    let v_2: Field = 900;
+    let r_2: Field = 43;
+    let v_new_2: Field = v_2 - V_A;
+    let sigma_2: Field = 0x11;
+    let r_e_2: Field = R_E + 7;
+
+    let vk = vk_from_sk(SK, ADDR_F);
+    let dvk = dvk_from_vk_op(vk, OP_I);
+    let r_a = derive_allow_r(dvk, SIGMA_A);
+    let c_a = commit(V_A, r_a);
+    let a_tilde = encrypt_allowance(V_A, dvk, SIGMA_A);
+    assert(c_a.x == C_A_X);
+    assert(c_a.y == C_A_Y);
+    assert(a_tilde == A_TILDE);
+
+    let c_spend_2 = commit(v_2, r_2);
+    let r_new_2 = derive_spend_r(vk, sigma_2);
+    let c_spend_new_2 = commit(v_new_2, r_new_2);
+    let b_tilde_2 = encrypt_balance(v_new_2, vk, sigma_2);
+    let y_op = EmbeddedCurvePoint { x: Y_OP_X, y: Y_OP_Y, is_infinite: false };
+    let escrowed_dvk_cipher_2 = encrypt_esc_dvk(dvk, ecdh(r_e_2, y_op), OP_I);
+    let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
+    let s_a_s_2 = ecdh(r_e_2, k_aud_s);
+    let m_s_2 = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s_2, sigma_2);
+    let r_e_2_pt = scalar_mul(r_e_2, H);
+
+    run_main(
+        SK,
+        v_2,
+        r_2,
+        V_A,
+        r_e_2,
+        c_spend_2.x,
+        c_spend_2.y,
+        Y_X,
+        Y_Y,
+        Y_OP_X,
+        Y_OP_Y,
+        OP_I,
+        ADDR_F,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        c_spend_new_2.x,
+        c_spend_new_2.y,
+        C_A_X,
+        C_A_Y,
+        r_e_2_pt.x,
+        escrowed_dvk_cipher_2,
+        b_tilde_2,
+        A_TILDE,
+        sigma_2,
+        SIGMA_A,
+        r_e_2_pt.x,
+        r_e_2_pt.y,
+        V_A + m_s_2[0],
+        v_new_2 + m_s_2[1],
+        r_new_2 + m_s_2[2],
+        encrypt_esc_allow_r_auditor(r_a, s_a_s_2, OP_I),
+    );
+}
+
+#[test]
+fn repeated_r_e_and_sigma_repeat_every_owner_channel_pad() {
+    // Reusing (r_e, sigma) repeats s_a_s and therefore all three sponge lanes
+    // and S14's pad. Re-escrowing the same plaintexts under them republishes
+    // byte-identical ciphertexts -- no differential.
+    let vk = vk_from_sk(SK, ADDR_F);
+    let dvk = dvk_from_vk_op(vk, OP_I);
+    let r_a = derive_allow_r(dvk, SIGMA_A);
+    let r_new = derive_spend_r(vk, SIGMA);
+    let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
+    let s_a_s = ecdh(R_E, k_aud_s);
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, SIGMA);
+    assert(V_A + m_s[0] == V_TILDE_AUD_S);
+    assert(V_NEW + m_s[1] == B_TILDE_AUD_S);
+    assert(r_new + m_s[2] == R_TILDE_AUD_S);
+    assert(encrypt_esc_allow_r_auditor(r_a, s_a_s, OP_I) == R_A_TILDE_AUD_S);
+
+    // Change a plaintext under the repeated pad and the difference survives
+    // the encryption in the clear. This is the leak the per-operation
+    // freshness of r_e exists to prevent (Section 5.3); the circuit cannot
+    // catch it, because a reused r_e is a perfectly well-formed witness.
+    let v_a_2: Field = V_A + 25;
+    assert((v_a_2 + m_s[0]) - V_TILDE_AUD_S == 25);
+
+    // The two allowance escrows do NOT leak the same way, and not because the
+    // pad is any fresher: r_a is a Poseidon image, so a change of v_a or
+    // sigma_a moves it unpredictably rather than by a known offset. What
+    // repeats byte-for-byte is only the case above, where nothing changed.
+    let r_a_2 = derive_allow_r(dvk, SIGMA_A + 1);
+    assert(encrypt_esc_allow_r_auditor(r_a_2, s_a_s, OP_I) != R_A_TILDE_AUD_S);
+}
+
+#[test(should_fail)]
+fn rejects_escrow_of_blinding_for_the_wrong_sigma_a() {
+    // The escrowed blinding must be the one S6 derived and S7 committed under,
+    // not merely *a* well-formed allowance blinding for this delegation. Here
+    // the prover escrows derive_allow_r(dvk, SIGMA_A + 1) -- correctly padded,
+    // correctly tagged, derived from the right dvk_i -- while every other
+    // public stays canonical at SIGMA_A. S14 fires.
+    //
+    // This is what makes the escrow useful: the auditor opens the on-chain C_a
+    // with what it decrypts. An escrow that floated free of sigma_a would let
+    // a prover hand the auditor an opening of some other allowance state, and
+    // the mismatch would only surface when the auditor checked the commitment.
+    let vk = vk_from_sk(SK, ADDR_F);
+    let dvk = dvk_from_vk_op(vk, OP_I);
+    let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
+    let s_a_s = ecdh(R_E, k_aud_s);
+    run_main(
+        SK,
+        V,
+        R,
+        V_A,
+        R_E,
+        C_SPEND_X,
+        C_SPEND_Y,
+        Y_X,
+        Y_Y,
+        Y_OP_X,
+        Y_OP_Y,
+        OP_I,
+        ADDR_F,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        C_SPEND_NEW_X,
+        C_SPEND_NEW_Y,
+        C_A_X,
+        C_A_Y,
+        R_E_X,
+        ESCROWED_DVK_CIPHER,
+        B_TILDE,
+        A_TILDE,
+        SIGMA,
+        SIGMA_A,
+        R_E_X,
+        R_E_Y,
+        V_TILDE_AUD_S,
+        B_TILDE_AUD_S,
+        R_TILDE_AUD_S,
+        encrypt_esc_allow_r_auditor(derive_allow_r(dvk, SIGMA_A + 1), s_a_s, OP_I),
+    );
+}
+
+#[test(should_fail)]
+fn rejects_tampered_r_tilde_aud_s() {
+    // r_tilde_aud_s mutated by +1: S_a6 fails because the lane[2] escrow is
+    // pinned to r' = derive_spend_r(vk, sigma), which the prover's claim no
+    // longer matches.
+    run_main(
+        SK,
+        V,
+        R,
+        V_A,
+        R_E,
+        C_SPEND_X,
+        C_SPEND_Y,
+        Y_X,
+        Y_Y,
+        Y_OP_X,
+        Y_OP_Y,
+        OP_I,
+        ADDR_F,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        C_SPEND_NEW_X,
+        C_SPEND_NEW_Y,
+        C_A_X,
+        C_A_Y,
+        R_E_X,
+        ESCROWED_DVK_CIPHER,
+        B_TILDE,
+        A_TILDE,
+        SIGMA,
+        SIGMA_A,
+        R_E_X,
+        R_E_Y,
+        V_TILDE_AUD_S,
+        B_TILDE_AUD_S,
+        R_TILDE_AUD_S + 1,
+        R_A_TILDE_AUD_S,
     );
 }

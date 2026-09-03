@@ -90,6 +90,10 @@ global POSEIDON2_IV_BASE: Field = 18446744073709551616; // 2^64
 /// | `delta_aud_s`     | 11    | `AUDITOR_SENDER`                  |
 /// | `delta_aud_r`     | 12    | `AUDITOR_RECIPIENT`               |
 /// | `delta_ecdh`      | 13    | `ECDH_SHARED_SECRET`              |
+/// | `delta_esc_allow_r_aud` | 17 | `ESCROWED_ALLOWANCE_BLINDING_AUDITOR` |
+///
+/// Tags 14-16 are deliberately absent here: 14 is derived off-circuit and
+/// 15-16 belong to the off-chain disclosure layer.
 pub mod domain {
     /// Soroban Address compression into a single `F_r` Field:
     /// `address_to_field(a) = Poseidon2(ADDRESS, lo(a), hi(a))`.
@@ -128,9 +132,21 @@ pub mod domain {
     /// Constraint S12, Section 7.11 (`delta_esc_dvk`).
     pub global ESCROWED_DELEGATION_VIEWING_KEY: Field = 10;
     /// Sender or owner-auditor channel tag for Poseidon2 sponge masks
-    /// (Section 2.5, Section 8.1). Squeeze 1 yields the amount mask (where
-    /// applicable); squeeze 2 yields the balance/allowance checkpoint mask.
-    /// Constraints W_a3 / T_a6 / S_a3 / V_a3 / O_a6 (`delta_aud_s`).
+    /// (Section 2.5, Section 8.1). **Three lanes**, and the only tag squeezed
+    /// three-wide: lane[0] is the amount mask (where applicable), lane[1] the
+    /// balance/allowance checkpoint mask, lane[2] the commitment-blinding
+    /// escrow slot -- the new spendable blinding on checkpoints, the new
+    /// allowance blinding on spender transfers. Constraints W_a3 / T_a6 /
+    /// S_a3 / O_a6 (`delta_aud_s`).
+    ///
+    /// RevokeSpender (V_a3) still reads two lanes, so the opening the auditor
+    /// holds is not renewed there and lapses until the next checkpoint; the
+    /// two widths agree on every lane they share (see [`sponge_squeeze_3`]).
+    ///
+    /// The tag stays in a single sponge mode per Section 2.5:
+    /// `sponge_squeeze_2(d, s, sigma)[0]` is the same field element as
+    /// `poseidon_with_domain(d, [s, sigma])`, so a tag used in both modes
+    /// would collapse one onto the other.
     pub global AUDITOR_SENDER: Field = 11;
     /// Recipient-auditor channel tag for Poseidon2 sponge masks
     /// (Section 2.5, Section 8.1). Squeeze 1 yields the amount mask; squeeze
@@ -141,6 +157,24 @@ pub mod domain {
     /// `s = Poseidon2(ECDH_SHARED_SECRET, S.x, S.y)`.
     /// Section 2.4 (`delta_ecdh`). See [`ecdh`].
     pub global ECDH_SHARED_SECRET: Field = 13;
+    /// Auditor-side allowance-blinding escrow mask (owner-auditor ECDH):
+    /// `Poseidon2(ESCROWED_ALLOWANCE_BLINDING_AUDITOR, s_a_s, op_i)`.
+    /// Constraint S14, Section 8.5 (`delta_esc_allow_r_aud`).
+    ///
+    /// A separate tag from `ESCROWED_DELEGATION_VIEWING_KEY` = 10 even though
+    /// reuse would be secure -- the two shared scalars differ, since `Y_op`
+    /// and `K_aud_s` are independent points. Sharing the tag would drop one
+    /// of the three legs of Section 5.3's "why reusing r_e is safe" argument;
+    /// a fresh tag keeps that argument intact.
+    ///
+    /// Unlike the tags above it, this one shares its shared scalar with
+    /// `AUDITOR_SENDER` (both key off `s_a_s`). What separates them is that
+    /// they are different tags: 17 is absorbed here, 11 there, and the tag is
+    /// the first absorbed element, so no `(s_a_s, x)` pair yields the same
+    /// field element under both. Section 2.5 mode exclusivity is a separate,
+    /// per-tag hygiene rule that each of the two satisfies on its own -- this
+    /// one is only ever single-output, tag 11 only ever multi-lane.
+    pub global ESCROWED_ALLOWANCE_BLINDING_AUDITOR: Field = 17;
 }
 
 // ################## CORE PRIMITIVES ##################
@@ -304,6 +338,29 @@ pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
     dvk + poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, op_i])
 }
 
+/// Auditor-side allowance-blinding escrow at `set_spender`. Constraint S14.
+/// `r_a_tilde_aud_s = r_a + Poseidon2(ESC_ALLOW_R_AUD, s_a_s, op_i)` where
+/// `s_a_s = ecdh(r_e, K_aud_s)` is the *owner-auditor* shared scalar.
+///
+/// A single-output Poseidon rather than a further sponge lane, because at
+/// `set_spender` lane[2] of the owner-auditor sponge is already taken by S_a6.
+/// Costs one Poseidon2 permutation and zero scalar multiplications. `op_i` is
+/// a per-`(owner, spender)` constant that separates pads across delegations,
+/// not a nonce: the pad's freshness comes solely from `s_a_s`, which is fresh
+/// per operation because `r_e` is, and `r_e` is fresh only because the salt is
+/// (Section 5.3, Section 9.6).
+///
+/// This is what gives the auditor the opening of `C_a`: `r_a` is the blinding
+/// S6 derived and S7 committed to, so with the emitted `a_tilde_aud_s` the
+/// auditor holds both halves of the allowance opening for the state this
+/// operation writes (Section 8.5). The escrowed value is a per-state blinding,
+/// not the key that generates every state: an auditor key that never saw this
+/// event cannot derive it, and one that saw only this event learns nothing
+/// about any other.
+pub fn encrypt_esc_allow_r_auditor(r_a: Field, s_a_s: Field, op_i: Field) -> Field {
+    r_a + poseidon_with_domain(domain::ESCROWED_ALLOWANCE_BLINDING_AUDITOR, [s_a_s, op_i])
+}
+
 // ################## AUDITOR-CHANNEL SPONGE ##################
 
 /// Poseidon2 sponge with two squeezes. Absorbs `(d, s, sigma)` -- where
@@ -316,27 +373,43 @@ pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
 /// and both outputs are served from the same permutation, so the constraint
 /// cost is exactly one Poseidon2 permutation per call.
 ///
-/// Used by: Transfer (T_a2 recipient-auditor amount + randomness, T_a6
-/// sender-auditor amount + balance) and SpenderTransfer (O_a2, O_a6).
+/// Used by the recipient-auditor channel of Transfer (T_a2) and
+/// SpenderTransfer (O_a2), and by RevokeSpender's sender-auditor channel
+/// (V_a3), which escrows nothing in lane[2]. Every other sender-auditor
+/// channel reads [`sponge_squeeze_3`].
+///
+/// Defined as the two-lane prefix of [`sponge_squeeze_3`] so the two cannot
+/// drift apart: a change to the IV or the absorb applies to both by
+/// construction rather than by test.
 pub fn sponge_squeeze_2(d: Field, s: Field, sigma: Field) -> [Field; 2] {
-    let iv: Field = 3 * POSEIDON2_IV_BASE;
-    let state = poseidon2_permutation([d, s, sigma, iv], 4);
+    let state = sponge_squeeze_3(d, s, sigma);
     [state[0], state[1]]
 }
 
-/// Sender-auditor encrypted balance checkpoint for circuits whose auditor
-/// block emits a single ciphertext (Withdraw W_a3/W_a4).
+/// Poseidon2 sponge with three squeezes. Absorbs `(d, s, sigma)` and returns
+/// the first three rate-elements of the post-permutation state in order.
 ///
-/// `b_tilde_aud_s = v_new + sponge_squeeze_2(AUDITOR_SENDER, s_a_s, sigma)[1]`,
-/// where `s_a_s` is the sender-auditor ECDH shared-secret scalar produced by
-/// [`ecdh`].
-/// The pad is the sponge's *second* squeeze -- the slot every two-ciphertext
-/// sender channel (Transfer T_a6-T_a8, SetSpender S_a3-S_a5, RevokeSpender
-/// V_a3-V_a5, SpenderTransfer O_a6-O_a8) uses for its balance/allowance mask.
-/// The first squeeze is reserved for amount masks, so a balance checkpoint
-/// never shares a pad with an amount ciphertext even if a `(r_e, sigma)` pair
-/// is mistakenly reused across operations (the pair must be unique per proof;
-/// DESIGN Section 2.5).
-pub fn encrypt_auditor_sender_balance(v_new: Field, s_a_s: Field, sigma: Field) -> Field {
-    v_new + sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, sigma)[1]
+/// Implements `SpongeSqueeze_3(delta, s, sigma)` from Section 2.5. As in
+/// [`sponge_squeeze_2`], lane[0] is the amount mask and lane[1] the balance /
+/// allowance / randomness mask. **The lane[2] slot is the sender-auditor
+/// blinding escrow**: it carries the blinding of a commitment the operation
+/// writes, and never a key -- the new spendable blinding on the three
+/// checkpoint operations (W_a5 / T_a9 / S_a6), the new allowance blinding on
+/// spender transfers (O_a9).
+///
+/// `sponge_squeeze_3(d, s, sigma)[0..2] == sponge_squeeze_2(d, s, sigma)`, by
+/// construction: the absorb fits one rate-3 block, so all three outputs are
+/// served from the same permutation and the two functions differ only in how
+/// much of the state they expose. Widening therefore changes no existing mask
+/// value and costs no extra constraints. The capacity lane at `state[3]` stays
+/// untouched.
+///
+/// The blindings lane[2] carries still belong to different commitment roles --
+/// spendable on the checkpoints, allowance on spender transfers -- so the
+/// uniformity is documentary, not a claim that a recipient can substitute one
+/// for the other. Each is scoped to the operation that emitted it.
+pub fn sponge_squeeze_3(d: Field, s: Field, sigma: Field) -> [Field; 3] {
+    let iv: Field = 3 * POSEIDON2_IV_BASE;
+    let state = poseidon2_permutation([d, s, sigma, iv], 4);
+    [state[0], state[1], state[2]]
 }
