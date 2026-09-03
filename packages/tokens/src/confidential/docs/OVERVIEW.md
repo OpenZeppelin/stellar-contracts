@@ -91,8 +91,8 @@ Merge is the gate between received funds and spendable funds.
 | Step | Who | What happens |
 |:-----|:----|:-------------|
 | 1 | Account holder | Specifies the withdrawal amount in the wallet. This amount will be publicly visible on-chain once the transaction executes. |
-| 2 | Wallet | Generates a zero-knowledge proof demonstrating balance sufficiency, correct construction of the new spendable balance commitment with deterministic randomness, and a sender-auditor encrypted balance checkpoint produced via ephemeral ECDH with the sender's auditor key. |
-| 3 | Contract | Verifies the proof, replaces the spendable balance commitment, and transfers the corresponding amount of regular tokens from the contract back to the account holder. Emits an event carrying the ephemeral public key, the salt, the encrypted balance scalar (for owner recovery), and the sender-auditor balance ciphertext. |
+| 2 | Wallet | Generates a zero-knowledge proof demonstrating balance sufficiency, correct construction of the new spendable balance commitment with deterministic randomness, and a sender-auditor encrypted balance checkpoint — the new balance and its blinding factor — produced via ephemeral ECDH with the sender's auditor key. |
+| 3 | Contract | Verifies the proof, replaces the spendable balance commitment, and transfers the corresponding amount of regular tokens from the contract back to the account holder. Emits an event carrying the ephemeral public key, the salt, the encrypted balance scalar (for owner recovery), and the sender-auditor ciphertexts. |
 
 ---
 
@@ -104,7 +104,7 @@ Spenders enable use cases like automated trading bots, payment processors, or cu
 |:-----|:----|:-------------|
 | **Setup** | | |
 | 1 | Owner | Specifies the spender address (which must already be a registered account in the contract, so its spending public key can be looked up for delegation key escrow), the allowance amount, and a `live_until_ledger` expiration. |
-| 2 | Wallet | Generates a proof that the allowance is correctly carved out of the owner's spendable balance. The proof also covers derivation and ECDH escrow of a delegation viewing key (`dvk`) so the spender can independently track and decrypt its allowance state, and produces ciphertexts for the owner's auditor (escrow amount and post-operation balance checkpoint). |
+| 2 | Wallet | Generates a proof that the allowance is correctly carved out of the owner's spendable balance. The proof also covers derivation and ECDH escrow of a delegation viewing key (`dvk`) so the spender can independently track and decrypt its allowance state, and produces ciphertexts for the owner's auditor (escrow amount, post-operation balance checkpoint, and the blinding of the allowance commitment it just wrote). |
 | 3 | Contract | Verifies the proof, deducts the allowance from the owner's spendable balance commitment, and stores the spender delegation (allowance commitment, encrypted allowance, escrowed `dvk`, allowance salt, expiration). Emits an event with the owner's post-operation balance checkpoint and the owner-auditor ciphertexts. |
 | **Operation** | | |
 | 4 | Spender | Initiates a confidential transfer from the escrowed allowance to any registered recipient. A proof accompanies each transfer, covering allowance sufficiency, ECDH-derived encryption for the recipient, and dual-auditor ciphertexts for the recipient's and owner's auditors. |
@@ -129,8 +129,14 @@ The system supports **real-time auditing** via a dual-auditor model. Each accoun
 | Sender's post-transfer balance | No | Yes |
 | Withdrawal amount | n/a | Yes (publicly visible) |
 | Post-withdrawal balance | n/a | Yes |
+| Post-operation spendable blinding factor | No | Yes, at withdrawal, outgoing transfer, and spender setup (enables opening the sender's spendable balance from that event onward, since the same key also receives every inbound transfer's blinding; not renewed at spender revocation) |
 | Spender escrow / reclaim amount | n/a | Yes (owner's auditor) |
 | Post-transfer spender allowance | No (for spender transfers) | Yes (owner's auditor) |
+| Post-escrow / post-reclaim balance | n/a | Yes (owner's auditor), at spender setup and revocation respectively |
+| Delegation viewing key `dvk` | No | No |
+| Allowance blinding $r_a$ | No | Yes (owner's auditor), at spender setup and on every spender transfer — one state's blinding per event, which with the amount opens that event's allowance commitment |
+
+The table covers every auditor ciphertext the protocol produces; `DESIGN_cont.md` §8.1-§8.5 is the normative account, including the bounds on each opening capability.
 
 Each auditor decrypts its ciphertexts by running the channel sponge (recipient-auditor channel for recipients, sender-auditor channel for senders/owners) with its private key, the ephemeral public key, and the per-operation salt published in the operation's event.
 
@@ -140,6 +146,7 @@ Each auditor decrypts its ciphertexts by running the channel sponge (recipient-a
 - **Dual-auditor ciphertexts.** The ciphertexts each operation produces are enforced by its zero-knowledge proof, so they cannot be omitted or malformed, and no extra action is needed from users.
 - **Per-account scope.** Auditing one account reveals nothing about any other account.
 - **Recipient-side opening capability.** The recipient's auditor holds the per-transfer Pedersen blinding $r_{\text{transfer}}$, hence the full Pedersen opening of the recipient's receiving balance between merges, which is what enables the seizure/clawback flow specified in `COMPLIANCE.md` §5; the capability and its bounds are specified in `DESIGN_cont.md` §8.1.
+- **Sender-side opening capability.** The sender's auditor holds the opening of the account's spendable balance as of each withdrawal, outgoing transfer, and spender setup, because those operations also encrypt the post-operation blinding factor to it. Because one key serves both of an account's auditor channels, the capability survives merges rather than expiring with the event; its bounds are specified in `DESIGN_cont.md` §8.1.
 - **Seamless auditor rotation.** When an auditor key is rotated, the new key immediately receives ciphertexts on subsequent operations. For the sender's auditor, the balance checkpoint at the next owner-initiated proof operation (transfer, withdrawal, set spender, or revoke spender) provides the current balance with no event replay or bootstrapping.
 - **Spender visibility.** The owner's auditor sees spender transfer amounts and post-transfer allowances via the same dual-auditor mechanism, and additionally sees escrowed and reclaimed amounts at `set_spender` and `revoke_spender`.
 - **Viewing vs. spending separation.** A viewing key cannot move or spend funds. Spending requires the separate spending key, which is never shared.

@@ -1,6 +1,6 @@
 use stellar_confidential_lib::{
-    H, assert_on_curve_non_identity, commit, derive_spend_r, ecdh, encrypt_auditor_sender_balance,
-    encrypt_balance, scalar_mul, vk_from_sk,
+    H, assert_on_curve_non_identity, commit, derive_spend_r, domain, ecdh, encrypt_balance,
+    scalar_mul, sponge_squeeze_3, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 
@@ -41,20 +41,28 @@ mod tests;
 //                                                      auditor ECDH.
 //   W_a2 s_{a,s}     = ecdh(r_e, K_{aud,s})            Sender-auditor ECDH
 //                                                      shared scalar (2.4).
-//   W_a3 m_b         = SpongeSqueeze_2(delta_aud_s,
+//   W_a3 (m_b, m_r)  = SpongeSqueeze_3(delta_aud_s,
 //                                     s_{a,s},
-//                                     sigma)[1]         Sender-channel sponge,
-//                                                      second squeeze (the
-//                                                      balance slot; the
-//                                                      first-squeeze amount
+//                                     sigma)[1], [2]    Sender-channel sponge,
+//                                                      lane[1] and lane[2].
+//                                                      The lane[0] amount
 //                                                      slot is unused -- the
 //                                                      withdrawal amount is
-//                                                      public).
+//                                                      public -- and skipping
+//                                                      it keeps the checkpoint
+//                                                      pad distinct from every
+//                                                      amount pad.
 //   W_a4 b_tilde_aud_s = (v - a) + m_b                  Sender-auditor
 //                                                      encrypted balance
 //                                                      checkpoint (emitted).
-//
-// W_a3 + W_a4 are encapsulated by `encrypt_auditor_sender_balance` in the lib.
+//   W_a5 r_tilde_aud_s = r' + m_r                       Sender-auditor escrow
+//                                                      of the new spendable
+//                                                      blinding, over W5's r'
+//                                                      (emitted). This is what
+//                                                      lets the auditor track
+//                                                      the full Pedersen
+//                                                      opening of C_spend
+//                                                      forward.
 //
 // Point-validation doctrine (Section 10.8)
 // ----------------------------------------
@@ -65,7 +73,7 @@ mod tests;
 // off-curve K_aud_s would break the soundness of W_a2. This file explicitly
 // validates K_aud_s on-curve AND non-identity before W_a2.
 //
-// Public inputs (15 fields, in design-doc canonical order)
+// Public inputs (16 fields, in design-doc canonical order)
 // --------------------------------------------------------
 //   Idx  Param          Symbol        Source / Note
 //   ---  -----          ------        -------------------------------------
@@ -89,6 +97,8 @@ mod tests;
 //   13   r_e_y          R_e.y           auditor ECDH; emitted.
 //   14   b_tilde_aud_s  b_tilde_aud_s Prover-supplied sender-auditor
 //                                     encrypted balance checkpoint; emitted.
+//   15   r_tilde_aud_s  r_tilde_aud_s Prover-supplied sender-auditor escrow
+//                                     of the new spendable blinding; emitted.
 //
 // Private witnesses
 // -----------------
@@ -118,6 +128,7 @@ fn main(
     r_e_x: pub Field,
     r_e_y: pub Field,
     b_tilde_aud_s: pub Field,
+    r_tilde_aud_s: pub Field,
 ) {
     // W8 -- runs first so the r_e = 0 attack is rejected before any
     // scalar mul against it could quietly produce the identity.
@@ -168,7 +179,13 @@ fn main(
     // W_a2 (shared-secret scalar)
     let s_a_s = ecdh(r_e, k_aud_s);
 
-    // W_a3 + W_a4
-    let b_tilde_aud_s_derived = encrypt_auditor_sender_balance(v_new, s_a_s, sigma);
-    assert(b_tilde_aud_s_derived == b_tilde_aud_s);
+    // W_a3 (sender-channel masks: lane[0] unused, then balance, then the
+    // secret-escrow slot)
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, sigma);
+
+    // W_a4
+    assert(v_new + m_s[1] == b_tilde_aud_s);
+
+    // W_a5
+    assert(r_new + m_s[2] == r_tilde_aud_s);
 }

@@ -115,6 +115,7 @@ pub struct WithdrawPayload {
     pub r_e_point: Point,
     pub sigma: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
@@ -141,6 +142,7 @@ pub struct TransferPayload {
     pub r_tilde_aud_r: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
@@ -167,6 +169,7 @@ pub struct SpenderTransferPayload {
     pub r_tilde_aud_r: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub a_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
@@ -192,6 +195,8 @@ pub struct SetSpenderPayload {
     pub sigma_a: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
+    pub r_a_tilde_aud_s: BytesN<32>,
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
@@ -574,7 +579,7 @@ pub fn merge(e: &Env, account: &Address) {
 ///
 /// * topics - `["withdraw", from: Address, to: Address]`
 /// * data - `[amount: i128, r_e_point: BytesN<64>, sigma: BytesN<32>, b_tilde:
-///   BytesN<32>, b_tilde_aud_s: BytesN<32>]`
+///   BytesN<32>, b_tilde_aud_s: BytesN<32>, r_tilde_aud_s: BytesN<32>]`
 ///
 /// # Notes
 ///
@@ -610,7 +615,7 @@ pub fn withdraw(
 
     // PI order (DESIGN §7.5):
     //   C_spend, Y, addr_f, K_aud_s, a,
-    //   C_spend', sigma, b_tilde, R_e, b_tilde_aud_s
+    //   C_spend', sigma, b_tilde, R_e, b_tilde_aud_s, r_tilde_aud_s
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &account.spendable_commitment);
     append_point(&mut pi, &account.spending_public_key);
@@ -622,6 +627,7 @@ pub fn withdraw(
     append_field(&mut pi, &payload.b_tilde);
     append_point(&mut pi, &payload.r_e_point);
     append_field(&mut pi, &payload.b_tilde_aud_s);
+    append_field(&mut pi, &payload.r_tilde_aud_s);
 
     verify(e, CircuitType::Withdraw, &pi, proof);
 
@@ -639,6 +645,7 @@ pub fn withdraw(
         &payload.sigma,
         &payload.b_tilde,
         &payload.b_tilde_aud_s,
+        &payload.r_tilde_aud_s,
     );
 }
 
@@ -667,7 +674,7 @@ pub fn withdraw(
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
 /// * data - `[r_e_point, v_tilde, sigma, b_tilde, v_tilde_aud_r, r_tilde_aud_r,
-///   v_tilde_aud_s, b_tilde_aud_s]`
+///   v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s]`
 ///
 /// # Security Warning
 ///
@@ -690,7 +697,8 @@ pub fn confidential_transfer(
     // PI order (DESIGN §7.6):
     //   C_spend_A, Y_A, PVK_B, addr_f, K_aud_r, K_aud_s,
     //   C_spend', C_transfer, R_e, v_tilde, b_tilde, sigma,
-    //   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s
+    //   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s,
+    //   r_tilde_aud_s
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &sender.spendable_commitment);
     append_point(&mut pi, &sender.spending_public_key);
@@ -708,6 +716,7 @@ pub fn confidential_transfer(
     append_field(&mut pi, &payload.r_tilde_aud_r);
     append_field(&mut pi, &payload.v_tilde_aud_s);
     append_field(&mut pi, &payload.b_tilde_aud_s);
+    append_field(&mut pi, &payload.r_tilde_aud_s);
 
     verify(e, CircuitType::Transfer, &pi, proof);
 
@@ -726,6 +735,7 @@ pub fn confidential_transfer(
         &payload.r_tilde_aud_r,
         &payload.v_tilde_aud_s,
         &payload.b_tilde_aud_s,
+        &payload.r_tilde_aud_s,
     );
 }
 
@@ -760,8 +770,8 @@ pub fn confidential_transfer(
 ///
 /// * topics - `["spender_transfer", spender: Address, from: Address, to:
 ///   Address]`
-/// * data - `[r_e_point, v_tilde, sigma_a, v_tilde_aud_r, r_tilde_aud_r,
-///   v_tilde_aud_s, a_tilde_aud_s]`
+/// * data - `[r_e_point, v_tilde, sigma_a_new, v_tilde_aud_r, r_tilde_aud_r,
+///   v_tilde_aud_s, a_tilde_aud_s, r_tilde_aud_s]`
 ///
 /// # Security Warning
 ///
@@ -790,12 +800,11 @@ pub fn confidential_transfer_from(
     // owner).
     let k_aud_s = auditor.get_key(&owner.auditor_id);
 
-    // Capture it here to emit in the event below.
-    let sigma_a = delegation.allowance_salt.clone();
     // PI order (DESIGN §7.8):
     //   C_a, sigma_a, Y_op, PVK_recipient, K_aud_r, K_aud_s,
     //   C_a', C_transfer, R_e, v_tilde, a_tilde', sigma_a',
-    //   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s
+    //   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s,
+    //   r_tilde_aud_s
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &delegation.allowance_commitment);
     append_field(&mut pi, &delegation.allowance_salt);
@@ -813,6 +822,7 @@ pub fn confidential_transfer_from(
     append_field(&mut pi, &payload.r_tilde_aud_r);
     append_field(&mut pi, &payload.v_tilde_aud_s);
     append_field(&mut pi, &payload.a_tilde_aud_s);
+    append_field(&mut pi, &payload.r_tilde_aud_s);
 
     verify(e, CircuitType::SpenderTransfer, &pi, proof);
 
@@ -833,11 +843,12 @@ pub fn confidential_transfer_from(
         to,
         &payload.r_e_point,
         &payload.v_tilde,
-        &sigma_a,
+        &payload.sigma_a_new,
         &payload.v_tilde_aud_r,
         &payload.r_tilde_aud_r,
         &payload.v_tilde_aud_s,
         &payload.a_tilde_aud_s,
+        &payload.r_tilde_aud_s,
     );
 }
 
@@ -873,7 +884,7 @@ pub fn confidential_transfer_from(
 ///
 /// * topics - `["set_spender", account: Address, spender: Address]`
 /// * data - `[live_until_ledger: u32, r_e_point, sigma, b_tilde, v_tilde_aud_s,
-///   b_tilde_aud_s]`
+///   b_tilde_aud_s, r_tilde_aud_s, r_a_tilde_aud_s]`
 ///
 /// # Security Warning
 ///
@@ -897,7 +908,8 @@ pub fn set_spender(
     // PI order (DESIGN §7.7):
     //   C_spend, Y, Y_op, spender_id (op_i), addr_f, K_aud_s,
     //   C_spend', C_a, escrowed_dvk, b_tilde, a_tilde,
-    //   sigma, sigma_a, R_e, v_tilde_aud_s, b_tilde_aud_s
+    //   sigma, sigma_a, R_e, v_tilde_aud_s, b_tilde_aud_s,
+    //   r_tilde_aud_s, r_a_tilde_aud_s
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &owner.spendable_commitment);
     append_point(&mut pi, &owner.spending_public_key);
@@ -915,6 +927,8 @@ pub fn set_spender(
     append_point(&mut pi, &payload.r_e_point);
     append_field(&mut pi, &payload.v_tilde_aud_s);
     append_field(&mut pi, &payload.b_tilde_aud_s);
+    append_field(&mut pi, &payload.r_tilde_aud_s);
+    append_field(&mut pi, &payload.r_a_tilde_aud_s);
 
     verify(e, CircuitType::SetSpender, &pi, proof);
 
@@ -942,6 +956,8 @@ pub fn set_spender(
         &payload.b_tilde,
         &payload.v_tilde_aud_s,
         &payload.b_tilde_aud_s,
+        &payload.r_tilde_aud_s,
+        &payload.r_a_tilde_aud_s,
     );
 }
 

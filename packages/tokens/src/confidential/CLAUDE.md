@@ -51,7 +51,7 @@ Beyond the root guide's conventions:
 
 Everything else defers by citation: `SDK.md`, `SELECTIVE_DISCLOSURE.md`, `INDEXER.md`, `COMPLIANCE.md`, and the non-normative `OVERVIEW.md`. Two exceptions run the other way — `circuits/lib/src/lib.nr` outranks the docs wherever they disagree about a primitive (`SDK.md` §4 says so explicitly), and the contract's `#[contracttype]`s are authoritative for their own shape.
 
-`DESIGN.md` is already at roughly 768 expressions, over its own stated budget. Do not add math to §1–§7; put it in `DESIGN_cont.md`.
+`DESIGN.md` is already at roughly 778 expressions, over its own stated budget. Do not add math to §1–§7; put it in `DESIGN_cont.md`.
 
 ### Duplicated tables that drift
 
@@ -59,17 +59,17 @@ Five things exist in more than one file. Changing the normative copy means grepp
 
 | Content | Normative source | Copies live in |
 |:---|:---|:---|
-| The 16 domain-separation tags | `DESIGN_cont.md` §13 | `SDK.md` §4.8, referenced by `SELECTIVE_DISCLOSURE.md` |
-| Sponge lane assignment (lane 0 = amount mask, lane 1 = balance/allowance/randomness) | `DESIGN.md` §2.5 | `SDK.md` §4.3 and §11 |
+| Domain-separation tag assignments | `DESIGN_cont.md` §13 | `SDK.md` §4.8, referenced by `SELECTIVE_DISCLOSURE.md` |
+| Sponge lane assignment | `DESIGN.md` §2.5 | `SDK.md` §4.3 and §11 |
 | Per-circuit scalar-multiplication counts | `DESIGN_cont.md` §10.3 | `OVERVIEW.md` |
-| Checkpoint event set (`Withdraw`, `Transfer` sender side, `SetSpender`, `RevokeSpender`) | `DESIGN.md` §5.2 | `INDEXER.md`, `SDK.md` |
+| Checkpoint event set | `DESIGN.md` §5.2 | `INDEXER.md`, `SDK.md` |
 | Replay-window anchor `T₀` | `DESIGN.md` §5.2 | `INDEXER.md`, `OVERVIEW.md` |
 
-The tags are a cross-language wire contract. `DESIGN_cont.md` §13 assigns all sixteen and no other document may; `circuits/lib/src/lib.nr` implements only 1–13, because 14 is derived off-circuit and 15–16 belong to the off-chain disclosure layer. That gap is intentional. Changing any assigned value is a new deployment, not an upgrade.
+The tags are a cross-language wire contract. `DESIGN_cont.md` §13 is their only authoritative source: it assigns every value, and it states which subset `circuits/lib/src/lib.nr` implements and why the remainder are absent. Changing any assigned value is a new deployment, not an upgrade.
 
 ### Editing rules
 
 - **Cite, do not restate.** Every drift bug in the recent history came from a second copy of something. When tempted to summarise a neighbouring section, write `§N` instead.
 - **Match the file's math style, not a global one.** `DESIGN*.md` and `SELECTIVE_DISCLOSURE.md` use `$$…$$` with backslash-escaped subscripts (`$$\mathbb{F}\_r$$`); `SDK.md` uses `$$…$$` unescaped; `OVERVIEW.md` uses single `$…$`; `INDEXER.md` and `COMPLIANCE.md` use backticked ASCII and no LaTeX.
-- **Symbols are a maintained namespace.** `sk`/`vk`/`dvk_i`/`PVK`/`Y`; `r_e` and `R_e = r_e·H`; `σ` (operation salt) is distinct from `σ_a` (per-delegation allowance salt); tilde means ciphertext; `C_spend` / `C_receive` / `C_transfer` / `C_a`. An audit finding once required renaming the `tx` subscript to `transfer` across the whole module.
+- **Symbols are a maintained namespace.** `sk`/`vk`/`dvk_i`/`PVK`/`Y`; `r_e` and `R_e = r_e·H`; `σ` (operation salt) is distinct from `σ_a` (per-delegation allowance salt); tilde means ciphertext; `C_spend` / `C_receive` / `C_transfer` / `C_a`; `r_a` is `C_a`'s blinding and `r_a'` the post-transfer one. An audit finding once required renaming the `tx` subscript to `transfer` across the whole module.
 - Prose is full-width — no hard wrapping. One paragraph or list item per line.

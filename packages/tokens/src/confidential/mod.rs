@@ -342,7 +342,8 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["withdraw", from: Address, to: Address]`
     /// * data - `[amount: i128, r_e_point: BytesN<64>, sigma: BytesN<32>,
-    ///   b_tilde: BytesN<32>, b_tilde_aud_s: BytesN<32>]`
+    ///   b_tilde: BytesN<32>, b_tilde_aud_s: BytesN<32>, r_tilde_aud_s:
+    ///   BytesN<32>]`
     fn withdraw(e: &Env, from: Address, to: Address, amount: i128, data: Bytes) {
         from.require_auth();
 
@@ -369,7 +370,7 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[r_e_point, v_tilde, sigma, b_tilde, v_tilde_aud_r,
-    ///   r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s]`
+    ///   r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s]`
     fn confidential_transfer(e: &Env, from: Address, to: Address, data: Bytes) {
         from.require_auth();
 
@@ -400,8 +401,8 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["spender_transfer", spender: Address, from: Address, to:
     ///   Address]`
-    /// * data - `[r_e_point, v_tilde, sigma_a, v_tilde_aud_r, r_tilde_aud_r,
-    ///   v_tilde_aud_s, a_tilde_aud_s]`
+    /// * data - `[r_e_point, v_tilde, sigma_a_new, v_tilde_aud_r,
+    ///   r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s, r_tilde_aud_s]`
     fn confidential_transfer_from(
         e: &Env,
         spender: Address,
@@ -448,7 +449,7 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["set_spender", account: Address, spender: Address]`
     /// * data - `[live_until_ledger: u32, r_e_point, sigma, b_tilde,
-    ///   v_tilde_aud_s, b_tilde_aud_s]`
+    ///   v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s, r_a_tilde_aud_s]`
     fn set_spender(
         e: &Env,
         account: Address,
@@ -663,6 +664,7 @@ pub struct Withdraw {
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `Withdraw` event.
@@ -676,6 +678,7 @@ pub fn emit_withdraw(
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
     b_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
 ) {
     Withdraw {
         from: from.clone(),
@@ -685,6 +688,7 @@ pub fn emit_withdraw(
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),
         b_tilde_aud_s: b_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -705,6 +709,7 @@ pub struct Transfer {
     pub r_tilde_aud_r: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `Transfer` event.
@@ -721,6 +726,7 @@ pub fn emit_transfer(
     r_tilde_aud_r: &BytesN<32>,
     v_tilde_aud_s: &BytesN<32>,
     b_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
 ) {
     Transfer {
         from: from.clone(),
@@ -733,6 +739,7 @@ pub fn emit_transfer(
         r_tilde_aud_r: r_tilde_aud_r.clone(),
         v_tilde_aud_s: v_tilde_aud_s.clone(),
         b_tilde_aud_s: b_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -749,11 +756,12 @@ pub struct SpenderTransfer {
     pub to: Address,
     pub r_e_point: BytesN<64>,
     pub v_tilde: BytesN<32>,
-    pub sigma_a: BytesN<32>,
+    pub sigma_a_new: BytesN<32>,
     pub v_tilde_aud_r: BytesN<32>,
     pub r_tilde_aud_r: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub a_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits an `SpenderTransfer` event.
@@ -765,11 +773,12 @@ pub fn emit_spender_transfer(
     to: &Address,
     r_e_point: &BytesN<64>,
     v_tilde: &BytesN<32>,
-    sigma_a: &BytesN<32>,
+    sigma_a_new: &BytesN<32>,
     v_tilde_aud_r: &BytesN<32>,
     r_tilde_aud_r: &BytesN<32>,
     v_tilde_aud_s: &BytesN<32>,
     a_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
 ) {
     SpenderTransfer {
         spender: spender.clone(),
@@ -777,11 +786,12 @@ pub fn emit_spender_transfer(
         to: to.clone(),
         r_e_point: r_e_point.clone(),
         v_tilde: v_tilde.clone(),
-        sigma_a: sigma_a.clone(),
+        sigma_a_new: sigma_a_new.clone(),
         v_tilde_aud_r: v_tilde_aud_r.clone(),
         r_tilde_aud_r: r_tilde_aud_r.clone(),
         v_tilde_aud_s: v_tilde_aud_s.clone(),
         a_tilde_aud_s: a_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -800,6 +810,8 @@ pub struct SetSpender {
     pub b_tilde: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
+    pub r_a_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `SetSpender` event.
@@ -814,6 +826,8 @@ pub fn emit_set_spender(
     b_tilde: &BytesN<32>,
     v_tilde_aud_s: &BytesN<32>,
     b_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
+    r_a_tilde_aud_s: &BytesN<32>,
 ) {
     SetSpender {
         account: account.clone(),
@@ -824,6 +838,8 @@ pub fn emit_set_spender(
         b_tilde: b_tilde.clone(),
         v_tilde_aud_s: v_tilde_aud_s.clone(),
         b_tilde_aud_s: b_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
+        r_a_tilde_aud_s: r_a_tilde_aud_s.clone(),
     }
     .publish(e);
 }
