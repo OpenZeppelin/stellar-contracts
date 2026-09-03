@@ -157,16 +157,18 @@ fn signer_order_and_duplicates_do_not_change_the_address() {
     let a = external(&e, &verifier, 1);
     let b = external(&e, &verifier, 2);
 
-    let ab = client.predict_address(&vec![&e, a.clone(), b.clone()], &no_policies(&e), &0);
-    let ba = client.predict_address(&vec![&e, b.clone(), a.clone()], &no_policies(&e), &0);
-    assert_eq!(ab, ba);
+    let order_first_second =
+        client.predict_address(&vec![&e, a.clone(), b.clone()], &no_policies(&e), &0);
+    let order_second_first =
+        client.predict_address(&vec![&e, b.clone(), a.clone()], &no_policies(&e), &0);
+    assert_eq!(order_first_second, order_second_first);
 
-    let aa = client.predict_address(&vec![&e, a.clone(), a.clone()], &no_policies(&e), &0);
-    let a_only = client.predict_address(&vec![&e, a.clone()], &no_policies(&e), &0);
-    assert_eq!(aa, a_only);
+    let duplicated = client.predict_address(&vec![&e, a.clone(), a.clone()], &no_policies(&e), &0);
+    let single = client.predict_address(&vec![&e, a.clone()], &no_policies(&e), &0);
+    assert_eq!(duplicated, single);
 
     let deployed = client.deploy(&vec![&e, a.clone(), a.clone()], &no_policies(&e), &0);
-    assert_eq!(deployed, a_only);
+    assert_eq!(deployed, single);
     assert_eq!(deployed_signers(&e, &deployed), vec![&e, a]);
 }
 
