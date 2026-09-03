@@ -142,7 +142,7 @@ rule).
 
 ```bash
 # WASM release build — catches no_std and target-specific issues
-cargo build --target wasm32v1-none --release --package <name>
+stellar contract build --package <name>
 
 # Unit + integration tests
 cargo test --package <name>

@@ -52,10 +52,8 @@ categories = ["no-std", "wasm"]
 version = "0.7.1"
 
 [workspace.dependencies]
-soroban-sdk = { version = "27.0.2", features = [
-    "experimental_spec_shaking_v2",
-] }
-soroban-poseidon = "27.0.0"
+soroban-sdk = "28.0.0-rc.1"
+soroban-poseidon = "28.0.0-rc.1"
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
@@ -92,3 +90,7 @@ lto = true
 [profile.release-with-logs]
 inherits = "release"
 debug-assertions = true
+
+# TODO(#865): remove once soroban-poseidon publishes a 28.x release.
+[patch.crates-io]
+soroban-poseidon = { git = "https://github.com/brozorec/rs-soroban-poseidon", branch = "sdk-28" }
