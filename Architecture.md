@@ -80,7 +80,7 @@ This design makes it **impossible** to implement conflicting extensions:
 ```rust
 // ✅ This works - using Enumerable
 impl NonFungibleToken for MyContract {
-    type ContractType = Enumerable;
+    type ContractType = Compose<(Enumerable,)>;
     // ... implementations
 }
 impl NonFungibleEnumerable for MyContract {
@@ -199,7 +199,9 @@ pub struct MyToken;
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for MyToken {
-    type ContractType = Base;
+    // `Compose` resolves the list of contract types (the behavior-overriding
+    // ones, not additive extensions like `Burnable`) to the right one.
+    type ContractType = Compose<(Base,)>;
     // The macro fills in every method body, no manual overrides needed.
     // Alternatively, custom overrides can be provided here (optional)
 }

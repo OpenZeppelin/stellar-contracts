@@ -13,7 +13,7 @@ use stellar_macros::only_role;
 use stellar_tokens::fungible::{
     allowlist::{AllowList, FungibleAllowList},
     burnable::FungibleBurnable,
-    Base, FungibleToken,
+    Base, Compose, FungibleToken,
 };
 
 #[contract]
@@ -46,7 +46,7 @@ impl ExampleContract {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
-    type ContractType = AllowList;
+    type ContractType = Compose<(AllowList,)>;
 }
 
 #[contractimpl(contracttrait)]

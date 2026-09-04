@@ -25,7 +25,7 @@ use soroban_sdk::{Address, Env, MuxedAddress, String};
 /// ```rust
 /// #[contractimpl(contracttrait)]
 /// impl FungibleToken for ExampleContract {
-///     type ContractType = Base;
+///     type ContractType = Compose<(Base,)>;
 /// }
 /// ```
 pub trait ContractOverrides {

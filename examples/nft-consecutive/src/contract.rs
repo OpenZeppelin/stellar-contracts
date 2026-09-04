@@ -7,7 +7,7 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
 use stellar_tokens::non_fungible::{
     burnable::NonFungibleBurnable,
     consecutive::{Consecutive, NonFungibleConsecutive},
-    Base, ContractOverrides, NonFungibleToken,
+    Base, Compose, ContractOverrides, NonFungibleToken,
 };
 
 #[contracttype]
@@ -39,7 +39,7 @@ impl ExampleContract {
 // `#[contractimpl(contracttrait)]` macro.
 #[contractimpl(contracttrait)]
 impl NonFungibleToken for ExampleContract {
-    type ContractType = Consecutive;
+    type ContractType = Compose<(Consecutive,)>;
 
     fn balance(e: &Env, owner: Address) -> u32 {
         Self::ContractType::balance(e, &owner)

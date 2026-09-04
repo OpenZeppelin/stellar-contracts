@@ -34,8 +34,9 @@ use soroban_sdk::{contractevent, contracttrait, Address, Env};
 ///
 /// The burn logic is selected automatically based on the `ContractType` set
 /// on the `NonFungibleToken` implementation. If the contract uses
-/// `type ContractType = Consecutive`, burning uses the consecutive bookkeeping;
-/// with `type ContractType = Base` it uses the vanilla behavior, and so on.
+/// `type ContractType = Compose<(Consecutive,)>`, burning uses the consecutive
+/// bookkeeping; with `type ContractType = Compose<(Base,)>` it uses the vanilla
+/// behavior, and so on.
 /// There is no need to interact with the override machinery, it works in the
 /// background.
 #[contracttrait]
