@@ -120,8 +120,8 @@ mod storage;
 #[cfg(test)]
 mod test;
 use soroban_sdk::{
-    auth::CustomAccountInterface, contracterror, contractevent, contracttrait, Address, Env, Map,
-    String, Symbol, Val, Vec,
+    auth::CustomAccountInterface, contracterror, contractevent, contracttrait, Address, BytesN,
+    Env, Map, String, Symbol, Val, Vec,
 };
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, batch_add_signer, do_check_auth,
@@ -195,6 +195,21 @@ pub trait SmartAccount: CustomAccountInterface {
     ///   registered in the global registry.
     fn get_policy_id(e: &Env, policy: Address) -> u32 {
         storage::get_policy_id(e, &policy)
+    }
+
+    /// Computes the digest that [`Signer::External`] signers sign for
+    /// `preimage`, that is `sha256(preimage.to_xdr())`. A pure helper for
+    /// off-chain clients: simulating it verifies a locally computed digest
+    /// before any signature is collected, and it exposes
+    /// [`AuthDigestPreimage`] in the contract spec so generated bindings can
+    /// encode the value that [`Signer::Delegated`] signers authorize.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `preimage` - The structured message that signers commit to.
+    fn auth_digest(e: &Env, preimage: AuthDigestPreimage) -> BytesN<32> {
+        preimage.digest(e)
     }
 
     /// Creates a new context rule with the specified configuration, returning

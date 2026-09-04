@@ -94,7 +94,14 @@ pub struct PolicyEntry {
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Signer {
-    /// A delegated signer that uses built-in signature verification.
+    /// A delegated signer, any contract or account address, authenticated
+    /// through `require_auth_for_args((preimage,))`. Transaction simulation
+    /// does not return this nested authorization entry, because the call
+    /// happens inside `__check_auth`. Clients add it manually: an entry for
+    /// the delegated address whose root invocation is `__check_auth` on the
+    /// smart account with the [`AuthDigestPreimage`] as its single argument.
+    /// See `src/smart_account/test/auth_entries.rs` for a reference
+    /// construction.
     Delegated(Address),
     /// An external signer with custom verification logic.
     /// Contains the verifier contract address and the public key data.

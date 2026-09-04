@@ -215,7 +215,7 @@ For off-chain clients (e.g., JS SDK):
 1. Build the preimage as an `ScVal::Map` with symbol keys `account`, `context_rule_ids`, and `signature_payload` (`ScMap` keys must be sorted)
 2. XDR-encode it and compute SHA-256
 3. External signers sign the resulting 32-byte digest
-4. Delegated signers authorize `__check_auth` on the smart account with the same `ScVal::Map` as the only argument
+4. Delegated signers authorize `__check_auth` on the smart account with the same `ScVal::Map` as the only argument. Simulation does not return this entry, so the client adds it as a second root-level authorization entry for the delegated address
 
 ## Next Steps
 
@@ -225,3 +225,4 @@ For off-chain clients (e.g., JS SDK):
 - [caveats](https://docs.openzeppelin.com/stellar-contracts/accounts/policies#caveats) of policy management and configurations 
 2. Explore how to invoke functions using this multisig smart account. You can use the [brozorec/smart-account-sign](https://github.com/brozorec/smart-account-sign) tool for demonstration purposes.
    > **⚠️ Disclaimer:** This tool is provided for demonstration purposes only. We do not vouch for its security or recommend it for production use. Always conduct your own security audit before using third-party tools in production environments.
+3. Sign and submit from a TypeScript client with the [smart-account-kit](https://github.com/stellar/smart-account-kit) SDK. Check that its version targets the `stellar-accounts` release the account was built with.
