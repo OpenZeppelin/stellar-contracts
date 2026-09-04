@@ -92,7 +92,7 @@ Signer::Delegated(Address)
 ```
 
 - Any Soroban address (contract or account)
-- Verification uses `require_auth_for_args(payload)`
+- Verification uses `require_auth_for_args((preimage,))`, where `preimage` is the `AuthDigestPreimage` described in [Signature Authentication](#1-signature-authentication)
 - This model requires manual authorization entry crafting, because it is not returned in a simulation mode.
 
 #### External Signers
@@ -194,9 +194,20 @@ Authorization is determined by explicitly selecting the rule to validate against
 
 ### 1. Signature Authentication
 
-All provided signatures are authenticated up front:
-- `Delegated` signers use `require_auth_for_args(payload)`.
-- `External` signers are verified through their verifier contract.
+All provided signatures are authenticated up front against an `AuthDigestPreimage`, the structured message every signer commits to:
+
+```rust
+AuthDigestPreimage {
+    account: e.current_contract_address(),
+    signature_payload, // BytesN<32> from the host
+    context_rule_ids,  // Vec<u32>, one per auth context
+}
+```
+
+- `Delegated` signers authorize `require_auth_for_args((preimage,))` on the smart account, so their authorization entry shows the named fields.
+- `External` signers sign `sha256(preimage.to_xdr())`, which is passed to their verifier contract.
+
+The `account` field scopes the message to a single smart account. Binding `context_rule_ids` rejects rule-selection downgrades after signature collection.
 
 ### 2. Per-Context Validation
 
@@ -432,6 +443,26 @@ For external signers, there are two options:
   - Maximum signers per context rule: 15
   - Maximum policies per context rule: 5
 - Signers and policies are stored in a global registry and deduplicated across rules. The same signer object (identified by its XDR encoding) is stored once regardless of how many rules reference it. Each signer and policy is assigned a stable `u32` ID that is used when removing them from a rule (`remove_signer`, `remove_policy`).
+
+## Migration Guide: from v0.7.x to 0.8.0
+
+### Signed message now binds the smart account address (breaking change)
+
+The digest that signers commit to is now the SHA-256 hash of a structured `AuthDigestPreimage` instead of `sha256(signature_payload || context_rule_ids.to_xdr())`:
+
+```rust
+#[contracttype]
+pub struct AuthDigestPreimage {
+    pub account: Address,              // the smart account
+    pub signature_payload: BytesN<32>, // from the host
+    pub context_rule_ids: Vec<u32>,    // one per auth context
+}
+```
+
+Off-chain signing flows must be updated:
+
+- `External` signers sign `sha256(preimage.to_xdr())`. In Rust: `AuthDigestPreimage { account, signature_payload, context_rule_ids }.digest(e)`. Other clients build the struct as an `ScVal::Map` with symbol keys `account`, `context_rule_ids`, and `signature_payload` (`ScMap` keys must be sorted), XDR-encode it, and hash it.
+- `Delegated` signers now authorize `__check_auth` on the smart account with the preimage struct as its single argument instead of the 32-byte digest. The manually crafted authorization entry for the delegated signer must carry the struct in `args`.
 
 ## Migration Guide: from v0.6.0 to 0.7.0
 

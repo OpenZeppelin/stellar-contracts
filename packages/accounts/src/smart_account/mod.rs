@@ -11,6 +11,11 @@
 //! - **External**: A public key paired with a verifier contract for custom
 //!   cryptographic verification (e.g., secp256r1, passkeys).
 //!
+//! Both kinds commit to an [`AuthDigestPreimage`] that binds the smart account
+//! address, the host `signature_payload`, and the selected `context_rule_ids`.
+//! External signers sign its SHA-256 digest. Delegated signers authorize the
+//! preimage itself through `require_auth_for_args`.
+//!
 //! ### Context Rules - Scope and Routing
 //! - A context rule binds a set of signers and policies to a specific operation
 //!   scope (`Default`, `CallContract(Address)`, or
@@ -123,8 +128,8 @@ pub use storage::{
     get_context_rule, get_context_rules_count, get_validated_context_by_id, remove_context_rule,
     remove_policy, remove_signer, update_context_rule_name, update_context_rule_valid_until,
     validate_context_rule_name, validate_no_canonical_duplicates, validate_signer_key_size,
-    validate_signers_and_policies, AuthPayload, ContextRule, ContextRuleEntry, ContextRuleType,
-    Signer, SmartAccountStorageKey,
+    validate_signers_and_policies, AuthDigestPreimage, AuthPayload, ContextRule, ContextRuleEntry,
+    ContextRuleType, Signer, SmartAccountStorageKey,
 };
 
 /// Core trait for smart account functionality, extending Soroban's
