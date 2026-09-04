@@ -95,7 +95,8 @@ pub fn verify_identity(e: &Env, account: &Address) {
 
         for (issuer, claim_id, is_last) in issuers_with_claim_ids {
             if account_claim_ids.contains(&claim_id) {
-                // Here, we can assume claim exists so no need to use `try_get_claim()`.
+                // Here, we can assume claim exists so no need to use
+                // `try_get_claim()`.
                 let claim: Claim = identity_client.get_claim(&claim_id);
 
                 if validate_claim(e, &claim, claim_topic, &issuer, &identity_addr) {

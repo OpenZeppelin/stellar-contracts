@@ -429,8 +429,8 @@ fn partial_token_freezing() {
         // Unfreeze some tokens
         RWA::unfreeze_partial_tokens(&e, &user, 10);
         assert_eq!(RWA::get_frozen_tokens(&e, &user), 20);
-        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen + 1
-        // TokensUnfrozen
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen +
+        // 1 TokensUnfrozen
         assert_eq!(e.events().all().events().len(), 5);
     });
 }
@@ -952,12 +952,14 @@ fn recover_balance_without_recovery_target_fails() {
         let _ = set_and_return_compliance(&e);
 
         // Do NOT set recovery target - this should cause the test to panic
-        // The mock function will return None, which triggers IdentityMismatch error
+        // The mock function will return None, which triggers IdentityMismatch
+        // error
 
         // Mint tokens to old account
         RWA::mint(&e, &old_account, 100);
 
-        // Attempt recovery without setting recovery target - should fail with #313
+        // Attempt recovery without setting recovery target - should fail with
+        // #313
         RWA::recover_balance(&e, &old_account, &new_account);
     });
 }

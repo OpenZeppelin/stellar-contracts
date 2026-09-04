@@ -97,7 +97,8 @@ impl CustomAccountInterface for SacAdminExampleContract {
         );
         let caller = signature.public_key.clone();
 
-        // extract from context and check required permissionss for every function
+        // extract from context and check required permissionss for every
+        // function
         for ctx in auth_context.iter() {
             let context = match ctx {
                 Context::Contract(c) => c,
@@ -124,7 +125,8 @@ impl CustomAccountInterface for SacAdminExampleContract {
                     ensure_caller_chief(&e, &caller, &SacDataKey::Chief)?;
                 }
                 SacFn::Unknown => {
-                    // ensure only chief can call other functions such as `assign_operator()`,
+                    // ensure only chief can call other functions such as
+                    // `assign_operator()`,
                     // `remove_operator()` or `set_minting_limit()`
                     ensure_caller_chief(&e, &caller, &SacDataKey::Chief)?
                 }

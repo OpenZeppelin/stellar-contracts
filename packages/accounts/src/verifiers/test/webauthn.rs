@@ -389,7 +389,8 @@ fn webauthn_batch_canonicalize_key_preserves_order() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        // Three keys with different 65-byte public keys and credential ID suffixes.
+        // Three keys with different 65-byte public keys and credential ID
+        // suffixes.
         let pub1 = Bytes::from_array(&e, &[1u8; 65]);
         let mut key1 = pub1.clone();
         key1.extend_from_array(&[0xAA; 10]);

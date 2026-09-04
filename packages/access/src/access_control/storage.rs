@@ -670,7 +670,8 @@ pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     let count_key = AccessControlStorageKey::RoleAccountsCount(role.clone());
     let count = e.storage().persistent().get(&count_key).unwrap_or(0);
 
-    // If this is the first account with this role, add the role to ExistingRoles
+    // If this is the first account with this role, add the role to
+    // ExistingRoles
     if count == 0 {
         let mut existing_roles = get_existing_roles(e);
 
@@ -733,8 +734,8 @@ pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
         index: last_index,
     });
 
-    // Swap the to be removed account with the last account, then delete the last
-    // account
+    // Swap the to be removed account with the last account, then delete the
+    // last account
     if to_be_removed_index != last_index {
         let last_account = e
             .storage()

@@ -415,7 +415,8 @@ fn remove_from_role_enumeration_works() {
         let count_after = get_role_member_count(&e, &USER_ROLE);
         assert_eq!(count_after, 1);
 
-        // Only account2 should remain and should be at index 0 (the swap happened)
+        // Only account2 should remain and should be at index 0 (the swap
+        // happened)
         let retrieved = get_role_member(&e, &USER_ROLE, 0);
         assert_eq!(retrieved, account2);
 
@@ -498,14 +499,15 @@ fn ensure_if_admin_or_admin_role_allows_role_admin_without_contract_admin() {
     let manager = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Set up MANAGER_ROLE as admin for USER_ROLE without setting a contract admin
+        // Set up MANAGER_ROLE as admin for USER_ROLE without setting a contract
+        // admin
         set_role_admin_no_auth(&e, &USER_ROLE, &MANAGER_ROLE);
 
         // Grant MANAGER_ROLE to manager directly
         grant_role_no_auth(&e, &manager, &MANAGER_ROLE, &manager);
 
-        // This should not panic - manager should be authorized for USER_ROLE operations
-        // even though there's no contract admin
+        // This should not panic - manager should be authorized for USER_ROLE
+        // operations even though there's no contract admin
         ensure_if_admin_or_admin_role(&e, &USER_ROLE, &manager);
     });
 }

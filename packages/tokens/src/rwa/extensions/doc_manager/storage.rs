@@ -263,7 +263,8 @@ pub fn remove_document(e: &Env, name: &BytesN<32>) {
         let (last_name, last_doc) =
             last_bucket.get(last_offset).expect("last document entry to be present");
 
-        // Update the last document's index to point to the removed document's position
+        // Update the last document's index to point to the removed document's
+        // position
         let last_index_key = DocumentStorageKey::Index(last_name.clone());
         e.storage().persistent().set(&last_index_key, &document_index);
 
