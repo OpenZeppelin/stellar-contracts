@@ -11,6 +11,11 @@
 //! - **External**: A public key paired with a verifier contract for custom
 //!   cryptographic verification (e.g., secp256r1, passkeys).
 //!
+//! Both kinds commit to an [`AuthDigestPreimage`] that binds the smart account
+//! address, the host `signature_payload`, and the selected `context_rule_ids`.
+//! External signers sign its SHA-256 digest. Delegated signers authorize the
+//! preimage itself through `require_auth_for_args`.
+//!
 //! ### Context Rules - Scope and Routing
 //! - A context rule binds a set of signers and policies to a specific operation
 //!   scope (`Default`, `CallContract(Address)`, or
@@ -115,16 +120,16 @@ mod storage;
 #[cfg(test)]
 mod test;
 use soroban_sdk::{
-    auth::CustomAccountInterface, contracterror, contractevent, contracttrait, Address, Env, Map,
-    String, Symbol, Val, Vec,
+    auth::CustomAccountInterface, contracterror, contractevent, contracttrait, Address, BytesN,
+    Env, Map, String, Symbol, Val, Vec,
 };
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, batch_add_signer, do_check_auth,
-    get_context_rule, get_context_rules_count, get_validated_context_by_id, remove_context_rule,
+    get_context_rule, get_context_rules_count, get_policy_id, get_signer_id, remove_context_rule,
     remove_policy, remove_signer, update_context_rule_name, update_context_rule_valid_until,
     validate_context_rule_name, validate_no_canonical_duplicates, validate_signer_key_size,
-    validate_signers_and_policies, AuthPayload, ContextRule, ContextRuleEntry, ContextRuleType,
-    Signer, SmartAccountStorageKey,
+    validate_signers_and_policies, AuthDigestPreimage, AuthPayload, ContextRule, ContextRuleEntry,
+    ContextRuleType, Signer, SmartAccountStorageKey,
 };
 
 /// Core trait for smart account functionality, extending Soroban's
@@ -190,6 +195,21 @@ pub trait SmartAccount: CustomAccountInterface {
     ///   registered in the global registry.
     fn get_policy_id(e: &Env, policy: Address) -> u32 {
         storage::get_policy_id(e, &policy)
+    }
+
+    /// Computes the digest that [`Signer::External`] signers sign for
+    /// `preimage`, that is `sha256(preimage.to_xdr())`. A pure helper for
+    /// off-chain clients: simulating it verifies a locally computed digest
+    /// before any signature is collected, and it exposes
+    /// [`AuthDigestPreimage`] in the contract spec so generated bindings can
+    /// encode the value that [`Signer::Delegated`] signers authorize.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `preimage` - The structured message that signers commit to.
+    fn auth_digest(e: &Env, preimage: AuthDigestPreimage) -> BytesN<32> {
+        preimage.digest(e)
     }
 
     /// Creates a new context rule with the specified configuration, returning

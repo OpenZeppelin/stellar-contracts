@@ -92,8 +92,8 @@ Signer::Delegated(Address)
 ```
 
 - Any Soroban address (contract or account)
-- Verification uses `require_auth_for_args(payload)`
-- This model requires manual authorization entry crafting, because it is not returned in a simulation mode.
+- Verification uses `require_auth_for_args((preimage,))`, where `preimage` is the `AuthDigestPreimage` described in [Signature Authentication](#1-signature-authentication)
+- Transaction simulation does not return the delegated signer's authorization entry, because `require_auth_for_args` runs inside `__check_auth`. Clients add it manually; see [Authorizing from a Client](#authorizing-from-a-client).
 
 #### External Signers
 
@@ -194,9 +194,22 @@ Authorization is determined by explicitly selecting the rule to validate against
 
 ### 1. Signature Authentication
 
-All provided signatures are authenticated up front:
-- `Delegated` signers use `require_auth_for_args(payload)`.
-- `External` signers are verified through their verifier contract.
+All provided signatures are authenticated up front against an `AuthDigestPreimage`, the structured message every signer commits to:
+
+```rust
+AuthDigestPreimage {
+    account: e.current_contract_address(),
+    signature_payload, // BytesN<32> from the host
+    context_rule_ids,  // Vec<u32>, one per auth context
+}
+```
+
+- `Delegated` signers authorize `require_auth_for_args((preimage,))` on the smart account, so their authorization entry shows the named fields.
+- `External` signers sign `sha256(preimage.to_xdr())`, which is passed to their verifier contract.
+
+The `account` field scopes the message to a single smart account. Binding `context_rule_ids` rejects rule-selection downgrades after signature collection.
+
+The `auth_digest(preimage)` view returns `sha256(preimage.to_xdr())` for a given preimage. Simulating it lets a client check its locally computed digest before collecting signatures.
 
 ### 2. Per-Context Validation
 
@@ -238,6 +251,15 @@ Each rule must:
 #### Example
 
 Consider a call in the `CallContract(dex_address)` context. The client presents an ed25519 key and a passkey signature. The smart account has a `CallContract(dex_address)` rule requiring both signers and a daily spending limit policy. The client sets `context_rule_ids = [rule_id]`. The account authenticates both keys, validates the rule, and then calls the spending limit policy’s `enforce()`, which checks the limit and updates counters. Authorization succeeds.
+
+### Authorizing from a Client
+
+A smart account is authorized like any custom account: the client simulates the transaction, replaces the void signature in the smart account's authorization entry with an `AuthPayload`, and submits. Two details are specific to this framework.
+
+1. Signers commit to the `AuthDigestPreimage`, not to the host's `signature_payload`. The client computes `signature_payload = sha256(HashIdPreimage::SorobanAuthorization { network_id, nonce, signature_expiration_ledger, invocation })` from the simulated entry, builds the preimage as an `ScVal::Map` with the symbol keys `account`, `context_rule_ids` and `signature_payload` (in that order), and has every `External` signer sign `sha256(preimage.to_xdr())`. The `auth_digest` view returns the same value and can be simulated to check the client-side computation.
+2. Simulation does not return the authorization entry of a `Delegated` signer, because `require_auth_for_args` runs inside `__check_auth`. The client adds a second root-level entry for the delegated address whose root invocation is `__check_auth` on the smart account with the preimage as its single argument, signed the way that address normally authorizes (an ed25519 signature for a G-account, its own `AuthPayload` for a nested smart account). A missing or mis-encoded entry fails with `Error(Auth, InvalidAction)` and a trap inside `__check_auth`, not with a `SmartAccountError`.
+
+The [`auth_entries` test module](./src/smart_account/test/auth_entries.rs) builds both entries in Rust and drives them through the host's `__check_auth`; it is the reference for client implementations. The [smart-account-kit](https://github.com/stellar/smart-account-kit) TypeScript SDK implements this flow end to end; check that its version targets the `stellar-accounts` release the account was built with. See also [Transaction Simulation Behavior](https://docs.openzeppelin.com/stellar-contracts/accounts/signers-and-verifiers#transaction-simulation-behavior) in the documentation.
 
 ## Use Cases
 
@@ -372,6 +394,8 @@ let signatures = AuthPayload {
 };
 ```
 
+See [Authorizing from a Client](#authorizing-from-a-client) for the full off-chain flow, including the authorization entry that simulation does not return for `Delegated` signers.
+
 ### 3. Create Context Rules
 
 ```rust
@@ -432,6 +456,27 @@ For external signers, there are two options:
   - Maximum signers per context rule: 15
   - Maximum policies per context rule: 5
 - Signers and policies are stored in a global registry and deduplicated across rules. The same signer object (identified by its XDR encoding) is stored once regardless of how many rules reference it. Each signer and policy is assigned a stable `u32` ID that is used when removing them from a rule (`remove_signer`, `remove_policy`).
+
+## Migration Guide: from v0.7.x to 0.8.0
+
+### Signed message now binds the smart account address (breaking change)
+
+The digest that signers commit to is now the SHA-256 hash of a structured `AuthDigestPreimage` instead of `sha256(signature_payload || context_rule_ids.to_xdr())`:
+
+```rust
+#[contracttype]
+pub struct AuthDigestPreimage {
+    pub account: Address,              // the smart account
+    pub signature_payload: BytesN<32>, // from the host
+    pub context_rule_ids: Vec<u32>,    // one per auth context
+}
+```
+
+Off-chain signing flows must be updated:
+
+- `External` signers sign `sha256(preimage.to_xdr())`. In Rust: `AuthDigestPreimage { account, signature_payload, context_rule_ids }.digest(e)`. Other clients build the struct as an `ScVal::Map` with symbol keys `account`, `context_rule_ids`, and `signature_payload` (`ScMap` keys must be sorted), XDR-encode it, and hash it.
+- `Delegated` signers now authorize `__check_auth` on the smart account with the preimage struct as its single argument instead of the 32-byte digest. The manually crafted authorization entry for the delegated signer must carry the struct in `args`.
+- The new `auth_digest(preimage)` view returns the digest for a given preimage, so a client can verify its encoding through simulation before signing. Contracts that implement `SmartAccount` through `#[contractimpl(contracttrait)]` must import `AuthDigestPreimage` next to the other trait types, because the macro re-emits the trait signatures at the implementation site.
 
 ## Migration Guide: from v0.6.0 to 0.7.0
 

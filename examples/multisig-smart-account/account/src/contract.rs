@@ -11,8 +11,8 @@ use soroban_sdk::{
     Address, BytesN, Env, Map, String, Symbol, Val, Vec,
 };
 use stellar_accounts::smart_account::{
-    self, AuthPayload, ContextRule, ContextRuleType, ExecutionEntryPoint, Signer, SmartAccount,
-    SmartAccountError,
+    self, AuthDigestPreimage, AuthPayload, ContextRule, ContextRuleType, ExecutionEntryPoint,
+    Signer, SmartAccount, SmartAccountError,
 };
 use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
 
