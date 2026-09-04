@@ -34,6 +34,12 @@
 //! - `CreateContractWithCtorHostFn(...)` — contract deployment with constructor
 //!   arguments
 //!
+//! The `executable` of a deployment is either `ContractExecutable::Wasm(hash)`
+//! or, since Protocol 28, `ContractExecutable::ExternalRef { owner, tag }`: a
+//! reference to a WASM hash that the `owner` contract stores under `tag` and
+//! may change later. The corresponding [`ContextRuleType`] variants are
+//! `CreateContract(hash)` and `CreateContractExternalRef(owner, tag)`.
+//!
 //! A [`ContextRule`] is this library's stored authorization entry, bound to a
 //! [`ContextRuleType`] that narrows which `Context` variants it can authorize.
 //! A smart account can hold **multiple [`ContextRule`]s for the same context

@@ -56,7 +56,8 @@ Context rules function like routing tables for authorization: for each `Context`
 - **Context Type**: Scope of the rule
   - `Default`: Applies to any context
   - `CallContract(Address)`: Specific contract calls
-  - `CreateContract(BytesN<32>)`: Contract deployments
+  - `CreateContract(BytesN<32>)`: Contract deployments from a specific WASM hash
+  - `CreateContractExternalRef(Address, String)`: Contract deployments from the executable reference an owner contract stores under a tag (Protocol 28, CAP-85); the WASM hash is resolved at deployment time, so the rule trusts the owner contract
 - **Valid Until**: Optional expiration (ledger sequence)
 - **Signers**: List of authorized signers (max: 15)
 - **Policies**: Map of policy contracts and their parameters (max: 5)
@@ -74,7 +75,7 @@ A single smart account can hold any number of context rules. There is no upper l
 `soroban_sdk::auth::Context` is a Soroban SDK type representing a single authorized operation within a transaction. When `__check_auth` is invoked, the runtime passes `auth_contexts: Vec<Context>` — one entry per `require_auth` call in the transaction. Each variant captures the operation details:
 
 - `Contract(ContractContext)` — a contract function call, carrying the `contract` address, `fn_name`, and `args`
-- `CreateContractHostFn(CreateContractHostFnContext)` — a contract deployment without constructor arguments, carrying `executable` (WASM hash) and `salt`
+- `CreateContractHostFn(CreateContractHostFnContext)` — a contract deployment without constructor arguments, carrying `executable` (`ContractExecutable::Wasm(hash)` or `ContractExecutable::ExternalRef { owner, tag }`) and `salt`
 - `CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext)` — a contract deployment with constructor arguments
 
 A `ContextRule` is this library's concept: a stored authorization requirements entry that lives in the smart account's own storage. A `ContextRule` is bound to a `ContextRuleType` that narrows which `Context` variants it can authorize. A smart account can hold **any number of `ContextRule`s covering the same context type** — for example, an admin rule and a time-limited session rule can both be scoped to `CallContract(dex_address)`.
