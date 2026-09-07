@@ -6,7 +6,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 mod tests;
 
-// Withdraw circuit -- design doc Section 7.5.
+// Withdraw circuit -- docs/protocol/operations/withdraw.md.
 //
 // Constraints
 // -----------
@@ -17,11 +17,11 @@ mod tests;
 //   W3 C_spend   = v * G + r * H                       Opening of current
 //                                                      spendable balance.
 //   W4 v, a, v - a in [0, 2^127)                       Range validity
-//                                                      (Section 2.6); the
+//                                                      (docs/protocol/primitives.md#integer-embedding-and-range-proofs); the
 //                                                      [0, 2^127) bound is
 //                                                      the SEP-41 i128
 //                                                      non-negative range
-//                                                      (Section 3.4)
+//                                                      (docs/protocol/system-model.md#underlying-token-assumptions)
 //   W5 r'        = Poseidon2(delta_spend_r, vk, sigma) Deterministic
 //                                                      randomness for the
 //                                                      new balance.
@@ -36,7 +36,7 @@ mod tests;
 //                                                      would collapse m_b to
 //                                                      a constant function
 //                                                      of sigma.
-// Auditor block (sender-auditor visibility, Section 8.1)
+// Auditor block (sender-auditor visibility, docs/protocol/auditing.md#per-transfer-auditor-ciphertexts)
 //   W_a1 R_e         = r_e * H                         Ephemeral key for
 //                                                      auditor ECDH.
 //   W_a2 s_{a,s}     = ecdh(r_e, K_{aud,s})            Sender-auditor ECDH
@@ -57,7 +57,7 @@ mod tests;
 //                                                      blinding, over W5's r'
 //                                                      (emitted).
 //
-// Point-validation doctrine (Section 10.8)
+// Point-validation doctrine (docs/protocol/proof-system.md#on-chain-point-arithmetic)
 // ----------------------------------------
 // Y, C_spend, C_spend', and R_e are each bound to in-circuit multi_scalar_mul
 // outputs (W1, W3, W6, W_a1) and are therefore on-curve by construction --
@@ -79,7 +79,7 @@ mod tests;
 //   6    k_aud_s_y     K_aud_s.y       `from.auditor_id`.
 //   7    a              a             Public withdrawal amount; the contract
 //                                     pre-checks a >= 0 at the entrypoint
-//                                     (Section 3.4), W4 then closes
+//                                     (docs/protocol/system-model.md#underlying-token-assumptions), W4 then closes
 //                                     a < 2^127 in-circuit.
 //   8    c_spend_new_x  C_spend'.x    Prover-supplied; written to
 //   9    c_spend_new_y  C_spend'.y      `from.spendable_commitment` on success.
@@ -140,7 +140,7 @@ fn main(
     assert(c_spend_derived.x == c_spend_x);
     assert(c_spend_derived.y == c_spend_y);
 
-    // W4 -- Section 2.6 spells out the 127-bit decomposition / recomposition
+    // W4 -- docs/protocol/primitives.md#integer-embedding-and-range-proofs spells out the 127-bit decomposition / recomposition
     // pattern; `assert_max_bit_size` is the Noir stdlib primitive that
     // implements it directly.
     v.assert_max_bit_size::<127>();
@@ -165,7 +165,7 @@ fn main(
     assert(r_e_derived.x == r_e_x);
     assert(r_e_derived.y == r_e_y);
 
-    // K_aud_s point validation (Section 10.8: public-input key).
+    // K_aud_s point validation (docs/protocol/proof-system.md#on-chain-point-arithmetic: public-input key).
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_s);
 

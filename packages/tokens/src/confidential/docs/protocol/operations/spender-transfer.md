@@ -9,8 +9,8 @@ The spender transfers from the owner's escrowed allowance to a recipient.
 | O1 | $$Y\_{\text{op}} = sk\_{\text{op}} \cdot H$$ (spender key ownership) |
 | O2 | Prover knows $$dvk\_i$$ and the opening $$(v\_a, r\_a)$$ of $$C\_a$$ |
 | O3 | $$r\_a = \text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a)$$ (allowance randomness matches stored state) |
-| O4 | $$v\_a \in [0, 2^{127})$$, $$v\_{\text{transfer}} \in [0, 2^{127})$$, $$v\_a - v\_{\text{transfer}} \in [0, 2^{127})$$ (range validity, Section 2.6) |
-| O5 | $$s = \text{ECDH}(r\_e, \text{PVK}\_{\text{recipient}})$$ (recipient ECDH shared scalar, §2.4) |
+| O4 | $$v\_a \in [0, 2^{127})$$, $$v\_{\text{transfer}} \in [0, 2^{127})$$, $$v\_a - v\_{\text{transfer}} \in [0, 2^{127})$$ (range validity, [Integer Embedding and Range Proofs](../primitives.md#integer-embedding-and-range-proofs)) |
+| O5 | $$s = \text{ECDH}(r\_e, \text{PVK}\_{\text{recipient}})$$ (recipient ECDH shared scalar, [Elliptic Curve Diffie-Hellman](../primitives.md#elliptic-curve-diffie-hellman)) |
 | O6 | $$R\_e = r\_e \cdot H$$ |
 | O7 | $$r\_{\text{transfer}} = \text{Poseidon}(\delta\_{\text{transfer\\\_blind}}, s, \sigma\_a')$$ (transfer blinding) |
 | O8 | $$C\_{\text{transfer}} = v\_{\text{transfer}} \cdot G + r\_{\text{transfer}} \cdot H$$ |
@@ -23,7 +23,7 @@ The spender transfers from the owner's escrowed allowance to a recipient.
 | O\_a1 | $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$ (recipient-auditor ECDH shared scalar, reuses ephemeral scalar) |
 | O\_a2 | $$(m\_{v,r}, m\_{r,r}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_r}}, s\_{a,r}, \sigma\_a')$$ (recipient-auditor channel masks) |
 | O\_a3 | $$\tilde{v}\_{\text{aud,r}} = v\_{\text{transfer}} + m\_{v,r}$$ (recipient-auditor encrypted transfer amount) |
-| O\_a4 | $$\tilde{r}\_{\text{aud,r}} = r\_{\text{transfer}} + m\_{r,r}$$ (recipient-auditor encrypted transfer randomness, enables Pedersen-opening reconstruction of $$C\_{\text{receive}}$$, see Section 8.1) |
+| O\_a4 | $$\tilde{r}\_{\text{aud,r}} = r\_{\text{transfer}} + m\_{r,r}$$ (recipient-auditor encrypted transfer randomness, enables Pedersen-opening reconstruction of $$C\_{\text{receive}}$$, see [Per-Transfer Auditor Ciphertexts](../auditing.md#per-transfer-auditor-ciphertexts)) |
 | O\_a5 | $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$ (owner-auditor ECDH shared scalar, reuses ephemeral scalar) |
 | O\_a6 | $$(m\_{v,s}, m\_{a,s}, m\_{r,s}) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma\_a')$$ (owner-auditor channel masks) |
 | O\_a7 | $$\tilde{v}\_{\text{aud,s}} = v\_{\text{transfer}} + m\_{v,s}$$ (owner-auditor encrypted transfer amount) |
@@ -49,9 +49,9 @@ $$sk\_{\text{op}}$$, $$dvk\_i$$, $$v\_a$$, $$r\_a$$ (single-limb $$\mathbb{F}\_r
 
 The contract checks `ledger.sequence() <= live_until_ledger`, updates `allowance_commitment`, `a_tilde`, stores $$\sigma\_a'$$ as the new `allowance_salt`, and adds $$C\_{\text{transfer}}$$ to the recipient's `receiving_commitment`. Emits event with $$(R\_e, \tilde{v}, \sigma\_a', \tilde{v}\_{\text{aud,r}}, \tilde{r}\_{\text{aud,r}}, \tilde{v}\_{\text{aud,s}}, \tilde{a}\_{\text{aud,s}}, \tilde{r}\_{\text{aud,s}})$$.
 
-**Ephemeral scalar.** The spender derives $$r\_e = \text{Poseidon}(\delta\_{\text{eph}}, vk\_{\text{op}}, \sigma\_a')$$ (§5.3, §6.2 *Transfer nonce*) from its *own* viewing key rather than the owner's, so that the spender can later disclose it ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §7). The circuit does not constrain the derivation; it does not constrain $$vk\_{\text{op}}$$ at all, per *Contract binding* below. One consequence follows for the owner: since the owner does not hold $$vk\_{\text{op}}$$, the owner cannot recompute $$r\_e$$ for a spender transfer and cannot disclose it without the spender's cooperation ([SELECTIVE_DISCLOSURE.md](./SELECTIVE_DISCLOSURE.md) §7, *Coverage asymmetry*).
+**Ephemeral scalar.** The spender derives $$r\_e = \text{Poseidon}(\delta\_{\text{eph}}, vk\_{\text{op}}, \sigma\_a')$$ ([ECDH-Derived Blinding](../keys-and-commitments.md#ecdh-derived-blinding), [Transfer nonce](../account-state.md#transfer-nonce)) from its *own* viewing key rather than the owner's, so that the spender can later disclose it ([D-sender](../../selective-disclosure/circuits/d-sender.md)). The circuit does not constrain the derivation; it does not constrain $$vk\_{\text{op}}$$ at all, per *Contract binding* below. One consequence follows for the owner: since the owner does not hold $$vk\_{\text{op}}$$, the owner cannot recompute $$r\_e$$ for a spender transfer and cannot disclose it without the spender's cooperation ([Coverage asymmetry](../../selective-disclosure/circuits/d-sender.md#coverage-asymmetry-owner-cannot-d-sender-a-spendertransfer)).
 
-**Recipient uniformity.** The recipient path is identical to the direct-transfer path of §7.6 *Recipient processing*.
+**Recipient uniformity.** The recipient path is identical to the direct-transfer path of [Recipient processing](transfer.md#recipient-processing).
 
 ## Contract binding
 

@@ -2,7 +2,7 @@ use stellar_confidential_lib::commit;
 
 mod tests;
 
-// Clawback circuit -- COMPLIANCE.md Section 5.3.
+// Clawback circuit -- docs/compliance.md#circuit.
 //
 // Proves that a compliance seizure of the public amount `alpha` is bounded by
 // what the target actually holds, without revealing either balance. It is the
@@ -16,7 +16,7 @@ mod tests;
 //   CB2 C_receive  = v_r * G + r_r * H       Prover knows the opening of the
 //                                            target's receiving commitment.
 //   CB3 v_s, v_r, alpha, and
-//       v_s + v_r - alpha in [0, 2^127)      The seize bound (Section 2.6).
+//       v_s + v_r - alpha in [0, 2^127)      The seize bound (docs/protocol/primitives.md#integer-embedding-and-range-proofs).
 //                                            The final term establishes
 //                                            alpha <= v_s + v_r.
 //
@@ -33,7 +33,7 @@ mod tests;
 // C_spend and C_receive are the only points, and both are bound to in-circuit
 // multi_scalar_mul outputs (CB1, CB2), so they are on-curve by construction.
 //
-// Public inputs (8 fields, in COMPLIANCE.md Section 5.3 canonical order)
+// Public inputs (8 fields, in docs/compliance.md#circuit canonical order)
 // ----------------------------------------------------------------------
 //   Idx  Param         Symbol      Source / Note
 //   ---  -----         ------      ----------------------------------------
@@ -91,7 +91,7 @@ fn main(
     assert(c_receive_derived.x == c_receive_x);
     assert(c_receive_derived.y == c_receive_y);
 
-    // CB3 -- Section 2.6's 127-bit decomposition / recomposition pattern.
+    // CB3 -- docs/protocol/primitives.md#integer-embedding-and-range-proofs's 127-bit decomposition / recomposition pattern.
     // Range on v_s and v_r alone does not bound v_s + v_r - alpha.
     v_s.assert_max_bit_size::<127>();
     v_r.assert_max_bit_size::<127>();

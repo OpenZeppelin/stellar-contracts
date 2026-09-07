@@ -1,0 +1,30 @@
+name: "docs workflow"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/tokens/src/confidential/**"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "packages/tokens/src/confidential/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    steps:
+      - name: git checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: check documentation references
+        run: python3 packages/tokens/src/confidential/docs/check_links.py

@@ -6,8 +6,8 @@ For statements of the form "this account received at least $$X$$ from counterpar
 
 | Symbol | Source |
 |:---|:---|
-| Common: $$\text{addr\\\_f}$$, $$\text{PVK}\_A$$, $$P\_R$$, $$\nu$$, $$R\_{\text{disc}}, \tilde{V}\_{\text{disc}}$$ | as in §6 |
-| List: $$(R\_{e,i}, \sigma\_{E,i}, \tilde{v}\_i)$$ for $$i \in [1, n]$$ | from $$n$$ on-chain transfer-family events; $$\sigma\_{E,i} = \sigma$$ if event $$i$$ is a `Transfer`, $$\sigma\_a'$$ if `SpenderTransfer`. Each event MUST be identified by a $$\text{ref}\_{E,i}$$ in the proof bundle and resolved per §5.3. |
+| Common: $$\text{addr\\\_f}$$, $$\text{PVK}\_A$$, $$P\_R$$, $$\nu$$, $$R\_{\text{disc}}, \tilde{V}\_{\text{disc}}$$ | as in [Circuit D-recipient: Holder Discloses an Inbound Transfer](d-recipient.md) |
+| List: $$(R\_{e,i}, \sigma\_{E,i}, \tilde{v}\_i)$$ for $$i \in [1, n]$$ | from $$n$$ on-chain transfer-family events; $$\sigma\_{E,i} = \sigma$$ if event $$i$$ is a `Transfer`, $$\sigma\_a'$$ if `SpenderTransfer`. Each event MUST be identified by a $$\text{ref}\_{E,i}$$ in the proof bundle and resolved per [Verifier Protocol](../protocol.md#verifier-protocol). |
 | Optional: $$V\_{\text{threshold}}$$ | aggregate threshold |
 
 ## Private witnesses
@@ -18,7 +18,7 @@ $$sk\_A$$, $$vk\_A$$, $$\\{v\_{\text{transfer},i}\\}\_{i=1}^n$$, $$r\_{\text{dis
 
 | # | Constraint |
 |:--|:---|
-| D1, D2 | As in §6 |
+| D1, D2 | As in [Circuit D-recipient: Holder Discloses an Inbound Transfer](d-recipient.md) |
 | For each $$i$$: D3$$\_i$$ | $$s\_i = \text{ECDH}(vk\_A, R\_{e,i})$$ |
 | For each $$i$$: D4$$\_i$$ | $$v\_{\text{transfer},i} = \tilde{v}\_i - \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s\_i, \sigma\_{E,i})$$ |
 | For each $$i$$: D5$$\_i$$ | $$v\_{\text{transfer},i} \in [0, 2^{127})$$ |

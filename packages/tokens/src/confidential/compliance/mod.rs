@@ -2,7 +2,7 @@
 //!
 //! Deployer-configurable controls layered on top of the [`ConfidentialToken`]:
 //! per-account freezing, SAC `authorized()` passthrough, a pluggable external
-//! authorization policy, and opt-in seizure. See `docs/COMPLIANCE.md` for the
+//! authorization policy, and opt-in seizure. See `docs/compliance.md` for the
 //! specification.
 //!
 //! ## Surface
@@ -313,7 +313,7 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
 ///   (registration predates the account entry) but passes policy and SAC. The
 ///   caller-selected `auditor_id` is not restricted; deployments that must
 ///   limit which auditors an account may bind to override `on_register` with a
-///   custom gate (see `docs/COMPLIANCE.md` §4.3).
+///   custom gate (see `docs/compliance.md#restrict-auditor-selection`).
 /// * [`on_spender_transfer`](Hooks::on_spender_transfer): `from` and `to` pass
 ///   all three gates; `spender` passes only the policy gate.
 /// * [`on_set_spender`](Hooks::on_set_spender): the delegating `account` passes
@@ -328,8 +328,9 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
 /// allowance models.
 ///
 /// Deployments that need additional behaviour (audit mirroring, rate
-/// limiting, or alternative deposit semantics — see `docs/COMPLIANCE.md` §4)
-/// can write a custom `Hooks` impl that calls the same primitives.
+/// limiting, or alternative deposit semantics — see
+/// `docs/compliance.md#customizing-the-hooks-trait`) can write a custom `Hooks`
+/// impl that calls the same primitives.
 pub struct ComplianceHooks;
 
 impl Hooks for ComplianceHooks {

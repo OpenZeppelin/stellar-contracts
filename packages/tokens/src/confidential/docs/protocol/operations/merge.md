@@ -16,9 +16,9 @@ C_receive ← O
 $$C\_{\text{spend}} + C\_{\text{receive}} = (v\_s \cdot G + r\_s \cdot H) + (v\_r \cdot G + r\_r \cdot H) = (v\_s + v\_r) \cdot G + (r\_s + r\_r) \cdot H = \text{Com}(v\_s + v\_r, r\_s + r\_r)$$
 No value is created or destroyed. $$\square$$
 
-**Owner state update.** The owner knows the opening of the post-merge commitment: $$v\_{\text{spend}}' = v\_s + v\_r$$, $$r\_{\text{spend}}' = r\_s + r\_r$$. The owner knows $$v\_r$$ and $$r\_r$$ from processing incoming transfer and deposit events into $$W\_{\text{receive}}$$ (Section 5.2, *Update rules*; the per-transfer derivation is Definition 1 in Section 5.3). The values $$v\_s$$ and $$r\_s$$ are known from the owner's last proof output.
+**Owner state update.** The owner knows the opening of the post-merge commitment: $$v\_{\text{spend}}' = v\_s + v\_r$$, $$r\_{\text{spend}}' = r\_s + r\_r$$. The owner knows $$v\_r$$ and $$r\_r$$ from processing incoming transfer and deposit events into $$W\_{\text{receive}}$$ ([Update rules](../wallet-state.md#update-rules); the per-transfer derivation is Definition 1 in [ECDH-Derived Blinding](../keys-and-commitments.md#ecdh-derived-blinding)). The values $$v\_s$$ and $$r\_s$$ are known from the owner's last proof output.
 
-**Griefing analysis.** Merge is not front-runnable, and incoming transfers cannot invalidate an in-flight spend proof (Proposition 2, Section 9.1; Proposition 3, Section 9.2).
+**Griefing analysis.** Merge is not front-runnable, and incoming transfers cannot invalidate an in-flight spend proof (Proposition 2, [Griefing Resistance](../security.md#griefing-resistance); Proposition 3, [Merge Safety](../security.md#merge-safety)).
 
 ## Encrypted balance
 

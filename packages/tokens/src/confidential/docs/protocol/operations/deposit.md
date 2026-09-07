@@ -1,6 +1,6 @@
 # Deposit
 
-Transparent tokens flow from the depositor to the contract via `token.transfer(from, self, amount)`. The amount $$a$$ is public and typed as `i128`. The contract checks $$a \ge 0$$ at the entrypoint and reverts on violation (Section 3.4). The contract then computes the deposit commitment with zero blinding:
+Transparent tokens flow from the depositor to the contract via `token.transfer(from, self, amount)`. The amount $$a$$ is public and typed as `i128`. The contract checks $$a \ge 0$$ at the entrypoint and reverts on violation ([Underlying Token Assumptions](../system-model.md#underlying-token-assumptions)). The contract then computes the deposit commitment with zero blinding:
 
 $$C\_{\text{dep}} = a \cdot G + 0 \cdot H = a \cdot G$$
 

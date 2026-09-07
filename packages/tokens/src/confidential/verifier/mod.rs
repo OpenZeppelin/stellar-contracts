@@ -4,7 +4,10 @@
 //! verify zero-knowledge proofs accompanying every state-changing operation.
 //! Each key is indexed by [`CircuitType`]. A single deployment can serve
 //! multiple confidential tokens: per-token binding is enforced inside the
-//! circuit via the `addr_f` field (DESIGN §2.7, §4.2), not by the verifier, so
+//! circuit via the `addr_f` field
+//! (`docs/protocol/primitives.md#address-to-field-encoding`,
+//! `docs/protocol/keys-and-commitments.md#viewing-key`), not by the verifier,
+//! so
 //! the same VK set is reusable across every confidential token that targets the
 //! same protocol version.
 //!
@@ -30,7 +33,8 @@
 //!   distinct from token admin powers.
 //! - **Lifecycle**: per-circuit VKs can be rotated (e.g. when a circuit is
 //!   patched) without redeploying the confidential token, subject to the
-//!   deployer's governance posture (see DESIGN §3.5).
+//!   deployer's governance posture (see
+//!   `docs/protocol/system-model.md#governance-and-upgradeability`).
 //!
 //! ## VK Encoding
 //!
@@ -52,7 +56,8 @@
 //!
 //! [`ConfidentialVerifier::update_verification_key`] (and the underlying
 //! [`storage::update_verification_key`] helper) is **soundness-critical** and
-//! should be treated as a break-glass operation. DESIGN §3.5 makes the
+//! should be treated as a break-glass operation.
+//! `docs/protocol/system-model.md#governance-and-upgradeability` makes the
 //! strongest possible recommendation: ship VKs immutably and require a fresh
 //! deployment for any circuit change. If a deployment exposes an update path
 //! at all, it should be reserved for one situation: a discovered soundness
@@ -69,13 +74,15 @@
 //!   generated against the previous VK fails verification the instant the new
 //!   VK is activated, so the corresponding transactions revert at the
 //!   proof-verification boundary. Wallets must regenerate against the new VK
-//!   and resubmit (DESIGN §8.3 discusses this for the related auditor-key
-//!   rotation case; the same reasoning applies here).
+//!   and resubmit
+//!   (`docs/protocol/auditing.md#auditor-key-management-and-rotation` discusses
+//!   this for the related auditor-key rotation case; the same reasoning applies
+//!   here).
 //! - **Should be gated.** Implementors are expected to put the update path
 //!   behind strong access control (multisig + timelock at a minimum) and to
 //!   publish enough material — circuit source, toolchain pin, SRS transcript
-//!   reference (DESIGN §10.6) — that any user can independently reproduce the
-//!   new VK before trusting it.
+//!   reference (`docs/protocol/proof-system.md#structured-reference-string`) —
+//!   that any user can independently reproduce the new VK before trusting it.
 //!
 //! Treat every call to `update_verification_key` as an emergency, not a
 //! routine operation.
@@ -171,7 +178,8 @@ pub trait ConfidentialVerifier {
     /// soundness bug in a circuit or verifier, and should be behind strong
     /// governance (multisig + timelock at minimum). The new VK must be
     /// independently reproducible from the audited circuit source, pinned
-    /// toolchain, and SRS transcript (DESIGN §10.6).
+    /// toolchain, and SRS transcript
+    /// (`docs/protocol/proof-system.md#structured-reference-string`).
     ///
     /// Only an operator with sufficient permissions should be able to call
     /// this function.

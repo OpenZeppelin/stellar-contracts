@@ -17,7 +17,7 @@ pub enum CircuitType {
 }
 ```
 
-`deposit`, `merge`, and `revoke_spender` carry no proof and have no circuit (Sections 7.3, 7.4, 7.9). The discriminants are part of the on-chain interface and are never renumbered; core circuits occupy `0..=4` and extension circuits start at `100`.
+`deposit`, `merge`, and `revoke_spender` carry no proof and have no circuit ([Deposit](operations/deposit.md), [Merge](operations/merge.md), [Revoke Spender](operations/revoke-spender.md)). The discriminants are part of the on-chain interface and are never renumbered; core circuits occupy `0..=4` and extension circuits start at `100`.
 
 ## Circuit Summary
 
@@ -26,15 +26,15 @@ pub enum CircuitType {
 | `Register` | Spending key well-formedness; contract-bound viewing key derivation from $$sk$$; public viewing key consistency with the derived $$vk$$ |
 | `Withdraw` | Balance sufficiency; new spendable commitment with deterministic randomness; encrypted balance scalar; sender-auditor ECDH ciphertexts (balance checkpoint + `lane[2]` escrow of the new spendable blinding); owner key ownership |
 | `Transfer` | Balance conservation; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; sender auditor: amount + balance + `lane[2]` escrow of the new spendable blinding); deterministic randomness for new sender balance; encrypted balance scalar; sender key ownership; range validity (balance $$\in [0, 2^{127})$$, amount $$\in [0, 2^{127})$$) |
-| `SpenderTransfer` | Allowance sufficiency; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; owner auditor: amount + allowance + `lane[2]` escrow of the new allowance blinding); deterministic randomness for new allowance; encrypted allowance scalar; spender key ownership; contract-bound indirectly via $$C\_a$$ chain (Section 7.8) |
+| `SpenderTransfer` | Allowance sufficiency; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; owner auditor: amount + allowance + `lane[2]` escrow of the new allowance blinding); deterministic randomness for new allowance; encrypted allowance scalar; spender key ownership; contract-bound indirectly via $$C\_a$$ chain ([Spender Transfer](operations/spender-transfer.md)) |
 | `SetSpender` | Balance split; $$dvk\_i$$ derivation; ECDH escrow of $$dvk\_i$$ to the spender and of the allowance blinding to the owner's auditor; allowance commitment with deterministic randomness; encrypted balance and allowance scalars; owner-auditor ECDH ciphertexts (escrow amount + balance checkpoint + `lane[2]` escrow of the new spendable blinding); owner key ownership; contract-bound via $$vk$$ derivation |
-| `Clawback` | Knowledge of the openings of the target's $$C\_{\text{spend}}$$ and $$C\_{\text{receive}}$$; public seize amount bounded by their sum, remainder in range; no key ownership, no ephemeral ([COMPLIANCE.md](./COMPLIANCE.md) §5.3) |
+| `Clawback` | Knowledge of the openings of the target's $$C\_{\text{spend}}$$ and $$C\_{\text{receive}}$$; public seize amount bounded by their sum, remainder in range; no key ownership, no ephemeral ([Circuit](../compliance.md#circuit)) |
 
 ## Circuit Cost Analysis
 
 The dominant cost in Noir circuits is elliptic curve scalar multiplication. With Barretenberg's native Grumpkin support via `multi_scalar_mul`, each scalar multiplication costs approximately 64 UltraPlonk-equivalent constraints (with ECC VM) or 4,700–6,250 without.
 
-**Counting unit.** The totals below count `multi_scalar_mul` *call sites*, matching how the circuits are written (`circuits/lib/src/lib.nr`): a Pedersen commitment is one call over two scalars, and each `ecdh` is one call plus a Poseidon2 absorb (§2.4). A per-scalar count is higher, since every commitment contributes two. Each row lists every site, so the constraint identifiers are the audit trail.
+**Counting unit.** The totals below count `multi_scalar_mul` *call sites*, matching how the circuits are written (`circuits/lib/src/lib.nr`): a Pedersen commitment is one call over two scalars, and each `ecdh` is one call plus a Poseidon2 absorb ([Elliptic Curve Diffie-Hellman](primitives.md#elliptic-curve-diffie-hellman)). A per-scalar count is higher, since every commitment contributes two. Each row lists every site, so the constraint identifiers are the audit trail.
 
 | Circuit | Calls | Sites |
 |:---|:--:|:---|
@@ -42,10 +42,10 @@ The dominant cost in Noir circuits is elliptic curve scalar multiplication. With
 | `Withdraw` | 5 | $$Y$$ (W1), $$C\_{\text{spend}}$$ opening (W3), $$C\_{\text{spend}}'$$ (W6), $$R\_e$$ (W\_a1), sender-auditor ECDH (W\_a2) |
 | `Transfer` | 8 | $$Y\_A$$ (T1), $$C\_{\text{spend}}^A$$ opening (T3), recipient ECDH (T5), $$R\_e$$ (T6), $$C\_{\text{transfer}}$$ (T8), $$C\_{\text{spend}}'$$ (T11), recipient-auditor ECDH (T\_a1), sender-auditor ECDH (T\_a5) |
 | `SpenderTransfer` | 8 | $$Y\_{\text{op}}$$ (O1), $$C\_a$$ opening (O2), recipient ECDH (O5), $$R\_e$$ (O6), $$C\_{\text{transfer}}$$ (O8), $$C\_a'$$ (O11), recipient-auditor ECDH (O\_a1), owner-auditor ECDH (O\_a5) |
-| `SetSpender` | 7 | $$Y$$ (S1), $$C\_{\text{spend}}$$ opening (S3), $$C\_a$$ (S7), $$C\_{\text{spend}}'$$ (S10), $$R\_e$$ (S\_a1), $$dvk\_i$$ escrow ECDH (S12, §7.11), owner-auditor ECDH (S\_a2) |
+| `SetSpender` | 7 | $$Y$$ (S1), $$C\_{\text{spend}}$$ opening (S3), $$C\_a$$ (S7), $$C\_{\text{spend}}'$$ (S10), $$R\_e$$ (S\_a1), $$dvk\_i$$ escrow ECDH (S12, [Delegation Key Escrow](operations/set-spender.md#delegation-key-escrow)), owner-auditor ECDH (S\_a2) |
 | `Clawback` | 2 | $$C\_{\text{spend}}$$ opening (CB1), $$C\_{\text{receive}}$$ opening (CB2) |
 
-`SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of §7.11 reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The auditor-side escrow of the allowance blinding $$r\_a$$ (S14) reuses the S\_a2 shared scalar and adds one Poseidon evaluation. The `lane[2]` escrows (W\_a5, T\_a9, S\_a6, O\_a9) read `lane[2]` of a permutation each circuit already computes and cost one field addition apiece. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`: `Register` 33, `Clawback` 51, `Withdraw` 95, `Transfer` 134, `SetSpender` 135, `SpenderTransfer` 136.
+`SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of [Delegation Key Escrow](operations/set-spender.md#delegation-key-escrow) reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The auditor-side escrow of the allowance blinding $$r\_a$$ (S14) reuses the S\_a2 shared scalar and adds one Poseidon evaluation. The `lane[2]` escrows (W\_a5, T\_a9, S\_a6, O\_a9) read `lane[2]` of a permutation each circuit already computes and cost one field addition apiece. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`: `Register` 33, `Clawback` 51, `Withdraw` 95, `Transfer` 134, `SetSpender` 135, `SpenderTransfer` 136.
 
 The ECDH computations add scalar multiplications compared to a random-blinding scheme, but the unchunked design eliminates all per-chunk constraints (which, in a chunked scheme, would involve 8+ scalar multiplications for balance chunks and per-chunk range proofs).
 
@@ -88,7 +88,7 @@ fn commit(value: Field, randomness: Field) -> EmbeddedCurvePoint {
     )
 }
 
-/// ECDH shared-secret scalar (Section 2.4): S = scalar * point, then
+/// ECDH shared-secret scalar (primitives.md#elliptic-curve-diffie-hellman): S = scalar * point, then
 /// s = Poseidon2(delta_ecdh, S.x, S.y). Absorbing both coordinates binds
 /// the full shared point, removing the (P, -P) negation invariance of an
 /// x-only extraction. All ECDH scalars in this protocol are F_r-sampled
@@ -104,7 +104,7 @@ fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> Field {
 
 ### Post-merge witness availability
 
-Every opening witnessed in any circuit is encoded as a single $$\mathbb{F}\_r$$ `Field` via the same `commit` primitive. After a proofless fold -- `Merge` (§7.4), `revoke_spender` (§7.9), or `clawback` ([COMPLIANCE.md](./COMPLIANCE.md) §5.4, where the compliance extension is enabled) -- the spendable-balance blinding is a sum over $$\mathbb{F}\_q$$: $$r\_s + r\_r$$ for a merge or a clawback, $$r\_s + r\_a$$ for a revoke. Its canonical $$\mathbb{F}\_q$$ representative lies in $$[0, r)$$ -- representable as a Noir `Field` -- with probability $$\geq 1 - (q - r)/q \approx 1 - 2^{-127}$$ per fold (§2.3). With the complementary probability $$\approx 2^{-127}$$ it lies in $$[r, q)$$. In that case the on-chain state remains well-formed (the commitment is a valid Grumpkin point), but the wallet's local opening witness is unencodable as a `Field`, so no spend / transfer / set-spender proof can be constructed against the affected $$C\_{\text{spend}}$$ until further accumulation shifts the blinding back into $$\mathbb{F}\_r$$.
+Every opening witnessed in any circuit is encoded as a single $$\mathbb{F}\_r$$ `Field` via the same `commit` primitive. After a proofless fold -- `Merge` ([Merge](operations/merge.md)), `revoke_spender` ([Revoke Spender](operations/revoke-spender.md)), or `clawback` ([Contract Flow](../compliance.md#contract-flow), where the compliance extension is enabled) -- the spendable-balance blinding is a sum over $$\mathbb{F}\_q$$: $$r\_s + r\_r$$ for a merge or a clawback, $$r\_s + r\_a$$ for a revoke. Its canonical $$\mathbb{F}\_q$$ representative lies in $$[0, r)$$ -- representable as a Noir `Field` -- with probability $$\geq 1 - (q - r)/q \approx 1 - 2^{-127}$$ per fold ([Pedersen Commitments](primitives.md#pedersen-commitments)). With the complementary probability $$\approx 2^{-127}$$ it lies in $$[r, q)$$. In that case the on-chain state remains well-formed (the commitment is a valid Grumpkin point), but the wallet's local opening witness is unencodable as a `Field`, so no spend / transfer / set-spender proof can be constructed against the affected $$C\_{\text{spend}}$$ until further accumulation shifts the blinding back into $$\mathbb{F}\_r$$.
 
 ### Soft recovery
 
@@ -149,7 +149,7 @@ where $$[x]\_1 = x \cdot G\_1$$ and $$[x]\_2 = x \cdot G\_2$$ are BN254 group el
 
 The contract performs Grumpkin affine point addition and subtraction for homomorphic balance updates. Since Grumpkin coordinates are $$\mathbb{F}\_r^{\text{BN254}}$$ elements, these reduce to Fr field operations.
 
-**Curve coefficients.** Grumpkin $$y^2 = x^3 - 17$$ (Section 2.2) is in short Weierstrass form $$y^2 = x^3 + a x + b$$ with $$a = 0$$ and $$b = -17$$. Only $$a$$ enters the point arithmetic slope formulas below; $$b$$ enters only the on-curve check.
+**Curve coefficients.** Grumpkin $$y^2 = x^3 - 17$$ ([Grumpkin-BN254 Cycle](primitives.md#grumpkin-bn254-cycle)) is in short Weierstrass form $$y^2 = x^3 + a x + b$$ with $$a = 0$$ and $$b = -17$$. Only $$a$$ enters the point arithmetic slope formulas below; $$b$$ enters only the on-curve check.
 
 The contract distinguishes the following cases when computing $$P\_3 = P\_1 + P\_2$$:
 
@@ -174,7 +174,7 @@ $$\lambda\_{\text{dbl}} = (3 x\_1^2 + a)(2 y\_1)^{-1} = 3 x\_1^2 \cdot (2 y\_1)^
 $$x\_3 = \lambda^2 - x\_1 - x\_2 \pmod{r}$$
 $$y\_3 = \lambda (x\_1 - x\_3) - y\_1 \pmod{r}$$
 
-Requires `bn254_fr_{add, sub, mul, inv}` host calls (CAP-80, Section 10.7).
+Requires `bn254_fr_{add, sub, mul, inv}` host calls (CAP-80, [Dependency: CAP-80](#dependency-cap-80)).
 
 **Point subtraction** $$P\_3 = P\_1 - P\_2$$: if $$P\_2 = \mathcal{O}$$ set $$-P\_2 = \mathcal{O}$$, else $$-P\_2 = (x\_2, -y\_2 \bmod r)$$; then apply the addition cases above. Subtraction of a point from itself yields $$\mathcal{O}$$ via the inverse case, never the doubling branch.
 
@@ -182,6 +182,6 @@ Requires `bn254_fr_{add, sub, mul, inv}` host calls (CAP-80, Section 10.7).
 
 1. **Proof-constrained points (the dominant case).** Every public input that the corresponding circuit also derives via `multi_scalar_mul` is on-curve by construction -- Noir's embedded-curve operations cannot produce an off-curve Grumpkin point. This covers $$Y$$ (R1), $$\text{PVK}$$ (R3), $$R\_e$$ (T6, O6, W_a1, S_a1), $$C\_{\text{transfer}}$$ (T8, O8), $$C\_{\text{spend}}'$$ (T11, W6, S10), $$C\_a$$ / $$C\_a'$$ (S7, O11), and the ECDH shared secrets. Non-identity is enforced *in-circuit* by explicit nonzero-scalar constraints: $$sk \neq 0$$ and $$vk \neq 0$$ at registration (R4, R5), and $$r\_e \neq 0$$ in every circuit that produces an ephemeral key (W8, T13, S13, O13). Without these constraints an adversary could publish $$Y = \mathcal{O}$$, $$\text{PVK} = \mathcal{O}$$, or $$R\_e = \mathcal{O}$$ and collapse ECDH (every shared secret becomes $$\mathcal{O}$$, every Poseidon mask becomes a constant function of the operation's salt, every ciphertext becomes trivially decryptable).
 2. **Points read from prior on-chain state.** $$C\_{\text{spend}}$$, $$C\_{\text{receive}}$$, stored $$Y$$ / $$\text{PVK}$$, and allowance commitments were validated through path (1) when first written. The contract trusts them on subsequent reads.
-3. **Auditor keys (the only proof-less entry point).** $$K\_{\text{aud}}$$ is registered in the auditor contract by the auditor itself, with no accompanying proof. The auditor contract performs canonical encoding, on-curve ($$y^2 \equiv x^3 - 17 \pmod{r}$$), and non-identity checks at insertion (Section 3.1); the contract trusts the fetched value.
+3. **Auditor keys (the only proof-less entry point).** $$K\_{\text{aud}}$$ is registered in the auditor contract by the auditor itself, with no accompanying proof. The auditor contract performs canonical encoding, on-curve ($$y^2 \equiv x^3 - 17 \pmod{r}$$), and non-identity checks at insertion ([Components](system-model.md#components)); the contract trusts the fetched value.
 
-**Canonical encoding** ($$x, y \in [0, r)$$ as 32-byte representatives) is enforced **by the contract** at the verifier boundary, not by the Soroban host, which reduces non-canonical inputs rather than rejecting them (§2.2 *Host deserialiser caveat*). Every prover-supplied scalar and coordinate that reaches the verifier — and therefore every byte string that gets persisted or emitted downstream — is the unique canonical representative of its field element.
+**Canonical encoding** ($$x, y \in [0, r)$$ as 32-byte representatives) is enforced **by the contract** at the verifier boundary, not by the Soroban host, which reduces non-canonical inputs rather than rejecting them ([Host deserialiser caveat](primitives.md#host-deserialiser-caveat)). Every prover-supplied scalar and coordinate that reaches the verifier — and therefore every byte string that gets persisted or emitted downstream — is the unique canonical representative of its field element.

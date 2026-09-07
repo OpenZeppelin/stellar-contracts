@@ -8,14 +8,7 @@ We present a confidential token for Soroban that adds private balances and trans
 
 ## Project Documents
 
-This project is composed of the following documents:
-
-- Confidential Token (this document, §1–§7; continued in [DESIGN_cont.md](./DESIGN_cont.md), §8–§13)
-- Confidential Token: [Compliance Extensions](./COMPLIANCE.md)
-- Confidential Token: [Selective Disclosure](./SELECTIVE_DISCLOSURE.md)
-- Confidential Token: [User Flows Overview](./OVERVIEW.md)
-- Confidential Token: [Indexing and Off-Chain State Recovery](./INDEXER.md)
-- Confidential Token: [SDK](./SDK.md)
+The protocol specification is the set of files under `protocol/`, read in the order given by the [documentation index](../README.md), which also lists the companion specifications for compliance, selective disclosure, indexing, and the SDK.
 
 ---
 

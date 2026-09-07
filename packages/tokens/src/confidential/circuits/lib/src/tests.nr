@@ -221,7 +221,7 @@ fn sponge_empty_input_applies_squeeze_permutation() {
 
 #[test]
 fn sponge_squeeze_2_first_matches_poseidon_with_domain() {
-    // SpongeSqueeze_n shares a single absorb (Section 2.5); the single-squeeze
+    // SpongeSqueeze_n shares a single absorb (docs/protocol/primitives.md#poseidon2-hash); the single-squeeze
     // form is just `poseidon_with_domain(d, [s, sigma])`, and it must equal
     // the first output of `sponge_squeeze_2` on the same absorb. If this
     // diverges, a circuit doing the single-squeeze form cannot be substituted
@@ -288,7 +288,7 @@ fn sponge_squeeze_2_outputs_distinct() {
     // permutation. They must differ -- a collision would let an attacker who
     // recovers one mask recover the other, breaking the per-ciphertext
     // independence assumption that justifies the dual-mask construction
-    // (Section 8.1, the recipient-auditor ciphertext pair).
+    // (docs/protocol/auditing.md#per-transfer-auditor-ciphertexts, the recipient-auditor ciphertext pair).
     let d: Field = domain::AUDITOR_SENDER;
     let s: Field = 0x42;
     let sigma: Field = 0x07;
@@ -492,7 +492,7 @@ fn fixtures_match_testdata() {
             == 0x15f3b867cbe94f0b6371e46752431be550f907ba8448c6191b7ba1f47c2cb83e,
     );
 
-    // Per-channel auditor sponge (v0.6, Section 2.5). Values pinned below are
+    // Per-channel auditor sponge (v0.6, docs/protocol/primitives.md#poseidon2-hash). Values pinned below are
     // produced by `nargo test print_fixtures` against the same fixture inputs.
     let ss2_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_ecdh, sigma);
     assert(ss2_s[0] == SPONGE_SQUEEZE_2_AUDITOR_SENDER_0);
@@ -503,7 +503,7 @@ fn fixtures_match_testdata() {
 
     // The lane[0] output is the single-squeeze funnel: the absorb fits one
     // rate-3 block, so a tag used in both modes would collapse one onto the
-    // other (Section 2.5 mode exclusivity).
+    // other (docs/protocol/primitives.md#mode-exclusivity).
     assert(
         poseidon_with_domain(domain::AUDITOR_SENDER, [s_ecdh, sigma])
             == SPONGE_SQUEEZE_2_AUDITOR_SENDER_0,

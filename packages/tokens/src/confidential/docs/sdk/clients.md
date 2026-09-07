@@ -2,9 +2,9 @@
 
 ## Disclosure construction
 
-An implementation supporting selective disclosure MUST follow SELECTIVE_DISCLOSURE.md for the holder, sender, and auditor variants, and MUST bind each proof to the requesting recipient's key and nonce so that a proof cannot be replayed against a different recipient or a later request (SELECTIVE_DISCLOSURE.md §2.1). A D-auditor witness reads each auditor channel at the width §4.3 fixes for its tag — three lanes on $$\delta_{\text{aud\\\_s}}$$, two on $$\delta_{\text{aud\\\_r}}$$ — exactly as §11 requires of the auditor client (SELECTIVE_DISCLOSURE.md §8 A3).
+An implementation supporting selective disclosure MUST follow the [Selective Disclosure](../selective-disclosure/README.md) specification for the holder, sender, and auditor variants, and MUST bind each proof to the requesting recipient's key and nonce so that a proof cannot be replayed against a different recipient or a later request ([Disclosure Recipient](../selective-disclosure/README.md#disclosure-recipient)). A D-auditor witness reads each auditor channel at the width [Poseidon2 sponge](crypto-core.md#poseidon2-sponge) fixes for its tag — three lanes on $$\delta_{\text{aud\\\_s}}$$, two on $$\delta_{\text{aud\\\_r}}$$ — exactly as [Auditor Client](auditor-client.md) requires of the auditor client ([D-auditor](../selective-disclosure/circuits/d-auditor.md) A3).
 
-Disclosure circuits are verified entirely off-chain and MUST NOT be registered with the on-chain verifier set (SELECTIVE_DISCLOSURE.md §15.1).
+Disclosure circuits are verified entirely off-chain and MUST NOT be registered with the on-chain verifier set ([Circuits](../selective-disclosure/security.md#circuits)).
 
 ## Disclosure verification
 
@@ -12,18 +12,18 @@ The verifier MUST be distributable independently of any wallet, since its purpos
 
 Verification MUST include comparing the circuit's verification key against the pinned key for that disclosure circuit, without which the proof attests to an unknown statement.
 
-Not every historical transfer is disclosable by its sender: one predating §10.5's requirement may carry an ephemeral scalar that does not reproduce. An implementation MUST report that as *not disclosable* rather than as a verification failure, and MUST establish it by test: derive the candidate $$r_e$$ from $$(vk, \sigma_E)$$ and compare $$r_e \cdot H$$ against the event's $$R_e$$. The comparison costs one Poseidon2 call and one scalar multiplication and is authoritative, where a stored per-transfer flag is not (§10.5).
+Not every historical transfer is disclosable by its sender: one predating [Deterministic ephemeral scalars](wallet.md#deterministic-ephemeral-scalars)'s requirement may carry an ephemeral scalar that does not reproduce. An implementation MUST report that as *not disclosable* rather than as a verification failure, and MUST establish it by test: derive the candidate $$r_e$$ from $$(vk, \sigma_E)$$ and compare $$r_e \cdot H$$ against the event's $$R_e$$. The comparison costs one Poseidon2 call and one scalar multiplication and is authoritative, where a stored per-transfer flag is not ([Deterministic ephemeral scalars](wallet.md#deterministic-ephemeral-scalars)).
 
 ## Indexer client
 
-Recovery beyond the RPC retention window requires a conforming durable archive (INDEXER.md). A client MUST propagate the archive's completeness signal to its caller rather than swallowing it, since an incomplete range and a tampered range both end in the same refusal at §10.6 and only that signal distinguishes them.
+Recovery beyond the RPC retention window requires a conforming durable archive ([Indexing and Off-Chain State Recovery](../indexer.md)). A client MUST propagate the archive's completeness signal to its caller rather than swallowing it, since an incomplete range and a tampered range both end in the same refusal at [Consistency checking](wallet.md#consistency-checking) and only that signal distinguishes them.
 
-Clients SHOULD support multiple independent archive endpoints, since withholding is the residual trust the archive retains (INDEXER.md §7).
+Clients SHOULD support multiple independent archive endpoints, since withholding is the residual trust the archive retains ([Trust Model and Client-Side Verification](../indexer.md#trust-model-and-client-side-verification)).
 
 ## The hybrid read path and its two failure modes
 
-RPC and archive compose: the RPC serves the recent tail, the archive everything older, and the client stitches them at a seam (INDEXER.md §1). Two requirements are not derivable from INDEXER.md and are specified here.
+RPC and archive compose: the RPC serves the recent tail, the archive everything older, and the client stitches them at a seam ([Why the Indexer Is Load-Bearing](../indexer.md#why-the-indexer-is-load-bearing)). Two requirements are not derivable from [Indexing and Off-Chain State Recovery](../indexer.md) and are specified here.
 
-**The seam MUST sit strictly above the RPC's reported retention floor, by a margin.** The floor advances as ledgers are collected, including between the moment the client reads it and the moment it issues the range query, with the archive request in between taking real time. A seam placed exactly at the observed floor therefore intermittently produces a rejected query. The archive covers everything below the seam, so a margin loses no events. Implementations MUST set the two legs to disjoint ledger ranges so that correctness does not depend on cross-source id equality, and MUST still deduplicate (§10.2) as a guard at the boundary.
+**The seam MUST sit strictly above the RPC's reported retention floor, by a margin.** The floor advances as ledgers are collected, including between the moment the client reads it and the moment it issues the range query, with the archive request in between taking real time. A seam placed exactly at the observed floor therefore intermittently produces a rejected query. The archive covers everything below the seam, so a margin loses no events. Implementations MUST set the two legs to disjoint ledger ranges so that correctness does not depend on cross-source id equality, and MUST still deduplicate ([Event application](wallet.md#event-application)) as a guard at the boundary.
 
-**A configured archive's failure MUST fail the whole sync.** If an archive is configured and its request fails, an implementation MUST NOT degrade silently to RPC-only and MUST NOT persist a sync position derived from the RPC leg alone. Persisting it moves the position past the pre-window range, so every later sync takes the warm path that never consults the archive and the openings in the skipped range become unrecoverable. An archive that is *not* configured is a different case and MAY be absent, provided §10.9's warning is surfaced.
+**A configured archive's failure MUST fail the whole sync.** If an archive is configured and its request fails, an implementation MUST NOT degrade silently to RPC-only and MUST NOT persist a sync position derived from the RPC leg alone. Persisting it moves the position past the pre-window range, so every later sync takes the warm path that never consults the archive and the openings in the skipped range become unrecoverable. An archive that is *not* configured is a different case and MAY be absent, provided [Recovery](wallet.md#recovery)'s warning is surfaced.

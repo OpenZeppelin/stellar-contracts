@@ -34,13 +34,13 @@ Directory `transfer/` is package `circuit_transfer`; `gadgets/commit/` is `gadge
 
 ### Never hash raw
 
-`poseidon_with_domain` is the only Poseidon entry point in `lib/src/lib.nr`; calling the underlying hash directly is a violation of the library contract. The domain tag is always the first absorbed element. The numeric tag values are the cross-language contract with the SDK — see `../CLAUDE.md` and `../docs/DESIGN_cont.md` §13, which is their only authoritative source.
+`poseidon_with_domain` is the only Poseidon entry point in `lib/src/lib.nr`; calling the underlying hash directly is a violation of the library contract. The domain tag is always the first absorbed element. The numeric tag values are the cross-language contract with the SDK — see `../CLAUDE.md` and `../docs/protocol/domain-separators.md`, which is their only authoritative source.
 
-Sponge parameters, the canonical lane assignment, and the mode-exclusivity rule that follows from a single-block absorb are normative in `../docs/DESIGN.md` §2.5; the Noir sponge must match it exactly. The obligations that section places on this code: `sponge_squeeze_2(d,s,σ)[0]` must stay equal to `poseidon_with_domain(d,[s,σ])`, and `sponge_squeeze_3(d,s,σ)[0..2]` must stay equal to `sponge_squeeze_2(d,s,σ)` — which is why `sponge_squeeze_2` is defined as the prefix of `sponge_squeeze_3`. A divergence in either silently changes every existing mask.
+Sponge parameters, the canonical lane assignment, and the mode-exclusivity rule that follows from a single-block absorb are normative in `../docs/protocol/primitives.md#poseidon2-hash`; the Noir sponge must match it exactly. The obligations that section places on this code: `sponge_squeeze_2(d,s,σ)[0]` must stay equal to `poseidon_with_domain(d,[s,σ])`, and `sponge_squeeze_3(d,s,σ)[0..2]` must stay equal to `sponge_squeeze_2(d,s,σ)` — which is why `sponge_squeeze_2` is defined as the prefix of `sponge_squeeze_3`. A divergence in either silently changes every existing mask.
 
 `AUDITOR_SENDER` is always squeezed three-wide; `AUDITOR_RECIPIENT` is always two-wide; every other tag goes through `poseidon_with_domain`. Widening or narrowing a channel is a spec change.
 
-`lane[2]` carries the blinding of a commitment the operation writes — `r'` on W_a5 / T_a9 / S_a6, `r_a'` on O_a9. Tag 17 (`ESCROWED_ALLOWANCE_BLINDING_AUDITOR`) escrows `r_a` off-sponge at S14; the construction is specified in `../docs/DESIGN_cont.md` §8.5.
+`lane[2]` carries the blinding of a commitment the operation writes — `r'` on W_a5 / T_a9 / S_a6, `r_a'` on O_a9. Tag 17 (`ESCROWED_ALLOWANCE_BLINDING_AUDITOR`) escrows `r_a` off-sponge at S14; the construction is specified in `../docs/protocol/auditing.md#auditor-side-allowance-blinding-escrow`.
 
 ECDH must absorb both `S.x` and `S.y`; x-only extraction collapses `P` and `-P`.
 
@@ -60,7 +60,7 @@ LC_ALL=C nargo info | grep '^|' | LC_ALL=C sort > constraints.baseline
 
 `LC_ALL=C` is mandatory on **both** sides of the pipe — byte order is the only ordering stable between macOS and the Ubuntu runner. The redirect overwrites the file's header comments; re-paste them, because CI's failure message asks for them.
 
-Two non-obvious consequences: adding or removing a **gadget** changes the baseline even when no circuit logic changed, and the ACIR opcode counts are quoted in prose at `../docs/DESIGN_cont.md` §10.3 (Register 33, Clawback 51, Withdraw 95, Transfer 134, SetSpender 135, SpenderTransfer 136). Nothing enforces that second copy — update it in the same PR.
+Two non-obvious consequences: adding or removing a **gadget** changes the baseline even when no circuit logic changed, and the ACIR opcode counts are quoted in prose at `../docs/protocol/proof-system.md#circuit-cost-analysis` (Register 33, Clawback 51, Withdraw 95, Transfer 134, SetSpender 135, SpenderTransfer 136). Nothing enforces that second copy — update it in the same PR.
 
 ### `vks/`
 
@@ -84,7 +84,7 @@ Fixtures are not auto-generated. Changing a primitive is a three-step lockstep:
 
 `address_to_field.json` is the exception. That derivation has no Noir implementation at all (circuits take `addr_f` as an opaque public input), so it is the one primitive with two independent implementations. Its guard is the Rust test `address_to_field_matches_testdata_vectors` in `../test.rs`, which **transcribes the hex values as string literals** rather than reading the JSON — update both together or neither. Its inputs are 56-character SEP-23 strkeys, and the lo/hi 28-byte limbs are little-endian.
 
-Note the standing obligation on the future TS SDK (`../docs/SDK.md` §6.1): its tests must *read* these JSON files rather than transcribe them, so that a change to `print_fixtures` output becomes a test failure instead of a silent divergence. Do not copy the Rust test's transcription pattern into new consumers.
+Note the standing obligation on the future TS SDK (`../docs/sdk/conformance.md#primitive-fixtures`): its tests must *read* these JSON files rather than transcribe them, so that a change to `print_fixtures` output becomes a test failure instead of a silent divergence. Do not copy the Rust test's transcription pattern into new consumers.
 
 ## Version bumps
 

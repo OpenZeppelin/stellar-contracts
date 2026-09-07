@@ -29,13 +29,15 @@ confidential/
 ├── compliance/     # turnkey ComplianceHooks: freeze, SAC passthrough, external policy
 ├── circuits/       # Noir/UltraHonk circuits + pinned VKs
 └── docs/
-    ├── DESIGN.md                  # protocol specification, §1–§7
-    ├── DESIGN_cont.md             # protocol specification, §8–§13
-    ├── COMPLIANCE.md              # compliance-extension specification
-    ├── SELECTIVE_DISCLOSURE.md    # off-chain selective-disclosure layer
-    ├── OVERVIEW.md                # user-flows overview
-    ├── INDEXER.md                 # indexer specs
-    └── SDK.md                     # client SDK specs
+    ├── README.md                  # documentation index: map, normativity, citation rules
+    ├── protocol/                  # normative protocol specification, one topic per file
+    │   └── operations/            # one file per entry point
+    ├── compliance.md              # compliance-extension specification
+    ├── selective-disclosure/      # off-chain selective-disclosure layer
+    ├── indexer.md                 # durable event archive specification
+    ├── sdk/                       # client SDK specification
+    ├── overview.md                # non-normative user-flows overview
+    └── check_links.py             # CI check for doc references and anchors
 ```
 
 A single deployment is **three contracts** wired together:
@@ -86,7 +88,7 @@ A turnkey [`Hooks`] implementation layering deployer-configurable
 controls on top of the token: per-account freezing, SAC `authorized()`
 passthrough, and an optional external authorization policy. Wire as
 `type Hooks = ComplianceHooks;`. See
-[`docs/COMPLIANCE.md`](./docs/COMPLIANCE.md) for the specification.
+[`docs/compliance.md`](./docs/compliance.md) for the specification.
 
 ### `circuits`
 
@@ -98,10 +100,7 @@ pin and re-extraction procedure.
 
 ## Documentation
 
-- [`docs/DESIGN.md`](./docs/DESIGN.md) — protocol specification, §1–§7
-  (cryptographic preliminaries, account model, operations, public-input
-  tables).
-- [`docs/DESIGN_cont.md`](./docs/DESIGN_cont.md) — protocol specification,
-  §8–§13 (auditing, security analysis, proof system, interface).
-- [`docs/COMPLIANCE.md`](./docs/COMPLIANCE.md) — compliance extension
-  specification.
+[`docs/README.md`](./docs/README.md) maps the documentation set: the
+normative protocol specification under [`docs/protocol/`](./docs/protocol/),
+the compliance, selective-disclosure, indexer, and SDK companions, and the
+citation rules that `docs/check_links.py` enforces in CI.

@@ -268,7 +268,7 @@ pub fn clawback(
         None => BytesN::from_array(e, &[0u8; 32]),
     };
 
-    // PI order (COMPLIANCE §5.3):
+    // PI order (docs/compliance.md#circuit):
     //   C_spend, C_receive, alpha, addr_f, acct_f, dest_f
     //
     // `addr_f`, `acct_f` and `dest_f` are referenced by no constraint; their
@@ -390,7 +390,8 @@ pub fn check_policy(e: &Env, account: &Address, config: &ComplianceConfig) {
 /// for `account`. A no-op when `config.sac_passthrough` is `false`.
 ///
 /// The `authorized` view belongs to the Stellar Asset Contract admin
-/// interface, not to generic SEP-41 (DESIGN §3.4). Enabling
+/// interface, not to generic SEP-41
+/// (`docs/protocol/system-model.md#underlying-token-assumptions`). Enabling
 /// `sac_passthrough` over a non-SAC underlying (e.g. a plain SEP-41 token)
 /// makes this call — and with it every gated operation — trap on the
 /// missing function.
