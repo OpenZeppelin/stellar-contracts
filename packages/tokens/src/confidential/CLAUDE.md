@@ -8,14 +8,14 @@ The module ships one token contract plus three satellites, each with the standar
 
 | Path | Role |
 |:---|:---|
-| `mod.rs`, `storage.rs` | The `ConfidentialToken` trait — eleven entry points — and the storage/orchestration layer |
+| `mod.rs`, `storage.rs` | The `ConfidentialToken` trait — eleven entry points, of which `revoke_spender` is proofless — and the storage/orchestration layer |
 | `verifier/` | Separate contract holding per-circuit UltraHonk verification keys |
 | `auditor/` | Separate contract holding the auditor key registry |
-| `compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract, clawback |
+| `compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract — plus the opt-in `ConfidentialClawback` trait (`clawback`, `force_revoke_spender`) |
 | `circuits/` | Noir workspace, compiled by `nargo`, not `cargo` |
 | `docs/` | The protocol specification (see below) |
 
-Balances are Pedersen commitments on Grumpkin; every operation that consumes private state carries a proof the contract forwards to the verifier contract.
+Balances are Pedersen commitments on Grumpkin. Every operation that opens or re-randomizes a commitment carries a proof the contract forwards to the verifier contract; `deposit`, `merge`, and `revoke_spender` are proofless homomorphic folds.
 
 **Not production ready.** The UltraHonk backend (`rs-soroban-ultrahonk`) is unfinished and unaudited. The `# ⚠️ Not Production Ready` blocks in `mod.rs` and `verifier/mod.rs` are load-bearing — do not remove or soften them.
 
@@ -25,13 +25,13 @@ Balances are Pedersen commitments on Grumpkin; every operation that consumes pri
 
 ## Canonical encoding is a security boundary
 
-The public-input blob is a positional concatenation of 32-byte big-endian `Bn254Fr` representatives, in the order given by each circuit's table in DESIGN §7. Grumpkin points contribute two limbs (`x` then `y`).
+The public-input blob is a positional concatenation of 32-byte big-endian `Bn254Fr` representatives, in the order given by each circuit's table in DESIGN §7 (COMPLIANCE §5.3 for the clawback circuit). Grumpkin points contribute two limbs (`x` then `y`).
 
 Soroban's host silently reduces values `≥ r` modulo `r` rather than rejecting them, so `x` and `x + r` deserialise to the same field element. Every caller-supplied scalar and coordinate must therefore reach `verify_proof` through `append_field` / `append_point`, which call `Grumpkin::is_canonical_field` / `is_canonical_point`. Bypassing those helpers breaks byte-uniqueness of stored state and emitted events even though proofs still verify.
 
 ## Code cites the spec by section number
 
-Rust carries roughly sixteen `DESIGN §N` / `DESIGN_cont §N` references in doc comments. Renumbering a spec section silently invalidates them — nothing checks. Before renumbering, grep the module for the old number.
+Rust carries roughly two dozen `DESIGN §N` / `DESIGN_cont §N` / `COMPLIANCE §N` references in doc comments, and `circuits/clawback/src/main.nr` cites `COMPLIANCE.md` by section too. Renumbering a spec section silently invalidates them — nothing checks. Before renumbering, grep the module for the old number.
 
 ## Tests
 
@@ -43,7 +43,7 @@ Beyond the root guide's conventions:
 
 ## The documentation set
 
-`docs/` is a specification, not commentary, and it is the single largest maintenance hazard in this module. Nine of the last sixteen commits on this branch were doc-consistency fixes.
+`docs/` is a specification, not commentary, and it is the single largest maintenance hazard in this module — doc-consistency fixes outnumber code commits on this branch.
 
 ### Normativity
 
@@ -51,25 +51,38 @@ Beyond the root guide's conventions:
 
 Everything else defers by citation: `SDK.md`, `SELECTIVE_DISCLOSURE.md`, `INDEXER.md`, `COMPLIANCE.md`, and the non-normative `OVERVIEW.md`. Two exceptions run the other way — `circuits/lib/src/lib.nr` outranks the docs wherever they disagree about a primitive (`SDK.md` §4 says so explicitly), and the contract's `#[contracttype]`s are authoritative for their own shape.
 
-`DESIGN.md` is already at roughly 768 expressions, over its own stated budget. Do not add math to §1–§7; put it in `DESIGN_cont.md`.
+`DESIGN.md` is already at roughly 778 expressions, over its own stated budget. Do not add math to §1–§7; put it in `DESIGN_cont.md`.
 
 ### Duplicated tables that drift
 
-Five things exist in more than one file. Changing the normative copy means grepping for every other one:
+Six things exist in more than one file. Changing the normative copy means grepping for every other one:
 
 | Content | Normative source | Copies live in |
 |:---|:---|:---|
-| The 16 domain-separation tags | `DESIGN_cont.md` §13 | `SDK.md` §4.8, referenced by `SELECTIVE_DISCLOSURE.md` |
-| Sponge lane assignment (lane 0 = amount mask, lane 1 = balance/allowance/randomness) | `DESIGN.md` §2.5 | `SDK.md` §4.3 and §11 |
+| Domain-separation tag assignments | `DESIGN_cont.md` §13 | `SDK.md` §4.8, referenced by `SELECTIVE_DISCLOSURE.md` |
+| Sponge lane assignment | `DESIGN.md` §2.5 | `SDK.md` §4.3 and §11 |
 | Per-circuit scalar-multiplication counts | `DESIGN_cont.md` §10.3 | `OVERVIEW.md` |
-| Checkpoint event set (`Withdraw`, `Transfer` sender side, `SetSpender`, `RevokeSpender`) | `DESIGN.md` §5.2 | `INDEXER.md`, `SDK.md` |
-| Replay-window anchor `T₀` | `DESIGN.md` §5.2 | `INDEXER.md`, `OVERVIEW.md` |
+| Checkpoint event set | `DESIGN.md` §5.2 | `INDEXER.md`, `SDK.md` |
+| Replay-window anchor `T₀` (`Register`, `Merge`, `Clawback`) | `DESIGN.md` §5.2 | `INDEXER.md`, `OVERVIEW.md`, `SDK.md`, `COMPLIANCE.md` §5.7 |
+| ACIR opcode counts | `circuits/constraints.baseline` | `DESIGN_cont.md` §10.3, `circuits/CLAUDE.md` |
 
-The tags are a cross-language wire contract. `DESIGN_cont.md` §13 assigns all sixteen and no other document may; `circuits/lib/src/lib.nr` implements only 1–13, because 14 is derived off-circuit and 15–16 belong to the off-chain disclosure layer. That gap is intentional. Changing any assigned value is a new deployment, not an upgrade.
+The tags are a cross-language wire contract. `DESIGN_cont.md` §13 is their only authoritative source: it assigns every value, and it states which subset `circuits/lib/src/lib.nr` implements and why the remainder are absent. Changing any assigned value is a new deployment, not an upgrade.
 
-### Editing rules
+### Economy
 
-- **Cite, do not restate.** Every drift bug in the recent history came from a second copy of something. When tempted to summarise a neighbouring section, write `§N` instead.
+Every sentence is a maintenance liability: a claim written twice has to be fixed twice, and the second copy is the one that goes stale. Doc work here trends net-negative in lines.
+
+- **One owning section per claim.** Every fact has exactly one home; everywhere else writes `§N`. When tempted to summarise a neighbouring section for the reader's convenience, cite it instead.
+- **Say it once, then move on.** No second-register restatement, no paragraph-closing punchline, no recap of the section's own argument in its last sentence. If a paragraph's content survives deleting it, delete it.
+- **Gloss a symbol at its definition site only.** Re-glossing `s` or `r_e` in each section that uses them is three more places to update when a name changes.
+- **No pre-stating.** A `Note:` or lead-in that previews what the next paragraph spells out in full is a duplicate. Fold it into the argument.
+- **Motivation before constraint.** State what a rule protects against, then the rule. Rationale appended after the fact invites a second copy of the rule next to it.
+- **Drop concessive asides.** "…though X would not be a violation either" earns nothing and dates fast.
+- **Grep before adding.** A new claim is usually a second copy of an existing one. Search the normative pair for the symbol or term before writing a sentence about it.
+- **A citation is not a summary.** `§8.1` is the whole reference. `§8.1, which escrows the allowance blinding` re-creates the copy the citation was avoiding — name the target only when the sentence would be unparsable without it.
+
+### Style
+
 - **Match the file's math style, not a global one.** `DESIGN*.md` and `SELECTIVE_DISCLOSURE.md` use `$$…$$` with backslash-escaped subscripts (`$$\mathbb{F}\_r$$`); `SDK.md` uses `$$…$$` unescaped; `OVERVIEW.md` uses single `$…$`; `INDEXER.md` and `COMPLIANCE.md` use backticked ASCII and no LaTeX.
-- **Symbols are a maintained namespace.** `sk`/`vk`/`dvk_i`/`PVK`/`Y`; `r_e` and `R_e = r_e·H`; `σ` (operation salt) is distinct from `σ_a` (per-delegation allowance salt); tilde means ciphertext; `C_spend` / `C_receive` / `C_transfer` / `C_a`. An audit finding once required renaming the `tx` subscript to `transfer` across the whole module.
+- **Symbols are a maintained namespace.** `sk`/`vk`/`dvk_i`/`PVK`/`Y`; `r_e` and `R_e = r_e·H`; `σ` (operation salt) is distinct from `σ_a` (per-delegation allowance salt); tilde means ciphertext; `C_spend` / `C_receive` / `C_transfer` / `C_a`; `r_a` is `C_a`'s blinding and `r_a'` the post-transfer one. An audit finding once required renaming the `tx` subscript to `transfer` across the whole module.
 - Prose is full-width — no hard wrapping. One paragraph or list item per line.

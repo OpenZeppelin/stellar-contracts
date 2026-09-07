@@ -60,6 +60,16 @@ impl IdentityRegistryStorage for MockIRSContract {
         unreachable!("add_identity is not used in these tests");
     }
 
+    fn batch_add_identity(
+        _e: &Env,
+        _accounts: Vec<Address>,
+        _identities: Vec<Address>,
+        _country_data_lists: Vec<Vec<Val>>,
+        _operator: Address,
+    ) {
+        unreachable!("batch_add_identity is not used in these tests");
+    }
+
     fn remove_identity(_e: &Env, _account: Address, _operator: Address) {
         unreachable!("remove_identity is not used in these tests");
     }
@@ -433,7 +443,8 @@ fn recovery_transfer_after_identity_recovery_is_noop_and_does_not_revert() {
         // `TransferKind::Recovery` by `recover_balance`.
         on_transfer(&e, &old_wallet, &new_wallet, 80, &TransferKind::Recovery, &token);
 
-        // Same identity on both sides => the aggregate is unchanged and correct.
+        // Same identity on both sides => the aggregate is unchanged and
+        // correct.
         assert_eq!(get_id_balance(&e, &token, &identity), 80);
     });
 }

@@ -5,20 +5,33 @@ use soroban_sdk::{
     testutils::{Address as _, Events, Ledger},
     token::StellarAssetClient,
     xdr::ToXdr,
-    Address, Bytes, BytesN, Env,
+    Address, Bytes, BytesN, Env, Event,
 };
+use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
 use crate::confidential::{
     auditor::{storage as auditor_storage, ConfidentialAuditor},
     storage as token_storage,
     verifier::{CircuitType, ConfidentialVerifier},
     ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, NoHooks, RegisterData,
-    RegisterPayload, RevokeSpenderData, RevokeSpenderPayload, SetSpenderData, SetSpenderPayload,
-    SpenderDelegation, SpenderTransferData, SpenderTransferPayload, TransferData, TransferPayload,
-    WithdrawData, WithdrawPayload,
+    RegisterPayload, RevokeSpender, SetSpender, SetSpenderData, SetSpenderPayload,
+    SpenderDelegation, SpenderTransfer, SpenderTransferData, SpenderTransferPayload, Transfer,
+    TransferData, TransferPayload, Withdraw, WithdrawData, WithdrawPayload,
 };
 
 // ################## TEST FIXTURES ##################
+
+/// `-G = (1, r - Y)`, the negation of [`GRUMPKIN_G_BYTES`]. On-curve and
+/// canonical, and distinct from `G`, so it stands in for a rotated-in auditor
+/// key wherever a test needs two different key versions.
+const GRUMPKIN_NEG_G_BYTES: [u8; 64] = [
+    // x = 1 (32-byte big-endian)
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+    // r - y (32-byte big-endian)
+    0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x26, 0xe9, 0x3c, 0xe7, 0x41, 0x7a, 0xdc, 0xfa, 0xf9,
+    0xfb, 0x0c, 0xdb, 0x02, 0x88, 0xa1, 0x5d, 0xfc, 0xc0, 0xa2, 0x31, 0x06, 0x6d, 0xc0, 0xd8, 0xd5,
+];
 
 /// Grumpkin generator `G = (1, Y)` with `Y =
 /// 17631683881184975370165255887551781615748388533673675138860`. Used as a
@@ -35,6 +48,10 @@ const GRUMPKIN_G_BYTES: [u8; 64] = [
 
 fn fixture_point(e: &Env) -> BytesN<64> {
     BytesN::from_array(e, &GRUMPKIN_G_BYTES)
+}
+
+fn rotated_fixture_point(e: &Env) -> BytesN<64> {
+    BytesN::from_array(e, &GRUMPKIN_NEG_G_BYTES)
 }
 
 fn fixture_field(e: &Env, byte: u8) -> BytesN<32> {
@@ -143,6 +160,34 @@ impl ConfidentialVerifier for ReplayGuardVerifier {
     }
 }
 
+/// Records the auditor key each proof was verified against.
+///
+/// The escrowed allowance opening is produced under whichever auditor key is
+/// registered at the moment of the operation, so "which key version can read
+/// this event" reduces, at the contract level, to "which `K_aud_s` went into
+/// the public-input blob". This mock captures exactly that. `K_aud_s` sits at
+/// limb 8 of the SetSpender blob and limb 9 of the SpenderTransfer blob
+/// (DESIGN §7.7 - §7.8).
+#[contract]
+struct KeyRecordingVerifier;
+
+#[contractimpl(contracttrait)]
+impl ConfidentialVerifier for KeyRecordingVerifier {
+    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn verify_proof(e: &Env, ct: CircuitType, pi: Bytes, _proof: Bytes) -> bool {
+        let (key, offset) = match ct {
+            CircuitType::SetSpender => (symbol_short!("k_set"), 8u32 * 32),
+            CircuitType::SpenderTransfer => (symbol_short!("k_xfer"), 9u32 * 32),
+            _ => return true,
+        };
+        e.storage().instance().set(&key, &pi.slice(offset..offset + 64));
+        true
+    }
+}
+
 #[contract]
 struct MockAuditor;
 
@@ -166,6 +211,7 @@ struct Harness<'a> {
     token_admin: Address,
     sac: StellarAssetClient<'a>,
     sac_addr: Address,
+    auditor_addr: Address,
 }
 
 fn setup<'a>() -> Harness<'a> {
@@ -200,7 +246,7 @@ fn setup_with_verifier_addr<'a>(e: Env, verifier_addr: Address) -> Harness<'a> {
         e.register(TokenContract, (sac_addr.clone(), verifier_addr.clone(), auditor_addr.clone()));
     let token = ConfidentialTokenClient::new(&e, &token_addr);
 
-    Harness { e, token, token_addr, token_admin, sac: sac_client, sac_addr }
+    Harness { e, token, token_addr, token_admin, sac: sac_client, sac_addr, auditor_addr }
 }
 
 fn register_data(e: &Env) -> Bytes {
@@ -219,6 +265,7 @@ fn withdraw_data(e: &Env) -> Bytes {
             r_e_point: fixture_point(e),
             sigma: fixture_field(e, 0xbb),
             b_tilde_aud_s: fixture_field(e, 0xcc),
+            r_tilde_aud_s: fixture_field(e, 0xdd),
         },
         proof: Bytes::new(e),
     }
@@ -238,6 +285,7 @@ fn transfer_data(e: &Env) -> Bytes {
             r_tilde_aud_r: fixture_field(e, 0x15),
             v_tilde_aud_s: fixture_field(e, 0x16),
             b_tilde_aud_s: fixture_field(e, 0x17),
+            r_tilde_aud_s: fixture_field(e, 0x18),
         },
         proof: Bytes::new(e),
     }
@@ -257,6 +305,8 @@ fn set_spender_data(e: &Env) -> Bytes {
             sigma_a: fixture_field(e, 0x24),
             v_tilde_aud_s: fixture_field(e, 0x25),
             b_tilde_aud_s: fixture_field(e, 0x26),
+            r_tilde_aud_s: fixture_field(e, 0x27),
+            r_a_tilde_aud_s: fixture_field(e, 0x28),
         },
         proof: Bytes::new(e),
     }
@@ -276,21 +326,7 @@ fn spender_transfer_data(e: &Env) -> Bytes {
             r_tilde_aud_r: fixture_field(e, 0x35),
             v_tilde_aud_s: fixture_field(e, 0x36),
             a_tilde_aud_s: fixture_field(e, 0x37),
-        },
-        proof: Bytes::new(e),
-    }
-    .to_xdr(e)
-}
-
-fn revoke_spender_data(e: &Env) -> Bytes {
-    RevokeSpenderData {
-        payload: RevokeSpenderPayload {
-            c_spend_new: fixture_point(e),
-            b_tilde: fixture_field(e, 0x41),
-            r_e_point: fixture_point(e),
-            sigma: fixture_field(e, 0x42),
-            v_tilde_aud_s: fixture_field(e, 0x43),
-            b_tilde_aud_s: fixture_field(e, 0x44),
+            r_tilde_aud_s: fixture_field(e, 0x38),
         },
         proof: Bytes::new(e),
     }
@@ -384,6 +420,7 @@ fn withdraw_non_canonical_scalar_panics() {
             r_e_point: fixture_point(&h.e),
             sigma: BytesN::from_array(&h.e, &[0xff; 32]),
             b_tilde_aud_s: fixture_field(&h.e, 0x12),
+            r_tilde_aud_s: fixture_field(&h.e, 0x13),
         },
         proof: Bytes::new(&h.e),
     }
@@ -536,7 +573,22 @@ fn withdraw_transfers_tokens_and_updates_spendable() {
 
     h.token.withdraw(&alice, &beneficiary, &300i128, &withdraw_data(&h.e));
     // 1 SAC transfer event + 1 Withdraw event.
-    assert_eq!(h.e.events().all().events().len(), 2);
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 2);
+    assert_eq!(
+        events.events().get(1).unwrap(),
+        &Withdraw {
+            from: alice.clone(),
+            to: beneficiary.clone(),
+            amount: 300i128,
+            r_e_point: fixture_point(&h.e),
+            sigma: fixture_field(&h.e, 0xbb),
+            b_tilde: fixture_field(&h.e, 0xaa),
+            b_tilde_aud_s: fixture_field(&h.e, 0xcc),
+            r_tilde_aud_s: fixture_field(&h.e, 0xdd),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
 
     let token_client = soroban_sdk::token::TokenClient::new(&h.e, &h.sac_addr);
     assert_eq!(token_client.balance(&beneficiary), 300);
@@ -584,7 +636,25 @@ fn confidential_transfer_updates_both_sides() {
     h.token.merge(&alice);
 
     h.token.confidential_transfer(&alice, &bob, &transfer_data(&h.e));
-    assert_eq!(h.e.events().all().events().len(), 1);
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &Transfer {
+            from: alice.clone(),
+            to: bob.clone(),
+            r_e_point: fixture_point(&h.e),
+            v_tilde: fixture_field(&h.e, 0x11),
+            sigma: fixture_field(&h.e, 0x13),
+            b_tilde: fixture_field(&h.e, 0x12),
+            v_tilde_aud_r: fixture_field(&h.e, 0x14),
+            r_tilde_aud_r: fixture_field(&h.e, 0x15),
+            v_tilde_aud_s: fixture_field(&h.e, 0x16),
+            b_tilde_aud_s: fixture_field(&h.e, 0x17),
+            r_tilde_aud_s: fixture_field(&h.e, 0x18),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
 
     // Sender's spendable balance was overwritten.
     let alice_acc = h.token.confidential_balance(&alice);
@@ -606,7 +676,24 @@ fn set_spender_stores_delegation() {
     h.token.register(&spender, &1u32, &register_data(&h.e));
 
     h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
-    assert_eq!(h.e.events().all().events().len(), 1);
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &SetSpender {
+            account: alice.clone(),
+            spender: spender.clone(),
+            live_until_ledger: 1_000u32,
+            r_e_point: fixture_point(&h.e),
+            sigma: fixture_field(&h.e, 0x23),
+            b_tilde: fixture_field(&h.e, 0x21),
+            v_tilde_aud_s: fixture_field(&h.e, 0x25),
+            b_tilde_aud_s: fixture_field(&h.e, 0x26),
+            r_tilde_aud_s: fixture_field(&h.e, 0x27),
+            r_a_tilde_aud_s: fixture_field(&h.e, 0x28),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
 
     let delegation = h.token.get_spender_delegation(&alice, &spender);
     assert_eq!(delegation.live_until_ledger, 1_000);
@@ -636,10 +723,60 @@ fn revoke_spender_deletes_delegation() {
     h.token.register(&spender, &1u32, &register_data(&h.e));
     h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
 
-    h.token.revoke_spender(&alice, &spender, &revoke_spender_data(&h.e));
+    h.token.revoke_spender(&alice, &spender);
     assert_eq!(h.e.events().all().events().len(), 1);
 
     assert!(!h.token.is_spender(&alice, &spender));
+}
+
+#[test]
+fn revoke_spender_folds_allowance_into_spendable() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
+
+    let pre = h.token.confidential_balance(&alice);
+    let delegation = h.token.get_spender_delegation(&alice, &spender);
+    let expected = h.e.as_contract(&h.token.address, || {
+        Grumpkin::add(&h.e, &pre.spendable_commitment, &delegation.allowance_commitment)
+    });
+
+    h.token.revoke_spender(&alice, &spender);
+
+    let post = h.token.confidential_balance(&alice);
+    assert_eq!(post.spendable_commitment, expected);
+    assert_eq!(post.receiving_commitment, pre.receiving_commitment);
+}
+
+#[test]
+fn revoke_spender_after_expiry_folds_allowance() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.set_spender(&alice, &spender, &10u32, &set_spender_data(&h.e));
+
+    let pre = h.token.confidential_balance(&alice);
+    let delegation = h.token.get_spender_delegation(&alice, &spender);
+    let expected = h.e.as_contract(&h.token.address, || {
+        Grumpkin::add(&h.e, &pre.spendable_commitment, &delegation.allowance_commitment)
+    });
+
+    h.e.ledger().set_sequence_number(100);
+    assert!(!h.token.is_spender(&alice, &spender));
+
+    h.token.revoke_spender(&alice, &spender);
+
+    assert_eq!(h.token.confidential_balance(&alice).spendable_commitment, expected);
+    assert!(!h.e.as_contract(&h.token.address, || token_storage::delegation_exists(
+        &h.e, &alice, &spender
+    )));
 }
 
 #[test]
@@ -649,7 +786,7 @@ fn revoke_unknown_spender_panics() {
     let alice = Address::generate(&h.e);
     let spender = Address::generate(&h.e);
     h.token.register(&alice, &1u32, &register_data(&h.e));
-    h.token.revoke_spender(&alice, &spender, &revoke_spender_data(&h.e));
+    h.token.revoke_spender(&alice, &spender);
 }
 
 #[test]
@@ -659,6 +796,117 @@ fn get_spender_delegation_unknown_panics() {
     let alice = Address::generate(&h.e);
     let spender = Address::generate(&h.e);
     h.token.get_spender_delegation(&alice, &spender);
+}
+
+// ################## AUDITOR-KEY ROTATION ##################
+
+#[test]
+fn auditor_key_rotation_rescopes_the_escrowed_allowance_opening() {
+    // The auditor's allowance opening is escrowed per event, not per
+    // delegation: every state-changing operation re-encrypts it under
+    // whichever auditor key is registered at that moment. So rotation is
+    // event-scoped in both directions -- K2 gets nothing retroactively, and
+    // K1 keeps whatever it already decrypted.
+    //
+    // Proofs are mocked here, so what this pins is the contract-level half of
+    // that claim: which key version each operation's ciphertexts were produced
+    // for, and which operations produce an allowance escrow at all.
+    let e = Env::default();
+    let verifier_addr = e.register(KeyRecordingVerifier, ());
+    let h = setup_with_verifier_addr(e, verifier_addr.clone());
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+    let bob = Address::generate(&h.e);
+
+    let k1 = fixture_point(&h.e);
+    let k2 = rotated_fixture_point(&h.e);
+    let recorded = |key: soroban_sdk::Symbol| -> Bytes {
+        h.e.as_contract(&verifier_addr, || h.e.storage().instance().get::<_, Bytes>(&key).unwrap())
+    };
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.register(&bob, &1u32, &register_data(&h.e));
+
+    // Step 1 -- delegate under K1. S14's escrow of r_a rides this event.
+    // The event buffer is scoped to the last top-level invocation, so it has
+    // to be read before the `as_contract` peek at the verifier's storage.
+    h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
+    let set_events = h.e.events().all();
+    assert_eq!(
+        set_events.events().first().unwrap(),
+        &SetSpender {
+            account: alice.clone(),
+            spender: spender.clone(),
+            live_until_ledger: 1_000u32,
+            r_e_point: fixture_point(&h.e),
+            sigma: fixture_field(&h.e, 0x23),
+            b_tilde: fixture_field(&h.e, 0x21),
+            v_tilde_aud_s: fixture_field(&h.e, 0x25),
+            b_tilde_aud_s: fixture_field(&h.e, 0x26),
+            r_tilde_aud_s: fixture_field(&h.e, 0x27),
+            r_a_tilde_aud_s: fixture_field(&h.e, 0x28),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
+    assert_eq!(recorded(symbol_short!("k_set")), k1.clone().into());
+
+    // Step 2 -- rotate the owner's auditor key. Nothing about the live
+    // delegation changes: no event, no new ciphertext, and the on-chain C_a is
+    // untouched. K2 holds no opening for it yet.
+    let auditor =
+        crate::confidential::auditor::ConfidentialAuditorClient::new(&h.e, &h.auditor_addr);
+    auditor.rotate_key(&1u32, &k2, &Address::generate(&h.e));
+    let before = h.token.get_spender_delegation(&alice, &spender);
+
+    // Step 3 -- the first post-rotation state change re-anchors K2. O_a9's
+    // escrow of r_a' is verified against K2, so this single event gives the
+    // rotated-in key an opening of the allowance it did not see created.
+    h.token.confidential_transfer_from(&spender, &alice, &bob, &spender_transfer_data(&h.e));
+    let xfer_events = h.e.events().all();
+    assert_eq!(
+        xfer_events.events().first().unwrap(),
+        &SpenderTransfer {
+            spender: spender.clone(),
+            from: alice.clone(),
+            to: bob.clone(),
+            r_e_point: fixture_point(&h.e),
+            v_tilde: fixture_field(&h.e, 0x31),
+            sigma_a_new: fixture_field(&h.e, 0x33),
+            v_tilde_aud_r: fixture_field(&h.e, 0x34),
+            r_tilde_aud_r: fixture_field(&h.e, 0x35),
+            v_tilde_aud_s: fixture_field(&h.e, 0x36),
+            a_tilde_aud_s: fixture_field(&h.e, 0x37),
+            r_tilde_aud_s: fixture_field(&h.e, 0x38),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
+    assert_eq!(recorded(symbol_short!("k_xfer")), k2.clone().into());
+    // The delegation moved to a new state, so the opening K2 just received is
+    // an opening of the CURRENT C_a, not of the one K1 saw. (The commitments
+    // themselves are the same canonical fixture point under a mocked verifier;
+    // the salt distinguishes the two states here.)
+    let after = h.token.get_spender_delegation(&alice, &spender);
+    assert_ne!(before.allowance_salt, after.allowance_salt);
+
+    // Step 4 -- revocation is a proofless fold (§7.9), so it opens no auditor
+    // channel: the event republishes the two delegation fields the fold
+    // deletes and nothing else. An auditor that missed step 3 folds the
+    // allowance it already holds into C_spend, or waits for the owner's next
+    // checkpoint.
+    h.token.revoke_spender(&alice, &spender);
+    let revoke_events = h.e.events().all();
+    assert_eq!(
+        revoke_events.events().first().unwrap(),
+        &RevokeSpender {
+            account: alice.clone(),
+            spender: spender.clone(),
+            a_tilde: after.a_tilde.clone(),
+            allowance_salt: after.allowance_salt.clone(),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
+    assert!(!h.token.is_spender(&alice, &spender));
 }
 
 // ################## SPENDER TRANSFER ##################
@@ -676,7 +924,27 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
     h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
 
     h.token.confidential_transfer_from(&spender, &alice, &bob, &spender_transfer_data(&h.e));
-    assert_eq!(h.e.events().all().events().len(), 1);
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &SpenderTransfer {
+            spender: spender.clone(),
+            from: alice.clone(),
+            to: bob.clone(),
+            r_e_point: fixture_point(&h.e),
+            v_tilde: fixture_field(&h.e, 0x31),
+            // The payload's sigma_a', not the stored allowance_salt (0x24) it
+            // replaces: every pad and the ephemeral scalar are keyed to it.
+            sigma_a_new: fixture_field(&h.e, 0x33),
+            v_tilde_aud_r: fixture_field(&h.e, 0x34),
+            r_tilde_aud_r: fixture_field(&h.e, 0x35),
+            v_tilde_aud_s: fixture_field(&h.e, 0x36),
+            a_tilde_aud_s: fixture_field(&h.e, 0x37),
+            r_tilde_aud_s: fixture_field(&h.e, 0x38),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
 
     // Delegation allowance commitment was rotated.
     let delegation = h.token.get_spender_delegation(&alice, &spender);
@@ -684,6 +952,50 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
     // Bob's receiving balance accumulated.
     let bob_acc = h.token.confidential_balance(&bob);
     assert_ne!(bob_acc.receiving_commitment.to_array(), [0u8; 64]);
+}
+
+/// The `SpenderTransfer` event carries the transfer's channel nonce
+/// `sigma_a'`, not the stored `allowance_salt` it replaces (DESIGN §6.2
+/// *Transfer nonce*). Emitting the stored salt would hand the recipient and
+/// both auditors a nonce none of the pads absorbed, and would repeat across a
+/// retry.
+#[test]
+fn confidential_transfer_from_emits_new_salt_as_channel_nonce() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+    let bob = Address::generate(&h.e);
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.register(&bob, &1u32, &register_data(&h.e));
+    h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
+    let stored_salt = h.token.get_spender_delegation(&alice, &spender).allowance_salt;
+    assert_eq!(stored_salt, fixture_field(&h.e, 0x24));
+
+    h.token.confidential_transfer_from(&spender, &alice, &bob, &spender_transfer_data(&h.e));
+
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &SpenderTransfer {
+            spender: spender.clone(),
+            from: alice.clone(),
+            to: bob.clone(),
+            r_e_point: fixture_point(&h.e),
+            v_tilde: fixture_field(&h.e, 0x31),
+            sigma_a_new: fixture_field(&h.e, 0x33),
+            v_tilde_aud_r: fixture_field(&h.e, 0x34),
+            r_tilde_aud_r: fixture_field(&h.e, 0x35),
+            v_tilde_aud_s: fixture_field(&h.e, 0x36),
+            a_tilde_aud_s: fixture_field(&h.e, 0x37),
+            r_tilde_aud_s: fixture_field(&h.e, 0x38),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
+    let delegation = h.token.get_spender_delegation(&alice, &spender);
+    assert_eq!(delegation.allowance_salt, fixture_field(&h.e, 0x33));
 }
 
 #[test]
@@ -771,7 +1083,8 @@ fn set_underlying_asset_twice_panics() {
 #[should_panic(expected = "Error(Contract, #3512)")]
 fn set_address_as_field_element_twice_panics() {
     // `__constructor` already populated the entry; calling
-    // `set_address_as_field_element` again must trip `AddressAsFieldAlreadySet`.
+    // `set_address_as_field_element` again must trip
+    // `AddressAsFieldAlreadySet`.
     let h = setup();
     h.e.as_contract(&h.token_addr, || {
         token_storage::set_address_as_field_element(&h.e);

@@ -93,15 +93,15 @@ A value is a **canonical** $$\mathbb{F}_r$$ representative iff it is a 32-byte b
 
 ### 4.3 Poseidon2 sponge
 
-The sponge construction, its width and rate, the IV placement, the padding rule, and the two-lane form of $$\text{SpongeSqueeze}_2$$ are specified normatively in DESIGN.md §2.5. What follows is what that construction additionally requires of a client.
+The sponge construction, its width and rate, the IV placement, the padding rule, and the two- and three-lane forms $$\text{SpongeSqueeze}_2$$ and $$\text{SpongeSqueeze}_3$$ are specified normatively in DESIGN.md §2.5. What follows is what that construction additionally requires of a client.
 
-**Two self-checks are available before any proof is generated.** The absorbed length in $$\text{SpongeSqueeze}_2$$ is always 3, so its IV is fixed at $$3 \cdot 2^{64}$$; and its first lane is identical to $$\text{poseidon\\\_with\\\_domain}(\delta, [s, \sigma])$$ on the same inputs. An implementation that reproduces both has the block layout and the IV lane right.
+**Three self-checks are available before any proof is generated.** The absorbed length in both squeeze forms is always 3, so the IV is fixed at $$3 \cdot 2^{64}$$; `lane[0]` is identical to $$\text{poseidon\\\_with\\\_domain}(\delta, [s, \sigma])$$ on the same inputs; and $$\text{SpongeSqueeze}_3(\delta, s, \sigma)[i] = \text{SpongeSqueeze}_2(\delta, s, \sigma)[i]$$ for $$i \in \\{0, 1\\}$$, since the absorb fits one rate-3 block and both forms read the same permutation. An implementation that reproduces all three has the block layout and the IV lane right. The third is pinned by `circuits/lib/testdata/sponge_squeeze_3.json`.
 
 **The domain-tagged funnel.** Every Poseidon2 invocation in the protocol routes through one entry point that places the domain tag as the **first absorbed element**:
 
 $$\text{poseidon\\\_with\\\_domain}(\delta, [x_1, \ldots, x_n]) = \text{sponge}([\delta, x_1, \ldots, x_n])$$
 
-Squeeze-slot assignment is canonical and MUST be followed: lane 0 is always an amount mask, lane 1 is always a balance, allowance, or per-transfer-randomness mask. Single-ciphertext channels — the `Withdraw` balance checkpoint (DESIGN.md W_a3/W_a4) — take lane **1** and leave lane 0 unused, so a checkpoint pad can never coincide with an amount pad.
+Squeeze-slot assignment is canonical and MUST be followed: `lane[0]` is always an amount mask, `lane[1]` is always a balance, allowance, or per-transfer-randomness mask, and `lane[2]` is always the sender-auditor blinding-escrow slot — the new spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`, the new allowance blinding $$r_a'$$ on `SpenderTransfer` (DESIGN.md §2.5). Only the sender-auditor channel ($$\delta_{\text{aud\\\_s}}$$) is squeezed three-wide; the recipient channel ($$\delta_{\text{aud\\\_r}}$$) stays at two lanes. `Withdraw`, whose amount is public, takes `lane[1]` and `lane[2]` and leaves `lane[0]` unused (DESIGN.md W_a3–W_a5), so a checkpoint pad can never coincide with an amount pad.
 
 ### 4.4 Generators and commitments
 
@@ -119,15 +119,19 @@ $$\text{ECDH}(a, B) = \text{poseidon\\\_with\\\_domain}(\delta_{\text{ecdh}}, [S
 
 The derivation MUST fail rather than proceed if $$S$$ is the identity: with $$\sigma$$ public, an identity shared secret makes every derived ciphertext trivially decryptable, which is why the circuits carry explicit nonzero-scalar constraints (DESIGN_cont.md §10.8).
 
-### 4.6 Blinding accumulation — mod $$q$$, never mod $$r$$
+### 4.6 Blinding accumulation
 
-Commitment blinding factors accumulate under homomorphic point addition, so they accumulate in the **Grumpkin scalar field** $$\mathbb{F}_q$$ (§4.1):
+Commitment blinding factors compose under homomorphic point addition, so their arithmetic is that of the **Grumpkin scalar field** $$\mathbb{F}_q$$ (§4.1):
 
 $$\text{Com}(v_1, r_1) + \text{Com}(v_2, r_2) = \text{Com}(v_1 + v_2, \\, (r_1 + r_2) \bmod q)$$
 
-Reducing modulo $$r$$ instead yields an opening that is off by $$q - r$$ and no longer matches the on-chain point, and for two full-size blindings the integer sum crosses $$q$$ roughly half the time. Implementations MUST provide distinct, clearly named addition operations for the two moduli and MUST use the $$\mathbb{F}_q$$ one for every blinding accumulation: merge (DESIGN.md §7.4) and receiving-balance credit (DESIGN.md §5.2 *Update rules*).
+Reducing modulo $$r$$ instead yields an opening that is off by $$q - r$$ and no longer matches the on-chain point, and for two full-size blindings the integer sum crosses $$q$$ roughly half the time. Implementations MUST provide distinct, clearly named reduction operations for the two moduli.
 
-Committed **values** accumulate as exact integers and MUST NOT be reduced by either modulus; DESIGN.md §2.3 establishes that they never wrap.
+**One reduction point.** An implementation MUST fold blindings with unbounded integer addition and MUST NOT reduce by either modulus as folds compose. This governs merge (DESIGN.md §7.4), the `RevokeSpender` and `Clawback` folds, and receiving-balance credit (DESIGN.md §5.2 *Update rules*) alike.
+
+An implementation MUST reduce modulo $$q$$ to the canonical representative only where a blinding leaves an accumulator for the curve: a proof witness, or the recommit of the §10.6 consistency check. §10.7 tests for encodability at that same point.
+
+Committed **values** accumulate as exact integers and are never reduced; DESIGN.md §2.3 establishes that they never wrap.
 
 ### 4.7 Scalar sampling
 
@@ -157,10 +161,11 @@ Secret scalars — $$\sigma$$, $$\sigma_a$$ — MUST be produced by the rejectio
 | $$\delta_{\text{eph}}$$ | 14 | No — derived off-circuit (DESIGN.md §5.3) |
 | $$\delta_{\text{disc\\\_bind}}$$ | 15 | No — off-chain disclosure only |
 | $$\delta_{\text{disc}}$$ | 16 | No — off-chain disclosure only |
+| $$\delta_{\text{esc\\\_allow\\\_r\\\_aud}}$$ | 17 | Yes |
 
-DESIGN_cont.md §13 assigns all sixteen values and is their only source; the right-hand column is this document's addition. $$\delta_{\text{disc\\\_bind}}$$ and $$\delta_{\text{disc}}$$ belong to the off-chain disclosure layer (SELECTIVE_DISCLOSURE.md §2.2). Tag 1 is absorbed by the contract rather than by a circuit — the contract derives $$\text{addr\\\_f}$$ and $$\text{op}_i$$ on-chain and the circuits receive them as opaque public inputs (DESIGN.md §2.7 *Usage sites*) — so it is part of the on-chain wire contract all the same. None of 14–16 is absorbed either in a circuit or on-chain, so none is part of the on-chain wire contract, but all three are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
+DESIGN_cont.md §13 assigns all seventeen values and is their only source; the right-hand column is this document's addition. $$\delta_{\text{disc\\\_bind}}$$ and $$\delta_{\text{disc}}$$ belong to the off-chain disclosure layer (SELECTIVE_DISCLOSURE.md §2.2). Tag 1 is absorbed by the contract rather than by a circuit — the contract derives $$\text{addr\\\_f}$$ and $$\text{op}_i$$ on-chain and the circuits receive them as opaque public inputs (DESIGN.md §2.7 *Usage sites*) — so it is part of the on-chain wire contract all the same. None of 14–16 is absorbed either in a circuit or on-chain, so none is part of the on-chain wire contract, but all three are part of the cross-client contract because two wallets serving the same account must agree on them (§6.3).
 
-All sixteen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tags 11 and 12 are the two-mask tags; the remaining fourteen, including 1 and 14–16, are single-output tags.
+All seventeen values MUST be distinct, and each MUST be used in exactly one sponge mode, per DESIGN.md §2.5 *Mode exclusivity*. Tags 11 and 12 are the multi-lane tags — 11 read three-wide wherever the sender / owner channel is instantiated, 12 always two-wide; the remaining fifteen, including 1, 14–16, and 17, are single-output tags. Tag 17 is absorbed only by the `SetSpender` circuit (DESIGN.md S14, DESIGN_cont.md §8.5); its fixture is `circuits/lib/testdata/encrypt_esc_allow_r_auditor.json`.
 
 ### 4.9 Address compression
 
@@ -290,7 +295,7 @@ Three derivations this document specifies or relies on are computed outside the 
 
 ## 7. Witness Assembly
 
-An implementation MUST provide witness assembly for each circuit it supports, covering the six core circuits of DESIGN_cont.md §10.1: `Register`, `Withdraw`, `Transfer`, `SpenderTransfer`, `SetSpender`, `RevokeSpender`.
+An implementation MUST provide witness assembly for each circuit it supports, covering the five circuits of DESIGN_cont.md §10.1: `Register`, `Withdraw`, `Transfer`, `SpenderTransfer`, `SetSpender`.
 
 **Public-input order is a wire contract.** The verifier sees an ordered vector of field elements with no knowledge of what they denote (DESIGN.md §7.1), so a permutation of two same-typed inputs produces a well-formed vector that verifies a different statement. Each builder MUST assemble public inputs in exactly the order the contract assembles them, and MUST cite the contract function it mirrors at the site of the ordering. The per-operation public-input tables in DESIGN.md §7.2–§7.9 are authoritative for *membership*; the contract's assembly is authoritative for *order*.
 
@@ -370,7 +375,7 @@ Separating the first two matters most: they present as the same opaque failure o
 
 ### 10.1 State model
 
-The wallet maintains the two accumulators of DESIGN.md §5.2 — $$W_{\text{spend}}$$ and $$W_{\text{receive}}$$ — plus a sync position and any in-flight projection (§10.3). Values accumulate as exact integers; blindings accumulate modulo $$q$$ (§4.6).
+The wallet maintains the two accumulators of DESIGN.md §5.2 — $$W_{\text{spend}}$$ and $$W_{\text{receive}}$$ — plus a sync position and any in-flight projection (§10.3). Values and blindings alike accumulate as exact integers; a blinding is reduced modulo $$q$$ only where it leaves an accumulator for the curve (§4.6).
 
 Persistence MUST be pluggable, since the same core serves environments with very different storage. With RPC-only event access, discarding persisted state loses the receiving-side openings permanently (§10.9), so it MUST NOT be treated as an evictable cache.
 
@@ -384,7 +389,9 @@ Event application MUST be ordered, deduplicated, and idempotent in combination, 
 
 Application rules are DESIGN.md §5.2's update table and are not restated here. Two properties worth making explicit:
 
-- `Withdraw`, sender-side `Transfer`, `SetSpender`, and `RevokeSpender` **overwrite** $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$ rather than adjusting it, so a wallet that missed intervening events still converges on the spendable side.
+- `Withdraw`, sender-side `Transfer`, and `SetSpender` **overwrite** $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$ rather than adjusting it, so a wallet that missed intervening events still converges on the spendable side.
+- `RevokeSpender` is not a checkpoint — it carries no $$\tilde{b}$$ — and is **folded**, like `Merge`. `RevokeSpender` adds the reclaimed allowance opening to $$W_{\text{spend}}$$, with $$v_a$$ and $$r_a$$ recovered from the event's $$\tilde{a}$$ and `allowance_salt` under the owner-derived $$dvk_i$$ (DESIGN.md §7.9). A wallet that misses either event diverges until the next checkpoint and MUST rely on §10.6 to detect that.
+- `Clawback` is likewise not a checkpoint and is **folded**: the `Merge` rule, then the event's public `amount` subtracted from $$W_{\text{spend}}$$'s value (COMPLIANCE.md §5.7). It occurs only in deployments that enable the compliance extension.
 - A self-transfer — a `Transfer` whose `from` and `to` are the same account — MUST be applied in both roles: the sender side overwrites $$W_{\text{spend}}$$ from the event's $$(\tilde{b}, \sigma)$$, and the recipient side credits $$W_{\text{receive}}$$ from the same event's recipient-channel ciphertexts. The two roles act on different accumulators, so their relative order does not affect the result; applying only one loses the other accumulator's update.
 
 ### 10.3 In-flight operations
@@ -395,11 +402,13 @@ The projection MUST still be reconciled against the event, and MUST NOT be treat
 
 ### 10.4 Salt freshness
 
-A fresh $$\sigma$$ MUST be sampled for every **attempt**, including retries after a reverted or dropped transaction.
+A fresh salt MUST be sampled for every **attempt**, including retries after a reverted or dropped transaction. The salt that must be fresh is the one the operation's pads absorb: $$\sigma$$ for owner-initiated operations, and $$\sigma_a'$$ — the replacement allowance salt — for spender transfers (DESIGN.md §6.2 *Transfer nonce*).
 
-DESIGN_cont.md §9.6 motivates this as unlinkability: a fresh $$\sigma$$ prevents an observer correlating a reverted attempt with its retry. It is equally a confidentiality requirement, because the salt is the sole freshness input to every derived pad in the operation, the ephemeral scalar included (DESIGN.md §2.5, §5.3). Reuse therefore repeats the ephemeral key and every channel mask that depends on it.
+DESIGN_cont.md §9.6 motivates this as unlinkability: a fresh salt prevents an observer correlating a reverted attempt with its retry. It is equally a confidentiality requirement, because the salt is the sole freshness input to every derived pad in the operation, the ephemeral scalar included (DESIGN.md §2.5, §5.3). Reuse therefore repeats the ephemeral key and every channel mask that depends on it.
 
 An implementation MUST NOT cache or reuse a salt across attempts, and MUST NOT derive it from anything an observer can predict.
+
+**Freshness is not enforced on-chain.** Constraint O14 rejects only $$\sigma_a' = \sigma_a$$, the adjacent collision; a circuit cannot see a delegation's older salts. An implementation MUST therefore treat non-repetition of $$\sigma_a'$$ over the whole life of a delegation as its own obligation, and MUST NOT cycle salts through a bounded set.
 
 ### 10.5 Deterministic ephemeral scalars
 
@@ -408,8 +417,6 @@ An implementation MUST derive the ephemeral scalar of every operation the holder
 $$r_e = \text{poseidon\\\_with\\\_domain}(\delta_{\text{eph}}, [vk, \sigma_E])$$
 
 where $$vk$$ is the originator's viewing key and $$\sigma_E$$ the operation's salt. DESIGN.md §5.3 is the normative source: it fixes which viewing key and salt each operation derives from, and the retry rule for the negligible case that the derivation yields zero.
-
-**Scope.** The clawback circuit is the one operation outside the rule, its ephemeral belonging to the auditor: an implementation that constructs clawback witnesses obtains that scalar by the §4.7 procedure, no viewing key being available there (COMPLIANCE.md §5.3).
 
 **Three consequences an implementation MUST handle.**
 
@@ -427,11 +434,11 @@ Implementations MUST report which accumulator diverged, since the two have diffe
 
 ### 10.7 The unspendable-blinding case
 
-A post-merge spendable blinding can land outside the range a Noir `Field` encodes, leaving no constructible proof against the affected commitment while on-chain state stays well-formed and §10.6's check still passes (DESIGN_cont.md §10.4 *Post-merge witness availability*).
+$$W_{\text{spend}}.r$$ is an exact integer, but a proof witnesses it as a single $$\mathbb{F}_r$$ `Field`. After any of the three proofless folds — `Merge`, `RevokeSpender`, `Clawback` — its canonical $$\mathbb{F}_q$$ representative can land in $$[r, q)$$, which no `Field` encodes, so no proof can be constructed against that commitment. The state itself is sound: the commitment is a well-formed Grumpkin point, and §10.6's check recommits from the same representative and still passes (DESIGN_cont.md §10.4 *Post-merge witness availability*).
 
-An implementation MUST detect this condition and surface it as a distinct, named state rather than as a generic proof-construction failure.
+An implementation MUST test the reduction rather than the accumulator: before attempting a proof, reduce $$W_{\text{spend}}.r$$ modulo $$q$$ at §4.6's reduction point and compare the representative against $$r$$. The unreduced accumulator carries no signal: after a few folds an integer sum past $$r$$ is the ordinary case.
 
-It MUST also surface the recovery path: the condition resolves at the next merge that folds in an inbound confidential transfer, and an account whose only inflows are deposits stays affected until one arrives (DESIGN_cont.md §10.4 *Soft recovery*).
+A failed comparison MUST surface as a distinct, named state rather than as a generic proof-construction failure. The recovery path MUST surface with it: the condition resolves at the next merge that folds in an inbound confidential transfer, and an account whose only inflows are deposits stays affected until one arrives (DESIGN_cont.md §10.4 *Soft recovery*).
 
 ### 10.8 Merge policy
 
@@ -441,18 +448,18 @@ Merge is proof-less and owner-authorized, and neither a merge nor an in-flight s
 
 ### 10.9 Recovery
 
-Recovery follows the procedure of DESIGN.md §5.2 *Recovery*, with the reconstructed state verified per §10.6. Its two anchors differ: the latest checkpoint event pins $$W_{\text{spend}}$$ in one lookup, while $$W_{\text{receive}}$$ restarts at $$T_0$$ — the account's last `Merge` at or before that checkpoint — from which the replay window runs.
+Recovery follows the procedure of DESIGN.md §5.2 *Recovery*, with the reconstructed state verified per §10.6. Its two anchors differ: the latest checkpoint event pins $$W_{\text{spend}}$$ as of that checkpoint in one lookup, with the `Merge`, `RevokeSpender`, and `Clawback` folds that follow it applied over the replay window per §10.2, while $$W_{\text{receive}}$$ restarts at $$T_0$$ — the account's last `Merge` or `Clawback` at or before that checkpoint — from which that window runs.
 
 Two further obligations follow from data availability:
 
 - Recovery from a root alone depends on a conforming indexer (INDEXER.md). Without one, a client can see that funds exist but cannot reconstruct the opening needed to spend them.
-- **With RPC-only event access, a client MUST sync at least once per RPC retention window**, and MUST warn when it has not. The spendable side is robust, since each checkpoint is self-contained, but the receiving side is a running sum from $$T_0$$, so a crediting event that ages out before it is applied takes its opening with it permanently.
+- **With RPC-only event access, a client MUST sync at least once per RPC retention window**, and MUST warn when it has not. Any event that ages out before it is applied takes its opening with it permanently: a crediting event on the receiving side, which is a running sum from $$T_0$$, and a `RevokeSpender` after the latest checkpoint, whose $$\tilde{a}$$ and `allowance_salt` survive nowhere else once the delegation entry is deleted (DESIGN.md §7.9). Only the spend history preceding the checkpoint is expendable, each checkpoint being self-contained.
 
 ### 10.10 Spender-side wallet
 
 A spender reconstructs its allowance state from the on-chain delegation entry rather than from event replay: it recovers $$dvk_i$$ from the escrowed value by ECDH (DESIGN.md §7.11), then reads the current allowance from the entry's encrypted allowance and salt (DESIGN_cont.md §11.3).
 
-Implementations MUST surface the delegation's expiry ledger and SHOULD warn ahead of it. They MUST represent expired-but-unrevoked delegations as still holding escrowed value (DESIGN.md §6.2).
+Implementations MUST surface the delegation's expiry ledger and SHOULD warn ahead of it. They MUST represent expired-but-unrevoked delegations as still holding escrowed value (DESIGN.md §6.2). A `RevokeSpender` event with the entry gone means the owner folded the delegation back.
 
 A spender MUST NOT be able to reach the owner's spendable balance through any interface (§3).
 
@@ -460,22 +467,26 @@ A spender MUST NOT be able to reach the owner's spendable balance through any in
 
 ## 11. Auditor Client
 
-An auditor decrypts from the public event and its own secret $$k$$ alone, with no viewing key, holder cooperation, or extra on-chain read. For each channel it computes the shared scalar against the event's ephemeral point, derives the two lane masks (§4.3), and subtracts.
+An auditor decrypts from the public event and its own secret $$k$$ alone, with no viewing key, holder cooperation, or extra on-chain read. For each channel it computes the shared scalar against the event's ephemeral point, derives that channel's lane masks (§4.3) — three on the sender / owner channel, two on the recipient channel — and subtracts. The allowance opening comes straight out of the event: the blinding of the $$C_a$$ that operation writes is escrowed in the event itself — tag 17 on `SetSpender`, `lane[2]` on `SpenderTransfer` — and the matching value is in the sender-channel ciphertext (DESIGN_cont.md §8.5). An auditor that did not observe the event holds no opening for that state.
 
 The two channels differ in what they yield (DESIGN_cont.md §8.1):
 
-| Channel | Lane 0 | Lane 1 |
-|:--|:--|:--|
-| Sender / owner ($$\delta_{\text{aud\\\_s}}$$) | Transfer amount, or the escrowed amount for `SetSpender` and the reclaimed amount for `RevokeSpender` | Sender's post-operation balance, or post-operation allowance for a spender transfer |
-| Recipient ($$\delta_{\text{aud\\\_r}}$$) | Transfer amount | Per-transfer Pedersen randomness $$r_{\text{transfer}}$$ |
+| Channel | `lane[0]` | `lane[1]` | `lane[2]` |
+|:--|:--|:--|:--|
+| Sender / owner ($$\delta_{\text{aud\\\_s}}$$) | Transfer amount, or the escrowed amount for `SetSpender` | Sender's post-operation balance, or post-operation allowance for a spender transfer | Post-operation spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`; post-transfer allowance blinding $$r_a'$$ on `SpenderTransfer` |
+| Recipient ($$\delta_{\text{aud\\\_r}}$$) | Transfer amount | Per-transfer Pedersen randomness $$r_{\text{transfer}}$$ | — (channel is two-lane) |
 
-`Withdraw`, `SetSpender`, and `RevokeSpender` carry a sender-channel balance checkpoint whose pad is lane **1**. Only `Withdraw` leaves lane 0 unused, its amount being public (DESIGN.md W_a3, §4.3); `SetSpender` and `RevokeSpender` read lane 0 as well, for the escrowed and reclaimed amounts respectively (DESIGN.md S_a4, V_a4).
+`Withdraw` and `SetSpender` carry a sender-channel balance checkpoint whose pad is `lane[1]`. Only `Withdraw` leaves `lane[0]` unused, its amount being public (DESIGN.md W_a3, §4.3); `SetSpender` reads `lane[0]` as well, for the escrowed amount (DESIGN.md S_a4).
+
+An implementation MUST squeeze the sender / owner channel three-wide and MUST NOT widen the recipient channel. `RevokeSpender` opens no auditor channel, the fold being proofless (DESIGN.md §7.9); an implementation MUST treat that event as carrying no escrowed blinding rather than substituting a stale one.
 
 **Cross-channel agreement.** Where an auditor holds the key for both parties, the amount decrypts independently on each channel and the circuit constrains both to the same value, so the two MUST agree. An implementation SHOULD perform this comparison and treat disagreement as evidence that $$k$$ is not the auditor key for both parties of that event.
 
-**Scope MUST be represented, not implied.** The recipient-channel capability is forward-only, receiving-side only, and reset by merge (DESIGN_cont.md §8.1). Rotation itself needs no replay on the sender side: the next owner-initiated proof operation publishes a fresh balance checkpoint under the new key.
+**Scope MUST be represented, not implied.** The recipient-channel capability is forward-only, reset by merge, and yields no opening of the spendable commitment (DESIGN_cont.md §8.1). The `lane[2]` opening of the sender channel is forward-only and **standing**: it opens the spendable commitment as of the checkpoint that escrowed it and stays valid through merges provided the client folded in every inbound flow since the previous merge, one account key serving both channels (DESIGN_cont.md §8.1 *Sender-auditor opening capability*). Maintaining it is the client's job: an implementation MUST add the `lane[0]` amount and `lane[1]` $$r_{\text{transfer}}$$ of every inbound `Transfer` and `SpenderTransfer` to its stored $$(v, r)$$, and MUST treat each `Deposit` as $$(\text{amount}, 0)$$ (DESIGN.md §7.3). On a `RevokeSpender` event it MUST add the $$(v_a, r_a)$$ it recorded for that delegation, the fold being public and the addend already escrowed (DESIGN_cont.md §8.5); where it holds no such record it MUST mark the opening unavailable until the next `lane[2]` escrow rather than carry a stale one. Across a key rotation, what an implementation may carry forward and what it MUST treat as unopened are fixed by DESIGN_cont.md §8.3.
 
-An auditor facade MUST NOT be able to construct a spending witness, and MUST NOT be able to open a post-merge spendable balance, since merge folds the receiving randomness into a blinding that depends on $$vk$$.
+**Clawback witness.** In a deployment that enables seizure (COMPLIANCE.md §5), the clawback witness is the pair of openings the client already maintains — the standing sender-channel opening of $$C_{\text{spend}}$$ and the recipient-channel opening of $$C_{\text{receive}}$$ (COMPLIANCE.md §5.2, §5.3). An implementation MUST verify both against the on-chain commitments before proving, and on a `Clawback` event MUST advance the standing opening by the `Merge` rule and the event's public `amount` (COMPLIANCE.md §5.7).
+
+An auditor facade MUST NOT be able to construct a spending witness. It can open the spendable balance past a merge — the inbound $$r_{\text{transfer}}$$ reaches the same key on the recipient channel — so a facade that exposes openings exposes them for the account's whole history under the active key.
 
 ---
 
@@ -513,7 +524,7 @@ RPC and archive compose: the RPC serves the recent tail, the archive everything 
 
 ## 13. Security Requirements
 
-**Secret handling.** The root, $$sk$$, $$vk$$, $$dvk_i$$, every derived $$r_e$$, and every cached opening are secrets. Implementations MUST keep them within the trust boundary (§2.1), SHOULD zeroize buffers holding them once no longer needed, and MUST NOT transmit them to any remote service except under §8.3's explicit opt-in.
+**Secret handling.** The root, $$sk$$, $$vk$$, $$dvk_i$$, every derived $$r_e$$, every cached opening, and — on the auditor side — $$k$$ and the accumulated openings of §11 are secrets. Implementations MUST keep them within the trust boundary (§2.1), SHOULD zeroize buffers holding them once no longer needed, and MUST NOT transmit them to any remote service except under §8.3's explicit opt-in.
 
 $$vk$$ MUST NOT be presented as a safely-shareable read-only credential. It exposes every historical balance checkpoint, every incoming amount, every delegation allowance, and — through the ephemeral-scalar derivation of DESIGN.md §5.3 — the opening of every transfer the account originated. Its only guarantee is that it cannot authorize spending. A party that needs outbound visibility is served with D-sender proofs, which are bound to that party and to a nonce (SELECTIVE_DISCLOSURE.md §13.2), never by handing over the key.
 
@@ -533,7 +544,7 @@ $$vk$$ MUST NOT be presented as a safely-shareable read-only credential. It expo
 
 **Proving latency.** Single-digit seconds on contemporary hardware is the design target (OVERVIEW.md). Implementations MUST treat it as user-visible.
 
-**Sync and replay bounds.** The replay window runs from the account's last `Merge` at or before its latest checkpoint, or from registration for an account that has not merged before that checkpoint (DESIGN.md §5.2 *Recovery*), which is unbounded in age. Implementations MUST NOT assume a bounded window, and SHOULD use the archive's checkpoint lookup where available (INDEXER.md §6, C1) so that a dormant account is not obliged to transfer its entire history.
+**Sync and replay bounds.** The replay window runs from the account's last `Merge` or `Clawback` at or before its latest checkpoint, or from registration if there is none before that checkpoint (DESIGN.md §5.2 *Recovery*), which is unbounded in age. Implementations MUST NOT assume a bounded window, and SHOULD use the archive's checkpoint lookup where available (INDEXER.md §6, C1) so that a dormant account is not obliged to transfer its entire history.
 
 **Storage growth.** Per-account event volume is linear in inbound transfers and unbounded by design, since incoming-transfer spam is rate-limited only by transaction fees (DESIGN_cont.md §9.5). Implementations MUST NOT size local storage on the assumption that inbound volume tracks the user's own activity.
 

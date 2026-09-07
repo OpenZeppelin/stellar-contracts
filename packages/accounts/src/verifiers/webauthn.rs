@@ -313,8 +313,8 @@ pub fn verify(
     // - type: 12 bytes ("webauthn.get")
     // - crossOrigin: optional boolean
     // - tokenBinding: optional field with a variable length
-    // - origin: variable length, but in almost all cases will fit into a couple of
-    //   dozens bytes
+    // - origin: variable length, but in almost all cases will fit into a couple
+    //   of dozens bytes
     //
     // https://www.w3.org/TR/webauthn-2/#client-data
     if client_data.len() > CLIENT_DATA_MAX_LEN as u32 {

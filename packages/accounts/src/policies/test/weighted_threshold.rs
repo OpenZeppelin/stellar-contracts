@@ -509,8 +509,8 @@ fn set_signer_weight_makes_threshold_unreachable_fails() {
     });
 
     e.as_contract(&address, || {
-        // Reduce signer1's weight from 100 to 10, making total weight 60 (10+50)
-        // This makes threshold 75 unreachable
+        // Reduce signer1's weight from 100 to 10, making total weight 60
+        // (10+50) This makes threshold 75 unreachable
         set_signer_weight(&e, &Signer::Delegated(signer1), 10, &context_rule, &smart_account);
     });
 }
