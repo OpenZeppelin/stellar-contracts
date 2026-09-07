@@ -12,7 +12,7 @@ Specification set for the confidential token module. Each file owns one topic. T
 
 Cite by relative path and heading anchor, for example `protocol/wallet-state.md#recovery`: as a Markdown link from the docs, as a plain `docs/...` path from Rust and Noir comments. Anchors are GitHub heading slugs: lower-case, punctuation removed, spaces replaced by hyphens. Constraint identifiers such as `T_a9`, `S14`, or `CB3` are stable and may be cited by name.
 
-`check_links.py` resolves every such reference in the module and fails on a missing file or heading, a duplicate heading within a file, or a file over the LaTeX rendering budget. CI runs it on every change to the module.
+CI resolves every such reference with lychee, the docs directly and the code citations through a generated link list, and fails on a missing file or heading. Headings carry no LaTeX: lychee drops math when it derives a heading slug and GitHub does not.
 
 ## Map
 

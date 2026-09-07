@@ -31,7 +31,7 @@ Soroban's host silently reduces values `≥ r` modulo `r` rather than rejecting 
 
 ## Code cites the spec by path and anchor
 
-Rust and Noir comments cite the docs as `docs/<file>.md#<heading-slug>` paths, and the docs cite each other with relative Markdown links. `docs/check_links.py` resolves every such reference across the module and fails CI on a missing file or heading, a duplicate heading within a file, or a file over the LaTeX budget. Run `python3 docs/check_links.py` after touching a heading, a file name, or a citation.
+Rust and Noir comments cite the docs as `docs/<file>.md#<heading-slug>` paths, and the docs cite each other with relative Markdown links. The `check-links` job in `.github/workflows/docs.yml` runs lychee over the Markdown and over a generated list of the code citations, and fails on a missing file or heading. Run its two steps locally (`brew install lychee`) after touching a heading, a file name, or a citation.
 
 ## Tests
 
@@ -47,7 +47,7 @@ Beyond the root guide's conventions:
 
 ### Layout and normativity
 
-`docs/README.md` maps the set, states which files are normative, and gives the precedence rules (`circuits/lib/src/lib.nr` outranks the docs on primitives; `#[contracttype]` definitions outrank them on shapes). One topic per file: new material goes into the file that owns its topic, and a new file is warranted only by a new topic. GitHub stops rendering LaTeX after roughly 750 expressions per page; the checker caps each file at 500, so the budget never again dictates where a section lives.
+`docs/README.md` maps the set, states which files are normative, and gives the precedence rules (`circuits/lib/src/lib.nr` outranks the docs on primitives; `#[contracttype]` definitions outrank them on shapes). One topic per file: new material goes into the file that owns its topic, and a new file is warranted only by a new topic. GitHub stops rendering LaTeX after roughly 750 expressions per page; one topic per file keeps every file well inside that.
 
 ### Facts with more than one home
 

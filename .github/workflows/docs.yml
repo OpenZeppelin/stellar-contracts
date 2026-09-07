@@ -26,5 +26,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: collect code citations
+        working-directory: packages/tokens/src/confidential
+        run: |
+          grep -rhoE '(\.\./)*docs/[A-Za-z0-9_./-]+\.md(#[A-Za-z0-9_-]+)?' --include='*.rs' --include='*.nr' --include='CLAUDE.md' . \
+            | sed -E 's|^(\.\./)+||' | sort -u | sed -E 's|.*|[&](/&)|' > "$RUNNER_TEMP/citations.md"
+
       - name: check documentation references
-        run: python3 packages/tokens/src/confidential/docs/check_links.py
+        uses: lycheeverse/lychee-action@v2
+        with:
+          lycheeVersion: v0.24.2
+          args: --offline --include-fragments --no-progress --root-dir ${{ github.workspace }}/packages/tokens/src/confidential 'packages/tokens/src/confidential/**/*.md' ${{ runner.temp }}/citations.md

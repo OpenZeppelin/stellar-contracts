@@ -36,8 +36,7 @@ confidential/
     ├── selective-disclosure/      # off-chain selective-disclosure layer
     ├── indexer.md                 # durable event archive specification
     ├── sdk/                       # client SDK specification
-    ├── overview.md                # non-normative user-flows overview
-    └── check_links.py             # CI check for doc references and anchors
+    └── overview.md                # non-normative user-flows overview
 ```
 
 A single deployment is **three contracts** wired together:
@@ -103,4 +102,4 @@ pin and re-extraction procedure.
 [`docs/README.md`](./docs/README.md) maps the documentation set: the
 normative protocol specification under [`docs/protocol/`](./docs/protocol/),
 the compliance, selective-disclosure, indexer, and SDK companions, and the
-citation rules that `docs/check_links.py` enforces in CI.
+citation rules that CI enforces with lychee.
