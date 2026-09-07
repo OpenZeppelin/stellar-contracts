@@ -135,7 +135,7 @@ Committed **values** accumulate as exact integers and are never reduced; DESIGN.
 
 ### 4.7 Scalar sampling
 
-Secret scalars — $$\sigma$$, $$\sigma_a$$ — MUST be produced by the rejection procedure of DESIGN.md §2.2:
+Secret scalars — $$\sigma$$, $$\sigma_a$$, the replacement $$\sigma_a'$$ of a spender transfer (DESIGN.md §6.2 *Transfer nonce*), and the disclosure layer's $$r_{\text{disc}}$$ (SELECTIVE_DISCLOSURE.md §4) — MUST be produced by the rejection procedure of DESIGN.md §2.2:
 
 1. Draw 32 bytes from a CSPRNG.
 2. Clear the top **2** bits, yielding a 254-bit candidate.
@@ -295,9 +295,9 @@ Three derivations this document specifies or relies on are computed outside the 
 
 ## 7. Witness Assembly
 
-An implementation MUST provide witness assembly for each circuit it supports, covering the five circuits of DESIGN_cont.md §10.1: `Register`, `Withdraw`, `Transfer`, `SpenderTransfer`, `SetSpender`.
+An implementation MUST provide witness assembly for each circuit it supports, covering the six circuits of DESIGN_cont.md §10.1: the five core circuits `Register`, `Withdraw`, `Transfer`, `SpenderTransfer`, `SetSpender`, and `Clawback`, which the auditor role proves in a deployment that enables the compliance extension (§11, COMPLIANCE.md §5.3).
 
-**Public-input order is a wire contract.** The verifier sees an ordered vector of field elements with no knowledge of what they denote (DESIGN.md §7.1), so a permutation of two same-typed inputs produces a well-formed vector that verifies a different statement. Each builder MUST assemble public inputs in exactly the order the contract assembles them, and MUST cite the contract function it mirrors at the site of the ordering. The per-operation public-input tables in DESIGN.md §7.2–§7.9 are authoritative for *membership*; the contract's assembly is authoritative for *order*.
+**Public-input order is a wire contract.** The verifier sees an ordered vector of field elements with no knowledge of what they denote (DESIGN.md §7.1), so a permutation of two same-typed inputs produces a well-formed vector that verifies a different statement. Each builder MUST assemble public inputs in exactly the order the contract assembles them, and MUST cite the contract function it mirrors at the site of the ordering. The per-operation public-input tables in DESIGN.md §7.2–§7.8 are authoritative for *membership*; the contract's assembly is authoritative for *order*.
 
 **The trust-boundary rule constrains the client too.** DESIGN.md §7.1 requires the contract to load state-derived public inputs itself and never accept them from the caller. The client-side corollary: a builder MUST NOT include a contract-loaded input in the payload it submits. Doing so does not break soundness, since the contract ignores it, but it produces a payload whose fields disagree with the proof's public inputs.
 
@@ -420,7 +420,7 @@ where $$vk$$ is the originator's viewing key and $$\sigma_E$$ the operation's sa
 
 **Three consequences an implementation MUST handle.**
 
-First, **$$vk$$ carries more authority than balance decryption.** Recomputing $$r_e$$ yields the recipient shared scalar, hence $$r_{\text{transfer}}$$, hence a full Pedersen opening of every transfer commitment the account created — retroactively, and reaching commitments that sit inside recipients' receiving balances (DESIGN_cont.md §9.4, §8.2). An implementation MUST treat $$vk$$ accordingly in §13 and MUST NOT export it as a read-only credential without stating this.
+First, **$$vk$$ carries more authority than balance decryption.** Recomputing $$r_e$$ yields the recipient shared scalar, hence $$r_{\text{transfer}}$$, hence a full Pedersen opening of every transfer commitment the account created — retroactively, and reaching commitments that sit inside recipients' receiving balances (DESIGN_cont.md §9.4, §8.1). An implementation MUST treat $$vk$$ accordingly in §13 and MUST NOT export it as a read-only credential without stating this.
 
 Second, **the salt requirement of §10.4 is a confidentiality requirement**, not only an unlinkability one, the salt being the operation's sole freshness input.
 
@@ -494,7 +494,7 @@ An auditor facade MUST NOT be able to construct a spending witness. It can open 
 
 ### 12.1 Disclosure construction
 
-An implementation supporting selective disclosure MUST follow SELECTIVE_DISCLOSURE.md for the holder, sender, and auditor variants, and MUST bind each proof to the requesting recipient's key and nonce so that a proof cannot be replayed against a different recipient or a later request (SELECTIVE_DISCLOSURE.md §2.1).
+An implementation supporting selective disclosure MUST follow SELECTIVE_DISCLOSURE.md for the holder, sender, and auditor variants, and MUST bind each proof to the requesting recipient's key and nonce so that a proof cannot be replayed against a different recipient or a later request (SELECTIVE_DISCLOSURE.md §2.1). A D-auditor witness reads each auditor channel at the width §4.3 fixes for its tag — three lanes on $$\delta_{\text{aud\\\_s}}$$, two on $$\delta_{\text{aud\\\_r}}$$ — exactly as §11 requires of the auditor client (SELECTIVE_DISCLOSURE.md §8 A3).
 
 Disclosure circuits are verified entirely off-chain and MUST NOT be registered with the on-chain verifier set (SELECTIVE_DISCLOSURE.md §15.1).
 
