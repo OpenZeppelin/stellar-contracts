@@ -53,6 +53,13 @@ The clawback flow specified in [Clawback](../compliance.md#clawback) draws its w
 
 ## Auditor Visibility Properties
 
+Per channel and lane, the auditor ciphertexts carry:
+
+| Channel | `lane[0]` | `lane[1]` | `lane[2]` |
+|:--|:--|:--|:--|
+| Sender / owner ($$\delta\_{\text{aud\\\_s}}$$) | Transfer amount, or the escrowed amount for `SetSpender`; unused on `Withdraw`, whose amount is public | Sender's post-operation balance, or post-operation allowance for a spender transfer | Post-operation spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`; post-transfer allowance blinding $$r\_a'$$ on `SpenderTransfer` |
+| Recipient ($$\delta\_{\text{aud\\\_r}}$$) | Transfer amount | Per-transfer Pedersen randomness $$r\_{\text{transfer}}$$ | — (channel is two-lane) |
+
 **Transfer amounts.** Both auditors see the transfer amount in real time. The recipient's auditor decrypts $$v\_{\text{transfer}}$$ from $$\tilde{v}\_{\text{aud,r}}$$; the sender's auditor decrypts it from $$\tilde{v}\_{\text{aud,s}}$$.
 
 **Balance checkpoints.** The sender's auditor receives an encrypted balance checkpoint at every owner-initiated operation that produces a proof:

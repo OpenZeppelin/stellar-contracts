@@ -69,13 +69,13 @@ A failed comparison MUST surface as a distinct, named state rather than as a gen
 
 ## Merge policy
 
-Received funds are spendable only after a merge ([Merge](../protocol/operations/merge.md)). A wallet SHOULD merge automatically, or prompt, ahead of a spend that the spendable balance alone cannot cover. Merging ahead of a spend also bounds the recovery replay window, which starts at the last merge at or before the latest checkpoint ([Recovery](#recovery)).
+Received funds are spendable only after a merge ([Merge](../protocol/operations/merge.md)). A wallet SHOULD merge automatically, or prompt, ahead of a spend that the spendable balance alone cannot cover. Merging ahead of a spend also bounds the recovery replay window ([Recovery](../protocol/wallet-state.md#recovery)).
 
 Merge is proof-less and owner-authorized, and neither a merge nor an in-flight spend proof can be disrupted by a third party ([Griefing Resistance](../protocol/security.md#griefing-resistance), [Merge Safety](../protocol/security.md#merge-safety)).
 
 ## Recovery
 
-Recovery follows the procedure of [Recovery](../protocol/wallet-state.md#recovery), with the reconstructed state verified per [Consistency checking](#consistency-checking). Its two anchors differ: the latest checkpoint event pins $$W_{\text{spend}}$$ as of that checkpoint in one lookup, with the `Merge`, `RevokeSpender`, and `Clawback` folds that follow it applied over the replay window per [Event application](#event-application), while $$W_{\text{receive}}$$ restarts at $$T_0$$ — the account's last `Merge` or `Clawback` at or before that checkpoint — from which that window runs.
+Recovery follows the procedure of [Recovery](../protocol/wallet-state.md#recovery), with the replayed events applied per [Event application](#event-application) and the reconstructed state verified per [Consistency checking](#consistency-checking).
 
 Two further obligations follow from data availability:
 

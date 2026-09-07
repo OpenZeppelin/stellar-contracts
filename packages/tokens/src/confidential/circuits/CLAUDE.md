@@ -60,7 +60,7 @@ LC_ALL=C nargo info | grep '^|' | LC_ALL=C sort > constraints.baseline
 
 `LC_ALL=C` is mandatory on **both** sides of the pipe — byte order is the only ordering stable between macOS and the Ubuntu runner. The redirect overwrites the file's header comments; re-paste them, because CI's failure message asks for them.
 
-Two non-obvious consequences: adding or removing a **gadget** changes the baseline even when no circuit logic changed, and the ACIR opcode counts are quoted in prose at `../docs/protocol/proof-system.md#circuit-cost-analysis` (Register 33, Clawback 51, Withdraw 95, Transfer 134, SetSpender 135, SpenderTransfer 136). Nothing enforces that second copy — update it in the same PR.
+One non-obvious consequence: adding or removing a **gadget** changes the baseline even when no circuit logic changed. The baseline is the only place the ACIR opcode counts are recorded; the docs cite it rather than quoting the numbers.
 
 ### `vks/`
 

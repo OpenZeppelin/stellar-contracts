@@ -170,9 +170,9 @@ The wallet abstracts all cryptographic operations. Account holders interact with
 The wallet must:
 
 - **Generate and store keys** - derive the full key hierarchy (spending key, viewing key, public viewing key, delegation viewing keys) from a single master secret.
-- **Produce zero-knowledge proofs** - the heaviest client-side computation. Proof generation time depends on the circuit complexity but targets single-digit seconds on modern hardware. The Transfer circuit involves 8 elliptic-curve scalar multiplications (including two auditor ECDH exchanges); the Register circuit needs 2. [Circuit Cost Analysis](protocol/proof-system.md#circuit-cost-analysis) lists the per-circuit totals.
+- **Produce zero-knowledge proofs** - the heaviest client-side computation. Proof generation time depends on the circuit complexity but targets single-digit seconds on modern hardware; [Circuit Cost Analysis](protocol/proof-system.md#circuit-cost-analysis) lists the per-circuit scalar-multiplication totals.
 - **Track local state** - maintain running commitment openings (value and blinding factor pairs) for the spendable and receiving balances by processing on-chain events. This is comparable to wallet sync in UTXO-based privacy systems (Zcash, Monero).
-- **Handle recovery** - if local state is lost, reconstruct balances from on-chain data using the viewing key: fetch the encrypted balance scalar and salt from the most recent spend-boundary event, derive the deterministic blinding factor, and replay the events emitted after the last merge (or compliance clawback) preceding that spend boundary, since only those clear the receiving balance and since merges, spender revocations, and clawbacks in that window fold into the spendable balance too. Recovery requires the master secret plus access to a durable event archive (Stellar RPC retains only 7 days of history); the indexer this archive must satisfy is specified in the companion [Indexing and Off-Chain State Recovery](indexer.md) document.
+- **Handle recovery** - if local state is lost, reconstruct both balance openings from the viewing key and the account's event history ([Recovery](protocol/wallet-state.md#recovery)). Recovery requires the master secret plus access to a durable event archive (Stellar RPC retains only 7 days of history); the indexer this archive must satisfy is specified in the companion [Indexing and Off-Chain State Recovery](indexer.md) document.
 
 ### For Developers (Integration)
 
@@ -207,9 +207,9 @@ If the wallet is lost or reinstalled on a new device:
 
 1. The account holder restores from the master secret (seed phrase or equivalent).
 2. The wallet re-derives the full key hierarchy.
-3. The wallet fetches the latest spend-boundary event for the account, reads the encrypted balance scalar and salt from it, recovers the spendable balance opening as of that boundary using the viewing key, then replays the deposits, incoming transfers, merges, spender revocations, and compliance clawbacks emitted after the last merge or clawback preceding that spend boundary — rebuilding the receiving balance and folding the merges, revocations, and clawbacks onto the spendable one. A spend boundary does not clear the receiving balance — only a merge or a clawback does — so the replay starts there rather than at the spend boundary.
+3. The wallet reconstructs the spendable and receiving balance openings from the account's event history by the procedure in [Recovery](protocol/wallet-state.md#recovery).
 
-The recovery process is fully deterministic given the master secret and access to the account's event history from that merge onward. Because Stellar RPC retains only the last 7 days of events, recovery from seed alone depends on a durable indexer ([Indexing and Off-Chain State Recovery](indexer.md)) that retains the per-account event log; without one, the on-chain commitments remain visible but their openings cannot be reconstructed.
+The recovery process is fully deterministic given the master secret and access to the account's event history. Because Stellar RPC retains only the last 7 days of events, recovery from seed alone depends on a durable indexer ([Indexing and Off-Chain State Recovery](indexer.md)) that retains the per-account event log; without one, the on-chain commitments remain visible but their openings cannot be reconstructed.
 
 ### Edge Cases the Wallet Handles
 

@@ -32,7 +32,7 @@ Four properties of the protocol place correctness and confidentiality in the cli
 
 - **Root** — the secret an implementation feeds to [Derivation](key-derivation.md#derivation)'s derivation: a SEP-0053 signature by a signer on the account, or a raw 32-byte value for an address with no ed25519 signer of its own ([Key Derivation](key-derivation.md)).
 - **Opening** — the pair $$(v, r)$$ such that $$C = v \cdot G + r \cdot H$$ for an on-chain commitment $$C$$.
-- **Checkpoint** — an owner-initiated proof-carrying event publishing $$(\tilde{b}, \sigma)$$ for the owner's spendable balance ([Recovery](../protocol/wallet-state.md#recovery), which enumerates the qualifying events).
+- **Checkpoint** — as defined in [Recovery](../protocol/wallet-state.md#recovery), which enumerates the qualifying events.
 - **Witness material** — any value that appears as a private witness in any circuit: $$sk$$, $$vk$$, $$dvk_i$$, $$v$$, $$r$$, $$r_e$$, $$v_{\text{transfer}}$$, and every intermediate derived from them.
 - **Trust boundary** — the process and storage under the account holder's exclusive control. Witness material inside it is secret; witness material that crosses it is disclosed.
 - **In-flight operation** — a submitted operation whose event has not yet been observed. Its projected post-operation opening is known locally but not yet confirmed against chain state.

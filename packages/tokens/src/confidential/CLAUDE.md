@@ -49,20 +49,17 @@ Beyond the root guide's conventions:
 
 `docs/README.md` maps the set, states which files are normative, and gives the precedence rules (`circuits/lib/src/lib.nr` outranks the docs on primitives; `#[contracttype]` definitions outrank them on shapes). One topic per file: new material goes into the file that owns its topic, and a new file is warranted only by a new topic. GitHub stops rendering LaTeX after roughly 750 expressions per page; the checker caps each file at 500, so the budget never again dictates where a section lives.
 
-### Duplicated tables that drift
+### Facts with more than one home
 
-Six things exist in more than one file. Changing the normative copy means grepping for every other one:
+Most facts now have exactly one owning section and are linked from everywhere else. Three still appear in more than one place because the second copy is a different artefact, not prose. Changing the owner means updating the copies in the same PR:
 
-| Content | Normative source | Copies live in |
+| Content | Owner | Copies live in |
 |:---|:---|:---|
-| Domain-separation tag assignments | `docs/protocol/domain-separators.md` | `docs/sdk/crypto-core.md#domain-separators`, referenced by `docs/selective-disclosure/README.md` |
-| Sponge lane assignment | `docs/protocol/primitives.md#lane-assignment` | `docs/sdk/crypto-core.md#poseidon2-sponge`, `docs/sdk/auditor-client.md` |
-| Per-circuit scalar-multiplication counts | `docs/protocol/proof-system.md#circuit-cost-analysis` | `docs/overview.md` |
-| Checkpoint event set | `docs/protocol/wallet-state.md#recovery` | `docs/indexer.md`, `docs/sdk/README.md` |
-| Replay-window anchor `T₀` (`Register`, `Merge`, `Clawback`) | `docs/protocol/wallet-state.md#recovery` | `docs/indexer.md`, `docs/overview.md`, `docs/sdk/wallet.md`, `docs/compliance.md#wallet-and-auditor-consequences` |
-| ACIR opcode counts | `circuits/constraints.baseline` | `docs/protocol/proof-system.md#circuit-cost-analysis`, `circuits/CLAUDE.md` |
+| `Clawback` is a `T₀` anchor alongside `Merge` | `docs/protocol/wallet-state.md#recovery` | `docs/compliance.md#wallet-and-auditor-consequences`, the role column of `docs/indexer.md#events-in-scope` |
+| Per-circuit public-input counts | the `Public inputs` heading of each `docs/protocol/operations/*.md` and `docs/compliance.md#circuit` | header comments of `circuits/*/src/main.nr`, `circuits/CLAUDE.md` |
+| Domain-separation tag values | `docs/protocol/domain-separators.md` | `circuits/lib/src/lib.nr`, `circuits/lib/testdata/*.json` |
 
-The tags are a cross-language wire contract. `docs/protocol/domain-separators.md` is their only authoritative source: it assigns every value, and it states which subset `circuits/lib/src/lib.nr` implements and why the remainder are absent. Changing any assigned value is a new deployment, not an upgrade.
+The tags are a cross-language wire contract. `docs/protocol/domain-separators.md` is their only authoritative source: it assigns every value, states which layer absorbs each, and states which subset `circuits/lib/src/lib.nr` implements. Changing any assigned value is a new deployment, not an upgrade.
 
 ### Economy
 

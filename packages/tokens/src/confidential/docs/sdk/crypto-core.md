@@ -31,7 +31,7 @@ The sponge construction, its width and rate, the IV placement, the padding rule,
 
 $$\text{poseidon\\\_with\\\_domain}(\delta, [x_1, \ldots, x_n]) = \text{sponge}([\delta, x_1, \ldots, x_n])$$
 
-Squeeze-slot assignment is canonical and MUST be followed: `lane[0]` is always an amount mask, `lane[1]` is always a balance, allowance, or per-transfer-randomness mask, and `lane[2]` is always the sender-auditor blinding-escrow slot — the new spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`, the new allowance blinding $$r_a'$$ on `SpenderTransfer` ([Poseidon2 Hash](../protocol/primitives.md#poseidon2-hash)). Only the sender-auditor channel ($$\delta_{\text{aud\\\_s}}$$) is squeezed three-wide; the recipient channel ($$\delta_{\text{aud\\\_r}}$$) stays at two lanes. `Withdraw`, whose amount is public, takes `lane[1]` and `lane[2]` and leaves `lane[0]` unused ([W_a3–W_a5](../protocol/operations/withdraw.md#constraints)), so a checkpoint pad can never coincide with an amount pad.
+Squeeze-slot assignment is canonical and MUST be followed as [Lane assignment](../protocol/primitives.md#lane-assignment) fixes it, and each channel MUST be read at exactly the width its tag is assigned ([Mode exclusivity](../protocol/primitives.md#mode-exclusivity)).
 
 ## Generators and commitments
 
@@ -73,29 +73,7 @@ Secret scalars — $$\sigma$$, $$\sigma_a$$, the replacement $$\sigma_a'$$ of a 
 
 ## Domain separators
 
-| Tag | Value | Absorbed in a core circuit? |
-|:--|:--:|:--|
-| $$\delta_{\text{addr}}$$ | 1 | No — absorbed on-chain by the contract ([Address-to-Field Encoding](../protocol/primitives.md#address-to-field-encoding)) |
-| $$\delta_{\text{vk}}$$ | 2 | Yes |
-| $$\delta_{\text{dvk}}$$ | 3 | Yes |
-| $$\delta_{\text{spend\\\_r}}$$ | 4 | Yes |
-| $$\delta_{\text{transfer\\\_blind}}$$ | 5 | Yes |
-| $$\delta_{\text{transfer\\\_amount}}$$ | 6 | Yes |
-| $$\delta_{\text{enc\\\_bal}}$$ | 7 | Yes |
-| $$\delta_{\text{enc\\\_allow}}$$ | 8 | Yes |
-| $$\delta_{\text{allow\\\_r}}$$ | 9 | Yes |
-| $$\delta_{\text{esc\\\_dvk}}$$ | 10 | Yes |
-| $$\delta_{\text{aud\\\_s}}$$ | 11 | Yes |
-| $$\delta_{\text{aud\\\_r}}$$ | 12 | Yes |
-| $$\delta_{\text{ecdh}}$$ | 13 | Yes |
-| $$\delta_{\text{eph}}$$ | 14 | No — derived off-circuit ([ECDH-Derived Blinding](../protocol/keys-and-commitments.md#ecdh-derived-blinding)) |
-| $$\delta_{\text{disc\\\_bind}}$$ | 15 | No — off-chain disclosure only |
-| $$\delta_{\text{disc}}$$ | 16 | No — off-chain disclosure only |
-| $$\delta_{\text{esc\\\_allow\\\_r\\\_aud}}$$ | 17 | Yes |
-
-[Domain Separation Constants](../protocol/domain-separators.md) assigns all seventeen values and is their only source; the right-hand column is this document's addition. $$\delta_{\text{disc\\\_bind}}$$ and $$\delta_{\text{disc}}$$ belong to the off-chain disclosure layer ([Domain Separators](../selective-disclosure/README.md#domain-separators)). Tag 1 is absorbed by the contract rather than by a circuit — the contract derives $$\text{addr\\\_f}$$ and $$\text{op}_i$$ on-chain and the circuits receive them as opaque public inputs ([Usage sites](../protocol/primitives.md#usage-sites)) — so it is part of the on-chain wire contract all the same. None of 14–16 is absorbed either in a circuit or on-chain, so none is part of the on-chain wire contract, but all three are part of the cross-client contract because two wallets serving the same account must agree on them ([Vectors this specification requires](conformance.md#vectors-this-specification-requires)).
-
-All seventeen values MUST be distinct, and each MUST be used in exactly one sponge mode, per [Mode exclusivity](../protocol/primitives.md#mode-exclusivity). Tags 11 and 12 are the multi-lane tags — 11 read three-wide wherever the sender / owner channel is instantiated, 12 always two-wide; the remaining fifteen, including 1, 14–16, and 17, are single-output tags. Tag 17 is absorbed only by the `SetSpender` circuit ([S14](../protocol/operations/set-spender.md#constraints), [Spender Allowance Auditing](../protocol/auditing.md#spender-allowance-auditing)); its fixture is `circuits/lib/testdata/encrypt_esc_allow_r_auditor.json`.
+The seventeen tag values, the layer that absorbs each, and the sponge mode each is confined to are fixed in [Domain Separation Constants](../protocol/domain-separators.md). An implementation MUST hardcode those values and MUST NOT read any tag at a second arity ([Mode exclusivity](../protocol/primitives.md#mode-exclusivity)).
 
 ## Address compression
 

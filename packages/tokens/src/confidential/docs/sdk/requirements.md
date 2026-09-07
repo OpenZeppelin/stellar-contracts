@@ -22,7 +22,7 @@ $$vk$$ MUST NOT be presented as a safely-shareable read-only credential. It expo
 
 **Proving latency.** Single-digit seconds on contemporary hardware is the design target ([User Flows Overview](../overview.md)). Implementations MUST treat it as user-visible.
 
-**Sync and replay bounds.** The replay window runs from the account's last `Merge` or `Clawback` at or before its latest checkpoint, or from registration if there is none before that checkpoint ([Recovery](../protocol/wallet-state.md#recovery)), which is unbounded in age. Implementations MUST NOT assume a bounded window, and SHOULD use the archive's checkpoint lookup where available ([API Surface](../indexer.md#api-surface), C1) so that a dormant account is not obliged to transfer its entire history.
+**Sync and replay bounds.** The replay window ([Recovery](../protocol/wallet-state.md#recovery)) is unbounded in age. Implementations MUST NOT assume a bounded window, and SHOULD use the archive's checkpoint lookup where available ([API Surface](../indexer.md#api-surface), C1) so that a dormant account is not obliged to transfer its entire history.
 
 **Storage growth.** Per-account event volume is linear in inbound transfers and unbounded by design, since incoming-transfer spam is rate-limited only by transaction fees ([Recovery Properties](../protocol/wallet-state.md#recovery-properties)). Implementations MUST NOT size local storage on the assumption that inbound volume tracks the user's own activity.
 

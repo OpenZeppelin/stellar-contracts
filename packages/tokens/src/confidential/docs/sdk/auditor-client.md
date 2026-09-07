@@ -2,14 +2,7 @@
 
 An auditor decrypts from the public event and its own secret $$k$$ alone, with no viewing key, holder cooperation, or extra on-chain read. For each channel it computes the shared scalar against the event's ephemeral point, derives that channel's lane masks ([Poseidon2 sponge](crypto-core.md#poseidon2-sponge)) — three on the sender / owner channel, two on the recipient channel — and subtracts. The allowance opening comes straight out of the event: the blinding of the $$C_a$$ that operation writes is escrowed in the event itself — tag 17 on `SetSpender`, `lane[2]` on `SpenderTransfer` — and the matching value is in the sender-channel ciphertext ([Spender Allowance Auditing](../protocol/auditing.md#spender-allowance-auditing)). An auditor that did not observe the event holds no opening for that state.
 
-The two channels differ in what they yield ([Per-Transfer Auditor Ciphertexts](../protocol/auditing.md#per-transfer-auditor-ciphertexts)):
-
-| Channel | `lane[0]` | `lane[1]` | `lane[2]` |
-|:--|:--|:--|:--|
-| Sender / owner ($$\delta_{\text{aud\\\_s}}$$) | Transfer amount, or the escrowed amount for `SetSpender` | Sender's post-operation balance, or post-operation allowance for a spender transfer | Post-operation spendable blinding on `Withdraw`, `Transfer`, and `SetSpender`; post-transfer allowance blinding $$r_a'$$ on `SpenderTransfer` |
-| Recipient ($$\delta_{\text{aud\\\_r}}$$) | Transfer amount | Per-transfer Pedersen randomness $$r_{\text{transfer}}$$ | — (channel is two-lane) |
-
-`Withdraw` and `SetSpender` carry a sender-channel balance checkpoint whose pad is `lane[1]`. Only `Withdraw` leaves `lane[0]` unused, its amount being public ([W_a3](../protocol/operations/withdraw.md#constraints), [Poseidon2 sponge](crypto-core.md#poseidon2-sponge)); `SetSpender` reads `lane[0]` as well, for the escrowed amount ([S_a4](../protocol/operations/set-spender.md#constraints)).
+What each channel yields per lane is fixed by the lane map in [Auditor Visibility Properties](../protocol/auditing.md#auditor-visibility-properties).
 
 An implementation MUST squeeze the sender / owner channel three-wide and MUST NOT widen the recipient channel. `RevokeSpender` opens no auditor channel, the fold being proofless ([Revoke Spender](../protocol/operations/revoke-spender.md)); an implementation MUST treat that event as carrying no escrowed blinding rather than substituting a stale one.
 
