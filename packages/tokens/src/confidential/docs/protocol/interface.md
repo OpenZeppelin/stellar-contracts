@@ -119,3 +119,7 @@ The function returns the *spending-authority* state, not the *escrow-existence* 
 - **Indexers:** verify their replayed delegation state against the live commitment, in the same way `confidential_balance` is used for account state ([Consistency check](wallet-state.md#consistency-check)).
 
 The auditor's allowance tracking does **not** use this method: per-event allowance ciphertexts ([Spender Allowance Auditing](auditing.md#spender-allowance-auditing)) are the auditor's data path. `a_tilde` is keyed to $$dvk_i$$ and is unreadable without it, the owner's auditor included ([Spender Allowance Auditing](auditing.md#spender-allowance-auditing)).
+
+---
+
+Previous: [Proof System](proof-system.md) · Up: [Documentation Index](../README.md) · Next: [Domain Separation Constants](domain-separators.md)

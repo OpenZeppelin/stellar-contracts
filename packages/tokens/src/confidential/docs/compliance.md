@@ -304,3 +304,7 @@ The seizure entry points add three variants to `ComplianceError`:
 | `AccountNotFrozen` | 3604 | the target of `clawback` or `force_revoke_spender` is not frozen |
 | `InvalidClawbackAmount` | 3605 | `amount <= 0` |
 | `InvalidClawbackDestination` | 3606 | `destination` is `Some` naming the contract's own address |
+
+---
+
+Up: [Documentation Index](README.md)

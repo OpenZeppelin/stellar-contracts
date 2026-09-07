@@ -82,3 +82,7 @@ $$\text{address\\\_to\\\_field}(a) = \text{poseidon\\\_with\\\_domain}(\delta_{\
 where $$\text{enc}(a)$$ is the 56-character ASCII strkey (SEP-23), and $$\text{lo}$$ and $$\text{hi}$$ interpret its lower and upper 28 bytes respectively in **little-endian** order ([Address-to-Field Encoding](../protocol/primitives.md#address-to-field-encoding)). Implementations MUST obtain the strkey from their language's stellar-strkey library.
 
 **Bootstrap check.** On first contact with a deployment, an implementation MAY compute $$\text{addr\\\_f}$$ for the contract's own address and assert equality against the value the contract stores in instance storage ([Governance and Upgradeability](../protocol/system-model.md#governance-and-upgradeability)).
+
+---
+
+Previous: [SDK](README.md) · Up: [Documentation Index](../README.md) · Next: [Key Derivation](key-derivation.md)

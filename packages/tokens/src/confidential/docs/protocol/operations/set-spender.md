@@ -71,3 +71,4 @@ The same proof also escrows the allowance blinding $$r_a$$ to the owner's audito
 
 ---
 
+Previous: [Confidential Transfer](transfer.md) · Up: [Operations](README.md) · Next: [Spender Transfer](spender-transfer.md)

@@ -8,7 +8,7 @@ We present a confidential token for Soroban that adds private balances and trans
 
 ## Project Documents
 
-The protocol specification is the set of files under `protocol/`, read in the order given by the [documentation index](../README.md), which also lists the companion specifications for compliance, selective disclosure, indexing, and the SDK.
+The protocol specification is this file followed by [Primitives](primitives.md), [System Model](system-model.md), [Key Hierarchy and Commitment Scheme](keys-and-commitments.md), [Wallet State and Recovery](wallet-state.md), [Account State](account-state.md), [Operations](operations/README.md), [Auditing](auditing.md), [Security Analysis](security.md), [Proof System](proof-system.md), [Interface](interface.md), and [Domain Separation Constants](domain-separators.md), in that order. The [documentation index](../README.md) lists the companion specifications for compliance, selective disclosure, indexing, and the SDK.
 
 ---
 
@@ -43,3 +43,7 @@ The design is built on three interlocking mechanisms:
 3. **Proof-less merge.** Incoming funds accumulate in a receiving balance that is separate from the spendable balance. To make received funds spendable, the owner authorizes a merge - no ZK proof is required. Since merge requires owner authorization and incoming transfers touch only the receiving balance, neither the spend path nor the merge path can be front-run by a third party.
 
 Five Noir/UltraHonk circuits cover registration, withdrawal, confidential transfer, spender transfer, and spender delegation. The proof system leverages the Grumpkin–BN254 curve cycle: Grumpkin point arithmetic is native inside Noir circuits (no field emulation), while Soroban natively supports BN254 operations for UltraHonk proof verification.
+
+---
+
+Previous: [User Flows Overview](../overview.md) · Up: [Documentation Index](../README.md) · Next: [Primitives](primitives.md)

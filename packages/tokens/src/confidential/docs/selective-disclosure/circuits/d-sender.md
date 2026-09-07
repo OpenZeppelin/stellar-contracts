@@ -62,3 +62,7 @@ A D-sender proof for a `SpenderTransfer` proves that the spender (not the owner)
 ## Verifier flow
 
 Follow [Verifier Protocol](../protocol.md#verifier-protocol) with `circuit_id = D-sender`. Step 2 looks up two account records: $$\text{PVK}_A$$ at $$E.\text{from}$$ (for `Transfer`) or $$E.\text{spender}$$ (for `SpenderTransfer`), and $$\text{PVK}_B$$ at $$E.\text{to}$$ in both cases.
+
+---
+
+Previous: [D-recipient](d-recipient.md) · Up: [Documentation Index](../../README.md) · Next: [D-auditor](d-auditor.md)

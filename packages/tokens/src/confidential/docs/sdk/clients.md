@@ -27,3 +27,7 @@ RPC and archive compose: the RPC serves the recent tail, the archive everything 
 **The seam MUST sit strictly above the RPC's reported retention floor, by a margin.** The floor advances as ledgers are collected, including between the moment the client reads it and the moment it issues the range query, with the archive request in between taking real time. A seam placed exactly at the observed floor therefore intermittently produces a rejected query. The archive covers everything below the seam, so a margin loses no events. Implementations MUST set the two legs to disjoint ledger ranges so that correctness does not depend on cross-source id equality, and MUST still deduplicate ([Event application](wallet.md#event-application)) as a guard at the boundary.
 
 **A configured archive's failure MUST fail the whole sync.** If an archive is configured and its request fails, an implementation MUST NOT degrade silently to RPC-only and MUST NOT persist a sync position derived from the RPC leg alone. Persisting it moves the position past the pre-window range, so every later sync takes the warm path that never consults the archive and the openings in the skipped range become unrecoverable. An archive that is *not* configured is a different case and MAY be absent, provided [Recovery](wallet.md#recovery)'s warning is surfaced.
+
+---
+
+Previous: [Auditor Client](auditor-client.md) · Up: [Documentation Index](../README.md) · Next: [Security, Non-Functional, and Conformance Requirements](requirements.md)

@@ -134,3 +134,7 @@ It is a single-output pad because `lane[2]` of this channel is taken by the spen
 ### Archive dependence
 
 The auditor must have *observed* the event: the escrowed blinding lives nowhere in contract storage, so an auditor that missed a delegation event cannot recover that opening from `a_tilde` and $$\sigma_a$$ the way a $$dvk_i$$ holder could. [Wallet State and Recovery](wallet-state.md) already makes a durable event archive normative; [Auditor recovery](../indexer.md#auditor-recovery) states the operational consequences for auditor clients.
+
+---
+
+Previous: [Revoke Spender](operations/revoke-spender.md) · Up: [Documentation Index](../README.md) · Next: [Security Analysis](security.md)

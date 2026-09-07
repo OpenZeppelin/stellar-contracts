@@ -75,3 +75,7 @@ The adapter MUST surface contract failures as typed, distinguishable outcomes. A
 | Delegation state | Absent, duplicate, or expired | Distinguish per [Reads](#reads) |
 
 Separating the first two matters most: they present as the same opaque failure on the wire but have opposite remedies.
+
+---
+
+Previous: [Conformance Vectors](conformance.md) · Up: [Documentation Index](../README.md) · Next: [Holder Wallet](wallet.md)

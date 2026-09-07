@@ -57,3 +57,7 @@ The contract verifies the proof, then:
 ## Recipient processing
 
 Upon observing the event, the recipient computes $$s = \text{ECDH}(vk, R_e)$$, derives amount and blinding. The decryption flow is independent of whether the sender was the owner or a spender.
+
+---
+
+Previous: [Withdrawal](withdraw.md) · Up: [Operations](README.md) · Next: [Set Spender](set-spender.md)

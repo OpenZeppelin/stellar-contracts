@@ -86,3 +86,7 @@ A standalone verifier library (independent of the wallet) consumes:
 - Proof bundle $$(\pi, R_{\text{disc}}, \tilde{v}_{\text{disc}})$$ and event reference.
 
 It returns the decrypted $$v_{\text{transfer}}$$ on successful verification, or a typed error indicating which check failed (proof verification, on-chain state mismatch, decryption failure).
+
+---
+
+Previous: [Aggregate Disclosures](circuits/aggregate.md) · Up: [Documentation Index](../README.md)

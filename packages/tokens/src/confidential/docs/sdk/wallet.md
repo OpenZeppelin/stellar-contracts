@@ -89,3 +89,7 @@ A spender reconstructs its allowance state from the on-chain delegation entry ra
 Implementations MUST surface the delegation's expiry ledger and SHOULD warn ahead of it. They MUST represent expired-but-unrevoked delegations as still holding escrowed value ([Spender Delegation](../protocol/account-state.md#spender-delegation)). A `RevokeSpender` event with the entry gone means the owner folded the delegation back.
 
 A spender MUST NOT be able to reach the owner's spendable balance through any interface ([Roles and Capability Separation](README.md#roles-and-capability-separation)).
+
+---
+
+Previous: [Witness Assembly, Prover, and Chain Adapter](proving.md) · Up: [Documentation Index](../README.md) · Next: [Auditor Client](auditor-client.md)

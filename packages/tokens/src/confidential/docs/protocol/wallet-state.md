@@ -73,3 +73,7 @@ The event archive is trusted for availability, not for integrity. Recovery termi
 ### Incoming-transfer spam
 
 A third party can spam an account with confidential transfers (including zero-value transfers, see [Griefing Resistance](security.md#griefing-resistance) Corollary) without invalidating the recipient's spend proofs. The cost to the spammer is the Soroban transaction fee per transfer, which bounds the rate. The cost to the recipient is per-event indexer storage and wallet replay work. Both costs are linear in the number of incoming transfers and bounded by the replay window; neither breaks correctness.
+
+---
+
+Previous: [Key Hierarchy and Commitment Scheme](keys-and-commitments.md) · Up: [Documentation Index](../README.md) · Next: [Account State](account-state.md)

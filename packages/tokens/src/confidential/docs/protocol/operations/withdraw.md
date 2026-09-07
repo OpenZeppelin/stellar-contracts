@@ -40,3 +40,7 @@ $$sk$$, $$vk$$, $$v$$, $$r$$, $$r_e$$.
 ## Post-verification
 
 The contract verifies the proof, sets `from`.`spendable_commitment` $$= C_{\text{spend}}'$$, and calls `token.transfer(self, to, a)`. Emits event with $$(R_e, \sigma, \tilde{b}, \tilde{b}_{\text{aud,s}}, \tilde{r}_{\text{aud,s}})$$.
+
+---
+
+Previous: [Merge](merge.md) · Up: [Operations](README.md) · Next: [Confidential Transfer](transfer.md)

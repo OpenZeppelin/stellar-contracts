@@ -56,3 +56,7 @@ The contract checks `ledger.sequence() <= live_until_ledger`, updates `allowance
 ## Contract binding
 
 Unlike owner-initiated circuits, the SpenderTransfer circuit does not constrain the $$vk$$ derivation (the spender has no access to the owner's $$sk$$). Contract binding is instead inherited indirectly through the allowance commitment chain: the SetSpender circuit derives $$dvk_i$$ from the contract-specific $$vk$$ (S2, S5), which determines $$r_a$$ (S6) and thus $$C_a$$ (S7). The SpenderTransfer circuit verifies $$dvk_i$$ against $$C_a$$ via $$\sigma_a$$ (O3). Since $$C_a$$ is a public input and was constructed with contract-specific randomness, a proof generated against one contract's $$C_a$$ cannot verify against another's.
+
+---
+
+Previous: [Set Spender](set-spender.md) · Up: [Operations](README.md) · Next: [Revoke Spender](revoke-spender.md)

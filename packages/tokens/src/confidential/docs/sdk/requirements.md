@@ -46,3 +46,7 @@ Partial role coverage is conformant and MUST be declared: an implementation supp
 **The portable surface is [Crypto Core](crypto-core.md) through [Witness Assembly](proving.md#witness-assembly).** The crypto core, key derivation, and witness assembly are what two implementations must agree on byte-for-byte. The facades of [Holder Wallet](wallet.md), [Auditor Client](auditor-client.md), and [Disclosure and Indexer Clients](clients.md) are deployment-shaped, and this document constrains their obligations rather than their structure.
 
 This document is versioned with the protocol documentation set. A change to any primitive in [Crypto Core](crypto-core.md), to the derivation in [Key Derivation](key-derivation.md), to the ephemeral-scalar derivation ([ECDH-Derived Blinding](../protocol/keys-and-commitments.md#ecdh-derived-blinding), restated in [Deterministic ephemeral scalars](wallet.md#deterministic-ephemeral-scalars)), or to the domain separators in [Domain separators](crypto-core.md#domain-separators) breaks the cross-implementation contract: it MUST bump the protocol documentation version, MUST be called out in release notes, and MUST be accompanied by updated fixtures in `circuits/lib/testdata/`. A change to the numeric value of a domain separator, or to the sponge convention, invalidates every previously derived key and every previously emitted ciphertext, and is a new deployment rather than an upgrade.
+
+---
+
+Previous: [Disclosure and Indexer Clients](clients.md) · Up: [Documentation Index](../README.md)

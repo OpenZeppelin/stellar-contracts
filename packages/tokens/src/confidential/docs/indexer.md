@@ -128,3 +128,7 @@ An auditor's allowance tracking is strictly event-scoped and has no state-based 
 ## Conformance and Versioning
 
 An implementation conforms to this specification iff it satisfies [Data Model](#data-model) through [Retention Obligations](#retention-obligations) and exposes the normative capabilities C2, C3, and C4 (C1 is RECOMMENDED). This document is versioned with the protocol documentation set; breaking changes to the archived record shape or the normative capabilities bump the protocol documentation version and MUST be called out in release notes.
+
+---
+
+Up: [Documentation Index](README.md)

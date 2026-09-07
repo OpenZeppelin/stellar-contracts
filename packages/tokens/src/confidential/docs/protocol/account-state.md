@@ -75,3 +75,7 @@ A spender transfer avoids this by splitting the salt's two jobs: opening the sto
 The ledger number at which the delegation expires. The delegation is live while `ledger.sequence() <= live_until_ledger` and expired once `ledger.sequence() > live_until_ledger`. Checked on every `confidential_transfer_from`. The entry lives in persistent, not temporary, storage: automatic cleanup would destroy escrowed funds.
 
 The `(owner, spender)` storage entry holds at most one delegation. `set_spender` ([Set Spender](operations/set-spender.md)) reverts if a delegation already exists for that pair, regardless of whether the existing delegation is past `live_until_ledger`. Expiry only prevents the spender from spending; the escrowed value persists on-chain until `revoke_spender` ([Revoke Spender](operations/revoke-spender.md)) folds it back into the owner's spendable balance. Re-delegating to the same spender therefore requires the sequence: `revoke_spender` then `set_spender`. This rule is what keeps the balance-conservation invariant ([Balance Conservation](security.md#balance-conservation)) well-defined over stored delegations: every delegation is either active, expired-pending-revoke, or absent, and the escrowed value is never silently dropped.
+
+---
+
+Previous: [Wallet State and Recovery](wallet-state.md) · Up: [Documentation Index](../README.md) · Next: [Operations](operations/README.md)

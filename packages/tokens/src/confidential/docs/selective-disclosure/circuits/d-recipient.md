@@ -33,3 +33,7 @@ D1 and D2 anchor the proof to the disclosing account's on-chain record without r
 ## Verifier flow
 
 Follow [Verifier Protocol](../protocol.md#verifier-protocol) with `circuit_id = D-recipient`. Step 2 resolves $$\text{PVK}_A$$ at $$E.\text{to}$$ (the only account record this variant consults). On success, the recipient now knows that the named on-chain event paid the named account exactly $$v_{\text{transfer}}$$ tokens, and learns nothing else.
+
+---
+
+Previous: [Disclosure Protocol](../protocol.md) · Up: [Documentation Index](../../README.md) · Next: [D-sender](d-sender.md)

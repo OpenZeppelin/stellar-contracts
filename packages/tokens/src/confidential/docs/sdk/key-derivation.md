@@ -84,3 +84,7 @@ Recovering a signer-root account requires the enrolled signer ([Signer roots](#s
 3. Read the account record at that address and compare its stored spending public key against $$Y$$. A match identifies a registered confidential account belonging to this signer.
 
 Step 2 needs a signature rather than a hash, so a client that cannot sign locally SHOULD drive recovery from its own per-account record instead of scanning ([Signer roots](#signer-roots)). An account registered under a raw root, or under a signer that is neither held nor reproducible, is not reachable by any scan: only the direct import of a previously exported $$sk$$ recovers it.
+
+---
+
+Previous: [Crypto Core](crypto-core.md) · Up: [Documentation Index](../README.md) · Next: [Conformance Vectors](conformance.md)

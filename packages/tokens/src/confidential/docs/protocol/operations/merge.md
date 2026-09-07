@@ -23,3 +23,7 @@ No value is created or destroyed. $$\square$$
 ## Encrypted balance
 
 Merge emits no $$\tilde{b}$$ (there is no proof to enforce consistency between $$\tilde{b}$$ and the post-merge $$C_{\text{spend}}$$). The next owner-initiated proof operation issues a fresh checkpoint. The auditor tracks incoming amounts independently from transfer events.
+
+---
+
+Previous: [Deposit](deposit.md) · Up: [Operations](README.md) · Next: [Withdrawal](withdraw.md)

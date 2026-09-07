@@ -9,3 +9,7 @@ and adds it to the recipient's receiving balance:
 $$C_{\text{receive}} \leftarrow C_{\text{receive}} + C_{\text{dep}}$$
 
 No proof required. The recipient `to` **must** be registered: the receiving-balance update writes into `to`'s `ConfidentialAccount` storage entry. The depositor `from` does **not** need a registered confidential account; only the SEP-41 `token.transfer(from, self, a)` authorization is required. The recipient's off-chain state updates: $$v_{\text{receive}} \mathrel{+}= a$$, $$r_{\text{receive}} \mathrel{+}= 0$$.
+
+---
+
+Previous: [Registration](register.md) · Up: [Operations](README.md) · Next: [Merge](merge.md)

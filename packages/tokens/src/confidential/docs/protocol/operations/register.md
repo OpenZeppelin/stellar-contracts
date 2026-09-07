@@ -31,3 +31,7 @@ $$sk$$.
 The contract validates that `auditor_id` exists in the auditor contract and points to a valid key, then stores `spending_public_key`, `viewing_public_key`, `auditor_id`, and initializes `spendable_commitment = receiving_commitment = ` $$\mathcal{O}$$.
 
 **Auditor selection.** The registering account owner chooses `auditor_id` freely: the register proof does not constrain it, and the core validates only that the id exists in the auditor registry. On a shared auditor registry, deployments that must restrict which auditors an account may bind to MUST enforce that restriction in their `Hooks::on_register` implementation — the default `ComplianceHooks::on_register` deliberately does not restrict it. See [Restrict Auditor Selection](../../compliance.md#restrict-auditor-selection) for a worked example.
+
+---
+
+Up: [Operations](README.md) · Next: [Deposit](deposit.md)

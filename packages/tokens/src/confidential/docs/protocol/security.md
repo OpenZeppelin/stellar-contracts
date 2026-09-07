@@ -67,3 +67,7 @@ Because $$\sigma$$ is sampled fresh via CSPRNG for every operation, a retry afte
 *Proof.* Every spending proof includes the current on-chain commitment ($$C_{\text{spend}}$$ or $$C_a$$) as a public input. Upon successful verification, the contract replaces this commitment with the proof's output commitment ($$C_{\text{spend}}'$$ or $$C_a'$$). A replayed proof references the old commitment, which no longer matches the stored state, so verification fails. The same argument applies to spender transfers via $$C_a$$. $$\square$$
 
 **Corollary.** No explicit nullifier or nonce is needed. State binding through commitment chaining provides replay protection as an inherent property of the protocol.
+
+---
+
+Previous: [Auditing](auditing.md) · Up: [Documentation Index](../README.md) · Next: [Proof System](proof-system.md)

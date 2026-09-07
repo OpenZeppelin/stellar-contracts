@@ -51,3 +51,7 @@ Questions an implementer must answer:
 - How do users independently reproduce a deployed VK from circuit source, toolchain, and SRS ([Structured Reference String](proof-system.md#structured-reference-string))?
 
 **Recommendation.** The strongest soundness posture is full immutability: `token`, `verifier`, `auditor`, and per-circuit verification keys all fixed at deployment, with any circuit or verifier change requiring a fresh deployment and an explicit user-side migration. Where operational realities make full immutability impractical (for example, a discovered soundness bug in a circuit or verifier that needs a fast fix), implementers may expose admin-guarded upgrade entrypoints for the `verifier` address or per-circuit VKs. In that case the upgrade path should be gated.
+
+---
+
+Previous: [Primitives](primitives.md) · Up: [Documentation Index](../README.md) · Next: [Key Hierarchy and Commitment Scheme](keys-and-commitments.md)

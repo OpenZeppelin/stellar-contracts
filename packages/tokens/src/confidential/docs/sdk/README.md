@@ -65,3 +65,7 @@ Five roles consume the protocol. Each holds distinct key material and MUST be *s
 | Auditor | Auditor secret $$k$$ | Decrypt both channels for accounts bound to its `auditor_id` ([Per-Transfer Auditor Ciphertexts](../protocol/auditing.md#per-transfer-auditor-ciphertexts)) |
 | Disclosure recipient | $$(r_R, P_R)$$ | Verify a disclosure proof and recover the disclosed amount |
 | Observer | Nothing | Read commitments, ciphertexts, ephemerals, addresses, public amounts |
+
+---
+
+Up: [Documentation Index](../README.md) · Next: [Crypto Core](crypto-core.md)

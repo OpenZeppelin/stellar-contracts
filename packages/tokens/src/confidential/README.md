@@ -29,7 +29,7 @@ confidential/
 ├── compliance/     # turnkey ComplianceHooks: freeze, SAC passthrough, external policy
 ├── circuits/       # Noir/UltraHonk circuits + pinned VKs
 └── docs/
-    ├── README.md                  # documentation index: map, normativity, citation rules
+    ├── README.md                  # documentation index: where to start, map, citation rules
     ├── protocol/                  # normative protocol specification, one topic per file
     │   └── operations/            # one file per entry point
     ├── compliance.md              # compliance-extension specification
@@ -99,7 +99,9 @@ pin and re-extraction procedure.
 
 ## Documentation
 
-[`docs/README.md`](./docs/README.md) maps the documentation set: the
-normative protocol specification under [`docs/protocol/`](./docs/protocol/),
-the compliance, selective-disclosure, indexer, and SDK companions, and the
-citation rules that CI enforces with lychee.
+Start with [`docs/overview.md`](./docs/overview.md) for the design without
+mathematics, then read the protocol specification from
+[`docs/protocol/README.md`](./docs/protocol/README.md) onward; each file
+links to the next. [`docs/README.md`](./docs/README.md) maps the whole set:
+reading paths per role, the compliance, selective-disclosure, indexer, and
+SDK companions, and the citation rules that CI enforces with lychee.

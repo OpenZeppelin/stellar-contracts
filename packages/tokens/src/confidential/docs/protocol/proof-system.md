@@ -185,3 +185,7 @@ Requires `bn254_fr_{add, sub, mul, inv}` host calls (CAP-80, [Dependency: CAP-80
 3. **Auditor keys (the only proof-less entry point).** $$K_{\text{aud}}$$ is registered in the auditor contract by the auditor itself, with no accompanying proof. The auditor contract performs canonical encoding, on-curve ($$y^2 \equiv x^3 - 17 \pmod{r}$$), and non-identity checks at insertion ([Components](system-model.md#components)); the contract trusts the fetched value.
 
 **Canonical encoding** ($$x, y \in [0, r)$$ as 32-byte representatives) is enforced **by the contract** at the verifier boundary, not by the Soroban host, which reduces non-canonical inputs rather than rejecting them ([Host deserialiser caveat](primitives.md#host-deserialiser-caveat)). Every prover-supplied scalar and coordinate that reaches the verifier — and therefore every byte string that gets persisted or emitted downstream — is the unique canonical representative of its field element.
+
+---
+
+Previous: [Security Analysis](security.md) · Up: [Documentation Index](../README.md) · Next: [Interface](interface.md)

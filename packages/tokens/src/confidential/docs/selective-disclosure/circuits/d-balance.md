@@ -50,3 +50,7 @@ where `account` is the disclosing address (agreed during the request, not blindl
 4. **Verify proof and decrypt** as in [Verifier Protocol](../protocol.md#verifier-protocol) steps 5–6 (decryption applies only to the value-revealing variant).
 
 The recipient and prover MUST agree on $$V_{\text{threshold}}$$ during the request — otherwise the holder could pick a threshold the recipient never authorized and produce a proof against it. The freshness of the disclosure is the ledger at which the recipient read $$C_{\text{spend}}$$: if $$C_{\text{spend}}$$ changed between proving and verification — by the holder's own operation, or without the holder's participation through a compliance clawback or forced revocation ([Contract Flow](../../compliance.md#contract-flow), [Forced Revocation](../../compliance.md#forced-revocation)) — verification fails naturally; the prover then re-runs against the new commitment.
+
+---
+
+Previous: [D-auditor](d-auditor.md) · Up: [Documentation Index](../../README.md) · Next: [Aggregate Disclosures](aggregate.md)

@@ -20,3 +20,7 @@ The fold works for both active and expired-but-not-revoked delegations ([Spender
 ## Encrypted balance
 
 Revocation emits no $$\tilde{b}$$ and is not a checkpoint ([Wallet State and Recovery](../wallet-state.md)); the next owner-initiated proof operation issues a fresh checkpoint. The auditor carries its opening of $$C_{\text{spend}}$$ through the fold as [Per-Transfer Auditor Ciphertexts](../auditing.md#per-transfer-auditor-ciphertexts) specifies, using the opening of $$C_a$$ it holds from the delegation's last state change ([Spender Allowance Auditing](../auditing.md#spender-allowance-auditing)).
+
+---
+
+Previous: [Spender Transfer](spender-transfer.md) · Up: [Operations](README.md) · Next: [Auditing](../auditing.md)

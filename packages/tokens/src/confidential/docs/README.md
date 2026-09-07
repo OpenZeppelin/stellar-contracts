@@ -1,22 +1,21 @@
 # Confidential Token Documentation
 
-Specification set for the confidential token module. Each file owns one topic. The protocol specification is the `protocol/` directory read in the order given below; the remaining files are companion specifications that cite it.
+Documentation set for the confidential token module. The protocol specification is the `protocol/` directory, one topic per file, read top to bottom; the companion specifications for compliance, selective disclosure, indexing, and the SDK cite it. Every file ends with a footer linking to the previous file, the next file, and this index.
 
-## Normativity and precedence
+## Where to Start
 
-- `protocol/` is normative for the on-chain protocol. `compliance.md` is normative for the optional compliance extension, `selective-disclosure/` for the off-chain disclosure layer, `indexer.md` for the durable event archive, and `sdk/` for client implementations. `overview.md` is non-normative.
-- Where a document and `circuits/lib/src/lib.nr` disagree about a primitive, the Noir library is authoritative. The contract's `#[contracttype]` definitions are authoritative for the shape of on-chain types and payloads.
-- Every fact has one owning section. Other files cite it rather than restating it.
-
-## Citing a section
-
-Cite by relative path and heading anchor, for example `protocol/wallet-state.md#recovery`: as a Markdown link from the docs, as a plain `docs/...` path from Rust and Noir comments. Anchors are GitHub heading slugs: lower-case, punctuation removed, spaces replaced by hyphens. Constraint identifiers such as `T_a9`, `S14`, or `CB3` are stable and may be cited by name.
-
-CI resolves every such reference with lychee, the docs directly and the code citations through a generated link list, and fails on a missing file or heading. Headings carry no LaTeX: lychee drops math when it derives a heading slug and GitHub does not.
+- **New to the design:** [overview.md](overview.md) explains what the token does, why it is a separate contract, and how each user flow works, without mathematics. Its footer leads into the protocol specification at [protocol/README.md](protocol/README.md).
+- **Protocol, end to end:** the [Protocol](#protocol) table below in order, or follow the footers from [protocol/README.md](protocol/README.md). Concatenating the files in this order reproduces the specification as a single document.
+- **Contract implementer or reviewer:** [protocol/interface.md](protocol/interface.md), [protocol/operations/](protocol/operations/README.md), [protocol/proof-system.md](protocol/proof-system.md), [compliance.md](compliance.md).
+- **Wallet or SDK implementer:** [sdk/README.md](sdk/README.md) through [sdk/requirements.md](sdk/requirements.md) in file order, then [indexer.md](indexer.md) and [selective-disclosure/README.md](selective-disclosure/README.md) onward.
+- **Auditor operator:** [protocol/auditing.md](protocol/auditing.md), [sdk/auditor-client.md](sdk/auditor-client.md), the [Clawback](compliance.md#clawback) section of `compliance.md`.
+- **Indexer operator:** [indexer.md](indexer.md), [protocol/wallet-state.md](protocol/wallet-state.md).
 
 ## Map
 
 ### Protocol
+
+Table order is reading order.
 
 | File | Owns |
 |:---|:---|
@@ -26,7 +25,7 @@ CI resolves every such reference with lychee, the docs directly and the code cit
 | [protocol/keys-and-commitments.md](protocol/keys-and-commitments.md) | Key hierarchy, balance commitments, ECDH-derived blinding, anti-poisoning constraint, encrypted balance scalar |
 | [protocol/wallet-state.md](protocol/wallet-state.md) | Wallet accumulators, update rules, checkpoints, consistency check, recovery procedure and its properties, event-durability requirement |
 | [protocol/account-state.md](protocol/account-state.md) | `ConfidentialAccount` and `SpenderDelegation` storage entries, transfer nonce |
-| [protocol/operations/README.md](protocol/operations/README.md) | Public-input sources and the trust-boundary rule, index of operations |
+| [protocol/operations/README.md](protocol/operations/README.md) | Index of operations, public-input sources and the trust-boundary rule |
 | [protocol/operations/](protocol/operations/) | One file per operation: constraints, public inputs, private witnesses, post-verification state |
 | [protocol/auditing.md](protocol/auditing.md) | Auditor ciphertexts, opening capabilities, key rotation, spender and allowance auditing |
 | [protocol/security.md](protocol/security.md) | Griefing resistance, merge safety, balance conservation, privacy properties, revert safety, replay protection |
@@ -55,10 +54,14 @@ CI resolves every such reference with lychee, the docs directly and the code cit
 | [sdk/requirements.md](sdk/requirements.md) | Security requirements, non-functional requirements, conformance and versioning |
 | [overview.md](overview.md) | Non-normative user-flows overview |
 
-## Reading order
+## Normativity and Precedence
 
-- **Protocol, end to end:** `protocol/README.md`, `primitives.md`, `system-model.md`, `keys-and-commitments.md`, `wallet-state.md`, `account-state.md`, `operations/`, `auditing.md`, `security.md`, `proof-system.md`, `interface.md`, `domain-separators.md`. Concatenating the files in this order reproduces the specification as a single document.
-- **Contract implementer or reviewer:** `protocol/interface.md`, `protocol/operations/`, `protocol/proof-system.md`, `compliance.md`.
-- **Wallet or SDK implementer:** `sdk/README.md` through `sdk/requirements.md` in file order, then `indexer.md` and `selective-disclosure/`.
-- **Auditor operator:** `protocol/auditing.md`, `sdk/auditor-client.md`, the clawback sections of `compliance.md`.
-- **Indexer operator:** `indexer.md`, `protocol/wallet-state.md`.
+- `protocol/` is normative for the on-chain protocol. `compliance.md` is normative for the optional compliance extension, `selective-disclosure/` for the off-chain disclosure layer, `indexer.md` for the durable event archive, and `sdk/` for client implementations. `overview.md` is non-normative.
+- Where a document and `circuits/lib/src/lib.nr` disagree about a primitive, the Noir library is authoritative. The contract's `#[contracttype]` definitions are authoritative for the shape of on-chain types and payloads.
+- Every fact has one owning section. Other files cite it rather than restating it.
+
+## Citing a Section
+
+Cite by relative path and heading anchor, for example `protocol/wallet-state.md#recovery`: as a Markdown link from the docs, as a plain `docs/...` path from Rust and Noir comments. Anchors are GitHub heading slugs: lower-case, punctuation removed, spaces replaced by hyphens. Constraint identifiers such as `T_a9`, `S14`, or `CB3` are stable and may be cited by name.
+
+CI resolves every such reference with lychee, the docs directly and the code citations through a generated link list, and fails on a missing file or heading. Headings carry no LaTeX: lychee drops math when it derives a heading slug and GitHub does not.

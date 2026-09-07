@@ -100,3 +100,7 @@ The disclosure layer inherits the protocol's threat model ([Threat Model](../pro
 **Auditor is the prover for D-auditor variants.** The auditor is trusted to disclose accurately when asked. The auditor's existing trust scope ([Trust Assumptions](../protocol/system-model.md#trust-assumptions)) is not enlarged. That scope includes the full Pedersen opening of every $$C_a$$ ([Spender Allowance Auditing](../protocol/auditing.md#spender-allowance-auditing)) and, at each checkpoint event that escrows `lane[2]`, of the account's $$C_{\text{spend}}$$ as of that event ([Sender-auditor opening capability](../protocol/auditing.md#sender-auditor-opening-capability), [Auditor Visibility Properties](../protocol/auditing.md#auditor-visibility-properties)). The latter is standing rather than event-scoped: it carries across merges and across `revoke_spender` ([Per-Transfer Auditor Ciphertexts](../protocol/auditing.md#per-transfer-auditor-ciphertexts)). The D-auditor variants expose to a disclosure recipient only what the chosen variant states.
 
 **Disclosure recipient is honest-but-curious.** The recipient correctly verifies proofs and decrypts ciphertexts addressed to their key. The recipient may attempt to replay or rebroadcast proofs; nonce binding prevents reuse against other parties.
+
+---
+
+Up: [Documentation Index](../README.md) · Next: [Disclosure Protocol](protocol.md)

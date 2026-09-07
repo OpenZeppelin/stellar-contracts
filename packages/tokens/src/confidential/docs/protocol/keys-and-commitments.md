@@ -104,3 +104,7 @@ Owner-initiated operations (transfers, withdrawals) produce a new spendable bala
 $$\tilde{b} = v_{\text{new}} + \text{Poseidon}(\delta_{\text{enc\\\_bal}}, vk, \sigma)$$
 
 where $$v_{\text{new}}$$ is the new spendable balance and $$\sigma$$ is the prover-chosen random salt. The contract emits $$\tilde{b}$$ in the operation's event ([Event Schema](interface.md#event-schema)) rather than storing it on-chain; the contract never reads it after the proof has bound it to $$C_{\text{spend}}$$. Anyone with $$vk$$ recovers $$v_{\text{new}} = \tilde{b} - \text{Poseidon}(\delta_{\text{enc\\\_bal}}, vk, \sigma)$$ from the event. The primary consumer is the owner's wallet for checkpoint recovery ([Wallet State and Recovery](wallet-state.md)); auditors do not hold $$vk$$ and instead read balances via per-transfer ECDH ciphertexts ([Per-Transfer Auditor Ciphertexts](auditing.md#per-transfer-auditor-ciphertexts)). The circuit enforces consistency between $$\tilde{b}$$ and the committed value in $$C_{\text{spend}}$$.
+
+---
+
+Previous: [System Model](system-model.md) · Up: [Documentation Index](../README.md) · Next: [Wallet State and Recovery](wallet-state.md)

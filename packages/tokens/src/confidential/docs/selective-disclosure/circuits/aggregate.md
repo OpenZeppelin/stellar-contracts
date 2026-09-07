@@ -29,3 +29,7 @@ $$sk_A$$, $$vk_A$$, $$\\{v_{\text{transfer},i}\\}_{i=1}^n$$, $$r_{\text{disc}}$$
 The recipient filters the $$n$$ events off-chain by the criteria they care about (sender address, block timestamp) before constructing the verifier's public inputs. They learn the aggregate $$V_{\text{total}}$$ but not the individual amounts. If THRESH is included and the recipient does not need the aggregate value itself, U1–U3 can be omitted; the proof's mere validity asserts the threshold.
 
 Aggregate disclosures over outbound transfers use the D-sender constraint block per event; aggregate auditor disclosures use the D-auditor block per event.
+
+---
+
+Previous: [D-balance](d-balance.md) · Up: [Documentation Index](../../README.md) · Next: [Security and Implementation Notes](../security.md)

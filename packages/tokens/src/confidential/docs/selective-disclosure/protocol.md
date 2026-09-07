@@ -151,3 +151,7 @@ The diagram below shows the D-recipient case. D-sender and D-auditor follow the 
 ```
 
 The recipient MAY agree on ref_E in step (1) ahead of time (e.g., "disclose the transfer at tx 0xabc, log #3") or leave it to the holder, in which case the bundle in step (4) is the first time ref_E is communicated; either way the verifier resolves it independently in step (5). There is no on-chain transaction for the disclosure itself. Steps (1) and (4) flow over any authenticated channel the parties already use (TLS, signed email, dedicated compliance API).
+
+---
+
+Previous: [Selective Disclosure](README.md) · Up: [Documentation Index](../README.md) · Next: [D-recipient](circuits/d-recipient.md)

@@ -170,3 +170,7 @@ The contract, the SDK, the wallet, and any indexer reproduce the same Field valu
 |:---|:---|:---|
 | $$\text{addr\\\_f}$$ | Once, by the contract's `__constructor` over `env.current_contract_address()` | Stored as a single Field in the contract's **instance storage** ([Governance and Upgradeability](system-model.md#governance-and-upgradeability)); read on every proof verification |
 | $$\text{op}_i$$ | Per-call, by the contract at `set_spender` over the `spender` argument | Not stored; recomputed each call. The circuit binds it via S5 and absorbs it as the S12 / S14 escrow nonce. |
+
+---
+
+Previous: [Introduction](README.md) · Up: [Documentation Index](../README.md) · Next: [System Model](system-model.md)

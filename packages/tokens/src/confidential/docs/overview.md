@@ -216,3 +216,7 @@ The recovery process is fully deterministic given the master secret and access t
 - **Spam resistance.** Incoming transfers cannot block or delay spending. They modify only the receiving balance; spend proofs reference only the spendable balance, so in-flight proofs remain valid regardless of incoming activity ([Griefing Resistance](protocol/security.md#griefing-resistance)).
 - **Failed transactions.** If a transaction reverts, the wallet uses a fresh random salt on retry, producing different deterministic randomness. This prevents an observer who saw the reverted transaction from correlating the retried commitment. The salt is a public input so the auditor can still reconstruct state.
 - **Spender expiry.** Delegations carry a `live_until_ledger` after which spender transfers are rejected, and an expired delegation still holds its escrow until the owner revokes it ([Spender Delegation](protocol/account-state.md#spender-delegation)), so the wallet should surface upcoming expirations and facilitate renewal or revocation.
+
+---
+
+Up: [Documentation Index](README.md) · Next: [Introduction](protocol/README.md)
