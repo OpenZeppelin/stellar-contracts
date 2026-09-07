@@ -7,7 +7,7 @@ An account provides a Grumpkin spending key $$Y$$, a public viewing key $$\text{
 | # | Constraint |
 |:--|:---|
 | R1 | $$Y = sk \cdot H$$ (spending key well-formed) |
-| R2 | $$vk = \text{Poseidon}(\delta\_{\text{vk}}, sk, \text{addr\\\_f})$$ (viewing key correctly derived, binds proof to contract) |
+| R2 | $$vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr\\\_f})$$ (viewing key correctly derived, binds proof to contract) |
 | R3 | $$\text{PVK} = vk \cdot H$$ (public viewing key matches $$vk$$) |
 | R4 | $$sk \neq 0$$ (rules out $$Y = \mathcal{O}$$) |
 | R5 | $$vk \neq 0$$ (rules out $$\text{PVK} = \mathcal{O}$$, which would collapse every incoming-transfer ECDH) |

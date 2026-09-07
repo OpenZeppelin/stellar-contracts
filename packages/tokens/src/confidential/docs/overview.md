@@ -125,7 +125,7 @@ The system supports **real-time auditing** via a dual-auditor model. Each accoun
 | What | Recipient's auditor sees | Sender's auditor sees |
 |:-----|:------------------------|:---------------------|
 | Transfer amount | Yes | Yes |
-| Per-transfer Pedersen randomness $r_{\text{transfer}}$ | Yes (enables Pedersen-opening reconstruction of the recipient's receiving balance) | No |
+| Per-transfer Pedersen randomness $$r_{\text{transfer}}$$ | Yes (enables Pedersen-opening reconstruction of the recipient's receiving balance) | No |
 | Sender's post-transfer balance | No | Yes |
 | Withdrawal amount | n/a | Yes (publicly visible) |
 | Post-withdrawal balance | n/a | Yes |
@@ -133,7 +133,7 @@ The system supports **real-time auditing** via a dual-auditor model. Each accoun
 | Spender escrow amount | n/a | Yes (owner's auditor) |
 | Post-transfer spender allowance | No (for spender transfers) | Yes (owner's auditor) |
 | Post-escrow balance | n/a | Yes (owner's auditor), at spender setup |
-| Allowance blinding $r_a$ | No | Yes (owner's auditor), at spender setup and every spender transfer |
+| Allowance blinding $$r_a$$ | No | Yes (owner's auditor), at spender setup and every spender transfer |
 
 The table covers every auditor ciphertext the protocol produces; [Auditing](protocol/auditing.md) is the normative account, including the bounds on each opening capability.
 
@@ -144,7 +144,7 @@ Each auditor decrypts its ciphertexts by running the channel sponge (recipient-a
 - **Per-account auditor selection.** Each account selects an auditor at registration. The `auditor_id` is immutable and determines which auditor receives ciphertexts for the account's activity.
 - **Dual-auditor ciphertexts.** The ciphertexts each operation produces are enforced by its zero-knowledge proof, so they cannot be omitted or malformed, and no extra action is needed from users.
 - **Per-account scope.** Auditing one account reveals nothing about any other account.
-- **Recipient-side opening capability.** The recipient's auditor holds the per-transfer Pedersen blinding $r_{\text{transfer}}$, hence the full Pedersen opening of the recipient's receiving balance between merges, which is what enables the seizure/clawback flow specified in [Clawback](compliance.md#clawback); the capability and its bounds are specified in [Per-Transfer Auditor Ciphertexts](protocol/auditing.md#per-transfer-auditor-ciphertexts).
+- **Recipient-side opening capability.** The recipient's auditor holds the per-transfer Pedersen blinding $$r_{\text{transfer}}$$, hence the full Pedersen opening of the recipient's receiving balance between merges, which is what enables the seizure/clawback flow specified in [Clawback](compliance.md#clawback); the capability and its bounds are specified in [Per-Transfer Auditor Ciphertexts](protocol/auditing.md#per-transfer-auditor-ciphertexts).
 - **Seizure.** A deployment that opts into the compliance extension can reduce a frozen account's balance by a public amount against a proof that the amount does not exceed what the account holds; the proof is produced by the auditor or the owner, never by the admin alone, and the account stays spendable afterwards ([Clawback](compliance.md#clawback)).
 - **Sender-side opening capability.** The sender's auditor holds the opening of the account's spendable balance as of each withdrawal, outgoing transfer, and spender setup, because those operations also encrypt the post-operation blinding factor to it. Because one key serves both of an account's auditor channels, the capability survives merges; its bounds are specified in [Per-Transfer Auditor Ciphertexts](protocol/auditing.md#per-transfer-auditor-ciphertexts).
 - **Seamless auditor rotation.** When an auditor key is rotated, the new key immediately receives ciphertexts on subsequent operations. For the sender's auditor, the balance checkpoint at the next owner-initiated proof operation (transfer, withdrawal, or set spender) provides the current balance with no event replay; [Auditor Key Management and Rotation](protocol/auditing.md#auditor-key-management-and-rotation) bounds what a rotated key can open beyond that checkpoint.

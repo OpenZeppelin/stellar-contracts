@@ -50,25 +50,25 @@ SpenderDelegation {
 
 ### `allowance_commitment`
 
-The spender's remaining escrowed allowance, a single Pedersen commitment: $$C\_a = \text{Com}(v\_a, r\_a)$$ where $$r\_a = \text{Poseidon}(\delta\_{\text{allow\\\_r}}, dvk\_i, \sigma\_a)$$. One Grumpkin point (64 bytes).
+The spender's remaining escrowed allowance, a single Pedersen commitment: $$C_a = \text{Com}(v_a, r_a)$$ where $$r_a = \text{Poseidon}(\delta_{\text{allow\\\_r}}, dvk_i, \sigma_a)$$. One Grumpkin point (64 bytes).
 
 ### `a_tilde`
 
-Poseidon-encrypted allowance scalar: $$\tilde{a} = v\_a + \text{Poseidon}(\delta\_{\text{enc\\\_allow}}, dvk\_i, \sigma\_a)$$. Enables the spender (who holds $$dvk\_i$$ via `escrowed_dvk`) to read the current allowance without DLP when constructing an `SpenderTransfer` witness. The owner can also read it via $$vk \rightarrow dvk\_i$$. It is emitted alongside `allowance_salt` in the `RevokeSpender` event ([Revoke Spender](operations/revoke-spender.md)).
+Poseidon-encrypted allowance scalar: $$\tilde{a} = v_a + \text{Poseidon}(\delta_{\text{enc\\\_allow}}, dvk_i, \sigma_a)$$. Enables the spender (who holds $$dvk_i$$ via `escrowed_dvk`) to read the current allowance without DLP when constructing an `SpenderTransfer` witness. The owner can also read it via $$vk \rightarrow dvk_i$$. It is emitted alongside `allowance_salt` in the `RevokeSpender` event ([Revoke Spender](operations/revoke-spender.md)).
 
 ### `escrowed_dvk`
 
-$$dvk\_i$$ encrypted under the spender's spending key via ECDH. (64 bytes)
+$$dvk_i$$ encrypted under the spender's spending key via ECDH. (64 bytes)
 
 ### `allowance_salt`
 
-Per-delegation salt for allowance randomness derivation, encoded as `BytesN<32>` (canonical $$\mathbb{F}\_r$$ representative). $$\sigma\_a$$ is sampled by the rejection sampling procedure of [Grumpkin-BN254 Cycle](primitives.md#grumpkin-bn254-cycle) (same as $$\sigma$$), and it opens the current allowance: the stored `allowance_commitment` and `a_tilde` are both derived under it. It is not the freshness input for a spender transfer's pads -- its replacement is (*Transfer nonce* below). Set by the owner at `set_spender` and replaced by the spender on every `confidential_transfer_from`. The salt is bound to the current commitment: when the commitment changes, the salt changes with it. It is stored on-chain so the owner can decrypt the allowance at revocation without depending on event history, and it is emitted in the `RevokeSpender` event ([Revoke Spender](operations/revoke-spender.md)).
+Per-delegation salt for allowance randomness derivation, encoded as `BytesN<32>` (canonical $$\mathbb{F}_r$$ representative). $$\sigma_a$$ is sampled by the rejection sampling procedure of [Grumpkin-BN254 Cycle](primitives.md#grumpkin-bn254-cycle) (same as $$\sigma$$), and it opens the current allowance: the stored `allowance_commitment` and `a_tilde` are both derived under it. It is not the freshness input for a spender transfer's pads -- its replacement is (*Transfer nonce* below). Set by the owner at `set_spender` and replaced by the spender on every `confidential_transfer_from`. The salt is bound to the current commitment: when the commitment changes, the salt changes with it. It is stored on-chain so the owner can decrypt the allowance at revocation without depending on event history, and it is emitted in the `RevokeSpender` event ([Revoke Spender](operations/revoke-spender.md)).
 
 ### Transfer nonce
 
-Unlike $$\sigma$$, which an owner samples afresh for every operation, $$\sigma\_a$$ is stored state: a reverted transfer leaves the delegation entry untouched, so the retry is forced to reuse it. Pads keyed to it would repeat $$r\_e$$ and every mask across the two attempts, and a retry that changed the amount would publish the difference in the clear ([Poseidon2 Hash](primitives.md#poseidon2-hash)).
+Unlike $$\sigma$$, which an owner samples afresh for every operation, $$\sigma_a$$ is stored state: a reverted transfer leaves the delegation entry untouched, so the retry is forced to reuse it. Pads keyed to it would repeat $$r_e$$ and every mask across the two attempts, and a retry that changed the amount would publish the difference in the clear ([Poseidon2 Hash](primitives.md#poseidon2-hash)).
 
-A spender transfer avoids this by splitting the salt's two jobs: opening the stored allowance must be deterministic, since the value has to reproduce the randomness the commitment on-chain was built under, while keying pads must be fresh on every attempt. The stored $$\sigma\_a$$ does only the first (O3); every pad the transfer derives, and its ephemeral scalar, absorbs a prover-chosen replacement $$\sigma\_a'$$ instead ([Spender Transfer](operations/spender-transfer.md)).
+A spender transfer avoids this by splitting the salt's two jobs: opening the stored allowance must be deterministic, since the value has to reproduce the randomness the commitment on-chain was built under, while keying pads must be fresh on every attempt. The stored $$\sigma_a$$ does only the first (O3); every pad the transfer derives, and its ephemeral scalar, absorbs a prover-chosen replacement $$\sigma_a'$$ instead ([Spender Transfer](operations/spender-transfer.md)).
 
 ### `live_until_ledger`
 

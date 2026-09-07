@@ -4,7 +4,7 @@
 
 The system comprises three contracts deployed on Soroban:
 
-**Token contract.** Holds SEP-41 token balances, manages encrypted account state, and delegates proof verification via cross-contract calls. Performs Grumpkin point arithmetic through $$\mathbb{F}\_r$$ host operations for homomorphic balance updates.
+**Token contract.** Holds SEP-41 token balances, manages encrypted account state, and delegates proof verification via cross-contract calls. Performs Grumpkin point arithmetic through $$\mathbb{F}_r$$ host operations for homomorphic balance updates.
 
 **Verifier contract.** An UltraHonk verifier storing one verification key per circuit type. Accepts a circuit identifier, serialized public inputs, and a proof blob; returns success or failure. Builds on top of [NethermindEth/rs-soroban-ultrahonk](https://github.com/NethermindEth/rs-soroban-ultrahonk).
 
@@ -15,7 +15,7 @@ The system comprises three contracts deployed on Soroban:
 - The contract execution environment is trusted for correctness but not for privacy: all on-chain state and invocation inputs are public.
 - Proof verification is sound: a valid proof guarantees the proven statement holds. This depends on the UltraHonk knowledge soundness assumption *and* the integrity of the Structured Reference String ([Structured Reference String](proof-system.md#structured-reference-string)).
 - The discrete logarithm problem on Grumpkin is hard.
-- Poseidon2 ([Poseidon2 Hash](primitives.md#poseidon2-hash)) is a pseudorandom function (PRF) and is preimage-resistant over $$\mathbb{F}\_r$$ at the parameterized round count ($$R\_F = 8$$, $$R\_P = 56$$, 128-bit security target).
+- Poseidon2 ([Poseidon2 Hash](primitives.md#poseidon2-hash)) is a pseudorandom function (PRF) and is preimage-resistant over $$\mathbb{F}_r$$ at the parameterized round count ($$R_F = 8$$, $$R_P = 56$$, 128-bit security target).
 - Third parties may submit arbitrary transactions, including spam transfers to any registered account.
 
 ## Trust Assumptions
@@ -26,7 +26,7 @@ The contract, verifier, and auditor contracts are trusted code. Users trust that
 
 The contract holds units of an underlying SEP-41 token on behalf of its users. The confidential accounting invariant ([Balance Conservation](security.md#balance-conservation)) implicitly assumes:
 
-$$\sum\_i v\_{\text{committed},i} \\;\le\\; \text{token.balance}(\text{contract})$$
+$$\sum_i v_{\text{committed},i} \\;\le\\; \text{token.balance}(\text{contract})$$
 
 i.e., the total committed value across all confidential accounts never exceeds the public token balance held by the contract. The deployer's choice of underlying token determines whether that invariant is actually preserved over time. The contract itself does not, and cannot, defend against every misbehavior of the wrapped asset.
 
@@ -41,7 +41,7 @@ i.e., the total committed value across all confidential accounts never exceeds t
 
 ## Governance and Upgradeability
 
-The constructor binds the contract to fixed `admin`, `token`, `verifier`, and `auditor` addresses. It additionally computes and stores `addr_f = address_to_field(env.current_contract_address())` ([Address-to-Field Encoding](primitives.md#address-to-field-encoding)) in **instance storage** as a single canonical $$\mathbb{F}\_r$$ Field; this is the value every owner-initiated proof references via constraints R2 / W2 / T2 / S2. The compressed `addr_f` Field is computed once at construction (not recomputed per call) to ensure all proofs across the contract's lifetime bind to the same Field representative of the contract's address. Beyond that, this specification does not prescribe a governance policy for upgrading these components or for rotating per-circuit verification keys. Concrete deployments differ widely in spender structure, regulatory posture, and emergency-response requirements, so these decisions are deliberately left to implementers.
+The constructor binds the contract to fixed `admin`, `token`, `verifier`, and `auditor` addresses. It additionally computes and stores `addr_f = address_to_field(env.current_contract_address())` ([Address-to-Field Encoding](primitives.md#address-to-field-encoding)) in **instance storage** as a single canonical $$\mathbb{F}_r$$ Field; this is the value every owner-initiated proof references via constraints R2 / W2 / T2 / S2. The compressed `addr_f` Field is computed once at construction (not recomputed per call) to ensure all proofs across the contract's lifetime bind to the same Field representative of the contract's address. Beyond that, this specification does not prescribe a governance policy for upgrading these components or for rotating per-circuit verification keys. Concrete deployments differ widely in spender structure, regulatory posture, and emergency-response requirements, so these decisions are deliberately left to implementers.
 
 Questions an implementer must answer:
 

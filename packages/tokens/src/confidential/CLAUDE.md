@@ -76,6 +76,6 @@ Every sentence is a maintenance liability: a claim written twice has to be fixed
 
 ### Style
 
-- **Match the file's math style, not a global one.** `protocol/` and `selective-disclosure/` use `$$…$$` with backslash-escaped subscripts (`$$\mathbb{F}\_r$$`); `sdk/` uses `$$…$$` unescaped; `overview.md` uses single `$…$`; `indexer.md` and `compliance.md` use backticked ASCII and no LaTeX.
+- **One math style.** LaTeX is written as `$$…$$` with unescaped subscripts (`$$\mathbb{F}_r$$`); GitHub renders `\_` and `_` identically inside a math span, so the escape is noise. The only backslash-underscore that stays is LaTeX's own `\\_` inside `\text{}`. `indexer.md` and `compliance.md` use backticked ASCII and no LaTeX.
 - **Symbols are a maintained namespace.** `sk`/`vk`/`dvk_i`/`PVK`/`Y`; `r_e` and `R_e = r_e·H`; `σ` (operation salt) is distinct from `σ_a` (per-delegation allowance salt); tilde means ciphertext; `C_spend` / `C_receive` / `C_transfer` / `C_a`; `r_a` is `C_a`'s blinding and `r_a'` the post-transfer one. An audit finding once required renaming the `tx` subscript to `transfer` across the whole module.
 - Prose is full-width — no hard wrapping. One paragraph or list item per line.
