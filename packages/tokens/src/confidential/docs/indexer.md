@@ -7,7 +7,7 @@ The key words MUST, MUST NOT, SHOULD, and MAY are to be interpreted as in RFC 21
 - **Indexer operators** MUST satisfy §3–§5 for the deployment to support recovery from seed.
 - **Wallets and SDKs** MUST consume an indexer meeting this contract for recovery, and SHOULD apply the client-side verification in §7.
 
-## 1. Why the Indexer Is Load-Bearing
+## Why the Indexer Is Load-Bearing
 
 Confidential balances are Pedersen commitments; the on-chain entry alone does not reveal the opening `(v, r)` needed to spend. A wallet that loses its local cache reconstructs the opening deterministically from the master secret plus the account's event history: the latest *checkpoint* event supplies `(b_tilde, sigma)` from which the spendable opening as of that checkpoint is derived (DESIGN §5.2), while the receiving-side opening is rebuilt by replaying deposits and incoming transfers back to the account's last `Merge` or `Clawback` at or before that checkpoint, or to registration if there is none before it (§2). That same replay carries the post-checkpoint folds — `Merge`, `RevokeSpender`, and `Clawback` — onto the spendable side.
 
@@ -15,16 +15,16 @@ Stellar RPC retains events for a **7-day window** only. A wallet that loses loca
 
 **RPC and the archive compose.** A wallet need not read everything from the archive. Recent history is still live on Stellar RPC, so a client reads the recent tail from RPC directly and only the older portion — everything past the RPC retention floor — from the archive, stitching the two at a *seam* (§2) and deduplicating by event id (§3.4). The archive's obligation is therefore durable retention of everything older than the RPC window, not keeping pace with the chain head. Reading the whole history from the archive is equally conformant; the split is a client optimization. Either way the guarantee holds only if the archive does not fall so far behind that its ingested-through ledger (§6 C4) drops below the seam — see §4.
 
-## 2. Terminology
+## Terminology
 
 - **Checkpoint** — an owner-initiated proof-carrying event that publishes `(b_tilde, sigma)` for the owner's spendable balance (DESIGN §5.2; §3.2 lists the qualifying event types in ingestion scope).
 - **Replay window** — the range from `T_0` to the current ledger, where `T_0` is the account's most recent `Merge` or `Clawback` at or before its latest checkpoint, or its `Register` event if there is none before that checkpoint (DESIGN §5.2 *Recovery*). One window serves both sides: the checkpoint supplies the spendable opening as of the checkpoint, the window carries the `Merge`, `RevokeSpender`, and `Clawback` folds that follow it onto that opening, and the receiving opening is rebuilt across the window. Anchoring the receiving side at the account's last `Merge` overall is not sufficient — a `Merge` after the checkpoint reconstructs the current receiving opening correctly but leaves the spendable opening short by the amount that merge folded in, the checkpoint predating it.
 - **Event id** — the triple `(ledger_seq, tx_hash, event_index)`, unique per emitted event: `tx_hash` is globally unique, and `event_index` is unambiguous because a Soroban transaction carries a single operation. The same event MUST carry the same id whether served from the archive or from RPC, so a hybrid client can deduplicate across the seam. The id does not by itself encode position within a ledger — `tx_hash` conveys no ordering — so the canonical total order is instead `(ledger_seq, tx_application_order, event_index)`, where `tx_application_order` is persisted as its own field (§3.1) and drives §3.4.
 - **Seam** — in a hybrid client (§1) that reads the recent tail from Stellar RPC and older history from the archive, the ledger at which it switches sources. A client sets the seam above the RPC retention floor (`getHealth().oldestLedger`) so the RPC side is always served from live retention, and requires the archive's ingested-through ledger (§6 C4) to reach the seam.
 
-## 3. Data Model
+## Data Model
 
-### 3.1 Archived record
+### Archived record
 
 For every in-scope event the indexer MUST persist:
 
@@ -40,7 +40,7 @@ For every in-scope event the indexer MUST persist:
 
 Verbatim XDR is the RECOMMENDED payload: the wallet decodes it directly and, being the on-chain wire form, it survives field renames in the Rust bindings without a schema migration. A decoded representation — for example the JSON a managed indexing pipeline emits — MAY be served instead. Whichever form is served, it MUST reproduce the on-chain event exactly under that decoder. Indexers MAY additionally store decoded columns for querying.
 
-### 3.2 Events in scope
+### Events in scope
 
 All events emitted by the confidential token (DESIGN_cont §11.2) with the following recovery roles:
 
@@ -61,17 +61,17 @@ The auditor-channel fields these events carry (`v_tilde_aud_*`, `b_tilde_aud_s`,
 
 Configuration events (`UnderlyingAssetSet`, `VerifierSet`, `AuditorSet`, `AddressAsFieldSet`, verification-key events) and the compliance events `Frozen`, `Unfrozen`, and `ComplianceConfigChanged` are not needed for balance recovery; indexers SHOULD archive them anyway — they are low-volume and useful for deployment forensics.
 
-### 3.3 Account attribution
+### Account attribution
 
 Recovery is per-account, and an event belongs to **each** account address appearing in its topics — a `Transfer` to both the sender's and the recipient's history, a `SpenderTransfer` to the owner's, recipient's, and spender's, a `RevokeSpender` to the owner's and the spender's alone, a `Clawback` to the target's alone. Attribution MUST come from the event topics, never from the transaction source account.
 
 The indexer MAY apply this attribution server-side (per-account queries, §6 C2) or serve the whole per-contract stream and leave the client to select the events touching its account; both conform, since attribution is a pure function of the topics. Server-side per-account filtering is RECOMMENDED for high-volume contracts, where downloading the full contract history to every wallet does not scale.
 
-### 3.4 Ordering
+### Ordering
 
 The indexer MUST preserve and expose the total order `(ledger_seq, tx_application_order, event_index)` — all three components are persisted per §3.1. Replay correctness depends on it: interleaved deposits, transfers, merges, and revokes only reconstruct the right openings when applied in emission order (DESIGN §5.2 step 6).
 
-## 4. Ingestion Contract
+## Ingestion Contract
 
 - **Source.** Any source that yields the complete, final event stream (Stellar RPC `getEvents`, Horizon, or a captive core). Stellar ledgers are final at close; there is no reorg handling.
 - **Freshness.** The archive's ingested-through ledger (§6 C4) MUST stay within the source's retention window — at or above the seam a hybrid client would set (§2). It need not track the chain head: the RPC serves the recent tail (§1). But if it falls below the seam, a gap opens that neither source covers. Detect and backfill any gap while its ledgers are still retrievable from a source; a gap that can no longer be filled is permanent, and affected ranges MUST then be reported incomplete (§6 C3).
@@ -79,7 +79,7 @@ The indexer MUST preserve and expose the total order `(ledger_seq, tx_applicatio
 - **Gaps.** The indexer MUST track contiguous ingested ledger ranges. If a gap can no longer be backfilled from any source, the indexer MUST NOT silently serve affected histories as complete (see C3 in §6).
 - **Fidelity.** Events MUST be stored faithfully (§3.1) — verbatim XDR or a decoded form pinned to the canonical decoder. Decoding for queries is a read-side concern.
 
-## 5. Retention Obligations
+## Retention Obligations
 
 The indexer MUST retain the full per-account history of every in-scope event **indefinitely**. No pruning horizon is safe in general:
 
@@ -87,7 +87,7 @@ The indexer MUST retain the full per-account history of every in-scope event **i
 - The receiving side is replayed from the last `Merge` or `Clawback` at or before that checkpoint, which for an account that receives but never merges is its registration.
 - A `RevokeSpender` after the latest checkpoint is the only surviving record of the addend it folded: the delegation entry carrying `a_tilde` and `allowance_salt` is deleted in the same invocation (DESIGN §7.9).
 
-## 6. API Surface
+## API Surface
 
 C2–C4 below are normative; C1 is RECOMMENDED. The REST shape is RECOMMENDED — any transport exposing the same capabilities conforms.
 
@@ -113,7 +113,7 @@ GET /v1/tokens/{contract_id}/accounts/{account}/events
 
 `types` filters by event name; servers MUST apply it after attribution (§3.3), never by dropping events from storage. The `/checkpoint` endpoint implements the optional C1 and MAY be omitted. A deployment MAY instead expose history as a single per-contract stream (`GET /v1/tokens/{contract_id}/events`) and leave attribution to the client (§3.3).
 
-## 7. Trust Model and Client-Side Verification
+## Trust Model and Client-Side Verification
 
 The indexer is trusted for **availability and completeness only** — never for confidentiality or integrity:
 
@@ -121,10 +121,10 @@ The indexer is trusted for **availability and completeness only** — never for 
 - **Integrity fails closed.** Recovery ends with the wallet checking its reconstructed openings against the **on-chain** commitments (`C_spend =? v·G + r·H`, DESIGN §5.2 step 7). A tampered or incomplete history cannot produce a wrong balance that verifies; it produces a detectable mismatch.
 - **Withholding is the residual risk.** A malicious or broken indexer can deny recovery (a liveness failure, not a soundness one). Two structural mitigations: for the recent window the RPC is an independent source of the same events (the hybrid split of §1), so archive withholding bites only the pre-window history; and for that older history wallets SHOULD support multiple independent archive endpoints, with deployments running or contracting at least two.
 
-### 7.1 Auditor recovery
+### Auditor recovery
 
 An auditor's allowance tracking is strictly event-scoped and has no state-based fallback. The opening of a delegation's `C_a` is escrowed only in the event that wrote it (DESIGN_cont §8.5), so a missed, reordered, or unarchived `SetSpender` / `SpenderTransfer` leaves the auditor without that opening (DESIGN_cont §8.3 *Decryption capability across rotation*). An auditor client SHOULD verify each reconstructed allowance opening against the stored `allowance_commitment` — `C_a =? v_a·G + r_a·H` — which is the same fails-closed check §7 states for wallets. A mismatch is evidence of a missed, reordered, or pruned event rather than of a wrong balance. `live_until_ledger` governs spending authority and is independent of the delegation entry's persistent-entry TTL.
 
-## 8. Conformance and Versioning
+## Conformance and Versioning
 
 An implementation conforms to this specification iff it satisfies §3–§5 and exposes the normative capabilities C2, C3, and C4 (C1 is RECOMMENDED). This document is versioned with the protocol documentation set; breaking changes to the archived record shape or the normative capabilities bump the protocol documentation version and MUST be called out in release notes.

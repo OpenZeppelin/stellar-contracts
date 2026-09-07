@@ -35,7 +35,7 @@ The system provides **confidentiality**, not anonymity.
 
 ## Main User Flows
 
-### 1. Account Setup (Registration)
+### Account Setup (Registration)
 
 | Step | Who | What happens |
 |:-----|:----|:-------------|
@@ -48,7 +48,7 @@ The system provides **confidentiality**, not anonymity.
 
 ---
 
-### 2. Deposit (Public to Confidential)
+### Deposit (Public to Confidential)
 
 | Step | Who | What happens |
 |:-----|:----|:-------------|
@@ -60,7 +60,7 @@ Anyone can deposit into any registered account; the depositor itself does not ne
 
 ---
 
-### 3. Merge (Making Received Funds Spendable)
+### Merge (Making Received Funds Spendable)
 
 | Step | Who | What happens |
 |:-----|:----|:-------------|
@@ -71,7 +71,7 @@ Merge is the gate between received funds and spendable funds.
 
 ---
 
-### 4. Confidential Transfer
+### Confidential Transfer
 
 | Step | Who | What happens |
 |:-----|:----|:-------------|
@@ -86,7 +86,7 @@ Merge is the gate between received funds and spendable funds.
 
 ---
 
-### 5. Withdrawal (Confidential to Public)
+### Withdrawal (Confidential to Public)
 
 | Step | Who | What happens |
 |:-----|:----|:-------------|
@@ -96,7 +96,7 @@ Merge is the gate between received funds and spendable funds.
 
 ---
 
-### 6. Delegated Spending (Spenders)
+### Delegated Spending (Spenders)
 
 Spenders enable use cases like automated trading bots, payment processors, or custodial services.
 
