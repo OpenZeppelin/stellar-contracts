@@ -10,7 +10,7 @@ use soroban_sdk::{
 };
 use stellar_accounts::{
     policies::Policy,
-    smart_account::{ContextRule, Signer},
+    smart_account::{ContextRule, Signer, SmartAccountError},
 };
 
 use crate::contract::{AccountFactoryContract, AccountFactoryContractClient};
@@ -34,6 +34,28 @@ impl MockVerifierContract {
 
     pub fn batch_canonicalize_key(e: &Env, key_data: Vec<Val>) -> Vec<Bytes> {
         Vec::from_iter(e, key_data.iter().map(|key| Bytes::try_from_val(e, &key).unwrap()))
+    }
+}
+
+/// Lets tests build two External keys that are not exactly equal, but still
+/// count as the same signer — so we can check the factory rejects that as a
+/// duplicate. Identity in this mock is the first 32 bytes.
+#[contract]
+struct MockCanonicalizingVerifierContract;
+
+#[contractimpl]
+impl MockCanonicalizingVerifierContract {
+    pub fn verify(_e: &Env, _hash: Bytes, _key_data: Val, _sig_data: Val) -> bool {
+        true
+    }
+
+    pub fn canonicalize_key(e: &Env, key_data: Val) -> Bytes {
+        let key = Bytes::try_from_val(e, &key_data).unwrap();
+        key.slice(..32)
+    }
+
+    pub fn batch_canonicalize_key(e: &Env, key_data: Vec<Val>) -> Vec<Bytes> {
+        Vec::from_iter(e, key_data.iter().map(|key| Self::canonicalize_key(e, key)))
     }
 }
 
@@ -103,6 +125,18 @@ fn deployed_policies(e: &Env, account: &Address) -> Vec<Address> {
     account::Client::new(e, account).get_context_rule(&0).policies
 }
 
+fn assert_duplicate_signer(
+    result: Result<
+        Result<Address, soroban_sdk::ConversionError>,
+        Result<Error, soroban_sdk::InvokeError>,
+    >,
+) {
+    assert_eq!(
+        result,
+        Err(Ok(Error::from_contract_error(SmartAccountError::DuplicateSigner as u32)))
+    );
+}
+
 #[test]
 fn pinned_account_wasm_hash_returns_the_constructor_argument() {
     let e = Env::default();
@@ -150,7 +184,7 @@ fn deployed_account_holds_exactly_the_requested_configuration() {
 }
 
 #[test]
-fn signer_order_and_duplicates_do_not_change_the_address() {
+fn signer_order_does_not_change_the_address() {
     let e = Env::default();
     let (factory, verifier, _) = setup(&e);
     let client = AccountFactoryContractClient::new(&e, &factory);
@@ -163,13 +197,58 @@ fn signer_order_and_duplicates_do_not_change_the_address() {
         client.predict_address(&vec![&e, b.clone(), a.clone()], &no_policies(&e), &0);
     assert_eq!(order_first_second, order_second_first);
 
-    let duplicated = client.predict_address(&vec![&e, a.clone(), a.clone()], &no_policies(&e), &0);
-    let single = client.predict_address(&vec![&e, a.clone()], &no_policies(&e), &0);
-    assert_eq!(duplicated, single);
+    let deployed = client.deploy(&vec![&e, b.clone(), a.clone()], &no_policies(&e), &0);
+    assert_eq!(deployed, order_first_second);
+    let signers = deployed_signers(&e, &deployed);
+    assert_eq!(signers.len(), 2);
+    assert!(signers.contains(&a));
+    assert!(signers.contains(&b));
+}
 
-    let deployed = client.deploy(&vec![&e, a.clone(), a.clone()], &no_policies(&e), &0);
-    assert_eq!(deployed, single);
-    assert_eq!(deployed_signers(&e, &deployed), vec![&e, a]);
+#[test]
+fn exact_duplicate_signers_are_rejected() {
+    let e = Env::default();
+    let (factory, verifier, _) = setup(&e);
+    let client = AccountFactoryContractClient::new(&e, &factory);
+    let a = external(&e, &verifier, 1);
+    let b = external(&e, &verifier, 2);
+
+    assert_duplicate_signer(client.try_predict_address(
+        &vec![&e, a.clone(), a.clone()],
+        &no_policies(&e),
+        &0,
+    ));
+    assert_duplicate_signer(client.try_deploy(
+        &vec![&e, a.clone(), a.clone()],
+        &no_policies(&e),
+        &0,
+    ));
+    assert_duplicate_signer(client.try_predict_address(
+        &vec![&e, a.clone(), b.clone(), a.clone()],
+        &no_policies(&e),
+        &0,
+    ));
+}
+
+#[test]
+fn canonical_duplicate_external_signers_are_rejected() {
+    let e = Env::default();
+    let wasm_hash = e.deployer().upload_contract_wasm(account::WASM);
+    let factory = e.register(AccountFactoryContract, (wasm_hash,));
+    let verifier = e.register(MockCanonicalizingVerifierContract, ());
+    let client = AccountFactoryContractClient::new(&e, &factory);
+
+    // Same first 32 bytes, different suffixes — not equal, still a duplicate.
+    let mut key_a = Bytes::from_array(&e, &[1u8; 32]);
+    key_a.extend_from_array(&[0xAA; 8]);
+    let mut key_b = Bytes::from_array(&e, &[1u8; 32]);
+    key_b.extend_from_array(&[0xBB; 8]);
+
+    let signers =
+        vec![&e, Signer::External(verifier.clone(), key_a), Signer::External(verifier, key_b)];
+
+    assert_duplicate_signer(client.try_predict_address(&signers, &no_policies(&e), &0));
+    assert_duplicate_signer(client.try_deploy(&signers, &no_policies(&e), &0));
 }
 
 #[test]

@@ -8,7 +8,7 @@
 use soroban_sdk::{
     contract, contractimpl, contracttype, xdr::ToXdr, Address, BytesN, Env, IntoVal, Map, Val, Vec,
 };
-use stellar_accounts::smart_account::Signer;
+use stellar_accounts::smart_account::{validate_no_canonical_duplicates, Signer};
 
 #[contracttype]
 enum DataKey {
@@ -45,7 +45,7 @@ impl AccountFactoryContract {
     /// # Arguments
     ///
     /// * `signers` - Signers of the account's default context rule, in any
-    ///   order. Duplicates are removed.
+    ///   order. Duplicate identities are rejected.
     /// * `policies` - Policy contract addresses mapped to their install
     ///   parameters.
     /// * `salt` - Caller-chosen value that lets one configuration have several
@@ -68,7 +68,7 @@ impl AccountFactoryContract {
     /// # Arguments
     ///
     /// * `signers` - Signers of the account's default context rule, in any
-    ///   order. Duplicates are removed.
+    ///   order. Duplicate identities are rejected.
     /// * `policies` - Policy contract addresses mapped to their install
     ///   parameters.
     /// * `salt` - Caller-chosen value that lets one configuration have several
@@ -87,8 +87,10 @@ impl AccountFactoryContract {
     }
 }
 
-/// Sorts and deduplicates signers through a host `Map`.
+/// Rejects duplicate signer identities, then sorts through a host `Map`.
 fn canonical_signers(e: &Env, signers: &Vec<Signer>) -> Vec<Signer> {
+    validate_no_canonical_duplicates(e, signers);
+
     let mut set: Map<Signer, ()> = Map::new(e);
     for signer in signers.iter() {
         set.set(signer, ());
