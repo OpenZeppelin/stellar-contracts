@@ -219,4 +219,4 @@ The recovery process is fully deterministic given the master secret and access t
 
 ---
 
-Up: [Documentation Index](README.md) · Next: [Introduction](protocol/README.md)
+Up: [Index](README.md#companions) · Next: [Introduction](protocol/README.md)

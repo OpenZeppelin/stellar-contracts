@@ -107,4 +107,4 @@ where $$v_{\text{new}}$$ is the new spendable balance and $$\sigma$$ is the prov
 
 ---
 
-Previous: [System Model](system-model.md) · Up: [Documentation Index](../README.md) · Next: [Wallet State and Recovery](wallet-state.md)
+Previous: [System Model](system-model.md) · Up: [Index](../README.md#protocol) · Next: [Wallet State and Recovery](wallet-state.md)

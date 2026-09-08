@@ -78,4 +78,4 @@ Separating the first two matters most: they present as the same opaque failure o
 
 ---
 
-Previous: [Conformance Vectors](conformance.md) · Up: [Documentation Index](../README.md) · Next: [Holder Wallet](wallet.md)
+Previous: [Conformance Vectors](conformance.md) · Up: [Index](../README.md#companions) · Next: [Holder Wallet](wallet.md)

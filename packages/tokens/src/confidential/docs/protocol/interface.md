@@ -122,4 +122,4 @@ The auditor's allowance tracking does **not** use this method: per-event allowan
 
 ---
 
-Previous: [Proof System](proof-system.md) · Up: [Documentation Index](../README.md) · Next: [Domain Separation Constants](domain-separators.md)
+Previous: [Proof System](proof-system.md) · Up: [Index](../README.md#protocol) · Next: [Domain Separation Constants](domain-separators.md)

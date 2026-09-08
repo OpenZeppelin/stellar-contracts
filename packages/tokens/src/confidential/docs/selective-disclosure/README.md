@@ -103,4 +103,4 @@ The disclosure layer inherits the protocol's threat model ([Threat Model](../pro
 
 ---
 
-Up: [Documentation Index](../README.md) · Next: [Disclosure Protocol](protocol.md)
+Up: [Index](../README.md#companions) · Next: [Disclosure Protocol](protocol.md)

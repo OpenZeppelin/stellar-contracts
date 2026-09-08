@@ -46,4 +46,4 @@ Five Noir/UltraHonk circuits cover registration, withdrawal, confidential transf
 
 ---
 
-Previous: [User Flows Overview](../overview.md) · Up: [Documentation Index](../README.md) · Next: [Primitives](primitives.md)
+Previous: [User Flows Overview](../overview.md) · Up: [Index](../README.md#protocol) · Next: [Primitives](primitives.md)

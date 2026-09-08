@@ -25,4 +25,4 @@ Three derivations this document specifies or relies on are computed outside the 
 
 ---
 
-Previous: [Key Derivation](key-derivation.md) · Up: [Documentation Index](../README.md) · Next: [Witness Assembly, Prover, and Chain Adapter](proving.md)
+Previous: [Key Derivation](key-derivation.md) · Up: [Index](../README.md#companions) · Next: [Witness Assembly, Prover, and Chain Adapter](proving.md)

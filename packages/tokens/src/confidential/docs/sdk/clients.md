@@ -30,4 +30,4 @@ RPC and archive compose: the RPC serves the recent tail, the archive everything 
 
 ---
 
-Previous: [Auditor Client](auditor-client.md) · Up: [Documentation Index](../README.md) · Next: [Security, Non-Functional, and Conformance Requirements](requirements.md)
+Previous: [Auditor Client](auditor-client.md) · Up: [Index](../README.md#companions) · Next: [Security, Non-Functional, and Conformance Requirements](requirements.md)

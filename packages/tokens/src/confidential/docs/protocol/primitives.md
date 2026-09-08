@@ -173,4 +173,4 @@ The contract, the SDK, the wallet, and any indexer reproduce the same Field valu
 
 ---
 
-Previous: [Introduction](README.md) · Up: [Documentation Index](../README.md) · Next: [System Model](system-model.md)
+Previous: [Introduction](README.md) · Up: [Index](../README.md#protocol) · Next: [System Model](system-model.md)

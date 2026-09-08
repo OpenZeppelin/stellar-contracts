@@ -30,4 +30,4 @@ This table assigns all seventeen values; no other document assigns them. Tag 1 i
 
 ---
 
-Previous: [Interface](interface.md) · Up: [Documentation Index](../README.md)
+Previous: [Interface](interface.md) · Up: [Index](../README.md#protocol)

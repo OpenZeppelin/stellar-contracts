@@ -92,4 +92,4 @@ A spender MUST NOT be able to reach the owner's spendable balance through any in
 
 ---
 
-Previous: [Witness Assembly, Prover, and Chain Adapter](proving.md) · Up: [Documentation Index](../README.md) · Next: [Auditor Client](auditor-client.md)
+Previous: [Witness Assembly, Prover, and Chain Adapter](proving.md) · Up: [Index](../README.md#companions) · Next: [Auditor Client](auditor-client.md)

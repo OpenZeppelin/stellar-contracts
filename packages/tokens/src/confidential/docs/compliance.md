@@ -307,4 +307,4 @@ The seizure entry points add three variants to `ComplianceError`:
 
 ---
 
-Up: [Documentation Index](README.md)
+Up: [Index](README.md#companions)

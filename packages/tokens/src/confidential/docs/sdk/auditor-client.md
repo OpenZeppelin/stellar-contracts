@@ -16,4 +16,4 @@ An auditor facade MUST NOT be able to construct a spending witness. It can open 
 
 ---
 
-Previous: [Holder Wallet](wallet.md) · Up: [Documentation Index](../README.md) · Next: [Disclosure and Indexer Clients](clients.md)
+Previous: [Holder Wallet](wallet.md) · Up: [Index](../README.md#companions) · Next: [Disclosure and Indexer Clients](clients.md)

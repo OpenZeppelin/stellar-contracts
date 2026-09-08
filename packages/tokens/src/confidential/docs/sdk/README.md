@@ -68,4 +68,4 @@ Five roles consume the protocol. Each holds distinct key material and MUST be *s
 
 ---
 
-Up: [Documentation Index](../README.md) · Next: [Crypto Core](crypto-core.md)
+Up: [Index](../README.md#companions) · Next: [Crypto Core](crypto-core.md)

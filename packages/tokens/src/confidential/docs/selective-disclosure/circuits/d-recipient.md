@@ -36,4 +36,4 @@ Follow [Verifier Protocol](../protocol.md#verifier-protocol) with `circuit_id = 
 
 ---
 
-Previous: [Disclosure Protocol](../protocol.md) · Up: [Documentation Index](../../README.md) · Next: [D-sender](d-sender.md)
+Previous: [Disclosure Protocol](../protocol.md) · Up: [Index](../../README.md#companions) · Next: [D-sender](d-sender.md)

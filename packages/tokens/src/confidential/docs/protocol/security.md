@@ -70,4 +70,4 @@ Because $$\sigma$$ is sampled fresh via CSPRNG for every operation, a retry afte
 
 ---
 
-Previous: [Auditing](auditing.md) · Up: [Documentation Index](../README.md) · Next: [Proof System](proof-system.md)
+Previous: [Auditing](auditing.md) · Up: [Index](../README.md#protocol) · Next: [Proof System](proof-system.md)

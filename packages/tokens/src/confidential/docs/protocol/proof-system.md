@@ -188,4 +188,4 @@ Requires `bn254_fr_{add, sub, mul, inv}` host calls (CAP-80, [Dependency: CAP-80
 
 ---
 
-Previous: [Security Analysis](security.md) · Up: [Documentation Index](../README.md) · Next: [Interface](interface.md)
+Previous: [Security Analysis](security.md) · Up: [Index](../README.md#protocol) · Next: [Interface](interface.md)

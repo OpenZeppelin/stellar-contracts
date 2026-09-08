@@ -49,4 +49,4 @@ This document is versioned with the protocol documentation set. A change to any 
 
 ---
 
-Previous: [Disclosure and Indexer Clients](clients.md) · Up: [Documentation Index](../README.md)
+Previous: [Disclosure and Indexer Clients](clients.md) · Up: [Index](../README.md#companions)

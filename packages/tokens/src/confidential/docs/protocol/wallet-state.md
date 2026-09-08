@@ -76,4 +76,4 @@ A third party can spam an account with confidential transfers (including zero-va
 
 ---
 
-Previous: [Key Hierarchy and Commitment Scheme](keys-and-commitments.md) · Up: [Documentation Index](../README.md) · Next: [Account State](account-state.md)
+Previous: [Key Hierarchy and Commitment Scheme](keys-and-commitments.md) · Up: [Index](../README.md#protocol) · Next: [Account State](account-state.md)

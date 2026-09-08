@@ -40,4 +40,4 @@ Follow [Verifier Protocol](../protocol.md#verifier-protocol) with `circuit_id = 
 
 ---
 
-Previous: [D-sender](d-sender.md) · Up: [Documentation Index](../../README.md) · Next: [D-balance](d-balance.md)
+Previous: [D-sender](d-sender.md) · Up: [Index](../../README.md#companions) · Next: [D-balance](d-balance.md)

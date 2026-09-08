@@ -32,4 +32,4 @@ Aggregate disclosures over outbound transfers use the D-sender constraint block 
 
 ---
 
-Previous: [D-balance](d-balance.md) · Up: [Documentation Index](../../README.md) · Next: [Security and Implementation Notes](../security.md)
+Previous: [D-balance](d-balance.md) · Up: [Index](../../README.md#companions) · Next: [Security and Implementation Notes](../security.md)

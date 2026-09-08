@@ -85,4 +85,4 @@ where $$\text{enc}(a)$$ is the 56-character ASCII strkey (SEP-23), and $$\text{l
 
 ---
 
-Previous: [SDK](README.md) · Up: [Documentation Index](../README.md) · Next: [Key Derivation](key-derivation.md)
+Previous: [SDK](README.md) · Up: [Index](../README.md#companions) · Next: [Key Derivation](key-derivation.md)

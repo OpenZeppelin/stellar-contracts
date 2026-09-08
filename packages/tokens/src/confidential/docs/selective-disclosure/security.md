@@ -89,4 +89,4 @@ It returns the decrypted $$v_{\text{transfer}}$$ on successful verification, or 
 
 ---
 
-Previous: [Aggregate Disclosures](circuits/aggregate.md) · Up: [Documentation Index](../README.md)
+Previous: [Aggregate Disclosures](circuits/aggregate.md) · Up: [Index](../README.md#companions)

@@ -78,4 +78,4 @@ The `(owner, spender)` storage entry holds at most one delegation. `set_spender`
 
 ---
 
-Previous: [Wallet State and Recovery](wallet-state.md) · Up: [Documentation Index](../README.md) · Next: [Operations](operations/README.md)
+Previous: [Wallet State and Recovery](wallet-state.md) · Up: [Index](../README.md#protocol) · Next: [Operations](operations/README.md)

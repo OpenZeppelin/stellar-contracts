@@ -87,4 +87,4 @@ Step 2 needs a signature rather than a hash, so a client that cannot sign locall
 
 ---
 
-Previous: [Crypto Core](crypto-core.md) · Up: [Documentation Index](../README.md) · Next: [Conformance Vectors](conformance.md)
+Previous: [Crypto Core](crypto-core.md) · Up: [Index](../README.md#companions) · Next: [Conformance Vectors](conformance.md)

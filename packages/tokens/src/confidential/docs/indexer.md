@@ -131,4 +131,4 @@ An implementation conforms to this specification iff it satisfies [Data Model](#
 
 ---
 
-Up: [Documentation Index](README.md)
+Up: [Index](README.md#companions)

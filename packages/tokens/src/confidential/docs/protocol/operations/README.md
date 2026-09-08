@@ -27,4 +27,4 @@ Owner transfers, withdrawals, and merges proceed identically to the no-spender c
 
 ---
 
-Previous: [Account State](../account-state.md) · Up: [Documentation Index](../../README.md) · Next: [Registration](register.md)
+Previous: [Account State](../account-state.md) · Up: [Index](../../README.md#protocol) · Next: [Registration](register.md)

@@ -154,4 +154,4 @@ The recipient MAY agree on ref_E in step (1) ahead of time (e.g., "disclose the 
 
 ---
 
-Previous: [Selective Disclosure](README.md) · Up: [Documentation Index](../README.md) · Next: [D-recipient](circuits/d-recipient.md)
+Previous: [Selective Disclosure](README.md) · Up: [Index](../README.md#companions) · Next: [D-recipient](circuits/d-recipient.md)

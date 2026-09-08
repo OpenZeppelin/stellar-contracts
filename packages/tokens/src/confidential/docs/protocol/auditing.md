@@ -137,4 +137,4 @@ The auditor must have *observed* the event: the escrowed blinding lives nowhere 
 
 ---
 
-Previous: [Revoke Spender](operations/revoke-spender.md) · Up: [Documentation Index](../README.md) · Next: [Security Analysis](security.md)
+Previous: [Revoke Spender](operations/revoke-spender.md) · Up: [Index](../README.md#protocol) · Next: [Security Analysis](security.md)

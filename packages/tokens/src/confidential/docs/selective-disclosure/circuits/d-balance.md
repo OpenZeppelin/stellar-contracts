@@ -53,4 +53,4 @@ The recipient and prover MUST agree on $$V_{\text{threshold}}$$ during the reque
 
 ---
 
-Previous: [D-auditor](d-auditor.md) · Up: [Documentation Index](../../README.md) · Next: [Aggregate Disclosures](aggregate.md)
+Previous: [D-auditor](d-auditor.md) · Up: [Index](../../README.md#companions) · Next: [Aggregate Disclosures](aggregate.md)

@@ -54,4 +54,4 @@ Questions an implementer must answer:
 
 ---
 
-Previous: [Primitives](primitives.md) · Up: [Documentation Index](../README.md) · Next: [Key Hierarchy and Commitment Scheme](keys-and-commitments.md)
+Previous: [Primitives](primitives.md) · Up: [Index](../README.md#protocol) · Next: [Key Hierarchy and Commitment Scheme](keys-and-commitments.md)

@@ -65,4 +65,4 @@ Follow [Verifier Protocol](../protocol.md#verifier-protocol) with `circuit_id = 
 
 ---
 
-Previous: [D-recipient](d-recipient.md) · Up: [Documentation Index](../../README.md) · Next: [D-auditor](d-auditor.md)
+Previous: [D-recipient](d-recipient.md) · Up: [Index](../../README.md#companions) · Next: [D-auditor](d-auditor.md)
