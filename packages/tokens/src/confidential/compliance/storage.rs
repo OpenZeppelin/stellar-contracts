@@ -2,14 +2,15 @@ use soroban_sdk::{contracttype, panic_with_error, token, Address, Bytes, BytesN,
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
 use crate::confidential::{
+    auditor::ConfidentialAuditorClient,
     compliance::{
         emit_clawback, emit_compliance_config_changed, emit_frozen, emit_unfrozen, ComplianceError,
         PolicyClient, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
     storage::{
         address_to_field, append_amount, append_field, append_point, get_account,
-        get_address_as_field_element, get_underlying_asset, revoke_spender, set_commitments,
-        verify,
+        get_address_as_field_element, get_auditor, get_underlying_asset, revoke_spender,
+        set_commitments, verify,
     },
     verifier::CircuitType,
 };
@@ -190,10 +191,11 @@ pub fn unfreeze(e: &Env, account: &Address) {
 /// corresponding underlying according to `destination`.
 ///
 /// The proof establishes what the contract cannot check against committed
-/// balances: that the prover knows the Pedersen openings of `C_spend` and
-/// `C_receive` (CB1, CB2), and that `amount <= v_spend + v_receive` (CB3).
-/// The witness is producible by anyone holding the openings — the auditor, or
-/// the owner — and not by the admin, which holds no blinding.
+/// balances: that the prover holds the secret key of the auditor `account` is
+/// bound to (CB1), that it knows the Pedersen openings of `C_spend` and
+/// `C_receive` (CB2, CB3), and that `amount <= v_spend + v_receive` (CB4).
+/// The openings alone are not a secret — registration, deposits, and merges
+/// leave them public — so the witness is producible only by the auditor.
 ///
 /// The post-verification update is the [`crate::confidential::storage::merge`]
 /// rule plus a public debit — `C_spend <- C_spend + C_receive - amount * G`
@@ -217,8 +219,11 @@ pub fn unfreeze(e: &Env, account: &Address) {
 /// * [`ComplianceError::InvalidClawbackDestination`] - When `destination` is
 ///   `Some` naming this contract's own address.
 /// * refer to [`crate::confidential::storage::get_account`] errors.
+/// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
+///   errors.
 /// * [`crate::confidential::ConfidentialTokenError::NonCanonicalEncoding`] -
-///   When a stored commitment coordinate is not a canonical `Bn254Fr` value.
+///   When a stored commitment or auditor key coordinate is not a canonical
+///   `Bn254Fr` value.
 /// * [`crate::confidential::ConfidentialTokenError::InvalidProof`] - When the
 ///   proof fails verification.
 ///
@@ -260,6 +265,8 @@ pub fn clawback(
     }
 
     let data = get_account(e, account);
+    let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
+    let k_aud = auditor.get_key(&data.auditor_id);
     let addr_f = get_address_as_field_element(e);
     // Zero is an unambiguous `None` sentinel: `address_to_field` is a
     // Poseidon2 output.
@@ -269,7 +276,7 @@ pub fn clawback(
     };
 
     // PI order (COMPLIANCE §5.3):
-    //   C_spend, C_receive, alpha, addr_f, acct_f, dest_f
+    //   C_spend, C_receive, K_aud, alpha, addr_f, acct_f, dest_f
     //
     // `addr_f`, `acct_f` and `dest_f` are referenced by no constraint; their
     // membership in the public-input set binds the proof to one contract, one
@@ -277,6 +284,7 @@ pub fn clawback(
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &data.spendable_commitment);
     append_point(&mut pi, &data.receiving_commitment);
+    append_point(&mut pi, &k_aud);
     append_amount(&mut pi, e, amount);
     append_field(&mut pi, &addr_f);
     append_field(&mut pi, &address_to_field(e, account));

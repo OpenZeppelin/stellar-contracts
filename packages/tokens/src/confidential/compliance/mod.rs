@@ -207,9 +207,10 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// the same invocation and the pool remains equal to the sum of
     /// confidential claims.
     ///
-    /// `destination` is bound into the proof, so a proof built for one
-    /// destination cannot be submitted with another. `Some(d)` with `d` equal
-    /// to this contract's own address is rejected.
+    /// The proof is producible only by the auditor `account` is bound to, and
+    /// `destination` is bound into it, so a proof built for one destination
+    /// cannot be submitted with another. `Some(d)` with `d` equal to this
+    /// contract's own address is rejected.
     ///
     /// `account` MUST be frozen: the freeze keeps `C_spend` and `C_receive`
     /// unchanged between proof construction and submission, which the proof's

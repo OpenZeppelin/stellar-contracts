@@ -7,6 +7,7 @@ use soroban_sdk::{
     xdr::{AccountFlags, ToXdr},
     Address, Bytes, BytesN, Env,
 };
+use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
 use crate::confidential::{
     compliance::{
@@ -160,7 +161,9 @@ struct MockAuditor;
 
 #[contractimpl(contracttrait)]
 impl crate::confidential::auditor::ConfidentialAuditor for MockAuditor {
-    fn register_key(_e: &Env, _auditor_id: u32, _point: BytesN<64>, _operator: Address) {}
+    fn register_key(e: &Env, auditor_id: u32, point: BytesN<64>, _operator: Address) {
+        crate::confidential::auditor::storage::register_key(e, auditor_id, &point);
+    }
 
     fn rotate_key(_e: &Env, _auditor_id: u32, _new_point: BytesN<64>, _operator: Address) {}
 }
@@ -189,8 +192,15 @@ fn setup<'a>() -> Harness<'a> {
 
     let verifier = e.register(MockVerifier, ());
     let auditor = e.register(MockAuditor, ());
-    let host = e.register(TokenHost, (sac_addr.clone(), verifier, auditor));
     let admin = Address::generate(&e);
+    // Auditor 0 is the `auditor_id` every account in this suite binds to;
+    // `clawback` fetches its key for the public-input blob.
+    crate::confidential::auditor::ConfidentialAuditorClient::new(&e, &auditor).register_key(
+        &0,
+        &Grumpkin::generator(&e),
+        &admin,
+    );
+    let host = e.register(TokenHost, (sac_addr.clone(), verifier, auditor));
 
     Harness { e, host, sac_addr, sac: sac_client, admin }
 }
@@ -862,7 +872,6 @@ fn clawback_data(e: &Env) -> Bytes {
 /// Registers `account` with a spendable commitment of `amount * G` and an
 /// empty receiving side, then freezes it.
 fn frozen_account_with(h: &Harness, account: &Address, amount: u128) {
-    use stellar_contract_utils::crypto::grumpkin::Grumpkin;
     h.e.as_contract(&h.host, || {
         let identity = Grumpkin::identity(&h.e);
         let acc = ConfidentialAccount {
@@ -892,7 +901,6 @@ fn clawback_none_folds_commitments_and_moves_no_underlying() {
 
     // C_spend <- C_spend + O - 40*G, C_receive <- O.
     h.e.as_contract(&h.host, || {
-        use stellar_contract_utils::crypto::grumpkin::Grumpkin;
         let acc = crate::confidential::storage::get_account(&h.e, &alice);
         let expected = Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 60);
         assert_eq!(acc.spendable_commitment, expected);
@@ -1003,8 +1011,37 @@ fn clawback_to_self_panics() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3301)")]
+fn clawback_unregistered_auditor_panics() {
+    // The public-input blob carries the target's auditor key, so an account
+    // whose `auditor_id` has no registered key cannot be seized.
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        let identity = Grumpkin::identity(&h.e);
+        let acc = ConfidentialAccount {
+            spending_public_key: identity.clone(),
+            viewing_public_key: identity.clone(),
+            spendable_commitment: Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 100),
+            receiving_commitment: identity,
+            auditor_id: 7,
+        };
+        h.e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(alice.clone()), &acc);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &alice);
+    });
+
+    ConfidentialClawbackClient::new(&h.e, &h.host).clawback(
+        &alice,
+        &1i128,
+        &None,
+        &clawback_data(&h.e),
+        &h.admin,
+    );
+}
+
+#[test]
 fn force_revoke_spender_folds_allowance_and_deletes_delegation() {
-    use stellar_contract_utils::crypto::grumpkin::Grumpkin;
     let h = setup();
     let alice = Address::generate(&h.e);
     let spender = Address::generate(&h.e);
@@ -1063,7 +1100,6 @@ fn force_revoke_unknown_delegation_panics() {
 fn register_minimal_account(e: &Env, account: &Address) {
     // Bypass proof verification: the unregistered-deposit tests only need
     // `account_exists` to return true for selected addresses.
-    use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
     use crate::confidential::{ConfidentialAccount, ConfidentialTokenStorageKey};
     let identity = Grumpkin::identity(e);
