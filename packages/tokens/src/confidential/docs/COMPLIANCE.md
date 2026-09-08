@@ -235,7 +235,7 @@ No public input is prover-supplied (`DESIGN.md` §7.1). `addr_f`, `acct_f`, `des
 5. **Nonce.** `ClawbackNonce(account) <- nonce + 1`, where `nonce` is the value step 2 read into the public inputs. The entry is absent until the first seizure and reads as `0`; `clawback_nonce(account)` exposes it (§6).
 6. **Settlement**, by `destination`:
    - `None` — no underlying moves.
-   - `Some(d)` — exactly `amount` is transferred to `d` in the same invocation.
+   - `Some(d)` — exactly `amount` is transferred to `d` in the same invocation. `d` passes no compliance gate (§2, §3): the auditor chooses it when building the proof (§5.3) and the operator confirms it as an argument.
 7. **Event.** `Clawback { account, amount, destination }` (§6.1).
 
 **Extraction order.** The seize and the issuer's extraction are separate invocations by different parties, and Soroban admits one per transaction, so the pool sits mismatched for at least a ledger between them. Nothing in the contract enforces which comes first; under a `None` settlement the extraction must follow the seize:

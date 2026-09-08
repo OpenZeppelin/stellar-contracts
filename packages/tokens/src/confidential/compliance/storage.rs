@@ -270,7 +270,8 @@ pub fn unfreeze(e: &Env, account: &Address) {
 /// this call.
 ///
 /// Under `Some(d)`, exactly `amount` is transferred to `d` in this invocation,
-/// so the pool and the sum of claims move together.
+/// so the pool and the sum of claims move together. `d` passes no compliance
+/// gate (COMPLIANCE §5.4).
 ///
 /// # Security Warning
 ///

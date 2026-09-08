@@ -210,8 +210,9 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// The proof is producible only by the auditor `account` is bound to, and
     /// `destination` is bound into it, so a proof built for one destination
     /// cannot be submitted with another. `Some(d)` with `d` equal to this
-    /// contract's own address is rejected. The account's clawback nonce is
-    /// bound into it as well and advances on every seizure, so a proof
+    /// contract's own address is rejected; any other `d` is accepted without
+    /// passing the freeze, policy, or SAC gates. The account's clawback nonce
+    /// is bound into it as well and advances on every seizure, so a proof
     /// executes at most once.
     ///
     /// `account` MUST be frozen: the freeze keeps `C_spend` and `C_receive`
