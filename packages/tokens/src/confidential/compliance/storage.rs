@@ -5,7 +5,8 @@ use crate::confidential::{
     auditor::ConfidentialAuditorClient,
     compliance::{
         emit_clawback, emit_compliance_config_changed, emit_frozen, emit_unfrozen, ComplianceError,
-        PolicyClient, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
+        PolicyClient, CLAWBACK_NONCE_EXTEND_AMOUNT, CLAWBACK_NONCE_TTL_THRESHOLD,
+        FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
     storage::{
         address_to_field, append_amount, append_field, append_point, get_account,
@@ -52,6 +53,9 @@ pub enum ComplianceStorageKey {
     /// Per-account frozen flag. Persistent storage; only set when an account
     /// is frozen and removed on unfreeze.
     Frozen(Address),
+    /// Number of seizures executed against the account. Persistent storage;
+    /// absent until the first seizure.
+    ClawbackNonce(Address),
 }
 
 // ################## QUERY STATE ##################
@@ -85,6 +89,28 @@ pub fn is_frozen(e: &Env, account: &Address) -> bool {
         true
     } else {
         false
+    }
+}
+
+/// Returns the number of seizures executed against `account`, or `0` when it
+/// has never been seized from. The value is a public input of the next
+/// clawback proof (COMPLIANCE §5.3).
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `account` - The address to query.
+pub fn clawback_nonce(e: &Env, account: &Address) -> u32 {
+    let key = ComplianceStorageKey::ClawbackNonce(account.clone());
+    if let Some(nonce) = e.storage().persistent().get::<_, u32>(&key) {
+        e.storage().persistent().extend_ttl(
+            &key,
+            CLAWBACK_NONCE_TTL_THRESHOLD,
+            CLAWBACK_NONCE_EXTEND_AMOUNT,
+        );
+        nonce
+    } else {
+        0
     }
 }
 
@@ -203,6 +229,10 @@ pub fn unfreeze(e: &Env, account: &Address) {
 /// `(v_s + v_r - amount, r_s + r_r)`, which both the owner and the auditor
 /// recompute, so the seized account stays spendable.
 ///
+/// The account's clawback nonce is a public input and advances on every
+/// seizure, so a proof executes at most once even if the commitments are
+/// later restored to the values it was built against (COMPLIANCE §5.6).
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
@@ -274,13 +304,15 @@ pub fn clawback(
         Some(d) => address_to_field(e, d),
         None => BytesN::from_array(e, &[0u8; 32]),
     };
+    let nonce = clawback_nonce(e, account);
 
     // PI order (COMPLIANCE §5.3):
-    //   C_spend, C_receive, K_aud, alpha, addr_f, acct_f, dest_f
+    //   C_spend, C_receive, K_aud, alpha, addr_f, acct_f, dest_f, nonce
     //
-    // `addr_f`, `acct_f` and `dest_f` are referenced by no constraint; their
-    // membership in the public-input set binds the proof to one contract, one
-    // account, and one settlement destination, on the `register` precedent.
+    // `addr_f`, `acct_f`, `dest_f` and `nonce` are referenced by no
+    // constraint; their membership in the public-input set binds the proof to
+    // one contract, one account, one settlement destination, and one
+    // execution, on the `register` precedent.
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &data.spendable_commitment);
     append_point(&mut pi, &data.receiving_commitment);
@@ -289,6 +321,7 @@ pub fn clawback(
     append_field(&mut pi, &addr_f);
     append_field(&mut pi, &address_to_field(e, account));
     append_field(&mut pi, &dest_f);
+    append_amount(&mut pi, e, i128::from(nonce));
 
     verify(e, CircuitType::Clawback, &pi, proof);
 
@@ -299,6 +332,9 @@ pub fn clawback(
         &seized,
     );
     set_commitments(e, account, &c_spend_new, &Grumpkin::identity(e));
+    e.storage()
+        .persistent()
+        .set(&ComplianceStorageKey::ClawbackNonce(account.clone()), &(nonce + 1));
 
     if let Some(d) = destination {
         let token = token::TokenClient::new(e, &get_underlying_asset(e));

@@ -210,7 +210,9 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// The proof is producible only by the auditor `account` is bound to, and
     /// `destination` is bound into it, so a proof built for one destination
     /// cannot be submitted with another. `Some(d)` with `d` equal to this
-    /// contract's own address is rejected.
+    /// contract's own address is rejected. The account's clawback nonce is
+    /// bound into it as well and advances on every seizure, so a proof
+    /// executes at most once.
     ///
     /// `account` MUST be frozen: the freeze keeps `C_spend` and `C_receive`
     /// unchanged between proof construction and submission, which the proof's
@@ -285,6 +287,17 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// [`storage::force_revoke_spender`]. The [`ConfidentialCompliance`]
     /// trait-level docstring explains why the method has no default body.
     fn force_revoke_spender(e: &Env, account: Address, spender: Address, operator: Address);
+
+    /// Returns the number of seizures executed against `account`, which the
+    /// auditor binds into the next clawback proof.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The confidential account to query.
+    fn clawback_nonce(e: &Env, account: Address) -> u32 {
+        storage::clawback_nonce(e, &account)
+    }
 }
 
 // ################## HOOKS IMPL ##################
@@ -447,6 +460,8 @@ pub enum ComplianceError {
 const DAY_IN_LEDGERS: u32 = 17280;
 pub const FROZEN_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const FROZEN_TTL_THRESHOLD: u32 = FROZEN_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+pub const CLAWBACK_NONCE_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const CLAWBACK_NONCE_TTL_THRESHOLD: u32 = CLAWBACK_NONCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 // ################## EVENTS ##################
 

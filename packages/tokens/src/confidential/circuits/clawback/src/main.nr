@@ -42,7 +42,7 @@ mod tests;
 // in-circuit multi_scalar_mul outputs (CB1, CB2, CB3), so they are on-curve by
 // construction.
 //
-// Public inputs (10 fields, in COMPLIANCE.md Section 5.3 canonical order)
+// Public inputs (11 fields, in COMPLIANCE.md Section 5.3 canonical order)
 // -----------------------------------------------------------------------
 //   Idx  Param         Symbol      Source / Note
 //   ---  -----         ------      ----------------------------------------
@@ -62,10 +62,15 @@ mod tests;
 //   9    _dest_f       dest_f      `address_to_field(destination)` under
 //                                    `Some`, the zero field under `None`;
 //                                    computed per-call.
+//   10   _nonce        nonce       The target's clawback nonce, loaded from
+//                                    storage; the contract increments it on
+//                                    every seizure (Section 5.4).
 //
-// `addr_f`, `_acct_f`, and `_dest_f` are referenced by no gate and look like
-// dead parameters: their presence in the public-input set is the binding, on
-// the `register/_acct_f` precedent.
+// `addr_f`, `_acct_f`, `_dest_f`, and `_nonce` are referenced by no gate and
+// look like dead parameters: their presence in the public-input set is the
+// binding, on the `register/_acct_f` precedent. `_nonce` is what makes a proof
+// single-use: the commitments alone can be restored to an earlier value
+// (Section 5.6).
 //
 // Private witnesses
 // -----------------
@@ -91,9 +96,10 @@ fn main(
     addr_f: pub Field,
     _acct_f: pub Field,
     _dest_f: pub Field,
+    _nonce: pub Field,
 ) {
-    // addr_f is a binding-only input like _acct_f and _dest_f; naming it
-    // without a leading underscore would warn, so consume it explicitly.
+    // addr_f is a binding-only input like _acct_f, _dest_f, and _nonce; naming
+    // it without a leading underscore would warn, so consume it explicitly.
     let _ = addr_f;
 
     // CB1

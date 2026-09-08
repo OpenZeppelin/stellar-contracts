@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl,
+    contract, contractimpl, symbol_short,
     testutils::{Address as _, Events},
     token::StellarAssetClient,
     xdr::{AccountFlags, ToXdr},
@@ -156,6 +156,33 @@ impl crate::confidential::verifier::ConfidentialVerifier for MockVerifier {
     }
 }
 
+/// Models the clawback proof's binding to its public inputs for replay tests.
+///
+/// A real UltraHonk proof absorbs every public input into its transcript, so
+/// it verifies only against the blob it was produced for. The first blob this
+/// mock accepts becomes that statement; every later verification succeeds
+/// only when the contract assembles the identical blob.
+#[contract]
+struct ClawbackReplayGuardVerifier;
+
+#[contractimpl(contracttrait)]
+impl crate::confidential::verifier::ConfidentialVerifier for ClawbackReplayGuardVerifier {
+    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn verify_proof(e: &Env, _ct: CircuitType, pi: Bytes, _proof: Bytes) -> bool {
+        let key = symbol_short!("bound");
+        match e.storage().instance().get::<_, Bytes>(&key) {
+            None => {
+                e.storage().instance().set(&key, &pi);
+                true
+            }
+            Some(bound) => bound == pi,
+        }
+    }
+}
+
 #[contract]
 struct MockAuditor;
 
@@ -179,6 +206,10 @@ struct Harness<'a> {
 }
 
 fn setup<'a>() -> Harness<'a> {
+    setup_with(|e| e.register(MockVerifier, ()))
+}
+
+fn setup_with<'a>(register_verifier: impl FnOnce(&Env) -> Address) -> Harness<'a> {
     let e = Env::default();
     e.mock_all_auths();
 
@@ -190,7 +221,7 @@ fn setup<'a>() -> Harness<'a> {
     sac.issuer().set_flag(AccountFlags::RevocableFlag);
     let sac_client = StellarAssetClient::new(&e, &sac_addr);
 
-    let verifier = e.register(MockVerifier, ());
+    let verifier = register_verifier(&e);
     let auditor = e.register(MockAuditor, ());
     let admin = Address::generate(&e);
     // Auditor 0 is the `auditor_id` every account in this suite binds to;
@@ -862,8 +893,9 @@ fn storage_keys_isolated_from_token_keys() {
 //
 // Contract-layer plumbing only. The verifier is mocked, so nothing here
 // exercises CB1-CB3, the seize bound, or the destination binding -- those are
-// circuit-side (`circuits/clawback/src/tests.nr`). Full coverage of the replay
-// and redirect cases needs a public-input-binding verifier mock.
+// circuit-side (`circuits/clawback/src/tests.nr`). The replay case runs
+// against `ClawbackReplayGuardVerifier`, which binds the first public-input
+// blob it accepts; the redirect case would need the same treatment.
 
 fn clawback_data(e: &Env) -> Bytes {
     ClawbackData { proof: Bytes::new(e) }.to_xdr(e)
@@ -926,6 +958,55 @@ fn clawback_some_transfers_exactly_the_seized_amount() {
     let sac = StellarAssetClient::new(&h.e, &h.sac_addr);
     assert_eq!(sac.balance(&dest), 40);
     assert_eq!(sac.balance(&h.host), 960);
+}
+
+#[test]
+fn clawback_advances_the_nonce() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+    h.sac.mint(&h.host, &1_000);
+
+    let client = ConfidentialClawbackClient::new(&h.e, &h.host);
+    assert_eq!(client.clawback_nonce(&alice), 0);
+    client.clawback(&alice, &40i128, &None, &clawback_data(&h.e), &h.admin);
+    assert_eq!(client.clawback_nonce(&alice), 1);
+    client.clawback(&alice, &10i128, &None, &clawback_data(&h.e), &h.admin);
+    assert_eq!(client.clawback_nonce(&alice), 2);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3506)")]
+fn clawback_replay_after_restoring_commitments_panics() {
+    // The M-01 scenario: seize 20 from (100G, O), unfreeze, credit 20 with
+    // zero blinding (deposit + merge) so the commitments return to (100G, O),
+    // refreeze, and resubmit the original proof. Every public input except
+    // the nonce is byte-identical to the first submission.
+    let h = setup_with(|e| e.register(ClawbackReplayGuardVerifier, ()));
+    let alice = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+    h.sac.mint(&h.host, &1_000);
+    h.sac.mint(&alice, &20);
+
+    let clawback = ConfidentialClawbackClient::new(&h.e, &h.host);
+    let compliance = ConfidentialComplianceClient::new(&h.e, &h.host);
+    let token = ConfidentialTokenClient::new(&h.e, &h.host);
+    let proof = clawback_data(&h.e);
+
+    clawback.clawback(&alice, &20i128, &None, &proof, &h.admin);
+
+    compliance.unfreeze(&alice, &h.admin);
+    token.deposit(&alice, &alice, &20);
+    token.merge(&alice);
+    compliance.freeze(&alice, &h.admin);
+
+    h.e.as_contract(&h.host, || {
+        let acc = crate::confidential::storage::get_account(&h.e, &alice);
+        assert_eq!(acc.spendable_commitment, Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 100));
+        assert_eq!(acc.receiving_commitment, Grumpkin::identity(&h.e));
+    });
+
+    clawback.clawback(&alice, &20i128, &None, &proof, &h.admin);
 }
 
 #[test]

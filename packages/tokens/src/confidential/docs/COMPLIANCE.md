@@ -208,7 +208,7 @@ The clawback circuit proves that a public seize amount is bounded by the target'
 
 CB1 is what makes the witness an approval rather than a computation: without it, the public openings of a zero-blinding account (§5.2) would let the clawback signer prove — and settle to itself — a seizure of everything such an account holds. Range on `v_s` and `v_r` alone does not bound their sum against `alpha`, and an over-seize would drive the committed value negative mod `r` — a commitment the owner can still open but never again satisfy under W4 / T4.
 
-**Public inputs (10 fields):**
+**Public inputs (11 fields):**
 
 | Input | Notes |
 |:---|:---|
@@ -218,8 +218,9 @@ CB1 is what makes the witness an approval rather than a computation: without it,
 | `addr_f` | Loaded from instance storage (`DESIGN.md` §2.7) |
 | `acct_f` | Binds the proof to the target account |
 | `dest_f` | `address_to_field(destination)` under `Some`, the zero field under `None` |
+| `nonce` | The account's clawback nonce, loaded from storage (§5.4) |
 
-No public input is prover-supplied (`DESIGN.md` §7.1). `addr_f`, `acct_f`, and `dest_f` are referenced by no gate; their membership in the public-input set is the binding, on the `register` / `acct_f` precedent (`DESIGN.md` §7.2). For `dest_f` that binding is what stops a compromised clawback signer from settling a witness built for one destination to an address of its own choosing; its zero sentinel for `None` is unambiguous because `address_to_field` is a Poseidon2 output.
+No public input is prover-supplied (`DESIGN.md` §7.1). `addr_f`, `acct_f`, `dest_f`, and `nonce` are referenced by no gate; their membership in the public-input set is the binding, on the `register` / `acct_f` precedent (`DESIGN.md` §7.2). For `dest_f` that binding is what stops a compromised clawback signer from settling a witness built for one destination to an address of its own choosing; its zero sentinel for `None` is unambiguous because `address_to_field` is a Poseidon2 output. For `nonce` it is what makes a proof single-use (§5.6).
 
 **Private witnesses:** `k_aud`, `v_s`, `r_s`, `v_r`, `r_r` — the auditor secret and the openings of the two commitments.
 
@@ -231,10 +232,11 @@ No public input is prover-supplied (`DESIGN.md` §7.1). `addr_f`, `acct_f`, and 
 2. **Public inputs.** Assembled in the §5.3 order through `append_point` / `append_field` / `append_amount`, so every coordinate and scalar passes the canonicality guards. `data` decodes to `ClawbackData { proof }`.
 3. **Verification** against `CircuitType::Clawback`.
 4. **State update.** `C_spend <- C_spend + C_receive - alpha·G` and `C_receive <- O`: the `Merge` rule (`DESIGN.md` §7.4) followed by a public debit, with no fresh randomness. The new opening is `(v_s + v_r - alpha, r_s + r_r)`, which the owner and the auditor recompute from the event's `amount` alone, so the seized account stays spendable. Re-randomizing under a prover-chosen blinding instead would leave the owner unable to open its own commitment.
-5. **Settlement**, by `destination`:
+5. **Nonce.** `ClawbackNonce(account) <- nonce + 1`, where `nonce` is the value step 2 read into the public inputs. The entry is absent until the first seizure and reads as `0`; `clawback_nonce(account)` exposes it (§6).
+6. **Settlement**, by `destination`:
    - `None` — no underlying moves.
    - `Some(d)` — exactly `amount` is transferred to `d` in the same invocation.
-6. **Event.** `Clawback { account, amount, destination }` (§6.1).
+7. **Event.** `Clawback { account, amount, destination }` (§6.1).
 
 **Extraction order.** The seize and the issuer's extraction are separate invocations by different parties, and Soroban admits one per transaction, so the pool sits mismatched for at least a ledger between them. Nothing in the contract enforces which comes first; under a `None` settlement the extraction must follow the seize:
 
@@ -251,7 +253,11 @@ The owner and the auditor fold the event as they would an owner-initiated one (`
 
 ### 5.6 Anti-Replay and the Freeze
 
-`C_spend` and `C_receive` are public inputs, so any change to either between proof construction and submission — an inbound transfer, a merge, a revoke — fails verification with `InvalidProof`. The freeze holds the commitments still. An auditor key rotation in the same window fails the same way (`DESIGN_cont.md` §8.3). `ConfidentialClawback: ConfidentialCompliance` forces a `freeze` / `unfreeze` implementation but constrains nothing about the deployment's `Hooks`. Wiring `NoHooks` next to a `ConfidentialClawback` impl yields a `freeze` that writes the flag and an `is_frozen` that returns `true` while every token operation stays ungated, so the target spends out before the seizure lands and the admin's only signal is an `InvalidProof` once the commitments have moved. A deployment that enables clawback MUST wire `ComplianceHooks`, or a custom `Hooks` impl that gates the same seven positions (§4).
+`C_spend` and `C_receive` are public inputs, so any change to either between proof construction and submission — an inbound transfer, a merge, a revoke — fails verification with `InvalidProof`. The freeze holds the commitments still. An auditor key rotation in the same window fails the same way (`DESIGN_cont.md` §8.3).
+
+Commitment equality is not freshness. A seizure of `alpha` from `(C, O)` leaves `(C - alpha·G, O)`, and a zero-blinding credit of `alpha` restores `(C, O)` exactly — a public deposit followed by a merge once the account is unfrozen, or a `force_revoke_spender` fold of an allowance committed as `Com(alpha, 0)` while it is still frozen — with every other public input unchanged. The `nonce` input advances on every seizure (§5.4) and never returns to an earlier value, so the retained proof cannot execute a second seizure the auditor did not approve.
+
+`ConfidentialClawback: ConfidentialCompliance` forces a `freeze` / `unfreeze` implementation but constrains nothing about the deployment's `Hooks`. Wiring `NoHooks` next to a `ConfidentialClawback` impl yields a `freeze` that writes the flag and an `is_frozen` that returns `true` while every token operation stays ungated, so the target spends out before the seizure lands and the admin's only signal is an `InvalidProof` once the commitments have moved. A deployment that enables clawback MUST wire `ComplianceHooks`, or a custom `Hooks` impl that gates the same seven positions (§4).
 
 ### 5.7 Wallet and Auditor Consequences
 
@@ -283,6 +289,7 @@ impl Token {
     fn clawback(e: Env, account: Address, amount: i128, destination: Option<Address>,
                 data: Bytes /* XDR ClawbackData { proof } */, operator: Address);
     fn force_revoke_spender(e: Env, account: Address, spender: Address, operator: Address);
+    fn clawback_nonce(e: Env, account: Address) -> u32;
 }
 ```
 

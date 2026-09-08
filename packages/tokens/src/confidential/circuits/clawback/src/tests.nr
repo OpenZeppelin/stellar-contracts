@@ -20,6 +20,7 @@ global ALPHA: Field = 700;
 global ADDR_F: Field = 0xbeef;
 global ACCT_F: Field = 0xfeed;
 global DEST_F: Field = 0xcafe;
+global NONCE: Field = 3;
 
 // C_spend = commit(1000, 42) (= lib `commit` fixture).
 global C_SPEND_X: Field = 0x195a5d8ecd032fe1696054b28f0852b5f03a613681991ace823245ab2f97ed05;
@@ -84,6 +85,7 @@ fn matches_fixture() {
         ADDR_F,
         ACCT_F,
         DEST_F,
+        NONCE,
     );
 }
 
@@ -112,6 +114,7 @@ fn empty_receiving_side_is_the_identity() {
         ADDR_F,
         ACCT_F,
         DEST_F,
+        NONCE,
     );
 }
 
@@ -137,6 +140,7 @@ fn public_openings_verify_under_the_auditor_key() {
         ADDR_F,
         ACCT_F,
         DEST_F,
+        NONCE,
     );
 }
 
@@ -159,6 +163,7 @@ fn seize_of_the_entire_claim_is_admissible() {
         ADDR_F,
         ACCT_F,
         DEST_F,
+        NONCE,
     );
 }
 
@@ -183,6 +188,7 @@ fn none_destination_sentinel_verifies() {
         ADDR_F,
         ACCT_F,
         0,
+        NONCE,
     );
 }
 
@@ -209,6 +215,7 @@ fn public_openings_without_the_auditor_key_are_rejected() {
         ADDR_F,
         ACCT_F,
         DEST_F,
+        NONCE,
     );
 }
 
@@ -232,6 +239,7 @@ fn wrong_auditor_key_is_rejected() {
         ADDR_F,
         ACCT_F,
         DEST_F,
+        NONCE,
     );
 }
 
@@ -257,6 +265,7 @@ fn over_seize_is_rejected() {
         ADDR_F,
         ACCT_F,
         DEST_F,
+        NONCE,
     );
 }
 
@@ -279,6 +288,7 @@ fn out_of_range_alpha_is_rejected() {
         ADDR_F,
         ACCT_F,
         DEST_F,
+        NONCE,
     );
 }
 
@@ -302,6 +312,7 @@ fn wrong_spendable_opening_is_rejected() {
         ADDR_F,
         ACCT_F,
         DEST_F,
+        NONCE,
     );
 }
 
@@ -325,5 +336,6 @@ fn wrong_receiving_opening_is_rejected() {
         ADDR_F,
         ACCT_F,
         DEST_F,
+        NONCE,
     );
 }
