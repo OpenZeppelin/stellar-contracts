@@ -2,7 +2,7 @@
 
 ## Disclosure construction
 
-An implementation supporting selective disclosure MUST follow the [Selective Disclosure](../selective-disclosure/README.md) specification for the holder, sender, and auditor variants, and MUST bind each proof to the requesting recipient's key and nonce so that a proof cannot be replayed against a different recipient or a later request ([Disclosure Recipient](../selective-disclosure/README.md#disclosure-recipient)). A D-auditor witness reads each auditor channel at the width [Poseidon2 sponge](crypto-core.md#poseidon2-sponge) fixes for its tag — three lanes on $$\delta_{\text{aud\\\_s}}$$, two on $$\delta_{\text{aud\\\_r}}$$ — exactly as [Auditor Client](auditor-client.md) requires of the auditor client ([D-auditor](../selective-disclosure/circuits/d-auditor.md) A3).
+An implementation supporting selective disclosure MUST follow the [Selective Disclosure](../selective-disclosure/README.md) specification for the holder, sender, and auditor variants, and MUST bind each proof to the requesting recipient's key and nonce so that a proof cannot be replayed against a different recipient or a later request ([Disclosure Recipient](../selective-disclosure/README.md#disclosure-recipient)). A D-auditor witness reads each auditor channel at the width [Poseidon2 sponge](crypto-core.md#poseidon2-sponge) fixes for its tag — three lanes on $$\delta\_{\text{aud\\\_s}}$$, two on $$\delta\_{\text{aud\\\_r}}$$ — exactly as [Auditor Client](auditor-client.md) requires of the auditor client ([D-auditor](../selective-disclosure/circuits/d-auditor.md) A3).
 
 Disclosure circuits are verified entirely off-chain and MUST NOT be registered with the on-chain verifier set ([Circuits](../selective-disclosure/security.md#circuits)).
 
@@ -12,7 +12,7 @@ The verifier MUST be distributable independently of any wallet, since its purpos
 
 Verification MUST include comparing the circuit's verification key against the pinned key for that disclosure circuit, without which the proof attests to an unknown statement.
 
-Not every historical transfer is disclosable by its sender: one predating [Deterministic ephemeral scalars](wallet.md#deterministic-ephemeral-scalars)'s requirement may carry an ephemeral scalar that does not reproduce. An implementation MUST report that as *not disclosable* rather than as a verification failure, and MUST establish it by test: derive the candidate $$r_e$$ from $$(vk, \sigma_E)$$ and compare $$r_e \cdot H$$ against the event's $$R_e$$. The comparison costs one Poseidon2 call and one scalar multiplication and is authoritative, where a stored per-transfer flag is not ([Deterministic ephemeral scalars](wallet.md#deterministic-ephemeral-scalars)).
+Not every historical transfer is disclosable by its sender: one predating [Deterministic ephemeral scalars](wallet.md#deterministic-ephemeral-scalars)'s requirement may carry an ephemeral scalar that does not reproduce. An implementation MUST report that as *not disclosable* rather than as a verification failure, and MUST establish it by test: derive the candidate $$r\_e$$ from $$(vk, \sigma\_E)$$ and compare $$r\_e \cdot H$$ against the event's $$R\_e$$. The comparison costs one Poseidon2 call and one scalar multiplication and is authoritative, where a stored per-transfer flag is not ([Deterministic ephemeral scalars](wallet.md#deterministic-ephemeral-scalars)).
 
 ## Indexer client
 

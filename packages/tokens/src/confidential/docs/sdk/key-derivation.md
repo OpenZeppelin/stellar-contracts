@@ -1,12 +1,12 @@
 # Key Derivation
 
-[Key Hierarchy](../protocol/keys-and-commitments.md#key-hierarchy) specifies the hierarchy below $$sk$$ — $$vk$$ from $$(sk, \text{addr\\\_f})$$, $$\text{PVK}$$ from $$vk$$, $$dvk_i$$ from $$(vk, \text{op}_i)$$. It does not specify where $$sk$$ itself comes from. This section supplies a derivation, because recovery from backup material is a stated protocol property ([Recovery](../protocol/wallet-state.md#recovery), [Recovery Properties](../protocol/wallet-state.md#recovery-properties), [Why the Indexer Is Load-Bearing](../indexer.md#why-the-indexer-is-load-bearing)) and two clients given the same backup material would otherwise derive different accounts.
+[Key Hierarchy](../protocol/keys-and-commitments.md#key-hierarchy) specifies the hierarchy below $$sk$$ — $$vk$$ from $$(sk, \text{addr\\\_f})$$, $$\text{PVK}$$ from $$vk$$, $$dvk\_i$$ from $$(vk, \text{op}\_i)$$. It does not specify where $$sk$$ itself comes from. This section supplies a derivation, because recovery from backup material is a stated protocol property ([Recovery](../protocol/wallet-state.md#recovery), [Recovery Properties](../protocol/wallet-state.md#recovery-properties), [Why the Indexer Is Load-Bearing](../indexer.md#why-the-indexer-is-load-bearing)) and two clients given the same backup material would otherwise derive different accounts.
 
 The derivation is a single function ([Derivation](#derivation)) over a **root**, and the root's class is determined by what controls the address rather than chosen per client. An address controlled by a Stellar ed25519 key uses a deterministic signature by that key ([Signer roots](#signer-roots)). An address with no ed25519 key of its own — a smart account or any other contract address — uses raw bytes from whatever custody mechanism controls it ([Raw roots and imported keys](#raw-roots-and-imported-keys)). Tying the class to the address rather than to client preference is what keeps two clients from disagreeing about which class produced an account's $$sk$$, a disagreement `register` being single-use ([Interface](../protocol/interface.md)) would make unrepairable. The one residual case is [Raw roots and imported keys](#raw-roots-and-imported-keys)'s fallback, where an ed25519-controlled address has no way to sign the [Signer roots](#signer-roots) message; a client MUST therefore read a $$Y$$ mismatch under [Signer roots](#signer-roots) as evidence that the account uses a root it does not hold, not as a derivation defect.
 
 ## Derivation
 
-$$sk = \text{RS}\Big(\text{HKDF-SHA-512}\big(\text{IKM} = \text{root}, \\;\\; \text{salt} = \texttt{"openzeppelin/confidential-token/v1/sk"}, \\;\\; \text{info} = \text{be}_{32}(\text{addr\\\_f}) \\,\\|\\, \text{be}_{32}(\text{acct\\\_f}) \\,\\|\\, \text{le}_{4}(j)\big)\Big)$$
+$$sk = \text{RS}\Big(\text{HKDF-SHA-512}\big(\text{IKM} = \text{root}, \\;\\; \text{salt} = \texttt{"openzeppelin/confidential-token/v1/sk"}, \\;\\; \text{info} = \text{be}\_{32}(\text{addr\\\_f}) \\,\\|\\, \text{be}\_{32}(\text{acct\\\_f}) \\,\\|\\, \text{le}\_{4}(j)\big)\Big)$$
 
 where:
 
@@ -19,7 +19,7 @@ where:
 | $$j$$ | Rejection counter, starting at 0 |
 | $$\text{RS}$$ | The [Scalar sampling](crypto-core.md#scalar-sampling) procedure applied to the 32-byte HKDF output: clear the top 2 bits, accept iff the result is in $$[1, r)$$, otherwise increment $$j$$ and re-derive |
 
-The candidate MUST also be rejected if the resulting $$vk = \text{poseidon\\\_with\\\_domain}(\delta_{\text{vk}}, [sk, \text{addr\\\_f}])$$ is zero, since registration constraint R5 requires $$vk \neq 0$$.
+The candidate MUST also be rejected if the resulting $$vk = \text{poseidon\\\_with\\\_domain}(\delta\_{\text{vk}}, [sk, \text{addr\\\_f}])$$ is zero, since registration constraint R5 requires $$vk \neq 0$$.
 
 **The IKM is the root's bytes, verbatim.** HKDF-Extract accepts input keying material of any length, the 64 signature bytes or the 32 raw bytes go in as they are.
 
@@ -39,9 +39,9 @@ A signer root is a SEP-0053 signature over a message naming this protocol, the d
 
 $$\text{msg} = \texttt{"openzeppelin/confidential-token/v1/sk"} \\,\\|\\, \texttt{0x0a} \\,\\|\\, \text{enc}(\text{contract}) \\,\\|\\, \texttt{0x0a} \\,\\|\\, \text{enc}(\text{account})$$
 
-$$\text{root} = \text{Ed25519-Sign}\big(sk_{\text{ed}}, \\;\\; \text{SHA-256}(\text{prefix} \\,\\|\\, \text{msg})\big)$$
+$$\text{root} = \text{Ed25519-Sign}\big(sk\_{\text{ed}}, \\;\\; \text{SHA-256}(\text{prefix} \\,\\|\\, \text{msg})\big)$$
 
-where `prefix` is SEP-0053's 24 ASCII bytes `Stellar Signed Message:\n`, $$\text{enc}$$ is the 56-character strkey of [Address compression](crypto-core.md#address-compression), and $$sk_{\text{ed}}$$ is the ed25519 secret of a signer on the account. The message is 151 bytes, printable ASCII apart from its two separators, and carries the strkeys rather than their [Address compression](crypto-core.md#address-compression) compressions so that a wallet rendering SEP-0053 messages as text shows the user addresses they can compare against the deployment they intend to register on. The signature is the 64-byte RFC 8032 encoding $$R \\,\\|\\, S$$ that every Stellar SDK and SEP-0053 wallet already returns, and those 64 bytes are the IKM.
+where `prefix` is SEP-0053's 24 ASCII bytes `Stellar Signed Message:\n`, $$\text{enc}$$ is the 56-character strkey of [Address compression](crypto-core.md#address-compression), and $$sk\_{\text{ed}}$$ is the ed25519 secret of a signer on the account. The message is 151 bytes, printable ASCII apart from its two separators, and carries the strkeys rather than their [Address compression](crypto-core.md#address-compression) compressions so that a wallet rendering SEP-0053 messages as text shows the user addresses they can compare against the deployment they intend to register on. The signature is the 64-byte RFC 8032 encoding $$R \\,\\|\\, S$$ that every Stellar SDK and SEP-0053 wallet already returns, and those 64 bytes are the IKM.
 
 Binding both addresses into the *message* rather than relying on [Derivation](#derivation)'s `info` alone is what bounds a harvested signature: a dapp that tricks a user into signing once obtains the root for that account on that deployment, not for every account the key controls on every deployment.
 

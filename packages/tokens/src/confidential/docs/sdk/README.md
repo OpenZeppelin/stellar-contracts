@@ -20,7 +20,7 @@ Four properties of the protocol place correctness and confidentiality in the cli
 
 **Every amount a user sees is client-decrypted.** The contract performs homomorphic point arithmetic and never learns a value. Balances, transfer amounts, allowances, and audit figures are all produced by client-side decryption of event ciphertexts, so a decryption defect yields a plausible wrong number rather than a visible failure.
 
-**The client is an enforcement point for canonicality.** Neither the Soroban host nor the verifier distinguishes a canonical $$\mathbb{F}_r$$ representative from a non-canonical one ([Host deserialiser caveat](../protocol/primitives.md#host-deserialiser-caveat)); the contract enforces canonicality at its boundary, but the client is where the bytes are produced.
+**The client is an enforcement point for canonicality.** Neither the Soroban host nor the verifier distinguishes a canonical $$\mathbb{F}\_r$$ representative from a non-canonical one ([Host deserialiser caveat](../protocol/primitives.md#host-deserialiser-caveat)); the contract enforces canonicality at its boundary, but the client is where the bytes are produced.
 
 **The client is where all secrets live and all randomness is sampled.** The spending key, the viewing key, every blinding factor, and every per-operation salt originate client-side, so the protocol's confidentiality reduces to the client's key handling and CSPRNG quality. [Poseidon2 Hash](../protocol/primitives.md#poseidon2-hash) makes salt uniqueness a confidentiality requirement: a reused salt repeats the deterministic ephemeral scalar and every sponge mask keyed by it.
 
@@ -33,7 +33,7 @@ Four properties of the protocol place correctness and confidentiality in the cli
 - **Root** — the secret an implementation feeds to [Derivation](key-derivation.md#derivation)'s derivation: a SEP-0053 signature by a signer on the account, or a raw 32-byte value for an address with no ed25519 signer of its own ([Key Derivation](key-derivation.md)).
 - **Opening** — the pair $$(v, r)$$ such that $$C = v \cdot G + r \cdot H$$ for an on-chain commitment $$C$$.
 - **Checkpoint** — as defined in [Recovery](../protocol/wallet-state.md#recovery), which enumerates the qualifying events.
-- **Witness material** — any value that appears as a private witness in any circuit: $$sk$$, $$vk$$, $$dvk_i$$, $$v$$, $$r$$, $$r_e$$, $$v_{\text{transfer}}$$, and every intermediate derived from them.
+- **Witness material** — any value that appears as a private witness in any circuit: $$sk$$, $$vk$$, $$dvk\_i$$, $$v$$, $$r$$, $$r\_e$$, $$v\_{\text{transfer}}$$, and every intermediate derived from them.
 - **Trust boundary** — the process and storage under the account holder's exclusive control. Witness material inside it is secret; witness material that crosses it is disclosed.
 - **In-flight operation** — a submitted operation whose event has not yet been observed. Its projected post-operation opening is known locally but not yet confirmed against chain state.
 - **Facade** — a role-scoped interface over the crypto core ([Roles and Capability Separation](#roles-and-capability-separation)).
@@ -61,9 +61,9 @@ Five roles consume the protocol. Each holds distinct key material and MUST be *s
 | Role | Holds | Can |
 |:--|:--|:--|
 | Holder | Root, $$sk$$, $$vk$$ | Spend, withdraw, merge, delegate, disclose, read own balances |
-| Spender | Own $$sk_{\text{op}}$$, escrowed $$dvk_i$$ | Spend from the allowance, read allowance state, disclose own spender transfers |
+| Spender | Own $$sk\_{\text{op}}$$, escrowed $$dvk\_i$$ | Spend from the allowance, read allowance state, disclose own spender transfers |
 | Auditor | Auditor secret $$k$$ | Decrypt both channels for accounts bound to its `auditor_id` ([Per-Transfer Auditor Ciphertexts](../protocol/auditing.md#per-transfer-auditor-ciphertexts)) |
-| Disclosure recipient | $$(r_R, P_R)$$ | Verify a disclosure proof and recover the disclosed amount |
+| Disclosure recipient | $$(r\_R, P\_R)$$ | Verify a disclosure proof and recover the disclosed amount |
 | Observer | Nothing | Read commitments, ciphertexts, ephemerals, addresses, public amounts |
 
 ---

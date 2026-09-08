@@ -11,25 +11,25 @@ Two moduli are in play, and confusing them silently corrupts state ([Blinding ac
 | $$r$$ | `0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001` | BN254 scalar field. Noir's `Field`; the host's `Bn254Fr`; Grumpkin **coordinate** field | `FR_MODULUS` |
 | $$q$$ | `0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47` | BN254 base field. Grumpkin **scalar** (multiplier) field, i.e. the group order | `FP_MODULUS`, and conventionally $$p$$ in the pairing literature |
 
-$$r < q$$, so every $$\mathbb{F}_r$$ element is already a valid Grumpkin scalar with no reduction, which is why a Noir `Field` can be passed to `multi_scalar_mul` unambiguously.
+$$r < q$$, so every $$\mathbb{F}\_r$$ element is already a valid Grumpkin scalar with no reduction, which is why a Noir `Field` can be passed to `multi_scalar_mul` unambiguously.
 
 ## Canonicality
 
-A value is a **canonical** $$\mathbb{F}_r$$ representative iff it is a 32-byte big-endian encoding of an integer in $$[0, r)$$.
+A value is a **canonical** $$\mathbb{F}\_r$$ representative iff it is a 32-byte big-endian encoding of an integer in $$[0, r)$$.
 
-- Every $$\mathbb{F}_r$$ value the SDK emits — into a payload, an event assertion, a proof input, or persisted state — MUST be canonical.
+- Every $$\mathbb{F}\_r$$ value the SDK emits — into a payload, an event assertion, a proof input, or persisted state — MUST be canonical.
 - The SDK MUST reject a non-canonical value at its own boundary rather than relying on the contract's check ([Grumpkin-BN254 Cycle](../protocol/primitives.md#grumpkin-bn254-cycle)). A client that produces non-canonical bytes has already lost byte-uniqueness in the local state that recovery reads from.
 - Points are encoded as `BytesN<64>` = $$\text{be}(x) \\| \text{be}(y)$$, a **flat** 64-byte value. The identity $$\mathcal{O}$$ is all 64 bytes zero, and decodes back to the identity.
 
 ## Poseidon2 sponge
 
-The sponge construction, its width and rate, the IV placement, the padding rule, and the two- and three-lane forms $$\text{SpongeSqueeze}_2$$ and $$\text{SpongeSqueeze}_3$$ are specified normatively in [Poseidon2 Hash](../protocol/primitives.md#poseidon2-hash). What follows is what that construction additionally requires of a client.
+The sponge construction, its width and rate, the IV placement, the padding rule, and the two- and three-lane forms $$\text{SpongeSqueeze}\_2$$ and $$\text{SpongeSqueeze}\_3$$ are specified normatively in [Poseidon2 Hash](../protocol/primitives.md#poseidon2-hash). What follows is what that construction additionally requires of a client.
 
-**Three self-checks are available before any proof is generated.** The absorbed length in both squeeze forms is always 3, so the IV is fixed at $$3 \cdot 2^{64}$$; `lane[0]` is identical to $$\text{poseidon\\\_with\\\_domain}(\delta, [s, \sigma])$$ on the same inputs; and $$\text{SpongeSqueeze}_3(\delta, s, \sigma)[i] = \text{SpongeSqueeze}_2(\delta, s, \sigma)[i]$$ for $$i \in \\{0, 1\\}$$, since the absorb fits one rate-3 block and both forms read the same permutation. An implementation that reproduces all three has the block layout and the IV lane right. The third is pinned by `circuits/lib/testdata/sponge_squeeze_3.json`.
+**Three self-checks are available before any proof is generated.** The absorbed length in both squeeze forms is always 3, so the IV is fixed at $$3 \cdot 2^{64}$$; `lane[0]` is identical to $$\text{poseidon\\\_with\\\_domain}(\delta, [s, \sigma])$$ on the same inputs; and $$\text{SpongeSqueeze}\_3(\delta, s, \sigma)[i] = \text{SpongeSqueeze}\_2(\delta, s, \sigma)[i]$$ for $$i \in \\{0, 1\\}$$, since the absorb fits one rate-3 block and both forms read the same permutation. An implementation that reproduces all three has the block layout and the IV lane right. The third is pinned by `circuits/lib/testdata/sponge_squeeze_3.json`.
 
 **The domain-tagged funnel.** Every Poseidon2 invocation in the protocol routes through one entry point that places the domain tag as the **first absorbed element**:
 
-$$\text{poseidon\\\_with\\\_domain}(\delta, [x_1, \ldots, x_n]) = \text{sponge}([\delta, x_1, \ldots, x_n])$$
+$$\text{poseidon\\\_with\\\_domain}(\delta, [x\_1, \ldots, x\_n]) = \text{sponge}([\delta, x\_1, \ldots, x\_n])$$
 
 Squeeze-slot assignment is canonical and MUST be followed as [Lane assignment](../protocol/primitives.md#lane-assignment) fixes it, and each channel MUST be read at exactly the width its tag is assigned ([Mode exclusivity](../protocol/primitives.md#mode-exclusivity)).
 
@@ -43,7 +43,7 @@ Scalar multiplication MUST map a zero scalar to the identity rather than errorin
 
 ## ECDH
 
-$$\text{ECDH}(a, B) = \text{poseidon\\\_with\\\_domain}(\delta_{\text{ecdh}}, [S.x, S.y]) \quad \text{where} \quad S = a \cdot B$$
+$$\text{ECDH}(a, B) = \text{poseidon\\\_with\\\_domain}(\delta\_{\text{ecdh}}, [S.x, S.y]) \quad \text{where} \quad S = a \cdot B$$
 
 **Both coordinates MUST be absorbed.** An x-only extraction is negation-invariant: $$P$$ and $$-P$$ share an x-coordinate, and $$-\text{PVK} = (-vk) \cdot H$$ is itself a valid canonical registration, so an x-only map would collapse each $$(vk, -vk)$$ pair onto one shared secret ([Elliptic Curve Diffie-Hellman](../protocol/primitives.md#elliptic-curve-diffie-hellman)). The absorb fills exactly one rate-3 block.
 
@@ -51,9 +51,9 @@ The derivation MUST fail rather than proceed if $$S$$ is the identity: with $$\s
 
 ## Blinding accumulation
 
-Commitment blinding factors compose under homomorphic point addition, so their arithmetic is that of the **Grumpkin scalar field** $$\mathbb{F}_q$$ ([Fields and the `q` / `p` notation hazard](#fields-and-the-q--p-notation-hazard)):
+Commitment blinding factors compose under homomorphic point addition, so their arithmetic is that of the **Grumpkin scalar field** $$\mathbb{F}\_q$$ ([Fields and the `q` / `p` notation hazard](#fields-and-the-q--p-notation-hazard)):
 
-$$\text{Com}(v_1, r_1) + \text{Com}(v_2, r_2) = \text{Com}(v_1 + v_2, \\, (r_1 + r_2) \bmod q)$$
+$$\text{Com}(v\_1, r\_1) + \text{Com}(v\_2, r\_2) = \text{Com}(v\_1 + v\_2, \\, (r\_1 + r\_2) \bmod q)$$
 
 Reducing modulo $$r$$ instead yields an opening that is off by $$q - r$$ and no longer matches the on-chain point, and for two full-size blindings the integer sum crosses $$q$$ roughly half the time. Implementations MUST provide distinct, clearly named reduction operations for the two moduli.
 
@@ -65,7 +65,7 @@ Committed **values** accumulate as exact integers and are never reduced; [Peders
 
 ## Scalar sampling
 
-Secret scalars — $$\sigma$$, $$\sigma_a$$, the replacement $$\sigma_a'$$ of a spender transfer ([Transfer nonce](../protocol/account-state.md#transfer-nonce)), and the disclosure layer's $$r_{\text{disc}}$$ ([Disclosure Ciphertext to Recipient](../selective-disclosure/protocol.md#disclosure-ciphertext-to-recipient)) — MUST be produced by the rejection procedure of [Grumpkin-BN254 Cycle](../protocol/primitives.md#grumpkin-bn254-cycle):
+Secret scalars — $$\sigma$$, $$\sigma\_a$$, the replacement $$\sigma\_a'$$ of a spender transfer ([Transfer nonce](../protocol/account-state.md#transfer-nonce)), and the disclosure layer's $$r\_{\text{disc}}$$ ([Disclosure Ciphertext to Recipient](../selective-disclosure/protocol.md#disclosure-ciphertext-to-recipient)) — MUST be produced by the rejection procedure of [Grumpkin-BN254 Cycle](../protocol/primitives.md#grumpkin-bn254-cycle):
 
 1. Draw 32 bytes from a CSPRNG.
 2. Clear the top **2** bits, yielding a 254-bit candidate.
@@ -77,7 +77,7 @@ The seventeen tag values, the layer that absorbs each, and the sponge mode each 
 
 ## Address compression
 
-$$\text{address\\\_to\\\_field}(a) = \text{poseidon\\\_with\\\_domain}(\delta_{\text{addr}}, [\text{lo}(a), \text{hi}(a)])$$
+$$\text{address\\\_to\\\_field}(a) = \text{poseidon\\\_with\\\_domain}(\delta\_{\text{addr}}, [\text{lo}(a), \text{hi}(a)])$$
 
 where $$\text{enc}(a)$$ is the 56-character ASCII strkey (SEP-23), and $$\text{lo}$$ and $$\text{hi}$$ interpret its lower and upper 28 bytes respectively in **little-endian** order ([Address-to-Field Encoding](../protocol/primitives.md#address-to-field-encoding)). Implementations MUST obtain the strkey from their language's stellar-strkey library.
 

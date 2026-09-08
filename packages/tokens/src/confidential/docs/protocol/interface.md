@@ -44,12 +44,12 @@ This table is authoritative: every entry is exactly the set of prover-supplied p
 | Operation | `data` contents |
 |:---|:---|
 | `register` | $$Y$$, $$\text{PVK}$$, `proof` |
-| `withdraw` | $$C_{\text{spend}}'$$, $$\tilde{b}$$, $$R_e$$, $$\sigma$$, $$\tilde{b}_{\text{aud,s}}$$, $$\tilde{r}_{\text{aud,s}}$$, `proof` |
-| `confidential_transfer` | $$C_{\text{spend}}'$$, $$C_{\text{transfer}}$$, $$R_e$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\sigma$$, $$\tilde{v}_{\text{aud,r}}$$, $$\tilde{r}_{\text{aud,r}}$$, $$\tilde{v}_{\text{aud,s}}$$, $$\tilde{b}_{\text{aud,s}}$$, $$\tilde{r}_{\text{aud,s}}$$, `proof` |
-| `confidential_transfer_from` | $$C_a'$$, $$C_{\text{transfer}}$$, $$R_e$$, $$\tilde{v}$$, $$\tilde{a}'$$, $$\sigma_a'$$, $$\tilde{v}_{\text{aud,r}}$$, $$\tilde{r}_{\text{aud,r}}$$, $$\tilde{v}_{\text{aud,s}}$$, $$\tilde{a}_{\text{aud,s}}$$, $$\tilde{r}_{\text{aud,s}}$$, `proof` |
-| `set_spender` | $$C_{\text{spend}}'$$, $$C_a$$, $$\text{escrowed\\\_dvk}$$, $$\tilde{b}$$, $$\tilde{a}$$, $$R_e$$, $$\sigma$$, $$\sigma_a$$, $$\tilde{v}_{\text{aud,s}}$$, $$\tilde{b}_{\text{aud,s}}$$, $$\tilde{r}_{\text{aud,s}}$$, $$\tilde{r}_{a,\text{aud,s}}$$, `proof` |
+| `withdraw` | $$C\_{\text{spend}}'$$, $$\tilde{b}$$, $$R\_e$$, $$\sigma$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, `proof` |
+| `confidential_transfer` | $$C\_{\text{spend}}'$$, $$C\_{\text{transfer}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{b}$$, $$\sigma$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, `proof` |
+| `confidential_transfer_from` | $$C\_a'$$, $$C\_{\text{transfer}}$$, $$R\_e$$, $$\tilde{v}$$, $$\tilde{a}'$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, `proof` |
+| `set_spender` | $$C\_{\text{spend}}'$$, $$C\_a$$, $$\text{escrowed\\\_dvk}$$, $$\tilde{b}$$, $$\tilde{a}$$, $$R\_e$$, $$\sigma$$, $$\sigma\_a$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, $$\tilde{r}\_{a,\text{aud,s}}$$, `proof` |
 
-For `confidential_transfer_from`, the stored allowance salt $$\sigma_a$$ is **not** carried in `data`: the contract loads it from the `(from, spender)` delegation entry ([Spender Transfer](operations/spender-transfer.md) public-input table). Only the prover-chosen replacement $$\sigma_a'$$ travels in `data`. It is bound as this transfer's channel nonce (O7, O9, O\_a2, O\_a6), as the new allowance state's salt (O10, O12), and against the salt it replaces (O14); it is then written back to the delegation entry as the new `allowance_salt` and emitted in the event ([Transfer nonce](account-state.md#transfer-nonce)). This keeps the trust-boundary rule of [Public Input Sources](operations/README.md#public-input-sources) intact: caller-controlled bytes never overwrite the live $$\sigma_a$$ used to verify the proof. `set_spender`, by contrast, has no prior delegation entry to load from, so its $$\sigma_a$$ is prover-supplied and bound by S6.
+For `confidential_transfer_from`, the stored allowance salt $$\sigma\_a$$ is **not** carried in `data`: the contract loads it from the `(from, spender)` delegation entry ([Spender Transfer](operations/spender-transfer.md) public-input table). Only the prover-chosen replacement $$\sigma\_a'$$ travels in `data`. It is bound as this transfer's channel nonce (O7, O9, O\_a2, O\_a6), as the new allowance state's salt (O10, O12), and against the salt it replaces (O14); it is then written back to the delegation entry as the new `allowance_salt` and emitted in the event ([Transfer nonce](account-state.md#transfer-nonce)). This keeps the trust-boundary rule of [Public Input Sources](operations/README.md#public-input-sources) intact: caller-controlled bytes never overwrite the live $$\sigma\_a$$ used to verify the proof. `set_spender`, by contrast, has no prior delegation entry to load from, so its $$\sigma\_a$$ is prover-supplied and bound by S6.
 
 ## Authorization Model
 
@@ -82,11 +82,11 @@ Each state-modifying operation emits a structured event. Events carry the data n
 | `Register` | `account`, `auditor_id` |
 | `Deposit` | `from`, `to`, `amount` |
 | `Merge` | `account` |
-| `Withdraw` | `from`, `to`, `amount`, $$R_e$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{b}_{\text{aud,s}}$$, $$\tilde{r}_{\text{aud,s}}$$ |
-| `Transfer` | `from`, `to`, $$R_e$$, $$\tilde{v}$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{v}_{\text{aud,r}}$$, $$\tilde{r}_{\text{aud,r}}$$, $$\tilde{v}_{\text{aud,s}}$$, $$\tilde{b}_{\text{aud,s}}$$, $$\tilde{r}_{\text{aud,s}}$$ |
-| `SpenderTransfer` | `spender`, `from`, `to`, $$R_e$$, $$\tilde{v}$$, $$\sigma_a'$$, $$\tilde{v}_{\text{aud,r}}$$, $$\tilde{r}_{\text{aud,r}}$$, $$\tilde{v}_{\text{aud,s}}$$, $$\tilde{a}_{\text{aud,s}}$$, $$\tilde{r}_{\text{aud,s}}$$ |
-| `SetSpender` | `account`, `spender`, `live_until_ledger`, $$R_e$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{v}_{\text{aud,s}}$$, $$\tilde{b}_{\text{aud,s}}$$, $$\tilde{r}_{\text{aud,s}}$$, $$\tilde{r}_{a,\text{aud,s}}$$ |
-| `RevokeSpender` | `account`, `spender`, $$\tilde{a}$$, $$\sigma_a$$ |
+| `Withdraw` | `from`, `to`, `amount`, $$R\_e$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ |
+| `Transfer` | `from`, `to`, $$R\_e$$, $$\tilde{v}$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ |
+| `SpenderTransfer` | `spender`, `from`, `to`, $$R\_e$$, $$\tilde{v}$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ |
+| `SetSpender` | `account`, `spender`, `live_until_ledger`, $$R\_e$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, $$\tilde{r}\_{a,\text{aud,s}}$$ |
+| `RevokeSpender` | `account`, `spender`, $$\tilde{a}$$, $$\sigma\_a$$ |
 | `Clawback` | `account`, `amount`, `destination` |
 
 Amount fields in `Deposit`, `Withdraw`, and `Clawback` are typed `i128`, matching SEP-41.
@@ -95,9 +95,9 @@ Amount fields in `Deposit`, `Withdraw`, and `Clawback` are typed `i128`, matchin
 
 **Usage by consumers:**
 
-- **Recipient wallet**: processes `Transfer` and `SpenderTransfer` events using $$(R_e, \tilde{v}, \sigma)$$ -- with $$\sigma_a'$$ in place of $$\sigma$$ for `SpenderTransfer` -- to derive $$v_{\text{transfer}}$$ and $$r_{\text{transfer}}$$ ([ECDH-Derived Blinding](keys-and-commitments.md#ecdh-derived-blinding)).
-- **Owner wallet**: processes all events for recovery ([Wallet State and Recovery](wallet-state.md)). The $$(\tilde{b}, \sigma)$$ pair from the most recent checkpoint event (`Withdraw`, `Transfer` as sender, `SetSpender`) anchors $$W_{\text{spend}}$$; `Merge`, `RevokeSpender`, and `Clawback` are folded into it during replay.
-- **Auditor**: processes events containing $$R_e$$ to compute ECDH shared secrets and decrypt amounts, balance checkpoints, and the escrowed blindings ([Per-Transfer Auditor Ciphertexts](auditing.md#per-transfer-auditor-ciphertexts), [Auditor Visibility Properties](auditing.md#auditor-visibility-properties), [Spender Allowance Auditing](auditing.md#spender-allowance-auditing)); folds `Merge`, `RevokeSpender`, and `Clawback` into its accumulators as [Per-Transfer Auditor Ciphertexts](auditing.md#per-transfer-auditor-ciphertexts) and [Wallet and Auditor Consequences](../compliance.md#wallet-and-auditor-consequences) specify.
+- **Recipient wallet**: processes `Transfer` and `SpenderTransfer` events using $$(R\_e, \tilde{v}, \sigma)$$ -- with $$\sigma\_a'$$ in place of $$\sigma$$ for `SpenderTransfer` -- to derive $$v\_{\text{transfer}}$$ and $$r\_{\text{transfer}}$$ ([ECDH-Derived Blinding](keys-and-commitments.md#ecdh-derived-blinding)).
+- **Owner wallet**: processes all events for recovery ([Wallet State and Recovery](wallet-state.md)). The $$(\tilde{b}, \sigma)$$ pair from the most recent checkpoint event (`Withdraw`, `Transfer` as sender, `SetSpender`) anchors $$W\_{\text{spend}}$$; `Merge`, `RevokeSpender`, and `Clawback` are folded into it during replay.
+- **Auditor**: processes events containing $$R\_e$$ to compute ECDH shared secrets and decrypt amounts, balance checkpoints, and the escrowed blindings ([Per-Transfer Auditor Ciphertexts](auditing.md#per-transfer-auditor-ciphertexts), [Auditor Visibility Properties](auditing.md#auditor-visibility-properties), [Spender Allowance Auditing](auditing.md#spender-allowance-auditing)); folds `Merge`, `RevokeSpender`, and `Clawback` into its accumulators as [Per-Transfer Auditor Ciphertexts](auditing.md#per-transfer-auditor-ciphertexts) and [Wallet and Auditor Consequences](../compliance.md#wallet-and-auditor-consequences) specify.
 - **Indexer**: reconciles the pooled balance against the sum of claims ([Balance Conservation](security.md#balance-conservation), [Indexing and Off-Chain State Recovery](../indexer.md)).
 
 ## Read Methods
@@ -114,11 +114,11 @@ The function returns the *spending-authority* state, not the *escrow-existence* 
 
 **`get_spender_delegation(account, spender) -> SpenderDelegation`.** Returns the `SpenderDelegation` struct ([Spender Delegation](account-state.md#spender-delegation)) for the `(account, spender)` pair, i.e. `(allowance_commitment, a_tilde, escrowed_dvk, allowance_salt, live_until_ledger)`. Reverts if no delegation entry exists for the pair. Unlike `is_spender`, this surfaces the raw on-chain delegation state without applying the expiry filter, so callers can separate an absent delegation (revert) from an active one and from an expired-but-not-yet-revoked one, by comparing `live_until_ledger` against `ledger.sequence()` as `is_spender` does. Primary consumers:
 
-- **Spender wallet:** fetches `allowance_commitment`, `a_tilde`, `escrowed_dvk`, and `allowance_salt` to recover $$dvk_i$$ via [Delegation Key Escrow](operations/set-spender.md#delegation-key-escrow) decryption, then reads the current allowance via $$\tilde{a} = v_a + \text{Poseidon}(\delta_{\text{enc\\\_allow}}, dvk_i, \sigma_a)$$ to construct the next `confidential_transfer_from` witness.
+- **Spender wallet:** fetches `allowance_commitment`, `a_tilde`, `escrowed_dvk`, and `allowance_salt` to recover $$dvk\_i$$ via [Delegation Key Escrow](operations/set-spender.md#delegation-key-escrow) decryption, then reads the current allowance via $$\tilde{a} = v\_a + \text{Poseidon}(\delta\_{\text{enc\\\_allow}}, dvk\_i, \sigma\_a)$$ to construct the next `confidential_transfer_from` witness.
 - **Owner wallet:** reads the same fields after losing local state, or before calling `revoke_spender`, to confirm the on-chain entry matches its records.
 - **Indexers:** verify their replayed delegation state against the live commitment, in the same way `confidential_balance` is used for account state ([Consistency check](wallet-state.md#consistency-check)).
 
-The auditor's allowance tracking does **not** use this method: per-event allowance ciphertexts ([Spender Allowance Auditing](auditing.md#spender-allowance-auditing)) are the auditor's data path. `a_tilde` is keyed to $$dvk_i$$ and is unreadable without it, the owner's auditor included ([Spender Allowance Auditing](auditing.md#spender-allowance-auditing)).
+The auditor's allowance tracking does **not** use this method: per-event allowance ciphertexts ([Spender Allowance Auditing](auditing.md#spender-allowance-auditing)) are the auditor's data path. `a_tilde` is keyed to $$dvk\_i$$ and is unreadable without it, the owner's auditor included ([Spender Allowance Auditing](auditing.md#spender-allowance-auditing)).
 
 ---
 
