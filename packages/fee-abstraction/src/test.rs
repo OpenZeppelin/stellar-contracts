@@ -71,14 +71,120 @@ fn collect_fee_with_eager_approval_overwrites_allowance() {
     });
 
     let events = e.events().all();
-    // approval, transfer and collect fee
-    assert_eq!(events.events().len(), 3);
+    // approval, pull of the max fee, fee transfer, remainder refund and collect
+    // fee
+    assert_eq!(events.events().len(), 5);
 
     let allowance = token_client.allowance(&user, &contract_address);
-    assert_eq!(allowance, 30);
+    assert_eq!(allowance, 0);
 
-    let balance = token_client.balance(&recipient);
-    assert_eq!(balance, 20);
+    assert_eq!(token_client.balance(&recipient), 20);
+    assert_eq!(token_client.balance(&user), 980);
+    assert_eq!(token_client.balance(&contract_address), 0);
+}
+
+#[test]
+fn collect_fee_with_eager_approval_no_remainder() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+
+    let token_client = TokenClient::new(&e, &token_address);
+
+    e.as_contract(&contract_address, || {
+        // approve 50, spend 50
+        collect_fee(
+            &e,
+            &token_address,
+            50,
+            50,
+            100,
+            &user,
+            &recipient,
+            FeeAbstractionApproval::Eager,
+        );
+    });
+
+    let events = e.events().all();
+    // approval, pull of the max fee, fee transfer and collect fee
+    assert_eq!(events.events().len(), 4);
+
+    let allowance = token_client.allowance(&user, &contract_address);
+    assert_eq!(allowance, 0);
+
+    assert_eq!(token_client.balance(&recipient), 50);
+    assert_eq!(token_client.balance(&user), 950);
+    assert_eq!(token_client.balance(&contract_address), 0);
+}
+
+#[test]
+fn collect_fee_with_eager_approval_to_current_contract() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+
+    let token_client = TokenClient::new(&e, &token_address);
+
+    e.as_contract(&contract_address, || {
+        // approve 50, spend 20, the fee stays on the contract
+        collect_fee(
+            &e,
+            &token_address,
+            20,
+            50,
+            100,
+            &user,
+            &contract_address,
+            FeeAbstractionApproval::Eager,
+        );
+    });
+
+    let events = e.events().all();
+    // approval, pull of the max fee, remainder refund and collect fee
+    assert_eq!(events.events().len(), 4);
+
+    let allowance = token_client.allowance(&user, &contract_address);
+    assert_eq!(allowance, 0);
+
+    assert_eq!(token_client.balance(&contract_address), 20);
+    assert_eq!(token_client.balance(&user), 980);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #100)")]
+fn collect_fee_with_eager_approval_requires_max_fee_balance() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+    let other = Address::generate(&e);
+
+    let token_client = TokenClient::new(&e, &token_address);
+    // the user keeps 25, which covers the fee but not the approved maximum
+    token_client.transfer(&user, &other, &975);
+
+    e.as_contract(&contract_address, || {
+        collect_fee(
+            &e,
+            &token_address,
+            20,
+            50,
+            100,
+            &user,
+            &recipient,
+            FeeAbstractionApproval::Eager,
+        );
+    });
 }
 
 #[test]
