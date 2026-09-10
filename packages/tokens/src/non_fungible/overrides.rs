@@ -1,5 +1,9 @@
 use soroban_sdk::{Address, Env, String};
 
+use crate::non_fungible::royalties::{
+    remove_token_royalty_unchecked, royalty_info_unchecked, set_token_royalty_unchecked,
+};
+
 /// Internal override hook for [`crate::non_fungible::NonFungibleToken`].
 ///
 /// # Note
@@ -109,3 +113,109 @@ pub trait BurnableOverrides {
 }
 
 impl BurnableOverrides for Base {}
+
+/// Contract-type-dependent entry points of the royalties extension.
+///
+/// Every royalty operation must first establish that the token
+/// exists, and what "exists" means is decided by the contract type's
+/// ownership model. [`Base`] materializes an `Owner` entry for every token,
+/// so its check is a direct lookup.
+/// [`crate::non_fungible::consecutive::Consecutive`] stores ownership
+/// sparsely (one entry per batch boundary) and resolves the rest by scanning
+/// its ownership buckets, so an existence check hard-wired to
+/// [`Base::owner_of`] would reject almost every token of a consecutive
+/// collection. The check must therefore be routed through
+/// `ContractType::owner_of`.
+///
+/// This trait is how that routing is made reachable from everywhere it is
+/// needed:
+///
+/// 1. For [`crate::non_fungible::royalties::NonFungibleRoyalties::royalty_info`] alone, no extra machinery
+///    would be required. The method has a default implementation, and a default
+///    body can already reach the correct check through `Self::ContractType`,
+///    whose [`ContractOverrides`] bound carries `owner_of`.
+///
+/// 2. [`crate::non_fungible::royalties::NonFungibleRoyalties::set_token_royalty`] and
+///    [`crate::non_fungible::royalties::NonFungibleRoyalties::remove_token_royalty`] deliberately have no
+///    default implementations: they are privileged operations, and the access
+///    control is up to the implementing contract. Their bodies are written by
+///    the contract author, so the correctly-routed logic must be callable from
+///    the author's own code, and the only name available there that knows the
+///    ownership model is `Self::ContractType`.
+///
+/// 3. A function becomes callable on `Self::ContractType` by being defined on a
+///    trait that `ContractType` is bound by. [`ContractOverrides`] is not
+///    extended with royalty functions, because royalty logic belongs to this
+///    extension. Instead, this trait carries the royalty entry points, requires
+///    [`ContractOverrides`] as a supertrait so that its default bodies can call
+///    `Self::owner_of`, and
+///    [`crate::non_fungible::royalties::NonFungibleRoyalties`] bounds
+///    `ContractType` by it.
+///
+/// Like the other dispatch traits, the definition lives in this file with
+/// the rest of the plumbing, but unlike them it must be nameable by
+/// contract authors, so it is re-exported at
+/// `crate::non_fungible::royalties::RoyaltySupport`, next to the trait
+/// whose implementations call it.
+///
+/// # "Support", not "Overrides"
+///
+/// Unlike `BurnableOverrides` (the internal dispatch behind
+/// [`crate::non_fungible::burnable::NonFungibleBurnable`]), where the burn
+/// logic genuinely differs across contract types, nothing here is ever
+/// overridden. The royalty logic is identical for every contract type; the
+/// only type-dependent piece is the `owner_of` existence check, which the
+/// default bodies obtain through the supertrait. Every implementation of
+/// this trait is therefore empty: implementing it declares that the
+/// royalties extension can be used with a contract type, nothing more. A
+/// contract type defined outside this library opts in the same way, with an
+/// empty `impl`.
+///
+/// # Usage
+///
+/// The privileged functions are called on `Self::ContractType` after access
+/// control:
+///
+/// ```ignore
+/// use stellar_tokens::non_fungible::royalties::{NonFungibleRoyalties, RoyaltySupport};
+///
+/// #[contractimpl(contracttrait)]
+/// impl NonFungibleRoyalties for MyContract {
+///     #[only_admin]
+///     fn set_token_royalty(
+///         e: &Env,
+///         token_id: u32,
+///         receiver: Address,
+///         basis_points: u32,
+///         operator: Address,
+///     ) {
+///         Self::ContractType::set_token_royalty(e, token_id, &receiver, basis_points);
+///     }
+///
+///     // ...
+/// }
+/// ```
+pub trait RoyaltySupport: ContractOverrides {
+    fn set_token_royalty(e: &Env, token_id: u32, receiver: &Address, basis_points: u32) {
+        // Verify token exists, through this contract type's ownership model
+        let _ = Self::owner_of(e, token_id);
+
+        set_token_royalty_unchecked(e, token_id, receiver, basis_points);
+    }
+
+    fn remove_token_royalty(e: &Env, token_id: u32) {
+        // Verify token exists, through this contract type's ownership model
+        let _ = Self::owner_of(e, token_id);
+
+        remove_token_royalty_unchecked(e, token_id);
+    }
+
+    fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128) {
+        // Verify token exists, through this contract type's ownership model
+        let _ = Self::owner_of(e, token_id);
+
+        royalty_info_unchecked(e, token_id, sale_price)
+    }
+}
+
+impl RoyaltySupport for Base {}

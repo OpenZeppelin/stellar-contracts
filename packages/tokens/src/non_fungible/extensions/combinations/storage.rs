@@ -7,6 +7,7 @@ use crate::non_fungible::{
         enumerable::{Enumerable, EnumerableContractType},
     },
     overrides::{BurnableOverrides, ContractOverrides},
+    royalties::RoyaltySupport,
 };
 
 /// Contract type combining the [`Enumerable`] bookkeeping with vote
@@ -36,6 +37,11 @@ impl BurnableOverrides for EnumerableVotes {
         EnumerableVotes::burn_from(e, spender, from, token_id);
     }
 }
+
+// Implemented for `EnumerableVotes`, so that the royalty existence check
+// routes through the `Enumerable` ownership model (one `Owner` entry per
+// token).
+impl RoyaltySupport for EnumerableVotes {}
 
 impl EnumerableVotes {
     /// refer to [`Enumerable::sequential_mint`] and [`transfer_voting_units`]
@@ -130,6 +136,11 @@ impl BurnableOverrides for ConsecutiveVotes {
         ConsecutiveVotes::burn_from(e, spender, from, token_id);
     }
 }
+
+// Implemented for `ConsecutiveVotes`, so that the royalty existence check
+// routes through `Consecutive`'s `owner_of` instead of `Base`'s direct
+// entry lookup.
+impl RoyaltySupport for ConsecutiveVotes {}
 
 impl ConsecutiveVotes {
     /// Creates a batch of `amount` tokens for `to` and adds the matching

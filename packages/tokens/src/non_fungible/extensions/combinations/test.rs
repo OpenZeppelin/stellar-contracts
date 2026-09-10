@@ -11,7 +11,7 @@ use crate::non_fungible::{
         combinations::{Composable, Compose},
         consecutive::Consecutive,
         enumerable::Enumerable,
-        royalties::Royalties,
+        royalties::{Royalties, RoyaltySupport},
         votes::NonFungibleVotes,
     },
     overrides::{BurnableOverrides, ContractOverrides},
@@ -90,6 +90,20 @@ fn votes_combinations_are_order_insensitive() {
         TypeId::of::<Compose<(Enumerable, Burnable, NonFungibleVotes, Royalties)>>(),
         TypeId::of::<EnumerableVotes>(),
     );
+}
+
+// Every contract type must implement `RoyaltySupport`, so that the royalties
+// extension can be paired with any of them. A missing impl fails here at
+// compile time instead of at some downstream contract's build.
+#[test]
+fn all_contract_types_support_royalties() {
+    fn assert_support<T: RoyaltySupport>() {}
+    assert_support::<Base>();
+    assert_support::<Enumerable>();
+    assert_support::<Consecutive>();
+    assert_support::<NonFungibleVotes>();
+    assert_support::<EnumerableVotes>();
+    assert_support::<ConsecutiveVotes>();
 }
 
 #[contract]
