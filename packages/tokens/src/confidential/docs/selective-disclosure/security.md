@@ -60,11 +60,11 @@ Four new Noir circuits are added to the proof system:
 | Circuit | Purpose |
 |:---|:---|
 | `disclose_recipient` | D-recipient ([D-recipient](circuits/d-recipient.md)) and its aggregate form ([Aggregate Disclosures](circuits/aggregate.md)) |
-| `disclose_sender` | D-sender ([D-sender](circuits/d-sender.md)) and its aggregate form |
-| `disclose_auditor` | D-auditor ([D-auditor](circuits/d-auditor.md)) and its aggregate form |
+| `disclose_sender` | D-sender ([D-sender](circuits/d-sender.md)) and its aggregate form ([Aggregate Disclosures](circuits/aggregate.md)) |
+| `disclose_auditor` | D-auditor ([D-auditor](circuits/d-auditor.md)) and its aggregate form ([Aggregate Disclosures](circuits/aggregate.md)) |
 | `disclose_balance` | D-balance ([D-balance](circuits/d-balance.md)), exposed as predicate-only (`disclose_balance_ge` / `disclose_balance_le`) and value-revealing (`disclose_balance_value`) variants |
 
-The aggregate forms can be implemented as a single parameterized circuit per role with a compile-time event-count bound, or as a family of circuits at $$n \in \\{1, 4, 16, 64\\}$$ to balance proving time against generality.
+The aggregate forms can be implemented as a single parameterized circuit per role with a compile-time event-count bound, or as a family of circuits at $$n \in \\{1, 4, 16, 64\\}$$ to balance proving time against generality. Either way a proof over $$m \le n$$ events zero-fills the unused slots under the active-count input, and each aggregate form is exposed in the predicate-only and value-revealing shapes of D-balance ([Aggregate Disclosures](circuits/aggregate.md)).
 
 These circuits do *not* register with the on-chain verifier set ([Proof System](../protocol/proof-system.md)). They are verified entirely off-chain.
 

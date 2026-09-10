@@ -58,8 +58,8 @@ $$\text{Bundle} = (\text{circuit\\\_id}, \text{ref}\_E, \pi, R\_{\text{disc}}, \
 
 | Field | Purpose |
 |:---|:---|
-| `circuit_id` | Identifies the variant — D-recipient, D-sender, D-auditor, or one of their aggregate / balance / randomness sub-forms. Pins the verification key the recipient loads. |
-| $$\text{ref}\_E$$ | Event reference ([Event Reference](#event-reference)). Tells the verifier which on-chain event the proof claims to describe. |
+| `circuit_id` | Identifies the variant — D-recipient, D-sender, D-auditor, or one of their aggregate / balance / randomness sub-forms — and, for D-auditor, the channel disclosed. Pins the verification key the recipient loads. |
+| $$\text{ref}\_E$$ | Event reference ([Event Reference](#event-reference)). Tells the verifier which on-chain event the proof claims to describe. An aggregate form ([Aggregate Disclosures](circuits/aggregate.md)) carries one $$\text{ref}\_{E,i}$$ per event, in the order the circuit's per-event list expects. |
 | $$\pi$$ | UltraHonk proof. |
 | $$R\_{\text{disc}}, \tilde{v}\_{\text{disc}}$$ | Disclosure ciphertext ([Disclosure Ciphertext to Recipient](#disclosure-ciphertext-to-recipient)). Also appear in the proof's public-input vector. |
 
@@ -81,13 +81,13 @@ Given a bundle for $$(P\_R, \nu)$$ that this verifier previously issued, the rec
    - D-sender on `SpenderTransfer`: $$\text{PVK}\_A$$ from $$E.\text{spender}$$, $$\text{PVK}\_B$$ from $$E.\text{to}$$.
    - D-auditor: no on-chain account record is consulted for $$\text{PVK}\_A$$; instead the auditor key $$K\_{\text{aud}}$$ is resolved per step 3.
 
-3. **Resolve auxiliary on-chain state.** Read $$\text{addr\\\_f}$$ from the contract's instance storage ([Governance and Upgradeability](../protocol/system-model.md#governance-and-upgradeability)). For D-auditor, look up the auditor key for the disclosing account's `auditor_id` at the version active at the event's ledger ([Auditor's off-chain obligation](../protocol/auditing.md#auditors-off-chain-obligation)); pick $$K\_{\text{aud,r}}$$ vs. $$K\_{\text{aud,s}}$$ according to which channel ciphertext the proof claims to disclose. The verifier MUST reject if the version cannot be resolved (auditor contract has no key active at that ledger).
+3. **Resolve auxiliary on-chain state.** Read $$\text{addr\\\_f}$$ from the contract's instance storage ([Governance and Upgradeability](../protocol/system-model.md#governance-and-upgradeability)). For D-auditor, look up the auditor key for the disclosing account's `auditor_id` at the version active at the event's ledger ([Auditor's off-chain obligation](../protocol/auditing.md#auditors-off-chain-obligation)); pick $$K\_{\text{aud,r}}$$ vs. $$K\_{\text{aud,s}}$$ according to the channel the `circuit_id` names. The verifier MUST reject if the version cannot be resolved (auditor contract has no key active at that ledger).
 
 4. **Construct the public-input vector.** Build the vector from the event payload (step 1), the on-chain account records (step 2), the auxiliary state (step 3), the recipient's own $$(P\_R, \nu)$$, and the bundle's $$(R\_{\text{disc}}, \tilde{v}\_{\text{disc}})$$. The verifier MUST NOT use any value from the bundle other than these last two. If any public input the circuit expects is unavailable (e.g., a referenced account is not registered), the verifier rejects.
 
 5. **Verify the proof.** Run UltraHonk verification with the verification key for `circuit_id` against the constructed public inputs and $$\pi$$. Reject on failure.
 
-6. **Decrypt.** Compute $$s\_{\text{disc}} = \text{ECDH}(r\_R, R\_{\text{disc}})$$ and $$v\_{\text{transfer}} = \tilde{v}\_{\text{disc}} - \text{Poseidon}(\delta\_{\text{disc}}, s\_{\text{disc}}, \nu)$$ as in [Disclosure Ciphertext to Recipient](#disclosure-ciphertext-to-recipient).
+6. **Decrypt.** Compute $$s\_{\text{disc}} = \text{ECDH}(r\_R, R\_{\text{disc}})$$ and $$v\_{\text{transfer}} = \tilde{v}\_{\text{disc}} - \text{Poseidon}(\delta\_{\text{disc}}, s\_{\text{disc}}, \nu)$$ as in [Disclosure Ciphertext to Recipient](#disclosure-ciphertext-to-recipient). Aggregate forms substitute $$\delta\_{\text{disc\\\_bind}}$$ for $$\delta\_{\text{disc}}$$ ([Aggregate Disclosures](circuits/aggregate.md)).
 
 ### On-Chain Verification
 
