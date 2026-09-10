@@ -4,7 +4,7 @@ pub mod storage;
 mod test;
 
 use soroban_sdk::{contracttrait, Address, Env};
-pub use storage::Enumerable;
+pub use storage::{Enumerable, EnumerableContractType};
 
 use crate::non_fungible::NonFungibleToken;
 
@@ -41,7 +41,7 @@ use crate::non_fungible::NonFungibleToken;
 ///    exists for the use-cases where the enumeration is required as an on-chain
 ///    operation.
 #[contracttrait]
-pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
+pub trait NonFungibleEnumerable: NonFungibleToken<ContractType: EnumerableContractType> {
     /// Returns the total amount of tokens stored by the contract.
     ///
     /// # Arguments

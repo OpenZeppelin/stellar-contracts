@@ -5,15 +5,7 @@ use crate::non_fungible::{overrides::BurnableOverrides, NonFungibleToken};
 mod test;
 
 use soroban_sdk::{contractevent, contracttrait, Address, Env};
-
-/// Type-level name of the burnable extension, for use in a
-/// [`crate::non_fungible::combinations::Compose`] list.
-///
-/// Burnable is additive: it does not override the base behavior, so listing
-/// it is purely declarative and does not affect the resolved contract type.
-/// Burning is enabled by implementing [`NonFungibleBurnable`], whether or not
-/// `Burnable` is listed.
-pub enum Burnable {}
+pub use storage::Burnable;
 
 /// Burnable Trait for Non-Fungible Token
 ///
