@@ -28,7 +28,7 @@ pub enum CircuitType {
 | `Transfer` | Balance conservation; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; sender auditor: amount + balance + `lane[2]` escrow of the new spendable blinding); deterministic randomness for new sender balance; encrypted balance scalar; sender key ownership; range validity (balance $$\in [0, 2^{127})$$, amount $$\in [0, 2^{127})$$) |
 | `SpenderTransfer` | Allowance sufficiency; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; owner auditor: amount + allowance + `lane[2]` escrow of the new allowance blinding); deterministic randomness for new allowance; encrypted allowance scalar; spender key ownership; contract-bound indirectly via $$C\_a$$ chain ([Spender Transfer](operations/spender-transfer.md)) |
 | `SetSpender` | Balance split; $$dvk\_i$$ derivation; ECDH escrow of $$dvk\_i$$ to the spender and of the allowance blinding to the owner's auditor; allowance commitment with deterministic randomness; encrypted balance and allowance scalars; owner-auditor ECDH ciphertexts (escrow amount + balance checkpoint + `lane[2]` escrow of the new spendable blinding); owner key ownership; contract-bound via $$vk$$ derivation |
-| `Clawback` | Knowledge of the openings of the target's $$C\_{\text{spend}}$$ and $$C\_{\text{receive}}$$; public seize amount bounded by their sum, remainder in range; no key ownership, no ephemeral ([Circuit](../compliance.md#circuit)) |
+| `Clawback` | Knowledge of the openings of the target's $$C\_{\text{spend}}$$ and $$C\_{\text{receive}}$$; public seize amount bounded by their sum, remainder in range; auditor key ownership; no ephemeral ([Circuit](../compliance.md#circuit)) |
 
 ## Circuit Cost Analysis
 
@@ -43,7 +43,7 @@ The dominant cost in Noir circuits is elliptic curve scalar multiplication. With
 | `Transfer` | 8 | $$Y\_A$$ (T1), $$C\_{\text{spend}}^A$$ opening (T3), recipient ECDH (T5), $$R\_e$$ (T6), $$C\_{\text{transfer}}$$ (T8), $$C\_{\text{spend}}'$$ (T11), recipient-auditor ECDH (T\_a1), sender-auditor ECDH (T\_a5) |
 | `SpenderTransfer` | 8 | $$Y\_{\text{op}}$$ (O1), $$C\_a$$ opening (O2), recipient ECDH (O5), $$R\_e$$ (O6), $$C\_{\text{transfer}}$$ (O8), $$C\_a'$$ (O11), recipient-auditor ECDH (O\_a1), owner-auditor ECDH (O\_a5) |
 | `SetSpender` | 7 | $$Y$$ (S1), $$C\_{\text{spend}}$$ opening (S3), $$C\_a$$ (S7), $$C\_{\text{spend}}'$$ (S10), $$R\_e$$ (S\_a1), $$dvk\_i$$ escrow ECDH (S12, [Delegation Key Escrow](operations/set-spender.md#delegation-key-escrow)), owner-auditor ECDH (S\_a2) |
-| `Clawback` | 2 | $$C\_{\text{spend}}$$ opening (CB1), $$C\_{\text{receive}}$$ opening (CB2) |
+| `Clawback` | 3 | $$K\_{\text{aud}}$$ (CB1), $$C\_{\text{spend}}$$ opening (CB2), $$C\_{\text{receive}}$$ opening (CB3) |
 
 `SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of [Delegation Key Escrow](operations/set-spender.md#delegation-key-escrow) reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The auditor-side escrow of the allowance blinding $$r\_a$$ (S14) reuses the S\_a2 shared scalar and adds one Poseidon evaluation. The `lane[2]` escrows (W\_a5, T\_a9, S\_a6, O\_a9) read `lane[2]` of a permutation each circuit already computes and cost one field addition apiece. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`.
 
@@ -76,7 +76,7 @@ global H: EmbeddedCurvePoint = EmbeddedCurvePoint {
 /// circuit (input or output). Both scalars are encoded as single-limb F_r
 /// `Field` values: Poseidon outputs or rejection-sampled CSPRNG draws for fresh
 /// blindings, and (for the spend-side input opening of C_spend in W3/T3/S3 and
-/// of both balance commitments in CB1/CB2)
+/// of both balance commitments in CB2/CB3)
 /// the canonical F_q reduction of the wallet's post-merge integer blinding,
 /// which lies in F_r with probability >= 1 - 2^-127 per merge. The complementary
 /// case is acknowledged below in *Post-merge witness availability*.

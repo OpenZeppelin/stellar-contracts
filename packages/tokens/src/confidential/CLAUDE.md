@@ -39,7 +39,7 @@ Beyond the root guide's conventions:
 
 - Proof verification is mocked. `MockVerifier` / `MockAuditor` in `test.rs` stand in for the real contracts, and proofs are empty `Bytes::new(e)`. Do not attempt to generate real proofs in Rust tests.
 - Use `fixture_point` / `fixture_field`, not arbitrary bytes. The fixtures are canonical and on-curve; random values fail the canonicality guards before reaching any logic under test.
-- One mock models proof semantics on purpose: the register mock binds the first `acct_f` it sees, standing in for UltraHonk's absorption of public inputs, so replay tests are meaningful. Keep that behaviour if the register flow changes.
+- Two mocks model proof semantics on purpose: the register mock in `test.rs` binds the first `acct_f` it sees, and `ClawbackReplayGuardVerifier` in `compliance/test.rs` binds the first whole blob, both standing in for UltraHonk's absorption of public inputs, so replay tests are meaningful. Keep that behaviour if either flow changes.
 
 ## The documentation set
 
