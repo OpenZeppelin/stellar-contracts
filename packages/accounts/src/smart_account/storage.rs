@@ -94,7 +94,14 @@ pub struct PolicyEntry {
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Signer {
-    /// A delegated signer that uses built-in signature verification.
+    /// A delegated signer, any contract or account address, authenticated
+    /// through `require_auth_for_args((preimage,))`. Transaction simulation
+    /// does not return this nested authorization entry, because the call
+    /// happens inside `__check_auth`. Clients add it manually: an entry for
+    /// the delegated address whose root invocation is `__check_auth` on the
+    /// smart account with the [`AuthDigestPreimage`] as its single argument.
+    /// See `src/smart_account/test/auth_entries.rs` for a reference
+    /// construction.
     Delegated(Address),
     /// An external signer with custom verification logic.
     /// Contains the verifier contract address and the public key data.
@@ -123,11 +130,9 @@ pub enum Signer {
 /// a mismatch is rejected with
 /// [`SmartAccountError::ContextRuleIdsLengthMismatch`].
 ///
-/// **Important:** `context_rule_ids` are bound into the digest that signers
-/// authenticate against: `auth_digest = sha256(signature_payload ||
-/// context_rule_ids.to_xdr())`. Signers must sign `auth_digest`, not the
-/// raw `signature_payload` from the host. This prevents rule-selection
-/// downgrade attacks.
+/// **Important:** signers do not sign the raw `signature_payload` from the
+/// host. They commit to an [`AuthDigestPreimage`] that binds the smart account
+/// address, `context_rule_ids` and `signature_payload`.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct AuthPayload {
@@ -135,6 +140,33 @@ pub struct AuthPayload {
     pub signers: Map<Signer, Bytes>,
     /// Per-context rule IDs, aligned by index with `auth_contexts`.
     pub context_rule_ids: Vec<u32>,
+}
+
+/// The structured message that every signer commits to in `__check_auth`.
+///
+/// [`Signer::External`] signers sign [`AuthDigestPreimage::digest`], the
+/// SHA-256 hash of this struct's XDR encoding. [`Signer::Delegated`] signers
+/// authorize the struct itself through `require_auth_for_args`.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct AuthDigestPreimage {
+    /// The smart account performing the authorization check.
+    pub account: Address,
+    /// The 32-byte payload provided by the host to `__check_auth`.
+    pub signature_payload: BytesN<32>,
+    /// Per-context rule IDs, aligned by index with `auth_contexts`.
+    pub context_rule_ids: Vec<u32>,
+}
+
+impl AuthDigestPreimage {
+    /// Computes the digest signed by [`Signer::External`] signers.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    pub fn digest(&self, e: &Env) -> BytesN<32> {
+        e.crypto().sha256(&self.clone().to_xdr(e)).to_bytes()
+    }
 }
 
 /// Types of contexts that can be authorized by smart account rules.
@@ -327,10 +359,14 @@ pub fn get_validated_context_by_id(
 /// Verifies an `Address` authorization or a cryptographic signature through an
 /// external verifier contract.
 ///
+/// [`Signer::External`] signers are verified against
+/// [`AuthDigestPreimage::digest`]. [`Signer::Delegated`] signers must have
+/// authorized `require_auth_for_args((preimage,))` on the smart account.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `auth_digest` - The hash of the data that was signed.
+/// * `preimage` - The structured message the signer committed to.
 /// * `signer` - The signer who signed the payload.
 /// * `sig_data` - The signature to verify for an external signer.
 ///
@@ -338,10 +374,10 @@ pub fn get_validated_context_by_id(
 ///
 /// * [`SmartAccountError::ExternalVerificationFailed`] - When an external
 ///   signature fails verification through its verifier contract.
-pub fn authenticate(e: &Env, auth_digest: &Hash<32>, signer: &Signer, sig_data: &Bytes) {
+pub fn authenticate(e: &Env, preimage: &AuthDigestPreimage, signer: &Signer, sig_data: &Bytes) {
     match signer {
         Signer::External(verifier, key_data) => {
-            let sig_payload = auth_digest.to_bytes().to_bytes();
+            let sig_payload = preimage.digest(e).to_bytes();
             if !VerifierClient::new(e, verifier).verify(
                 &sig_payload,
                 &key_data.into_val(e),
@@ -351,7 +387,7 @@ pub fn authenticate(e: &Env, auth_digest: &Hash<32>, signer: &Signer, sig_data: 
             }
         }
         Signer::Delegated(addr) => {
-            let args = (auth_digest.clone(),).into_val(e);
+            let args = (preimage.clone(),).into_val(e);
             addr.require_auth_for_args(args)
         }
     }
@@ -438,11 +474,9 @@ pub fn validate_context_rule_name(e: &Env, name: &String) {
 /// validate against for the corresponding auth context (by index). Its length
 /// must equal `auth_contexts.len()`.
 ///
-/// To prevent rule-selection downgrade attacks, `context_rule_ids` are bound
-/// into the digest that signers authenticate against:
-/// `auth_digest = sha256(signature_payload || context_rule_ids.to_xdr())`.
-/// Altering `context_rule_ids` after signature collection therefore
-/// invalidates all signatures.
+/// Signers do not sign the raw `signature_payload`. They commit to an
+/// [`AuthDigestPreimage`] that binds the smart account address,
+/// `context_rule_ids` and `signature_payload`.
 ///
 /// # Arguments
 ///
@@ -489,10 +523,11 @@ pub fn do_check_auth(
         }
     }
 
-    // Bind context_rule_ids into the signed digest.
-    let mut preimage = signature_payload.to_bytes().to_bytes();
-    preimage.append(&signatures.context_rule_ids.clone().to_xdr(e));
-    let auth_digest = e.crypto().sha256(&preimage);
+    let preimage = AuthDigestPreimage {
+        account: e.current_contract_address(),
+        signature_payload: signature_payload.to_bytes(),
+        context_rule_ids: signatures.context_rule_ids.clone(),
+    };
 
     // Authenticate and reject any signer that is not part of any
     // selected rule, preventing arbitrary external calls via
@@ -501,7 +536,7 @@ pub fn do_check_auth(
         if !allowed_signers.contains_key(signer.clone()) {
             panic_with_error!(e, SmartAccountError::UnauthorizedSigner);
         }
-        authenticate(e, &auth_digest, &signer, &sig_data);
+        authenticate(e, &preimage, &signer, &sig_data);
     }
 
     // Enforce all policies.

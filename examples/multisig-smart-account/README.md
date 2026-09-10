@@ -170,47 +170,52 @@ This setup demonstrates the flexibility of smart accounts, combining different s
 
 ## 6. Constructing the Signature Payload
 
-When authorizing transactions with a smart account, signers do **not** sign the raw `signature_payload` provided by the Soroban host. Instead, the smart account binds the selected `context_rule_ids` into the digest to prevent rule-selection downgrade attacks.
+When authorizing transactions with a smart account, signers do **not** sign the raw `signature_payload` provided by the Soroban host. Instead, every signer commits to an `AuthDigestPreimage` that binds the smart account address and the selected `context_rule_ids` alongside `signature_payload`.
 
-### How the Auth Digest Is Computed
+### What Signers Commit To
 
-The Soroban host computes a `signature_payload` (`Hash<32>`) from the transaction's network ID, nonce, expiration ledger, and authorized invocation tree. The smart account then derives the **auth digest** that signers must actually sign:
+The Soroban host computes a `signature_payload` (`Hash<32>`) from the transaction's network ID, nonce, expiration ledger, and authorized invocation tree. The smart account wraps it in a structured message:
 
+```rust
+AuthDigestPreimage {
+    account: Address,              // the smart account
+    signature_payload: BytesN<32>, // from the host
+    context_rule_ids: Vec<u32>,    // one per auth context
+}
 ```
-auth_digest = sha256(signature_payload || context_rule_ids.to_xdr())
-```
 
-Where:
-- `signature_payload` is the 32-byte hash provided by the host to `__check_auth`
-- `context_rule_ids` is the `Vec<u32>` of rule IDs (one per auth context), serialized to XDR
-- `||` denotes byte concatenation
+- `External` signers sign the **auth digest**, `sha256(preimage.to_xdr())`, which the smart account passes to their verifier contract.
+- `Delegated` signers authorize a call to `__check_auth` on the smart account with the preimage as its single argument. Their manually crafted authorization entry therefore shows the named fields rather than an opaque hash.
 
 ### Why This Matters
 
-Without this binding, a malicious sponsor could collect signatures under a strict rule (e.g., one requiring a threshold policy) and then swap the `context_rule_ids` in the `AuthPayload` to reference a weaker rule — bypassing spending limits or threshold policies that signers expected to apply. By including rule IDs in the signed digest, any alteration of `context_rule_ids` after signature collection invalidates all signatures.
+Binding `context_rule_ids` stops a malicious sponsor from collecting signatures under a strict rule (e.g., one requiring a threshold policy) and then swapping the `context_rule_ids` in the `AuthPayload` to a weaker rule — bypassing spending limits or threshold policies that signers expected to apply. The `account` field scopes the message to a single smart account.
 
 ### Example: Computing the Auth Digest Off-Chain
 
 Using the Soroban Rust SDK:
 
 ```rust
-use soroban_sdk::xdr::ToXdr;
+use stellar_accounts::smart_account::AuthDigestPreimage;
 
 // signature_payload: Hash<32> from the host (via __check_auth)
 // context_rule_ids: Vec<u32> — the rule IDs the signer agrees to
 
-let mut preimage = signature_payload.to_bytes().to_bytes();
-preimage.append(&context_rule_ids.to_xdr(e));
-let auth_digest = e.crypto().sha256(&preimage);
+let preimage = AuthDigestPreimage {
+    account: smart_account_address,
+    signature_payload: signature_payload.to_bytes(),
+    context_rule_ids,
+};
+let auth_digest = preimage.digest(e);
 
-// Signers sign `auth_digest`, NOT `signature_payload` directly.
+// External signers sign `auth_digest`, NOT `signature_payload` directly.
 ```
 
-For off-chain clients (e.g., JS SDK), replicate the same concatenation:
-1. Take the raw 32 bytes of `signature_payload`
-2. XDR-encode the `Vec<u32>` of rule IDs (as `ScVal::Vec` of `ScVal::U32` entries)
-3. Concatenate them and compute SHA-256
-4. Sign the resulting 32-byte digest
+For off-chain clients (e.g., JS SDK):
+1. Build the preimage as an `ScVal::Map` with symbol keys `account`, `context_rule_ids`, and `signature_payload` (`ScMap` keys must be sorted)
+2. XDR-encode it and compute SHA-256
+3. External signers sign the resulting 32-byte digest
+4. Delegated signers authorize `__check_auth` on the smart account with the same `ScVal::Map` as the only argument. Simulation does not return this entry, so the client adds it as a second root-level authorization entry for the delegated address
 
 ## Next Steps
 
@@ -220,3 +225,4 @@ For off-chain clients (e.g., JS SDK), replicate the same concatenation:
 - [caveats](https://docs.openzeppelin.com/stellar-contracts/accounts/policies#caveats) of policy management and configurations 
 2. Explore how to invoke functions using this multisig smart account. You can use the [brozorec/smart-account-sign](https://github.com/brozorec/smart-account-sign) tool for demonstration purposes.
    > **⚠️ Disclaimer:** This tool is provided for demonstration purposes only. We do not vouch for its security or recommend it for production use. Always conduct your own security audit before using third-party tools in production environments.
+3. Sign and submit from a TypeScript client with the [smart-account-kit](https://github.com/stellar/smart-account-kit) SDK. Check that its version targets the `stellar-accounts` release the account was built with.
