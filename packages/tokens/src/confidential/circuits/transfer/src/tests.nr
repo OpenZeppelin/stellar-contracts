@@ -419,7 +419,7 @@ fn rejects_under_funded_transfer() {
 
 #[test(should_fail)]
 fn rejects_v_out_of_range() {
-    // 2^127 is exactly the boundary T4 rules out (Section 2.6 / 3.4 -- SEP-41
+    // 2^127 is exactly the boundary T4 rules out (docs/protocol/primitives.md#integer-embedding-and-range-proofs and docs/protocol/system-model.md#underlying-token-assumptions -- SEP-41
     // i128 non-negative range is [0, 2^127), so 2^127 is the smallest value
     // that must fail). With v_huge - V_TRANSFER = 2^127 - 100 still in [0, 2^127),
     // the v_new range check passes; only the `v.assert_max_bit_size<127>()`
@@ -710,7 +710,7 @@ fn rejects_wrong_recipient_pvk() {
 
 #[test(should_fail)]
 fn rejects_poisoned_c_transfer() {
-    // Anti-poisoning (Section 5.4): a sender that commits C_transfer with arbitrary
+    // Anti-poisoning (docs/protocol/keys-and-commitments.md#anti-poisoning-constraint): a sender that commits C_transfer with arbitrary
     // blinding -- here r_transfer' = canonical r_transfer + 1 -- desynchronizes the
     // recipient's accumulated blinding. T7 + T8 together close this attack:
     // r_transfer is uniquely determined by Poseidon2(delta_transfer_blind, s, sigma),

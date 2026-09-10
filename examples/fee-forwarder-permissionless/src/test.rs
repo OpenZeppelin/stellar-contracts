@@ -143,6 +143,8 @@ fn forward_basic() {
 
     assert_eq!(token.balance(&user), initial_user_balance - fee_amount);
     assert_eq!(token.balance(&relayer), initial_relayer_balance + fee_amount);
+    assert_eq!(token.balance(&fee_forwarder.address), 0);
+    assert_eq!(token.allowance(&user, &fee_forwarder.address), 0);
 }
 
 #[test]

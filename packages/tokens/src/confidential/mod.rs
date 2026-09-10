@@ -6,8 +6,7 @@
 //! accompanied by an UltraHonk proof that the contract verifies via a separate
 //! verifier contract. Auditor keys are read from a separate registry contract
 //! and dual auditor ciphertexts are emitted in each transfer event. See
-//! `docs/DESIGN.md` (§1–§7) and `docs/DESIGN_cont.md` (§8–§13) for the
-//! full specification.
+//! `docs/README.md` for the full specification.
 //!
 //! # ⚠️ Not Production Ready
 //!
@@ -25,17 +24,19 @@
 //!   and three read methods) with default bodies that delegate to the matching
 //!   free functions in [`storage`].
 //! - The on-chain account state types [`ConfidentialAccount`] and
-//!   [`SpenderDelegation`] (DESIGN §6).
-//! - The five XDR payload types carried in the `data: Bytes` parameter (DESIGN
-//!   §11). `revoke_spender` is proofless and carries none.
+//!   [`SpenderDelegation`] (`docs/protocol/account-state.md`).
+//! - The five XDR payload types carried in the `data: Bytes` parameter
+//!   (`docs/protocol/interface.md`). `revoke_spender` is proofless and carries
+//!   none.
 //! - Storage helpers and operation-level orchestration under [`storage`].
 //!
 //! ## Public-Input Encoding
 //!
 //! The contract assembles the public-input blob handed to the verifier by
 //! concatenating canonical 32-byte big-endian `Bn254Fr` representatives in
-//! the order specified by each circuit's table in DESIGN §7. Grumpkin
-//! points contribute two consecutive 32-byte limbs (`x` then `y`). Public
+//! the order specified by each operation's table under
+//! `docs/protocol/operations/`. Grumpkin points contribute two consecutive
+//! 32-byte limbs (`x` then `y`). Public
 //! `i128` amounts are zero-padded to 32 bytes. The encoding is positional
 //! (no length prefix); any divergence from the order the prover used will
 //! cause verification to fail.
@@ -63,14 +64,16 @@
 //! The check is by deliberate design **not** an on-curve check. Prover-
 //! supplied points are constrained on-curve in-circuit by their
 //! `multi_scalar_mul` derivation and pinned to `≠ O` by explicit
-//! nonzero-scalar constraints (DESIGN §10.8: R4/R5, W8, T13, S13, O13).
+//! nonzero-scalar constraints (R4/R5, W8, T13, S13, O13;
+//! `docs/protocol/proof-system.md#on-chain-point-arithmetic`).
 //! The only proof-less Grumpkin entry point is the auditor key, which the
 //! auditor contract validates canonical-encoding, on-curve, and non-identity
 //! at insertion via [`auditor::storage::validate_point`].
 //!
 //! Together these three boundaries discharge the trust-boundary rule of
-//! DESIGN §7.1: the canonical-encoding guard at the verifier boundary keeps
-//! caller bytes byte-unique, the in-circuit constraints keep prover-supplied
+//! `docs/protocol/operations/README.md#public-input-sources`: the
+//! canonical-encoding guard at the verifier boundary keeps caller bytes
+//! byte-unique, the in-circuit constraints keep prover-supplied
 //! points on-curve, and the auditor registry's insertion-time validation
 //! covers the lone proof-less point input.
 //!
@@ -78,7 +81,9 @@
 //!
 //! Every owner-initiated proof references a `addr_f` field, computed once at
 //! construction as `Poseidon2(δ_addr, lo, hi)` over the contract's own
-//! address (DESIGN §2.7, §3.5) and stored in instance storage.
+//! address (`docs/protocol/primitives.md#address-to-field-encoding`,
+//! `docs/protocol/system-model.md#governance-and-upgradeability`) and stored
+//! in instance storage.
 //!
 //! ## Underlying Token Requirements
 //!
@@ -110,8 +115,9 @@
 //! All deposits sit in a single pooled balance held by the contract's own
 //! address, and every withdrawal pays out of it via `token.transfer`. If
 //! the underlying is a Stellar Asset Contract, its issuer holds two
-//! distinct powers over that pooled balance (DESIGN §3.4), and they behave
-//! very differently.
+//! distinct powers over that pooled balance
+//! (`docs/protocol/system-model.md#underlying-token-assumptions`), and they
+//! behave very differently.
 //!
 //! *Freeze / deauthorization* is a reversible block that removes no value.
 //! One issuer action against the contract's address blocks every deposit

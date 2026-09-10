@@ -6,7 +6,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 mod tests;
 
-// Transfer circuit -- design doc Section 7.6.
+// Transfer circuit -- docs/protocol/operations/transfer.md.
 //
 // Constraints
 // -----------
@@ -19,11 +19,11 @@ mod tests;
 //                                                           sender's current
 //                                                           spendable balance.
 //   T4  v_A, v_transfer, v_A - v_transfer in [0, 2^127)                 Range validity
-//                                                           (Section 2.6); the
+//                                                           (docs/protocol/primitives.md#integer-embedding-and-range-proofs); the
 //                                                           [0, 2^127) bound is
 //                                                           the SEP-41 i128
 //                                                           non-negative range
-//                                                           (Section 3.4).
+//                                                           (docs/protocol/system-model.md#underlying-token-assumptions).
 //   T10 r_A'        = Poseidon2(delta_spend_r, vk_A, sigma) Deterministic
 //                                                           randomness for the
 //                                                           new sender balance.
@@ -33,7 +33,7 @@ mod tests;
 //                       + Poseidon2(delta_enc_bal, vk_A, sigma)
 //                                                           Encrypted balance
 //                                                           scalar (emitted).
-// Recipient ECDH + transfer commitment (Section 5.3, 5.4)
+// Recipient ECDH + transfer commitment (docs/protocol/keys-and-commitments.md#ecdh-derived-blinding, docs/protocol/keys-and-commitments.md#anti-poisoning-constraint)
 //   T5  s           = ecdh(r_e, PVK_B)                      Recipient ECDH
 //                                                           shared-secret
 //                                                           scalar (2.4).
@@ -52,7 +52,7 @@ mod tests;
 //   T13 r_e != 0                                            Rules out R_e = O
 //                                                           and S, S_{a,r},
 //                                                           S_{a,s} = O.
-// Auditor block (dual-channel visibility, Section 8.1)
+// Auditor block (dual-channel visibility, docs/protocol/auditing.md#per-transfer-auditor-ciphertexts)
 //   T_a1 s_{a,r}    = ecdh(r_e, K_aud_r)                    Recipient-auditor
 //                                                           ECDH shared scalar
 //                                                           (reuses r_e).
@@ -82,13 +82,13 @@ mod tests;
 //                                                           spendable blinding,
 //                                                           over T10's r_A'.
 //
-// Point-validation doctrine (Section 10.8)
+// Point-validation doctrine (docs/protocol/proof-system.md#on-chain-point-arithmetic)
 // ----------------------------------------
 // Y_A, C_spend', C_transfer, R_e, S, S_{a,r}, and S_{a,s} are bound to in-circuit
 // multi_scalar_mul outputs (T1, T11, T8, T6, T5, T_a1, T_a5) and are therefore
 // on-curve by construction -- no explicit check needed. PVK_B was constrained
-// on-curve when the recipient registered (R3, Section 7.2) and is loaded by
-// the contract from trusted storage, so it is path (2) of Section 10.8 and the
+// on-curve when the recipient registered (R3, docs/protocol/operations/register.md) and is loaded by
+// the contract from trusted storage, so it is path (2) of docs/protocol/proof-system.md#on-chain-point-arithmetic and the
 // contract trusts it on read. K_aud_r and K_aud_s are public-input keys
 // consumed by ECDH multiplications (path (3)); the verifier doesn't check
 // curve membership and an off-curve auditor key would break the soundness of
@@ -193,7 +193,7 @@ fn main(
     assert(c_spend_derived.x == c_spend_x);
     assert(c_spend_derived.y == c_spend_y);
 
-    // T4 -- Section 2.6 spells out the 127-bit decomposition / recomposition
+    // T4 -- docs/protocol/primitives.md#integer-embedding-and-range-proofs spells out the 127-bit decomposition / recomposition
     // pattern; `assert_max_bit_size` is the Noir stdlib primitive that
     // implements it directly.
     v.assert_max_bit_size::<127>();
@@ -206,12 +206,12 @@ fn main(
     assert(r_e_derived.x == r_e_x);
     assert(r_e_derived.y == r_e_y);
 
-    // T5 -- PVK_B is path (2) of Section 10.8 (proof-constrained at the
+    // T5 -- PVK_B is path (2) of docs/protocol/proof-system.md#on-chain-point-arithmetic (proof-constrained at the
     // recipient's registration, trusted on read).
     let pvk_b = EmbeddedCurvePoint { x: pvk_b_x, y: pvk_b_y, is_infinite: false };
     let s = ecdh(r_e, pvk_b);
 
-    // T7 (anti-poisoning, Section 5.4)
+    // T7 (anti-poisoning, docs/protocol/keys-and-commitments.md#anti-poisoning-constraint)
     let r_transfer = derive_transfer_blind(s, sigma);
 
     // T8
@@ -235,7 +235,7 @@ fn main(
     let b_tilde_derived = encrypt_balance(v_new, vk, sigma);
     assert(b_tilde_derived == b_tilde);
 
-    // K_aud_r / K_aud_s point validation (Section 10.8: public-input keys).
+    // K_aud_r / K_aud_s point validation (docs/protocol/proof-system.md#on-chain-point-arithmetic: public-input keys).
     let k_aud_r = EmbeddedCurvePoint { x: k_aud_r_x, y: k_aud_r_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_r);
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };

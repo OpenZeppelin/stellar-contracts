@@ -20,7 +20,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 // `set_spender_fixtures_match_lib`. K_AUD_S_SCALAR matches the withdraw
 // fixture's auditor scalar so the two circuits share the same owner-auditor
 // key in cross-circuit tooling. OP_I is a placeholder address-as-field; the
-// contract computes it off-circuit via `address_to_field` (Section 2.7).
+// contract computes it off-circuit via `address_to_field` (docs/protocol/primitives.md#address-to-field-encoding).
 global SK: Field = 0xdead;
 global ADDR_F: Field = 0xbeef;
 global SIGMA: Field = 0x01;
@@ -431,7 +431,7 @@ fn rejects_under_funded_escrow() {
 
 #[test(should_fail)]
 fn rejects_v_out_of_range() {
-    // 2^127 is exactly the boundary S4 rules out (Section 2.6 / 3.4 -- SEP-41
+    // 2^127 is exactly the boundary S4 rules out (docs/protocol/primitives.md#integer-embedding-and-range-proofs and docs/protocol/system-model.md#underlying-token-assumptions -- SEP-41
     // i128 non-negative range is [0, 2^127), so 2^127 is the smallest value
     // that must fail). With v_huge - V_A = 2^127 - 300 still in [0, 2^127),
     // the v_new range check passes; only the `v.assert_max_bit_size<127>()`
@@ -979,7 +979,7 @@ fn rejects_wrong_y_op() {
     // Y_op replaced by a different on-curve key (Y_X, Y_Y -- the owner's
     // own Y, which is valid on-curve). s_esc = r_e * Y_op changes, so
     // escrowed_dvk_cipher under the canonical dvk no longer matches and
-    // S12(c) fails. (Y_op is path (2) of Section 10.8: trusted on read from
+    // S12(c) fails. (Y_op is path (2) of docs/protocol/proof-system.md#on-chain-point-arithmetic: trusted on read from
     // the contract, so the in-circuit consequence of swapping it is purely
     // through the escrow-cipher mask.)
     run_main(
@@ -1456,7 +1456,7 @@ fn repeated_r_e_and_sigma_repeat_every_owner_channel_pad() {
 
     // Change a plaintext under the repeated pad and the difference survives
     // the encryption in the clear. This is the leak the per-operation
-    // freshness of r_e exists to prevent (Section 5.3); the circuit cannot
+    // freshness of r_e exists to prevent (docs/protocol/keys-and-commitments.md#ecdh-derived-blinding); the circuit cannot
     // catch it, because a reused r_e is a perfectly well-formed witness.
     let v_a_2: Field = V_A + 25;
     assert((v_a_2 + m_s[0]) - V_TILDE_AUD_S == 25);
