@@ -1,7 +1,9 @@
 use soroban_sdk::{Address, Env};
 use stellar_governance::votes::transfer_voting_units;
 
-use crate::non_fungible::{overrides::BurnableOverrides, Base, ContractOverrides};
+use crate::non_fungible::{
+    overrides::BurnableOverrides, royalties::RoyaltySupport, Base, ContractOverrides,
+};
 
 pub struct NonFungibleVotes;
 
@@ -24,6 +26,11 @@ impl BurnableOverrides for NonFungibleVotes {
         NonFungibleVotes::burn_from(e, spender, from, token_id);
     }
 }
+
+// Implemented for `NonFungibleVotes`, so that the royalty existence check
+// routes through `NonFungibleVotes`'s `owner_of` (one `Owner` entry per
+// token).
+impl RoyaltySupport for NonFungibleVotes {}
 
 impl NonFungibleVotes {
     /// Transfers a non-fungible token from `from` to `to`.

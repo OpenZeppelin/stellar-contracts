@@ -1,8 +1,9 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::non_fungible::{
-    emit_mint, overrides::BurnableOverrides, Base, ContractOverrides, NonFungibleTokenError,
-    OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
+    emit_mint, overrides::BurnableOverrides, royalties::RoyaltySupport, Base, ContractOverrides,
+    NonFungibleTokenError, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT,
+    TOKEN_TTL_THRESHOLD,
 };
 
 pub struct Enumerable;
@@ -36,6 +37,10 @@ impl BurnableOverrides for Enumerable {
         Enumerable::burn_from(e, spender, from, token_id);
     }
 }
+
+// Implemented for `Enumerable`, so that the royalty existence check routes
+// through `Enumerable`'s `owner_of` (one `Owner` entry per token).
+impl RoyaltySupport for Enumerable {}
 
 #[contracttype]
 pub struct OwnerTokensKey {

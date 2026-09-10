@@ -7,6 +7,7 @@ use crate::non_fungible::{
     emit_transfer,
     extensions::consecutive::emit_consecutive_mint,
     overrides::BurnableOverrides,
+    royalties::RoyaltySupport,
     sequential::{self as sequential},
     Base, ContractOverrides, NonFungibleTokenError, OWNERSHIP_EXTEND_AMOUNT,
     OWNERSHIP_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT,
@@ -62,6 +63,11 @@ impl BurnableOverrides for Consecutive {
         Consecutive::burn_from(e, spender, from, token_id);
     }
 }
+
+// Implemented for `Consecutive`, so that the royalty existence check routes
+// through `Consecutive`'s `owner_of` (sparse, bucket-based ownership)
+// instead of `Base`'s direct entry lookup.
+impl RoyaltySupport for Consecutive {}
 
 /// For 32,000 total IDs with ITEM of type u32 and 100 items per bucket:
 ///
