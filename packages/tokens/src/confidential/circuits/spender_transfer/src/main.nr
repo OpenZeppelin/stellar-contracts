@@ -6,7 +6,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 mod tests;
 
-// SpenderTransfer circuit -- design doc Section 7.8.
+// SpenderTransfer circuit -- docs/protocol/operations/spender-transfer.md.
 //
 // Constraints
 // -----------
@@ -24,12 +24,12 @@ mod tests;
 //                                                           contract-binding
 //                                                           anchor, see below).
 //   O4  v_a, v_transfer, v_a - v_transfer in [0, 2^127)                 Range validity
-//                                                           (Section 2.6); the
+//                                                           (docs/protocol/primitives.md#integer-embedding-and-range-proofs); the
 //                                                           [0, 2^127) bound is
 //                                                           the SEP-41 i128
 //                                                           non-negative range
-//                                                           (Section 3.4).
-// Recipient ECDH + transfer commitment (Section 5.3, 5.4)
+//                                                           (docs/protocol/system-model.md#underlying-token-assumptions).
+// Recipient ECDH + transfer commitment (docs/protocol/keys-and-commitments.md#ecdh-derived-blinding, docs/protocol/keys-and-commitments.md#anti-poisoning-constraint)
 //   O5  s          = ecdh(r_e, PVK_recipient)               Recipient ECDH
 //                                                           shared-secret
 //                                                           scalar (2.4).
@@ -51,7 +51,7 @@ mod tests;
 //                                                           pads to the salt the
 //                                                           previous transfer
 //                                                           already used
-//                                                           (Section 6.2
+//                                                           (docs/protocol/account-state.md#spender-delegation
 //                                                           *Transfer nonce*).
 //   O10 r_a'       = Poseidon2(delta_allow_r, dvk_i,
 //                              sigma_a')                    New allowance
@@ -71,7 +71,7 @@ mod tests;
 //                                                           to a constant
 //                                                           function of
 //                                                           sigma_a'.
-// Auditor block (dual-channel visibility, Section 8.1 + Section 8.4)
+// Auditor block (dual-channel visibility, docs/protocol/auditing.md#per-transfer-auditor-ciphertexts + docs/protocol/auditing.md#spender-transfer-auditing)
 //   O_a1 s_{a,r}   = ecdh(r_e, K_aud_r)                     Recipient-auditor
 //                                                           ECDH shared scalar
 //                                                           (reuses r_e).
@@ -108,7 +108,7 @@ mod tests;
 //                                                           allowance blinding,
 //                                                           over O10's r_a'.
 //
-// Contract binding (Section 7.8 final paragraph)
+// Contract binding (docs/protocol/operations/spender-transfer.md#contract-binding)
 // ---------------------------------------------
 // Unlike owner-initiated circuits, SpenderTransfer does NOT constrain the vk
 // derivation -- the spender has no access to the owner's sk. Contract binding
@@ -119,26 +119,26 @@ mod tests;
 // input and was constructed with contract-specific randomness, a proof
 // generated against one contract's `C_a` cannot verify against another's.
 //
-// Channel nonce (Section 6.2 *Transfer nonce*)
+// Channel nonce (docs/protocol/account-state.md#transfer-nonce)
 // --------------------------------------------
 // The stored `sigma_a` opens the current allowance (O3) and nothing else.
 // Every pad this circuit derives absorbs the prover-chosen replacement
 // `sigma_a'` instead: the recipient ECDH chain (O7 / O9), both auditor-channel
 // sponges (O_a2 / O_a6, hence O_a9's lane[2] pad), and the new-allowance
-// derivations (O10 / O12). Section 6.2 *Transfer nonce* states why the
+// derivations (O10 / O12). docs/protocol/account-state.md#transfer-nonce states why the
 // stored salt cannot key the pads. `sigma_a'` is constrained only against
 // prover-supplied state, so a retry re-samples it freely. O14 rejects the one
 // adjacent collision; global non-repetition of `sigma_a'` over the
-// delegation's lifetime is a client obligation (SDK.md Section 10.4).
+// delegation's lifetime is a client obligation (docs/sdk/wallet.md#salt-freshness).
 //
-// Point-validation doctrine (Section 10.8)
+// Point-validation doctrine (docs/protocol/proof-system.md#on-chain-point-arithmetic)
 // ----------------------------------------
 // Y_op, C_a, C_a', C_transfer, R_e, S, S_{a,r}, and S_{a,s} are bound to in-circuit
 // multi_scalar_mul outputs (O1, O2, O11, O8, O6, O5, O_a1, O_a5) and are
 // therefore on-curve by construction -- no explicit check needed.
 // PVK_recipient was constrained on-curve when the recipient registered (R3,
-// Section 7.2) and is loaded by the contract from trusted storage, so it is
-// path (2) of Section 10.8 and the circuit consumes it without re-checking.
+// docs/protocol/operations/register.md) and is loaded by the contract from trusted storage, so it is
+// path (2) of docs/protocol/proof-system.md#on-chain-point-arithmetic and the circuit consumes it without re-checking.
 // K_aud_r and K_aud_s are public-input keys with no proof constraint at
 // insertion (path (3)) -- the verifier doesn't check curve membership and
 // an off-curve key would break the soundness of O_a1 / O_a5. This file
@@ -165,7 +165,7 @@ mod tests;
 //   9    k_aud_s_x            K_aud_s.x         Fetched from the auditor
 //   10   k_aud_s_y            K_aud_s.y           contract by the OWNER's
 //                                                 `auditor_id`, not the
-//                                                 spender's (Section 7.8).
+//                                                 spender's (docs/protocol/operations/spender-transfer.md).
 //   11   c_a_new_x            C_a'.x            Prover-supplied; written to
 //   12   c_a_new_y            C_a'.y              the delegation entry's new
 //                                                 allowance_commitment.
@@ -259,7 +259,7 @@ fn main(
     assert(c_a_derived.x == c_a_x);
     assert(c_a_derived.y == c_a_y);
 
-    // O4 -- Section 2.6 spells out the 127-bit decomposition / recomposition
+    // O4 -- docs/protocol/primitives.md#integer-embedding-and-range-proofs spells out the 127-bit decomposition / recomposition
     // pattern; `assert_max_bit_size` is the Noir stdlib primitive that
     // implements it directly.
     v_a.assert_max_bit_size::<127>();
@@ -272,13 +272,13 @@ fn main(
     assert(r_e_derived.x == r_e_x);
     assert(r_e_derived.y == r_e_y);
 
-    // O5 -- PVK_recipient is path (2) of Section 10.8 (proof-constrained at
+    // O5 -- PVK_recipient is path (2) of docs/protocol/proof-system.md#on-chain-point-arithmetic (proof-constrained at
     // the recipient's registration via R3, trusted on read).
     let pvk_recipient =
         EmbeddedCurvePoint { x: pvk_recipient_x, y: pvk_recipient_y, is_infinite: false };
     let s = ecdh(r_e, pvk_recipient);
 
-    // O7 (anti-poisoning, Section 5.4)
+    // O7 (anti-poisoning, docs/protocol/keys-and-commitments.md#anti-poisoning-constraint)
     let r_transfer = derive_transfer_blind(s, sigma_a_new);
 
     // O8
@@ -305,7 +305,7 @@ fn main(
     let a_tilde_new_derived = encrypt_allowance(v_a_new, dvk_i, sigma_a_new);
     assert(a_tilde_new_derived == a_tilde_new);
 
-    // K_aud_r / K_aud_s point validation (Section 10.8: public-input keys).
+    // K_aud_r / K_aud_s point validation (docs/protocol/proof-system.md#on-chain-point-arithmetic: public-input keys).
     let k_aud_r = EmbeddedCurvePoint { x: k_aud_r_x, y: k_aud_r_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_r);
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };

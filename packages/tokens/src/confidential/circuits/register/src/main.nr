@@ -2,7 +2,7 @@ use stellar_confidential_lib::{H, pvk_from_vk, scalar_mul, vk_from_sk};
 
 mod tests;
 
-// Register circuit -- design doc Section 7.2.
+// Register circuit -- docs/protocol/operations/register.md.
 //
 // Constraints
 // -----------
@@ -17,7 +17,7 @@ mod tests;
 // On-curve checks for Y and PVK are not needed: both are bound to in-circuit
 // `scalar_mul` outputs, which are on-curve by construction (Noir's embedded-
 // curve ops cannot produce an off-curve Grumpkin point).See design doc
-// Section 10.8 for the system-wide point-validation doctrine.
+// docs/protocol/proof-system.md#on-chain-point-arithmetic for the system-wide point-validation doctrine.
 //
 // Public inputs
 // -------------

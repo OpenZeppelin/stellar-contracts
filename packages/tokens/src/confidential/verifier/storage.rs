@@ -89,7 +89,7 @@ pub fn register_verification_key(e: &Env, circuit_type: CircuitType, verificatio
 ///   full immutability. If an update path is exposed at all, it should be gated
 ///   by multisig + timelock, and the new VK must be independently reproducible
 ///   from the audited circuit source, pinned toolchain, and SRS transcript
-///   (DESIGN §10.6).
+///   (`docs/protocol/proof-system.md#structured-reference-string`).
 ///
 /// Use only in response to a discovered soundness bug in a circuit or
 /// verifier that cannot be fixed by a fresh deployment.

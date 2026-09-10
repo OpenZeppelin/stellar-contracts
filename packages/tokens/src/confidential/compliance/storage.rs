@@ -94,7 +94,7 @@ pub fn is_frozen(e: &Env, account: &Address) -> bool {
 
 /// Returns the number of seizures executed against `account`, or `0` when it
 /// has never been seized from. The value is a public input of the next
-/// clawback proof (COMPLIANCE §5.3).
+/// clawback proof (`docs/compliance.md#circuit`).
 ///
 /// # Arguments
 ///
@@ -231,7 +231,8 @@ pub fn unfreeze(e: &Env, account: &Address) {
 ///
 /// The account's clawback nonce is a public input and advances on every
 /// seizure, so a proof executes at most once even if the commitments are
-/// later restored to the values it was built against (COMPLIANCE §5.6).
+/// later restored to the values it was built against
+/// (`docs/compliance.md#anti-replay-and-the-freeze`).
 ///
 /// # Arguments
 ///
@@ -271,7 +272,7 @@ pub fn unfreeze(e: &Env, account: &Address) {
 ///
 /// Under `Some(d)`, exactly `amount` is transferred to `d` in this invocation,
 /// so the pool and the sum of claims move together. `d` passes no compliance
-/// gate (COMPLIANCE §5.4).
+/// gate (`docs/compliance.md#contract-flow`).
 ///
 /// # Security Warning
 ///
@@ -307,7 +308,7 @@ pub fn clawback(
     };
     let nonce = clawback_nonce(e, account);
 
-    // PI order (COMPLIANCE §5.3):
+    // PI order (docs/compliance.md#circuit):
     //   C_spend, C_receive, K_aud, alpha, addr_f, acct_f, dest_f, nonce
     //
     // `addr_f`, `acct_f`, `dest_f` and `nonce` are referenced by no
@@ -435,7 +436,8 @@ pub fn check_policy(e: &Env, account: &Address, config: &ComplianceConfig) {
 /// for `account`. A no-op when `config.sac_passthrough` is `false`.
 ///
 /// The `authorized` view belongs to the Stellar Asset Contract admin
-/// interface, not to generic SEP-41 (DESIGN §3.4). Enabling
+/// interface, not to generic SEP-41
+/// (`docs/protocol/system-model.md#underlying-token-assumptions`). Enabling
 /// `sac_passthrough` over a non-SAC underlying (e.g. a plain SEP-41 token)
 /// makes this call — and with it every gated operation — trap on the
 /// missing function.
