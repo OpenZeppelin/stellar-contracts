@@ -13,8 +13,9 @@
 /// - `set_cap`: Sets the maximum token supply.
 /// - `query_cap`: Returns the maximum token supply.
 /// - `check_cap`: Panics if minting a specified `amount` added to the given
-///   `total_supply` would exceed the cap. Should be used before calling
-///   [`crate::fungible::total_supply::mint`].
+///   `total_supply` would exceed the cap. Should be used before minting through
+///   the contract type (`Self::ContractType::mint`, e.g.
+///   [`crate::fungible::total_supply::TotalSupply::mint`]).
 mod storage;
 pub use self::storage::{check_cap, query_cap, set_cap, CapStorageKey};
 #[cfg(test)]

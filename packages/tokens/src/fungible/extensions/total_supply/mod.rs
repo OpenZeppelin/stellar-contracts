@@ -18,12 +18,23 @@
 //!   [`crate::fungible::combinations::Compose`] (e.g. `Compose<(AllowList,
 //!   TotalSupply)>`) to pair tracking with the allowlist or blocklist policy.
 //!
-//! Minting has to go through [`mint`] (instead of
-//! [`crate::fungible::Base::mint`]) for the supply to be increased.
+//! Minting has to be routed through the contract type
+//! (`Self::ContractType::mint`, resolving to [`TotalSupply::mint`] or to the
+//! combined contract type's `mint`) instead of [`crate::fungible::Base::mint`]
+//! for the supply to be increased.
 //!
 //! Usage:
 //!
 //! ```ignore
+//! #[contractimpl]
+//! impl MyToken {
+//!     #[only_owner]
+//!     pub fn mint(e: &Env, to: Address, amount: i128) {
+//!         // outside a trait impl, `Self::ContractType` has to be spelled out
+//!         <Self as FungibleToken>::ContractType::mint(e, &to, amount);
+//!     }
+//! }
+//!
 //! #[contractimpl(contracttrait)]
 //! impl FungibleToken for MyToken {
 //!     type ContractType = Compose<(TotalSupply,)>;
@@ -75,7 +86,8 @@ use crate::fungible::FungibleToken;
 ///   voting checkpoints).
 ///
 /// When using one of the `TotalSupply*` contract types, minting has to be
-/// performed with [`mint`] so that the supply is increased; burns through
+/// routed through the contract type (`Self::ContractType::mint`) so that the
+/// supply is increased; burns through
 /// [`crate::fungible::burnable::FungibleBurnable`] decrease it automatically.
 #[contracttrait]
 pub trait FungibleTotalSupply: FungibleToken<ContractType: TotalSupplyOverrides> {

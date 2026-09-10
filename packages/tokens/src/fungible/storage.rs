@@ -395,8 +395,8 @@ impl Base {
     /// is handled at a higher level.
     ///
     /// This function does not account for the total supply; supply-aware
-    /// flows (e.g. [`crate::fungible::total_supply::mint`], the RWA and Vault
-    /// contract types) layer the supply bookkeeping on top of it.
+    /// contract types (e.g. [`crate::fungible::total_supply::TotalSupply`],
+    /// RWA and Vault) layer the supply bookkeeping on top of it.
     pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i128) {
         if amount < 0 {
             panic_with_error!(e, FungibleTokenError::LessThanZero);
@@ -444,8 +444,9 @@ impl Base {
     ///
     /// This function does not account for the total supply. For tokens that
     /// track it (i.e. implementers of
-    /// [`crate::fungible::total_supply::FungibleTotalSupply`]),
-    /// [`crate::fungible::total_supply::mint`] should be used instead.
+    /// [`crate::fungible::total_supply::FungibleTotalSupply`]), minting has
+    /// to be routed through the contract type (`Self::ContractType::mint`,
+    /// e.g. [`crate::fungible::total_supply::TotalSupply::mint`]) instead.
     ///
     /// # Security Warning
     ///

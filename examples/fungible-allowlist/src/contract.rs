@@ -18,7 +18,7 @@ use stellar_tokens::fungible::{
     allowlist::{AllowList, FungibleAllowList},
     burnable::FungibleBurnable,
     combinations::Compose,
-    total_supply::{self, FungibleTotalSupply, TotalSupply},
+    total_supply::{FungibleTotalSupply, TotalSupply},
     Base, FungibleToken,
 };
 
@@ -45,8 +45,9 @@ impl ExampleContract {
         // Allow the admin to transfer tokens
         AllowList::allow_user(e, &admin);
 
-        // Mint initial supply to the admin
-        total_supply::mint(e, &admin, initial_supply);
+        // Mint initial supply to the admin, routed through the contract type
+        // so the total supply is tracked.
+        <Self as FungibleToken>::ContractType::mint(e, &admin, initial_supply);
     }
 }
 

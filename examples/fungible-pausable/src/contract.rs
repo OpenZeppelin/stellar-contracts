@@ -17,7 +17,7 @@ use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_macros::when_not_paused;
 use stellar_tokens::fungible::{
     burnable::FungibleBurnable,
-    total_supply::{self, FungibleTotalSupply, TotalSupply},
+    total_supply::{FungibleTotalSupply, TotalSupply},
     Base, Compose, ContractOverrides, FungibleToken,
 };
 
@@ -43,7 +43,8 @@ impl ExampleContract {
         initial_supply: i128,
     ) {
         Base::set_metadata(e, 18, name, symbol);
-        total_supply::mint(e, &owner, initial_supply);
+        // Routed through the contract type so the total supply is tracked.
+        <Self as FungibleToken>::ContractType::mint(e, &owner, initial_supply);
         e.storage().instance().set(&OWNER, &owner);
     }
 
@@ -55,7 +56,7 @@ impl ExampleContract {
         let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
         owner.require_auth();
 
-        total_supply::mint(e, &to, amount);
+        <Self as FungibleToken>::ContractType::mint(e, &to, amount);
     }
 }
 
