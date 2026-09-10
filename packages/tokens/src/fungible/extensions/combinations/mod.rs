@@ -34,6 +34,9 @@
 //! [`crate::fungible::allowlist::FungibleAllowList`] without `AllowList` in
 //! the list) is rejected by that trait's bound.
 
+#[cfg(test)]
+mod test;
+
 use crate::{
     fungible::{
         extensions::{allowlist::AllowList, blocklist::BlockList, votes::FungibleVotes},

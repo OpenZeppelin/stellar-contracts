@@ -4,7 +4,7 @@ use soroban_sdk::{
     token::TokenClient,
     vec, Address, Env, FromVal, MuxedAddress, String, Symbol, Val, Vec,
 };
-use stellar_tokens::fungible::{Base, FungibleToken};
+use stellar_tokens::fungible::{Base, Compose, FungibleToken};
 
 use crate::{
     collect_fee, collect_fee_and_invoke, is_allowed_fee_token, is_fee_token_allowlist_enabled,
@@ -37,7 +37,7 @@ impl MockToken {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for MockToken {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 }
 
 #[test]

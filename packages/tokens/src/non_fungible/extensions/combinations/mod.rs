@@ -32,6 +32,9 @@
 //! [`crate::non_fungible::enumerable::NonFungibleEnumerable`] without
 //! `Enumerable` in the list) is rejected by that trait's bound.
 
+#[cfg(test)]
+mod test;
+
 use crate::non_fungible::{
     extensions::{consecutive::Consecutive, enumerable::Enumerable, votes::NonFungibleVotes},
     Base, ContractOverrides,

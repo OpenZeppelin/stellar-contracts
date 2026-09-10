@@ -35,8 +35,8 @@ use crate::fungible::{overrides::BurnableOverrides, FungibleToken};
 /// on the `FungibleToken` implementation. If the contract uses
 /// `type ContractType = Compose<(AllowList,)>`, burning checks the allowlist;
 /// with `type ContractType = Compose<(Base,)>` it uses the vanilla behavior,
-/// and so on. There
-/// is no need to interact with the override machinery, it works in the
+/// and so on.
+/// There is no need to interact with the override machinery, it works in the
 /// background.
 #[contracttrait]
 pub trait FungibleBurnable: FungibleToken<ContractType: BurnableOverrides> {

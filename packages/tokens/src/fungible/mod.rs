@@ -105,23 +105,23 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 ///
 /// This trait is implemented for the following Contract Types:
 /// * [`crate::fungible::Base`] (covering the vanilla case, and compatible with
-///   [`crate::fungible::burnable::FungibleBurnable`]) trait
+///   the [`crate::fungible::burnable::FungibleBurnable`] trait)
 /// * [`crate::fungible::allowlist::AllowList`] (enabling the compatibility and
-///   overrides for [`crate::fungible::allowlist::FungibleAllowList`]) trait,
-///   incompatible with [`crate::fungible::blocklist::BlockList`] trait and
-///   [`crate::rwa::RWA`] trait.
+///   overrides for the [`crate::fungible::allowlist::FungibleAllowList`]
+///   trait), incompatible with [`crate::fungible::blocklist::BlockList`] and
+///   [`crate::rwa::RWA`].
 /// * [`crate::fungible::blocklist::BlockList`] (enabling the compatibility and
-///   overrides for [`crate::fungible::blocklist::FungibleBlockList`]) trait,
-///   incompatible with [`crate::fungible::allowlist::AllowList`] trait and
-///   [`crate::rwa::RWA`] trait.
-/// * [`crate::rwa::RWA`] (enabling the compatibility and overrides for
-///   [`crate::rwa::RWAToken`]) trait, incompatible with
-///   [`crate::fungible::allowlist::AllowList`] trait and
-///   [`crate::fungible::blocklist::BlockList`] trait.
-/// * [`crate::vault::Vault`] (enabling the compatibility and overrides for
-///   [`crate::vault::FungibleVault`]) trait.
+///   overrides for the [`crate::fungible::blocklist::FungibleBlockList`]
+///   trait), incompatible with [`crate::fungible::allowlist::AllowList`] and
+///   [`crate::rwa::RWA`].
+/// * [`crate::rwa::RWA`] (enabling the compatibility and overrides for the
+///   [`crate::rwa::RWAToken`] trait), incompatible with
+///   [`crate::fungible::allowlist::AllowList`] and
+///   [`crate::fungible::blocklist::BlockList`].
+/// * [`crate::vault::Vault`] (enabling the compatibility and overrides for the
+///   [`crate::vault::FungibleVault`] trait).
 /// * [`crate::fungible::votes::FungibleVotes`] (enabling the compatibility and
-///   overrides for [`stellar_governance::votes::Votes`]) trait.
+///   overrides for the [`stellar_governance::votes::Votes`] trait).
 ///
 /// The contract type is selected with
 /// [`crate::fungible::combinations::Compose`]; invalid combinations are
@@ -139,7 +139,7 @@ pub trait FungibleToken {
     /// be overridden based on the extensions implemented.
     /// The contract type is selected with
     /// [`crate::fungible::combinations::Compose`], by listing the contract
-    /// types that override the `Base` behavior: `Compose<(Base,)>` for the
+    /// types providing the overridable behavior: `Compose<(Base,)>` for the
     /// vanilla case, `Compose<(AllowList,)>` for an allowlist token, and so
     /// on. Extensions that add functionality without overriding behavior
     /// (e.g. [`crate::fungible::burnable::FungibleBurnable`]) have no

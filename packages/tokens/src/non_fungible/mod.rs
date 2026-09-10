@@ -96,21 +96,21 @@ pub use utils::sequential;
 ///
 /// This trait is implemented for the following Contract Types:
 /// * [`crate::non_fungible::Base`] (covering the vanilla case, and compatible
-///   with [`crate::non_fungible::extensions::burnable::NonFungibleBurnable`])
-///   trait
+///   with the [`crate::non_fungible::extensions::burnable::NonFungibleBurnable`]
+///   trait)
 /// * [`crate::non_fungible::extensions::enumerable::Enumerable`] (enabling the
-///   compatibility and overrides for
-///   [`crate::non_fungible::extensions::enumerable::NonFungibleEnumerable`])
-///   trait, incompatible with
-///   [`crate::non_fungible::extensions::consecutive::Consecutive`] trait.
+///   compatibility and overrides for the
+///   [`crate::non_fungible::extensions::enumerable::NonFungibleEnumerable`]
+///   trait), incompatible with
+///   [`crate::non_fungible::extensions::consecutive::Consecutive`].
 /// * [`crate::non_fungible::extensions::consecutive::Consecutive`] (enabling
-///   the compatibility and overrides for
-///   [`crate::non_fungible::extensions::consecutive::NonFungibleConsecutive`])
-///   trait, incompatible with
-///   [`crate::non_fungible::extensions::enumerable::Enumerable`] trait.
+///   the compatibility and overrides for the
+///   [`crate::non_fungible::extensions::consecutive::NonFungibleConsecutive`]
+///   trait), incompatible with
+///   [`crate::non_fungible::extensions::enumerable::Enumerable`].
 /// * [`crate::non_fungible::extensions::votes::NonFungibleVotes`] (enabling the
-///   compatibility and overrides for [`stellar_governance::votes::Votes`])
-///   trait.
+///   compatibility and overrides for the [`stellar_governance::votes::Votes`]
+///   trait).
 ///
 /// The contract type is selected with
 /// [`crate::non_fungible::combinations::Compose`]; invalid combinations are
@@ -127,7 +127,7 @@ pub trait NonFungibleToken {
     /// be overridden based on the extensions implemented.
     /// The contract type is selected with
     /// [`crate::non_fungible::combinations::Compose`], by listing the
-    /// contract types that override the `Base` behavior: `Compose<(Base,)>`
+    /// contract types providing the overridable behavior: `Compose<(Base,)>`
     /// for the vanilla case, `Compose<(Enumerable,)>` for an enumerable
     /// token, and so on. Extensions that add functionality without
     /// overriding behavior (e.g.
