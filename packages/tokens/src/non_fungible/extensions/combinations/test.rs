@@ -157,3 +157,85 @@ fn consecutive_votes_tracks_batches_and_voting_units() {
         assert_eq!(get_voting_units(&e, &bob), 0);
     });
 }
+
+#[test]
+fn enumerable_votes_non_sequential_mint_and_transfer_from() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        EnumerableVotes::non_sequential_mint(&e, &alice, 42);
+        assert_eq!(Enumerable::get_owner_token_id(&e, &alice, 0), 42);
+        assert_eq!(get_voting_units(&e, &alice), 1);
+
+        Base::approve(&e, &alice, &spender, 42, e.ledger().sequence() + 100);
+        <EnumerableVotes as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 42);
+        assert_eq!(get_voting_units(&e, &alice), 0);
+        assert_eq!(get_voting_units(&e, &bob), 1);
+        assert_eq!(Enumerable::get_owner_token_id(&e, &bob, 0), 42);
+    });
+}
+
+#[test]
+fn enumerable_votes_burn_from() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        let token_id = EnumerableVotes::sequential_mint(&e, &alice);
+
+        Base::approve(&e, &alice, &spender, token_id, e.ledger().sequence() + 100);
+        <EnumerableVotes as BurnableOverrides>::burn_from(&e, &spender, &alice, token_id);
+        assert_eq!(get_voting_units(&e, &alice), 0);
+        assert_eq!(Enumerable::total_supply(&e), 0);
+    });
+}
+
+#[test]
+fn consecutive_votes_queries_and_transfer_from() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        let last_id = ConsecutiveVotes::batch_mint(&e, &alice, 3);
+
+        // queries route through the consecutive bucket model unchanged
+        assert_eq!(<ConsecutiveVotes as ContractOverrides>::owner_of(&e, last_id - 1), alice);
+        assert_eq!(
+            <ConsecutiveVotes as ContractOverrides>::token_uri(&e, last_id),
+            Consecutive::token_uri(&e, last_id)
+        );
+
+        <ConsecutiveVotes as ContractOverrides>::approve(
+            &e,
+            &alice,
+            &spender,
+            last_id,
+            e.ledger().sequence() + 100,
+        );
+        <ConsecutiveVotes as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, last_id);
+        assert_eq!(get_voting_units(&e, &alice), 2);
+        assert_eq!(get_voting_units(&e, &bob), 1);
+        assert_eq!(Consecutive::owner_of(&e, last_id), bob);
+    });
+}
+
+#[test]
+fn consecutive_votes_burn_from() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        let last_id = ConsecutiveVotes::batch_mint(&e, &alice, 2);
+
+        Base::approve(&e, &alice, &spender, last_id, e.ledger().sequence() + 100);
+        <ConsecutiveVotes as BurnableOverrides>::burn_from(&e, &spender, &alice, last_id);
+        assert_eq!(get_voting_units(&e, &alice), 1);
+    });
+}
