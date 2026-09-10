@@ -7,6 +7,16 @@ use crate::non_fungible::{
 
 pub struct Enumerable;
 
+/// Marker for the contract types backing the
+/// [`crate::non_fungible::enumerable::NonFungibleEnumerable`] trait:
+/// [`Enumerable`] itself and the curated combinations that include it.
+/// Contract authors never interact with this trait; it only appears as the
+/// bound enforcing that the selected `ContractType` keeps the enumeration
+/// bookkeeping.
+pub trait EnumerableContractType {}
+
+impl EnumerableContractType for Enumerable {}
+
 impl ContractOverrides for Enumerable {
     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
         Enumerable::transfer(e, from, to, token_id);

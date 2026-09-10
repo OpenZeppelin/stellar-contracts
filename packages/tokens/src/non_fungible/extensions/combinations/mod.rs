@@ -29,16 +29,20 @@
 //! impl NonFungibleBurnable for MyToken {}
 //! ```
 //!
-//! No multi-type combinations of contract types are curated for non-fungible
-//! tokens yet; every valid list currently holds at most one contract type
-//! (plus any additive extensions). Invalid lists do not compile: `Enumerable`
-//! and `Consecutive` are mutually exclusive, and implementing an extension
-//! trait the list does not back (e.g.
+//! Curated multi-type combinations: [`NonFungibleVotes`] can be combined with
+//! either [`Enumerable`] or [`Consecutive`], e.g.
+//! `Compose<(Enumerable, NonFungibleVotes)>`. Invalid lists do not compile:
+//! `Enumerable` and `Consecutive` are mutually exclusive, and implementing an
+//! extension trait the list does not back (e.g.
 //! [`crate::non_fungible::enumerable::NonFungibleEnumerable`] without
 //! `Enumerable` in the list) is rejected by that trait's bound.
 
+mod storage;
+
 #[cfg(test)]
 mod test;
+
+use storage::{ConsecutiveVotes, EnumerableVotes};
 
 use crate::non_fungible::{
     extensions::{
@@ -67,6 +71,8 @@ pub type Compose<L> = <L as Composable>::Out;
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a valid contract type combination",
     note = "valid single contract types: `Base`, `Enumerable`, `Consecutive`, `NonFungibleVotes`",
+    note = "curated combinations: `(Enumerable, NonFungibleVotes)`, `(Consecutive, \
+            NonFungibleVotes)`",
     note = "additive extensions (e.g. `Burnable`, `Royalties`) may be listed alongside a contract \
             type; they do not affect the resolved type",
     note = "lists of up to 5 entries are supported"
@@ -145,8 +151,8 @@ impl Extension for Royalties {
 
 // Identity rows: combining with `Nil` changes nothing. One pair of rows per
 // contract type, plus the `Nil`/`Nil` row for lists of only additive
-// extensions. Curated multi-type combinations would be added here as
-// additional rows (in both orders, so lists stay order-insensitive).
+// extensions. Curated multi-type combinations are additional rows, declared
+// in both orders so lists stay order-insensitive.
 impl Combine<Nil> for Nil {
     type Out = Nil;
 }
@@ -174,6 +180,26 @@ impl Combine<Nil> for NonFungibleVotes {
 impl Combine<NonFungibleVotes> for Nil {
     type Out = NonFungibleVotes;
 }
+impl Combine<Nil> for EnumerableVotes {
+    type Out = EnumerableVotes;
+}
+impl Combine<Nil> for ConsecutiveVotes {
+    type Out = ConsecutiveVotes;
+}
+
+// Curated pairs.
+impl Combine<NonFungibleVotes> for Enumerable {
+    type Out = EnumerableVotes;
+}
+impl Combine<Enumerable> for NonFungibleVotes {
+    type Out = EnumerableVotes;
+}
+impl Combine<NonFungibleVotes> for Consecutive {
+    type Out = ConsecutiveVotes;
+}
+impl Combine<Consecutive> for NonFungibleVotes {
+    type Out = ConsecutiveVotes;
+}
 
 impl Finalize for Nil {
     type Out = Base;
@@ -189,6 +215,12 @@ impl Finalize for Consecutive {
 }
 impl Finalize for NonFungibleVotes {
     type Out = NonFungibleVotes;
+}
+impl Finalize for EnumerableVotes {
+    type Out = EnumerableVotes;
+}
+impl Finalize for ConsecutiveVotes {
+    type Out = ConsecutiveVotes;
 }
 
 // Bare forms: a single entry may also be written without the one-element

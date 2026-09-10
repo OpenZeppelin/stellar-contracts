@@ -63,7 +63,7 @@
 //!   the logic of tracking ownership.
 pub mod storage;
 use soroban_sdk::{contractevent, Address, Env};
-pub use storage::Consecutive;
+pub use storage::{Consecutive, ConsecutiveContractType};
 
 use crate::non_fungible::NonFungibleToken;
 
@@ -74,7 +74,7 @@ use crate::non_fungible::NonFungibleToken;
 /// The `consecutive` extension provides its own business logic for creating and
 /// destroying tokens. Therefore, this trait is INCOMPATIBLE with the
 /// `Enumerable` extension.
-pub trait NonFungibleConsecutive: NonFungibleToken<ContractType = Consecutive> {}
+pub trait NonFungibleConsecutive: NonFungibleToken<ContractType: ConsecutiveContractType> {}
 
 #[cfg(test)]
 mod test;

@@ -5,6 +5,16 @@ use crate::non_fungible::{
     Base, NonFungibleTokenError, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
 };
 
+/// Type-level name of the royalties extension, for use in a
+/// [`crate::non_fungible::combinations::Compose`] list.
+///
+/// Royalties is additive: it does not override the base behavior, so listing
+/// it is purely declarative and does not affect the resolved contract type.
+/// Royalty support is enabled by implementing
+/// [`crate::non_fungible::royalties::NonFungibleRoyalties`], whether or not
+/// `Royalties` is listed.
+pub enum Royalties {}
+
 /// Storage container for royalty information
 #[contracttype]
 pub struct RoyaltyInfo {
