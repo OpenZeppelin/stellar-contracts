@@ -51,7 +51,7 @@ First, **$$vk$$ carries more authority than balance decryption.** Recomputing $$
 
 Second, **the salt requirement of [Salt freshness](#salt-freshness) is a confidentiality requirement**, not only an unlinkability one, the salt being the operation's sole freshness input.
 
-Third, **disclosability is unverifiable from chain data.** No on-chain value distinguishes an ephemeral this derivation produced from one it did not, so an implementation MUST NOT infer disclosability from a stored per-transfer flag and MUST determine it by test ([Disclosure verification](clients.md#disclosure-verification)). Transfers predating this specification may not be disclosable by their sender.
+Third, **disclosability is unverifiable from chain data.** No on-chain value distinguishes an ephemeral this derivation produced from one it did not, so an implementation MUST NOT infer disclosability from a stored per-transfer flag and MUST determine it by test ([Disclosure construction](clients.md#disclosure-construction)). Transfers predating this specification may not be disclosable by their sender.
 
 ## Consistency checking
 

@@ -42,7 +42,7 @@ The design is built on three interlocking mechanisms:
 
 3. **Proof-less merge.** Incoming funds accumulate in a receiving balance that is separate from the spendable balance. To make received funds spendable, the owner authorizes a merge - no ZK proof is required. Since merge requires owner authorization and incoming transfers touch only the receiving balance, neither the spend path nor the merge path can be front-run by a third party.
 
-Five Noir/UltraHonk circuits cover registration, withdrawal, confidential transfer, spender transfer, and spender delegation. The proof system leverages the Grumpkin–BN254 curve cycle: Grumpkin point arithmetic is native inside Noir circuits (no field emulation), while Soroban natively supports BN254 operations for UltraHonk proof verification.
+Five core Noir/UltraHonk circuits cover registration, withdrawal, confidential transfer, spender transfer, and spender delegation; the optional compliance extension adds a sixth, [clawback](../compliance.md#clawback). The proof system leverages the Grumpkin–BN254 curve cycle: Grumpkin point arithmetic is native inside Noir circuits (no field emulation), while Soroban natively supports BN254 operations for UltraHonk proof verification.
 
 ---
 

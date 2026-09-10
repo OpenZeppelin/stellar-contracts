@@ -23,8 +23,11 @@ $$sk\_A$$, $$vk\_A$$, $$\\{v\_{\text{transfer},i}\\}\_{i=1}^n$$, $$r\_{\text{dis
 | For each $$i$$: $$\text{D4}\_i$$ | $$v\_{\text{transfer},i} = \tilde{v}\_i - \text{Poseidon}(\delta\_{\text{transfer\\\_amount}}, s\_i, \sigma\_{E,i})$$ |
 | For each $$i$$: $$\text{D5}\_i$$ | $$v\_{\text{transfer},i} \in [0, 2^{127})$$ |
 | AGG | $$V\_{\text{total}} = \sum\_{i=1}^n v\_{\text{transfer},i}$$ |
-| THRESH (optional) | $$V\_{\text{total}} \geq V\_{\text{threshold}}$$ |
-| U1–U3 | Encrypt $$V\_{\text{total}}$$ (not the individual $$v\_{\text{transfer},i}$$) to the recipient, with $$\delta\_{\text{disc\\\_bind}}$$ replacing $$\delta\_{\text{disc}}$$ to separate domain |
+| AGG-R | $$V\_{\text{total}} \in [0, 2^{127})$$ (range, [Integer Embedding and Range Proofs](../../protocol/primitives.md#integer-embedding-and-range-proofs)) |
+| THRESH (optional) | $$V\_{\text{total}} \geq V\_{\text{threshold}}$$, evaluated as $$V\_{\text{total}} - V\_{\text{threshold}} \in [0, 2^{127})$$ on the AGG-R-checked $$V\_{\text{total}}$$, with $$V\_{\text{threshold}} \in [0, 2^{127})$$ supplied by the recipient |
+| U1–U3 | Encrypt the AGG-R-checked $$V\_{\text{total}}$$ (not the individual $$v\_{\text{transfer},i}$$) to the recipient, with $$\delta\_{\text{disc\\\_bind}}$$ replacing $$\delta\_{\text{disc}}$$ to separate domain |
+
+Over $$\mathbb{F}\_r$$ the comparison in THRESH is undefined and decrypting $$\tilde{V}\_{\text{disc}}$$ recovers $$V\_{\text{total}}$$ only modulo $$r$$, so AGG-R MUST precede THRESH and U1–U3. The event count $$n$$ is fixed per aggregate `circuit_id` ([Circuits](../security.md#circuits)); every realizable $$n$$ satisfies $$n \cdot 2^{127} < r$$, so the field sum in AGG is the integer sum and AGG-R bounds that integer. An aggregate of $$2^{127}$$ or more exceeds the token's `i128` domain and is not disclosable by this circuit.
 
 The recipient filters the $$n$$ events off-chain by the criteria they care about (sender address, block timestamp) before constructing the verifier's public inputs. They learn the aggregate $$V\_{\text{total}}$$ but not the individual amounts. If THRESH is included and the recipient does not need the aggregate value itself, U1–U3 can be omitted; the proof's mere validity asserts the threshold.
 

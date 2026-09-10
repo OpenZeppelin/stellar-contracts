@@ -23,7 +23,7 @@ The mechanism lives entirely *outside* the on-chain contract: both proving and v
 3. **The holder delivers.** The proof and the sealed value go to the recipient directly, off-chain. They are never published.
 4. **The recipient verifies.** The recipient checks the proof against the public on-chain record. If it passes, the recipient learns the one disclosed fact — and can trust it as much as they trust the blockchain itself — and learns nothing else about the account.
 
-Because each proof is locked to the recipient's identity *and* to their one-time reference number, a proof handed to one bank is useless to anyone else, and useless even to the same bank for a different request. A leaked or archived proof reveals nothing.
+Anyone holding the proof can check that it is valid and see that a disclosure was made, but the sealed value opens only with the recipient's own key, and the bound reference number stops the same proof from serving a different request ([Recipient Binding](security.md#recipient-binding)). What the recipient does with the value once opened — keep it, share it — is outside the protocol ([What This Does Not Prevent](security.md#what-this-does-not-prevent)).
 
 The layer supports a small family of these statements, each a different shape of question:
 
@@ -49,7 +49,7 @@ Three properties make this insufficient as the only disclosure surface:
 
 **Per-event scope.** A disclosure proof corresponds to one named on-chain event (or a finite enumerated set), not to an account's history.
 
-**Recipient binding.** Each proof is bound to a specific disclosure recipient's public key plus a fresh nonce so that proofs are non-replayable and not transferable to other parties.
+**Recipient binding.** Each proof is bound to a specific disclosure recipient's public key plus a fresh nonce so that a proof cannot be reused for another request and its disclosed value opens only for that recipient.
 
 **Verifiable correctness.** The disclosure recipient verifies the proof against on-chain state (event log, account record, auditor key registry) without trusting the prover.
 

@@ -4,6 +4,8 @@
 
 An implementation supporting selective disclosure MUST follow the [Selective Disclosure](../selective-disclosure/README.md) specification for the holder, sender, and auditor variants, and MUST bind each proof to the requesting recipient's key and nonce so that a proof cannot be replayed against a different recipient or a later request ([Disclosure Recipient](../selective-disclosure/README.md#disclosure-recipient)). A D-auditor witness reads each auditor channel at the width [Poseidon2 sponge](crypto-core.md#poseidon2-sponge) fixes for its tag — three lanes on $$\delta\_{\text{aud\\\_s}}$$, two on $$\delta\_{\text{aud\\\_r}}$$ — exactly as [Auditor Client](auditor-client.md) requires of the auditor client ([D-auditor](../selective-disclosure/circuits/d-auditor.md) A3).
 
+Not every historical transfer is disclosable by its sender: one predating [Deterministic ephemeral scalars](wallet.md#deterministic-ephemeral-scalars)'s requirement may carry an ephemeral scalar that does not reproduce, and the disclosure recipient holds no key material that could detect this. The disclosing wallet MUST therefore establish disclosability before constructing a D-sender proof: derive the candidate $$r\_e$$ from $$(vk, \sigma\_E)$$ and compare $$r\_e \cdot H$$ against the event's $$R\_e$$. A mismatch MUST surface to the caller as a distinct *not disclosable* outcome that carries neither a proof nor an amount, and MUST NOT be reported as a proof-construction error. The comparison costs one Poseidon2 call and one scalar multiplication and is authoritative, where a stored per-transfer flag is not ([Deterministic ephemeral scalars](wallet.md#deterministic-ephemeral-scalars)).
+
 Disclosure circuits are verified entirely off-chain and MUST NOT be registered with the on-chain verifier set ([Circuits](../selective-disclosure/security.md#circuits)).
 
 ## Disclosure verification
@@ -11,8 +13,6 @@ Disclosure circuits are verified entirely off-chain and MUST NOT be registered w
 The verifier MUST be distributable independently of any wallet, since its purpose is to let a party who trusts no holder check a claim. It consumes a chain endpoint, the recipient keypair, and the proof bundle with its event reference, and returns the disclosed amount or a **typed** indication of which check failed — proof verification, on-chain state mismatch, or decryption failure. A single boolean is not conformant, because the three outcomes have different meanings to the recipient.
 
 Verification MUST include comparing the circuit's verification key against the pinned key for that disclosure circuit, without which the proof attests to an unknown statement.
-
-Not every historical transfer is disclosable by its sender: one predating [Deterministic ephemeral scalars](wallet.md#deterministic-ephemeral-scalars)'s requirement may carry an ephemeral scalar that does not reproduce. An implementation MUST report that as *not disclosable* rather than as a verification failure, and MUST establish it by test: derive the candidate $$r\_e$$ from $$(vk, \sigma\_E)$$ and compare $$r\_e \cdot H$$ against the event's $$R\_e$$. The comparison costs one Poseidon2 call and one scalar multiplication and is authoritative, where a stored per-transfer flag is not ([Deterministic ephemeral scalars](wallet.md#deterministic-ephemeral-scalars)).
 
 ## Indexer client
 

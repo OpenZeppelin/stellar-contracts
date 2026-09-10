@@ -24,7 +24,7 @@ The sender (account $$A$$, spending key $$sk\_A$$) transfers a hidden amount $$v
 | T\_a1 | $$s\_{a,r} = \text{ECDH}(r\_e, K\_{\text{aud,r}})$$ (recipient-auditor ECDH shared scalar, reuses ephemeral scalar) |
 | T\_a2 | $$(m\_{v,r}, m\_{r,r}) = \text{SpongeSqueeze}\_2(\delta\_{\text{aud\\\_r}}, s\_{a,r}, \sigma)$$ (recipient-auditor channel masks) |
 | T\_a3 | $$\tilde{v}\_{\text{aud,r}} = v\_{\text{transfer}} + m\_{v,r}$$ (recipient-auditor encrypted transfer amount) |
-| T\_a4 | $$\tilde{r}\_{\text{aud,r}} = r\_{\text{transfer}} + m\_{r,r}$$ (recipient-auditor encrypted transfer randomness, enables Pedersen-opening reconstruction of $$C\_{\text{receive}}$$, see [Per-Transfer Auditor Ciphertexts](../auditing.md#per-transfer-auditor-ciphertexts)) |
+| T\_a4 | $$\tilde{r}\_{\text{aud,r}} = r\_{\text{transfer}} + m\_{r,r}$$ (recipient-auditor encrypted transfer randomness, enables Pedersen-opening reconstruction of $$C\_{\text{transfer}}$$, see [Per-Transfer Auditor Ciphertexts](../auditing.md#per-transfer-auditor-ciphertexts)) |
 | T\_a5 | $$s\_{a,s} = \text{ECDH}(r\_e, K\_{\text{aud,s}})$$ (sender-auditor ECDH shared scalar, reuses ephemeral scalar) |
 | T\_a6 | $$(m\_{v,s}, m\_{b,s}, m\_{r,s}) = \text{SpongeSqueeze}\_3(\delta\_{\text{aud\\\_s}}, s\_{a,s}, \sigma)$$ (sender-auditor channel masks) |
 | T\_a7 | $$\tilde{v}\_{\text{aud,s}} = v\_{\text{transfer}} + m\_{v,s}$$ (sender-auditor encrypted transfer amount) |

@@ -55,7 +55,7 @@ Commitment blinding factors compose under homomorphic point addition, so their a
 
 $$\text{Com}(v\_1, r\_1) + \text{Com}(v\_2, r\_2) = \text{Com}(v\_1 + v\_2, \\, (r\_1 + r\_2) \bmod q)$$
 
-Reducing modulo $$r$$ instead yields an opening that is off by $$q - r$$ and no longer matches the on-chain point, and for two full-size blindings the integer sum crosses $$q$$ roughly half the time. Implementations MUST provide distinct, clearly named reduction operations for the two moduli.
+Reducing modulo $$r$$ instead yields an opening that is off and no longer matches the on-chain point, and for two full-size blindings the integer sum crosses $$q$$ roughly half the time. Implementations MUST provide distinct, clearly named reduction operations for the two moduli.
 
 **One reduction point.** An implementation MUST fold blindings with unbounded integer addition and MUST NOT reduce by either modulus as folds compose. This governs merge ([Merge](../protocol/operations/merge.md)), the `RevokeSpender` and `Clawback` folds, and receiving-balance credit ([Update rules](../protocol/wallet-state.md#update-rules)) alike.
 
@@ -65,11 +65,13 @@ Committed **values** accumulate as exact integers and are never reduced; [Peders
 
 ## Scalar sampling
 
-Secret scalars — $$\sigma$$, $$\sigma\_a$$, the replacement $$\sigma\_a'$$ of a spender transfer ([Transfer nonce](../protocol/account-state.md#transfer-nonce)), and the disclosure layer's $$r\_{\text{disc}}$$ ([Disclosure Ciphertext to Recipient](../selective-disclosure/protocol.md#disclosure-ciphertext-to-recipient)) — MUST be produced by the rejection procedure of [Grumpkin-BN254 Cycle](../protocol/primitives.md#grumpkin-bn254-cycle):
+Sampled scalars — $$\sigma$$, $$\sigma\_a$$, the replacement $$\sigma\_a'$$ of a spender transfer ([Transfer nonce](../protocol/account-state.md#transfer-nonce)), and the disclosure layer's $$r\_{\text{disc}}$$ ([Disclosure Ciphertext to Recipient](../selective-disclosure/protocol.md#disclosure-ciphertext-to-recipient)) — MUST be produced by the rejection procedure of [Grumpkin-BN254 Cycle](../protocol/primitives.md#grumpkin-bn254-cycle):
 
 1. Draw 32 bytes from a CSPRNG.
 2. Clear the top **2** bits, yielding a 254-bit candidate.
 3. Reject and redraw if the candidate is $$\geq r$$, or if it is zero and the call site requires nonzero.
+
+The requirement is unpredictability and uniform distribution, not confidentiality. The protocol emits $$\sigma$$, $$\sigma\_a$$, and $$\sigma\_a'$$ in events and stores $$\sigma\_a$$ and $$\sigma\_a'$$ on-chain as `allowance_salt` ([Event application](wallet.md#event-application), [`allowance_salt`](../protocol/account-state.md#allowance_salt)), and a wallet MAY persist any of them for [Recovery](wallet.md#recovery).
 
 ## Domain separators
 
