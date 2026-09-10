@@ -152,6 +152,9 @@ fn consecutive_votes_tracks_batches_and_voting_units() {
         assert_eq!(get_voting_units(&e, &alice), 4);
         assert_eq!(get_voting_units(&e, &bob), 1);
         assert_eq!(Consecutive::owner_of(&e, last_id), bob);
+        // transferring the batch boundary materializes the previous token's
+        // owner, keeping the rest of the batch resolvable
+        assert_eq!(Consecutive::owner_of(&e, last_id - 1), alice);
 
         <ConsecutiveVotes as BurnableOverrides>::burn(&e, &bob, last_id);
         assert_eq!(get_voting_units(&e, &bob), 0);
