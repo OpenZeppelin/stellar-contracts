@@ -1,11 +1,15 @@
 mod storage;
-use crate::non_fungible::{Base, NonFungibleToken};
+pub use crate::non_fungible::overrides::RoyaltySupport;
+use crate::non_fungible::NonFungibleToken;
 
 #[cfg(test)]
 mod test;
 
 use soroban_sdk::{contractevent, contracttrait, Address, Env};
 pub use storage::Royalties;
+pub(crate) use storage::{
+    remove_token_royalty_unchecked, royalty_info_unchecked, set_token_royalty_unchecked,
+};
 
 /// Royalties Trait for Non-Fungible Token (ERC2981)
 ///
@@ -22,8 +26,15 @@ pub use storage::Royalties;
 /// - Remove per-token royalties to fall-back to the global royalty set for the
 ///   contract
 ///
-/// `storage.rs` file of this module provides the `NonFungibleRoyalties` trait
-/// implementation.
+/// [`NonFungibleRoyalties::set_default_royalty`] does not take a `token_id`,
+/// and its implementation calls
+/// [`crate::non_fungible::Base::set_default_royalty`] directly. The other
+/// operations take a `token_id` and first check that the token exists. How a
+/// token is looked up depends on the contract type: `Base` stores an `Owner`
+/// entry for every token, while `Consecutive` stores one only for the last
+/// token of a minted batch. These operations are therefore called on the
+/// contract type, as `Self::ContractType::set_token_royalty(...)`, and are
+/// provided by [`RoyaltySupport`].
 ///
 /// # Notes
 ///
@@ -33,7 +44,7 @@ pub use storage::Royalties;
 /// Non-Fungible and Fungible tokens, `i128` is used instead of `u128` for the
 /// `sale_price`, due to SEP-41.
 #[contracttrait]
-pub trait NonFungibleRoyalties: NonFungibleToken {
+pub trait NonFungibleRoyalties: NonFungibleToken<ContractType: RoyaltySupport> {
     /// Sets the global default royalty information for the entire collection.
     /// This will be used for all tokens that don't have specific royalty
     /// information.
@@ -61,7 +72,8 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
-    /// [`Base::set_default_royalty`] for the implementation.
+    /// [`crate::non_fungible::Base::set_default_royalty`] for the
+    /// implementation.
     fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32, operator: Address);
 
     /// Sets the royalty information for a specific token.
@@ -92,7 +104,8 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
-    /// [`Base::set_token_royalty`] for the implementation.
+    /// `Self::ContractType::set_token_royalty(e, token_id, &receiver,
+    /// basis_points)` for the implementation.
     fn set_token_royalty(
         e: &Env,
         token_id: u32,
@@ -125,7 +138,8 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
-    /// [`Base::remove_token_royalty`] for the implementation.
+    /// `Self::ContractType::remove_token_royalty(e, token_id)` for the
+    /// implementation.
     fn remove_token_royalty(e: &Env, token_id: u32, operator: Address);
 
     /// Returns `(Address, i128)` - A tuple containing the receiver address and
@@ -143,7 +157,7 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// * [`crate::non_fungible::NonFungibleTokenError::NonExistentToken`] - If
     ///   the token does not exist.
     fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128) {
-        Base::royalty_info(e, token_id, sale_price)
+        Self::ContractType::royalty_info(e, token_id, sale_price)
     }
 }
 
