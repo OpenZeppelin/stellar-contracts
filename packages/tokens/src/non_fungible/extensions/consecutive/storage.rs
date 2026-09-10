@@ -15,6 +15,16 @@ use crate::non_fungible::{
 
 pub struct Consecutive;
 
+/// Marker for the contract types backing the
+/// [`crate::non_fungible::consecutive::NonFungibleConsecutive`] trait:
+/// [`Consecutive`] itself and the curated combinations that include it.
+/// Contract authors never interact with this trait; it only appears as the
+/// bound enforcing that the selected `ContractType` follows the consecutive
+/// accounting model.
+pub trait ConsecutiveContractType {}
+
+impl ConsecutiveContractType for Consecutive {}
+
 impl ContractOverrides for Consecutive {
     fn owner_of(e: &Env, token_id: u32) -> Address {
         Consecutive::owner_of(e, token_id)
