@@ -2,13 +2,27 @@
 
 ## Abstract
 
-We present a confidential token for Soroban that adds private balances and transfers to any SEP-41 token. Balances are stored as unchunked Pedersen commitments as single elliptic curve points, and updated homomorphically by the contract without decryption. Zero-knowledge proofs (Noir/UltraHonk) accompany each spending operation to prove correctness without revealing amounts. Transfer recipients and auditors recover amounts and blinding factors via per-transfer ephemeral ECDH key agreement over Grumpkin. A dual-balance model (spendable/receiving) prevents griefing: incoming transfers accumulate in a receiving commitment that third parties cannot use to invalidate in-flight spend proofs. A dual-auditor model provides per-account audit visibility: each transfer produces ciphertexts under two auditor keys, giving the recipient's auditor the transfer amount and the sender's auditor the transfer amount plus the sender's post-transfer balance (or post-transfer allowance for spender transfers), enabling real-time auditing. Account owners can delegate spending to time-limited spenders via escrowed allowances with derived delegation viewing keys. The system uses 6 Noir circuits, and works seamlessly with Soroban's BN254 host functions (leveraging the recently added CAP-80), and requires approximately 288 bytes of on-chain storage per account.
+We present a confidential token for Soroban that adds private balances and transfers to any SEP-41 token. Balances are stored as unchunked Pedersen commitments as single elliptic curve points, and updated homomorphically by the contract without decryption. Zero-knowledge proofs (Noir/UltraHonk) accompany each spending operation to prove correctness without revealing amounts. Transfer recipients and auditors recover amounts and blinding factors via per-transfer ephemeral ECDH key agreement over Grumpkin. A dual-balance model (spendable/receiving) prevents griefing: incoming transfers accumulate in a receiving commitment that third parties cannot use to invalidate in-flight spend proofs. A dual-auditor model provides per-account audit visibility: each transfer produces ciphertexts under two auditor keys, giving the recipient's auditor the transfer amount and the sender's auditor the transfer amount plus the sender's post-transfer balance (or post-transfer allowance for spender transfers), enabling real-time auditing. Account owners can delegate spending to time-limited spenders via escrowed allowances with derived delegation viewing keys. The system uses 6 Noir circuits, and works seamlessly with Soroban's BN254 host functions, and requires approximately 288 bytes of on-chain storage per account.
 
 ---
 
 ## Project Documents
 
-The protocol specification is this file followed by [Primitives](primitives.md), [System Model](system-model.md), [Key Hierarchy and Commitment Scheme](keys-and-commitments.md), [Wallet State and Recovery](wallet-state.md), [Account State](account-state.md), [Operations](operations/README.md), [Auditing](auditing.md), [Security Analysis](security.md), [Proof System](proof-system.md), [Interface](interface.md), and [Domain Separation Constants](domain-separators.md), in that order. The [documentation index](../README.md) lists the companion specifications for compliance, selective disclosure, indexing, and the SDK.
+The protocol specification is this file followed by, in order:
+
+- [Primitives](primitives.md)
+- [System Model](system-model.md)
+- [Key Hierarchy and Commitment Scheme](keys-and-commitments.md)
+- [Wallet State and Recovery](wallet-state.md)
+- [Account State](account-state.md)
+- [Operations](operations/README.md)
+- [Auditing](auditing.md)
+- [Security Analysis](security.md)
+- [Proof System](proof-system.md)
+- [Interface](interface.md)
+- [Domain Separation Constants](domain-separators.md)
+
+The [documentation index](../README.md) lists the companion specifications for compliance, selective disclosure, indexing, and the SDK.
 
 ---
 
@@ -40,7 +54,7 @@ The design is built on three interlocking mechanisms:
 
 2. **ECDH-derived blinding.** When a sender transfers to a recipient, the blinding factor of the transfer commitment is derived from an ephemeral Diffie-Hellman key exchange with the recipient's public viewing key. The circuit enforces correct derivation, ensuring the recipient can always compute the blinding. The same ephemeral scalar is reused for an ECDH exchange with auditors' public key.
 
-3. **Proof-less merge.** Incoming funds accumulate in a receiving balance that is separate from the spendable balance. To make received funds spendable, the owner authorizes a merge - no ZK proof is required. Since merge requires owner authorization and incoming transfers touch only the receiving balance, neither the spend path nor the merge path can be front-run by a third party.
+3. **Dual-balance model.** Incoming funds accumulate in a receiving balance that is separate from the spendable balance. To make received funds spendable, the owner authorizes a merge - no ZK proof is required. Since merge requires owner authorization and incoming transfers touch only the receiving balance, neither the spend path nor the merge path can be front-run by a third party.
 
 Five core Noir/UltraHonk circuits cover registration, withdrawal, confidential transfer, spender transfer, and spender delegation; the optional compliance extension adds a sixth, [clawback](../compliance.md#clawback). The proof system leverages the Grumpkin–BN254 curve cycle: Grumpkin point arithmetic is native inside Noir circuits (no field emulation), while Soroban natively supports BN254 operations for UltraHonk proof verification.
 
