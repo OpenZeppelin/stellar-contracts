@@ -15,19 +15,35 @@ For more information about smart accounts and their components, check:
 
 ## Why a factory?
 
-Soroban derives a contract address from `(network, deployer, chain_salt)`. The
-factory is the deployer (`deployer().with_current_contract(chain_salt)`), so
-only it can create in its namespace. Because the deployer is the factory rather
-than the transaction caller, the account address is independent of who submits
-or pays for the deployment transaction. The 32-byte `chain_salt` is computed as
-`sha256` of the canonical XDR of `(signers, policies, salt)`, where `signers`
-and `policies` are the account constructor arguments and `salt` is a
-caller-chosen `u32`.
+### The problem
 
-The account wasm hash is pinned on the factory instance during
-`__constructor`. Because code hash is not part of a Stellar contract address,
-pinning the wasm at factory construction prevents arbitrary bytecode from
-landing at a predicted address.
+The [account example](../README.md) deploys from the caller's address.
+Constructor arguments (the account's initial configuration) are passed at
+deploy but are not part of address derivation. Soroban derives the address
+from `(network, deployer, salt)` alone, so:
+
+- the deployer is part of the derivation, so different deployers get
+  different addresses;
+- constructor arguments and the wasm hash are not part of the
+  derivation, so on a given network the same deployer and salt produce
+  the same address even if the constructor arguments or bytecode differ.
+
+You cannot tell from the address which constructor arguments or bytecode
+were used. Confirm those before funding or using the contract at that
+address.
+
+### How this factory solves it
+
+The factory's address is the deployer for every account it creates, so
+who submits the deployment transaction does not affect the address.
+
+The factory derives the salt from the constructor arguments, so different
+constructor arguments produce a different salt and therefore a different
+address. A predicted address cannot be created with a different initial
+configuration.
+
+The factory pins the account wasm and instantiates only that wasm, so
+it deploys only that bytecode to an address it derives.
 
 ## 1. Setup
 
