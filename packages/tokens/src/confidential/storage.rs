@@ -82,7 +82,8 @@ pub struct SpenderDelegation {
 
 // ################## DATA PAYLOADS ##################
 //
-// Each `*Payload` struct mirrors DESIGN §11.1 minus the proof field. The
+// Each `*Payload` struct mirrors the `data` table in
+// docs/protocol/interface.md minus the proof field. The
 // matching `*Data` envelope is what the trait-entry-point `data: Bytes`
 // argument decodes into: `{ payload, proof }`. Splitting at the storage
 // boundary lets storage fns take `(payload, proof)` as two distinct args
@@ -414,7 +415,8 @@ pub fn register(
     let _k_aud = auditor.get_key(&auditor_id);
     let addr_f = get_address_as_field_element(e);
 
-    // PI order (DESIGN §7.2): Y, PVK, addr_f, acct_f. Recomputing acct_f
+    // PI order (docs/protocol/operations/register.md): Y, PVK, addr_f,
+    // acct_f. Recomputing acct_f
     // from `account` (never accepting it from caller bytes) is what binds
     // the proof to the registering address: any other caller assembles a
     // different blob, so published registration material cannot be
@@ -592,7 +594,7 @@ pub fn withdraw(
     let k_aud_s = auditor.get_key(&account.auditor_id);
     let addr_f = get_address_as_field_element(e);
 
-    // PI order (DESIGN §7.5):
+    // PI order (docs/protocol/operations/withdraw.md):
     //   C_spend, Y, addr_f, K_aud_s, a,
     //   C_spend', sigma, b_tilde, R_e, b_tilde_aud_s, r_tilde_aud_s
     let mut pi = Bytes::new(e);
@@ -673,7 +675,7 @@ pub fn confidential_transfer(
     let k_aud_s = auditor.get_key(&sender.auditor_id);
     let addr_f = get_address_as_field_element(e);
 
-    // PI order (DESIGN §7.6):
+    // PI order (docs/protocol/operations/transfer.md):
     //   C_spend_A, Y_A, PVK_B, addr_f, K_aud_r, K_aud_s,
     //   C_spend', C_transfer, R_e, v_tilde, b_tilde, sigma,
     //   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s,
@@ -774,12 +776,12 @@ pub fn confidential_transfer_from(
     let recipient = get_account(e, to);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_r = auditor.get_key(&recipient.auditor_id);
-    // Sender-auditor key is the OWNER's auditor, not the spender's (DESIGN
-    // §7.8 — visibility points balance/allowance ciphertexts at the funds'
-    // owner).
+    // Sender-auditor key is the OWNER's auditor, not the spender's
+    // (docs/protocol/operations/spender-transfer.md: visibility points
+    // balance/allowance ciphertexts at the funds' owner).
     let k_aud_s = auditor.get_key(&owner.auditor_id);
 
-    // PI order (DESIGN §7.8):
+    // PI order (docs/protocol/operations/spender-transfer.md):
     //   C_a, sigma_a, Y_op, PVK_recipient, K_aud_r, K_aud_s,
     //   C_a', C_transfer, R_e, v_tilde, a_tilde', sigma_a',
     //   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s,
@@ -884,7 +886,7 @@ pub fn set_spender(
     let addr_f = get_address_as_field_element(e);
     let spender_id = address_to_field(e, spender);
 
-    // PI order (DESIGN §7.7):
+    // PI order (docs/protocol/operations/set-spender.md):
     //   C_spend, Y, Y_op, spender_id (op_i), addr_f, K_aud_s,
     //   C_spend', C_a, escrowed_dvk, b_tilde, a_tilde,
     //   sigma, sigma_a, R_e, v_tilde_aud_s, b_tilde_aud_s,
@@ -944,7 +946,8 @@ pub fn set_spender(
 /// commitment `C_a` back into `owner`'s spendable commitment and deletes the
 /// delegation entry. Works for both active and expired-but-not-revoked
 /// delegations. The fold and the openings it yields to the owner and the
-/// auditor are specified in DESIGN §7.9 and DESIGN_cont §8.5.
+/// auditor are specified in `docs/protocol/operations/revoke-spender.md` and
+/// `docs/protocol/auditing.md#spender-allowance-auditing`.
 ///
 /// # Arguments
 ///
@@ -1145,7 +1148,8 @@ pub fn set_address_as_field_element(e: &Env) {
 ///
 /// **IMPORTANT**: This function performs no authorization check, consumes no
 /// proof, and verifies no conservation property. Establishing that the write
-/// preserves balance conservation (DESIGN_cont §9.3) is the caller's
+/// preserves balance conservation
+/// (`docs/protocol/security.md#balance-conservation`) is the caller's
 /// obligation. It exists for the compliance module's clawback flow
 /// ([`crate::confidential::compliance::storage::clawback`]), which discharges
 /// that obligation in-circuit before calling.

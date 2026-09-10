@@ -167,7 +167,8 @@ impl ConfidentialVerifier for ReplayGuardVerifier {
 /// this event" reduces, at the contract level, to "which `K_aud_s` went into
 /// the public-input blob". This mock captures exactly that. `K_aud_s` sits at
 /// limb 8 of the SetSpender blob and limb 9 of the SpenderTransfer blob
-/// (DESIGN §7.7 - §7.8).
+/// (`docs/protocol/operations/set-spender.md`,
+/// `docs/protocol/operations/spender-transfer.md`).
 #[contract]
 struct KeyRecordingVerifier;
 
@@ -889,7 +890,8 @@ fn auditor_key_rotation_rescopes_the_escrowed_allowance_opening() {
     let after = h.token.get_spender_delegation(&alice, &spender);
     assert_ne!(before.allowance_salt, after.allowance_salt);
 
-    // Step 4 -- revocation is a proofless fold (§7.9), so it opens no auditor
+    // Step 4 -- revocation is a proofless fold
+    // (docs/protocol/operations/revoke-spender.md), so it opens no auditor
     // channel: the event republishes the two delegation fields the fold
     // deletes and nothing else. An auditor that missed step 3 folds the
     // allowance it already holds into C_spend, or waits for the owner's next
@@ -955,8 +957,9 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
 }
 
 /// The `SpenderTransfer` event carries the transfer's channel nonce
-/// `sigma_a'`, not the stored `allowance_salt` it replaces (DESIGN §6.2
-/// *Transfer nonce*). Emitting the stored salt would hand the recipient and
+/// `sigma_a'`, not the stored `allowance_salt` it replaces
+/// (`docs/protocol/account-state.md#transfer-nonce`). Emitting the stored
+/// salt would hand the recipient and
 /// both auditors a nonce none of the pads absorbed, and would repeat across a
 /// retry.
 #[test]
@@ -1061,7 +1064,8 @@ fn is_spender_returns_false_for_missing_and_expired() {
     h.e.ledger().set_sequence_number(100);
     assert!(!h.token.is_spender(&alice, &spender));
 
-    // But the entry still exists (DESIGN §6.2).
+    // But the entry still exists
+    // (docs/protocol/account-state.md#spender-delegation).
     let _ = h.token.get_spender_delegation(&alice, &spender);
 }
 
@@ -1156,8 +1160,10 @@ fn delegation_type_export_compiles() {
 /// This derivation is the only Poseidon2 primitive in the protocol with two
 /// independent implementations: the circuits take `addr_f` as an opaque public
 /// input, so it lives in the contract (here) and in every client, with no Noir
-/// version to hold them together. DESIGN.md §2.7 asserts that all of them
-/// reproduce the same Field from the same Address; this test is what makes that
+/// version to hold them together.
+/// `docs/protocol/primitives.md#address-to-field-encoding` asserts that all of
+/// them reproduce the same Field from the same Address; this test is what makes
+/// that
 /// assertion executable on the contract side. The expected values are the
 /// committed vectors -- update both together or not at all.
 #[test]

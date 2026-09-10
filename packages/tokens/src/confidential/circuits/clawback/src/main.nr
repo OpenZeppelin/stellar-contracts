@@ -2,7 +2,7 @@ use stellar_confidential_lib::{commit, scalar_mul, H};
 
 mod tests;
 
-// Clawback circuit -- COMPLIANCE.md Section 5.3.
+// Clawback circuit -- docs/compliance.md#circuit.
 //
 // Proves that a compliance seizure of the public amount `alpha` is bounded by
 // what the target actually holds, without revealing either balance, and that
@@ -24,7 +24,7 @@ mod tests;
 //   CB3 C_receive  = v_r * G + r_r * H       Prover knows the opening of the
 //                                            target's receiving commitment.
 //   CB4 v_s, v_r, alpha, and
-//       v_s + v_r - alpha in [0, 2^127)      The seize bound (Section 2.6).
+//       v_s + v_r - alpha in [0, 2^127)      The seize bound (docs/protocol/primitives.md#integer-embedding-and-range-proofs).
 //                                            The final term establishes
 //                                            alpha <= v_s + v_r.
 //
@@ -42,7 +42,7 @@ mod tests;
 // in-circuit multi_scalar_mul outputs (CB1, CB2, CB3), so they are on-curve by
 // construction.
 //
-// Public inputs (11 fields, in COMPLIANCE.md Section 5.3 canonical order)
+// Public inputs (11 fields, in docs/compliance.md#circuit canonical order)
 // -----------------------------------------------------------------------
 //   Idx  Param         Symbol      Source / Note
 //   ---  -----         ------      ----------------------------------------
@@ -64,13 +64,13 @@ mod tests;
 //                                    computed per-call.
 //   10   _nonce        nonce       The target's clawback nonce, loaded from
 //                                    storage; the contract increments it on
-//                                    every seizure (Section 5.4).
+//                                    every seizure (docs/compliance.md#contract-flow).
 //
 // `addr_f`, `_acct_f`, `_dest_f`, and `_nonce` are referenced by no gate and
 // look like dead parameters: their presence in the public-input set is the
 // binding, on the `register/_acct_f` precedent. `_nonce` is what makes a proof
 // single-use: the commitments alone can be restored to an earlier value
-// (Section 5.6).
+// (docs/compliance.md#anti-replay-and-the-freeze).
 //
 // Private witnesses
 // -----------------
@@ -117,7 +117,7 @@ fn main(
     assert(c_receive_derived.x == c_receive_x);
     assert(c_receive_derived.y == c_receive_y);
 
-    // CB4 -- Section 2.6's 127-bit decomposition / recomposition pattern.
+    // CB4 -- docs/protocol/primitives.md#integer-embedding-and-range-proofs's 127-bit decomposition / recomposition pattern.
     // Range on v_s and v_r alone does not bound v_s + v_r - alpha.
     v_s.assert_max_bit_size::<127>();
     v_r.assert_max_bit_size::<127>();

@@ -1,0 +1,42 @@
+name: "docs workflow"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/tokens/src/confidential/**"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "packages/tokens/src/confidential/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    steps:
+      - name: git checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: collect code citations
+        working-directory: packages/tokens/src/confidential
+        run: |
+          grep -rhoE '(\.\./)*docs/[A-Za-z0-9_./-]+\.md(#[A-Za-z0-9_-]+)?' --include='*.rs' --include='*.nr' --include='CLAUDE.md' . \
+            | sed -E 's|^(\.\./)+||' | sort -u | sed -E 's|.*|[&](/&)|' > "$RUNNER_TEMP/citations.md"
+
+      - name: check documentation references
+        uses: lycheeverse/lychee-action@v2
+        with:
+          lycheeVersion: v0.24.2
+          args: --offline --include-fragments --no-progress --root-dir ${{ github.workspace }}/packages/tokens/src/confidential 'packages/tokens/src/confidential/**/*.md' ${{ runner.temp }}/citations.md
