@@ -8,15 +8,6 @@ pub use storage::Burnable;
 
 use crate::fungible::{overrides::BurnableOverrides, FungibleToken};
 
-/// Type-level name of the burnable extension, for use in a
-/// [`crate::fungible::combinations::Compose`] list.
-///
-/// Burnable is additive: it does not override the base behavior, so listing
-/// it is purely declarative and does not affect the resolved contract type.
-/// Burning is enabled by implementing [`FungibleBurnable`], whether or not
-/// `Burnable` is listed.
-pub enum Burnable {}
-
 /// Burnable Trait for Fungible Token
 ///
 /// The `FungibleBurnable` trait extends the `FungibleToken` trait to provide
