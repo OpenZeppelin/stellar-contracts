@@ -2,14 +2,14 @@ use soroban_sdk::{
     contract, contractimpl,
     testutils::{Address as _, Events, Ledger},
     token::TokenClient,
-    vec, Address, Env, FromVal, MuxedAddress, String, Symbol, Val, Vec,
+    vec, Address, Env, Event, FromVal, MuxedAddress, String, Symbol, Val, Vec,
 };
-use stellar_tokens::fungible::{Base, Compose, FungibleToken};
+use stellar_tokens::fungible::{Approve, Base, Compose, FungibleToken, Transfer};
 
 use crate::{
     collect_fee, collect_fee_and_invoke, is_allowed_fee_token, is_fee_token_allowlist_enabled,
     set_allowed_fee_token, sweep_token, validate_expiration_ledger, validate_fee_bounds,
-    FeeAbstractionApproval, FeeAbstractionStorageKey,
+    FeeAbstractionApproval, FeeAbstractionStorageKey, FeeCollected,
 };
 
 #[contract]
@@ -71,14 +71,211 @@ fn collect_fee_with_eager_approval_overwrites_allowance() {
     });
 
     let events = e.events().all();
-    // approval, transfer and collect fee
-    assert_eq!(events.events().len(), 3);
+    assert_eq!(events.events().len(), 5);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &Approve {
+            owner: user.clone(),
+            spender: contract_address.clone(),
+            amount: max_fee_amount,
+            live_until_ledger: 100,
+        }
+        .to_xdr(&e, &token_address)
+    );
+    assert_eq!(
+        events.events().get(1).unwrap(),
+        &Transfer { from: user.clone(), to: contract_address.clone(), amount: max_fee_amount }
+            .to_xdr(&e, &token_address)
+    );
+    assert_eq!(
+        events.events().get(2).unwrap(),
+        &Transfer { from: contract_address.clone(), to: recipient.clone(), amount: 20 }
+            .to_xdr(&e, &token_address)
+    );
+    assert_eq!(
+        events.events().get(3).unwrap(),
+        &Transfer { from: contract_address.clone(), to: user.clone(), amount: 30 }
+            .to_xdr(&e, &token_address)
+    );
+    assert_eq!(
+        events.events().get(4).unwrap(),
+        &FeeCollected {
+            user: user.clone(),
+            recipient: recipient.clone(),
+            token: token_address.clone(),
+            amount: 20,
+        }
+        .to_xdr(&e, &contract_address)
+    );
 
     let allowance = token_client.allowance(&user, &contract_address);
-    assert_eq!(allowance, 30);
+    assert_eq!(allowance, 0);
 
-    let balance = token_client.balance(&recipient);
-    assert_eq!(balance, 20);
+    assert_eq!(token_client.balance(&recipient), 20);
+    assert_eq!(token_client.balance(&user), 980);
+    assert_eq!(token_client.balance(&contract_address), 0);
+}
+
+#[test]
+fn collect_fee_with_eager_approval_no_remainder() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+
+    let token_client = TokenClient::new(&e, &token_address);
+
+    e.as_contract(&contract_address, || {
+        // approve 50, spend 50
+        collect_fee(
+            &e,
+            &token_address,
+            50,
+            50,
+            100,
+            &user,
+            &recipient,
+            FeeAbstractionApproval::Eager,
+        );
+    });
+
+    let events = e.events().all();
+    assert_eq!(events.events().len(), 4);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &Approve {
+            owner: user.clone(),
+            spender: contract_address.clone(),
+            amount: 50,
+            live_until_ledger: 100,
+        }
+        .to_xdr(&e, &token_address)
+    );
+    assert_eq!(
+        events.events().get(1).unwrap(),
+        &Transfer { from: user.clone(), to: contract_address.clone(), amount: 50 }
+            .to_xdr(&e, &token_address)
+    );
+    assert_eq!(
+        events.events().get(2).unwrap(),
+        &Transfer { from: contract_address.clone(), to: recipient.clone(), amount: 50 }
+            .to_xdr(&e, &token_address)
+    );
+    assert_eq!(
+        events.events().get(3).unwrap(),
+        &FeeCollected {
+            user: user.clone(),
+            recipient: recipient.clone(),
+            token: token_address.clone(),
+            amount: 50,
+        }
+        .to_xdr(&e, &contract_address)
+    );
+
+    let allowance = token_client.allowance(&user, &contract_address);
+    assert_eq!(allowance, 0);
+
+    assert_eq!(token_client.balance(&recipient), 50);
+    assert_eq!(token_client.balance(&user), 950);
+    assert_eq!(token_client.balance(&contract_address), 0);
+}
+
+#[test]
+fn collect_fee_with_eager_approval_to_current_contract() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+
+    let token_client = TokenClient::new(&e, &token_address);
+
+    e.as_contract(&contract_address, || {
+        // approve 50, spend 20, the fee stays on the contract
+        collect_fee(
+            &e,
+            &token_address,
+            20,
+            50,
+            100,
+            &user,
+            &contract_address,
+            FeeAbstractionApproval::Eager,
+        );
+    });
+
+    let events = e.events().all();
+    assert_eq!(events.events().len(), 4);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &Approve {
+            owner: user.clone(),
+            spender: contract_address.clone(),
+            amount: 50,
+            live_until_ledger: 100,
+        }
+        .to_xdr(&e, &token_address)
+    );
+    assert_eq!(
+        events.events().get(1).unwrap(),
+        &Transfer { from: user.clone(), to: contract_address.clone(), amount: 50 }
+            .to_xdr(&e, &token_address)
+    );
+    assert_eq!(
+        events.events().get(2).unwrap(),
+        &Transfer { from: contract_address.clone(), to: user.clone(), amount: 30 }
+            .to_xdr(&e, &token_address)
+    );
+    assert_eq!(
+        events.events().get(3).unwrap(),
+        &FeeCollected {
+            user: user.clone(),
+            recipient: contract_address.clone(),
+            token: token_address.clone(),
+            amount: 20,
+        }
+        .to_xdr(&e, &contract_address)
+    );
+
+    let allowance = token_client.allowance(&user, &contract_address);
+    assert_eq!(allowance, 0);
+
+    assert_eq!(token_client.balance(&contract_address), 20);
+    assert_eq!(token_client.balance(&user), 980);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #100)")]
+fn collect_fee_with_eager_approval_requires_max_fee_balance() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+    let other = Address::generate(&e);
+
+    let token_client = TokenClient::new(&e, &token_address);
+    // the user keeps 25, which covers the fee but not the approved maximum
+    token_client.transfer(&user, &other, &975);
+
+    e.as_contract(&contract_address, || {
+        collect_fee(
+            &e,
+            &token_address,
+            20,
+            50,
+            100,
+            &user,
+            &recipient,
+            FeeAbstractionApproval::Eager,
+        );
+    });
 }
 
 #[test]

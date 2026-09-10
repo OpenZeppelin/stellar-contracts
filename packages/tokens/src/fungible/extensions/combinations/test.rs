@@ -9,6 +9,7 @@ use crate::{
         extensions::{
             allowlist::AllowList,
             blocklist::BlockList,
+            burnable::Burnable,
             combinations::{Composable, Compose},
             total_supply::{mint, total_supply, TotalSupply},
             votes::FungibleVotes,
@@ -154,4 +155,28 @@ fn blocklist_burn_respects_policy() {
         // `account` is blocked, the blocklist policy has to reject the burn
         <BlockListWithSupply as BurnableOverrides>::burn(&e, &account, 40);
     });
+}
+
+#[test]
+fn additive_extensions_are_ignored() {
+    // Additive markers may appear in any position without changing the
+    // resolution.
+    assert_composes_to::<(AllowList, Burnable), AllowList>();
+    assert_composes_to::<(Burnable, AllowList), AllowList>();
+    assert_composes_to::<(Vault, Burnable), Vault>();
+    assert_composes_to::<(RWA, Burnable), RWA>();
+    // Higher arities, covering every tuple impl.
+    assert_composes_to::<(Burnable, FungibleVotes, Burnable), FungibleVotes>();
+    assert_composes_to::<(BlockList, Burnable, Burnable, Burnable), BlockList>();
+    assert_composes_to::<(Burnable, Burnable, Base, Burnable, Burnable), Base>();
+    // Curated pairs are not disturbed by additive markers either.
+    assert_composes_to::<(AllowList, TotalSupply, Burnable), AllowListWithSupply>();
+    assert_composes_to::<(Burnable, TotalSupply, BlockList), BlockListWithSupply>();
+}
+
+#[test]
+fn additive_only_lists_resolve_to_base() {
+    assert_composes_to::<Burnable, Base>();
+    assert_composes_to::<(Burnable,), Base>();
+    assert_composes_to::<(Burnable, Burnable), Base>();
 }

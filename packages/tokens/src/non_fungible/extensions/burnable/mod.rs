@@ -5,6 +5,7 @@ use crate::non_fungible::{overrides::BurnableOverrides, NonFungibleToken};
 mod test;
 
 use soroban_sdk::{contractevent, contracttrait, Address, Env};
+pub use storage::Burnable;
 
 /// Burnable Trait for Non-Fungible Token
 ///

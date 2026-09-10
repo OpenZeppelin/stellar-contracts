@@ -3,37 +3,40 @@
 //! A contract selects exactly one `ContractType` on its
 //! [`crate::fungible::FungibleToken`] implementation, and that single slot
 //! decides all overridable behavior. The contract type is selected uniformly
-//! with [`Compose`], by listing the contract types that override the `Base`
-//! behavior: a single one, or several whose overrides have to apply at the
-//! same time. [`Compose`] resolves the list to the curated contract type at
-//! compile time, so no dedicated combination type has to be named by the
-//! contract author.
+//! with [`Compose`], by listing the extensions the token is made of.
 //!
-//! Note that [`Compose`] only selects the `ContractType`; it says nothing
-//! about extensions that add new functionality without overriding the base
-//! behavior. Those (e.g. [`crate::fungible::burnable::FungibleBurnable`] or
-//! the [`crate::fungible::capped`] helpers) have no contract type and are
-//! simply implemented alongside; there is no `Compose<(Burnable,)>`.
+//! Additive extensions (e.g. [`Burnable`] for
+//! [`crate::fungible::burnable::FungibleBurnable`]) may be listed as well:
+//! they do not affect the resolved contract type and are enabled by
+//! implementing their trait, whether or not they are listed. A list holding
+//! only additive extensions resolves to [`Base`].
 //!
 //! Usage:
 //!
 //! ```ignore
 //! #[contractimpl(contracttrait)]
 //! impl FungibleToken for MyToken {
-//!     type ContractType = Compose<(AllowList, TotalSupply)>;
+//!     // resolves to the contract type combining `AllowList` with
+//!     // `TotalSupply`; `Burnable` is declarative
+//!     type ContractType = Compose<(AllowList, TotalSupply, Burnable)>;
+//! }
+//!
+//! #[contractimpl(contracttrait)]
+//! impl FungibleAllowList for MyToken {
+//!     // ...
 //! }
 //!
 //! #[contractimpl(contracttrait)]
 //! impl FungibleTotalSupply for MyToken {}
 //!
 //! #[contractimpl(contracttrait)]
-//! impl FungibleAllowList for MyToken {
-//!     // ...
-//! }
+//! impl FungibleBurnable for MyToken {}
 //! ```
 //!
-//! The list is order-insensitive: `Compose<(TotalSupply, AllowList)>` and
-//! `Compose<(AllowList, TotalSupply)>` resolve to the same contract type.
+//! Curated multi-type combinations: [`TotalSupply`] can be combined with
+//! either [`AllowList`] or [`BlockList`], e.g.
+//! `Compose<(AllowList, TotalSupply)>`. The list is order-insensitive:
+//! `Compose<(TotalSupply, AllowList)>` resolves to the same contract type.
 //! Invalid lists do not compile: `AllowList` and `BlockList` are mutually
 //! exclusive, and implementing an extension trait the list does not back
 //! (e.g. [`crate::fungible::total_supply::FungibleTotalSupply`] without
@@ -46,14 +49,11 @@ mod test;
 
 use storage::{TotalSupplyAllowList, TotalSupplyBlockList};
 
-#[cfg(test)]
-mod test;
-
 use crate::{
     fungible::{
         extensions::{
-            allowlist::AllowList, blocklist::BlockList, total_supply::TotalSupply,
-            votes::FungibleVotes,
+            allowlist::AllowList, blocklist::BlockList, burnable::Burnable,
+            total_supply::TotalSupply, votes::FungibleVotes,
         },
         Base, ContractOverrides,
     },
@@ -61,89 +61,302 @@ use crate::{
     vault::Vault,
 };
 
-/// Resolves a list of contract types to the combined contract type, e.g.
-/// `Compose<(AllowList, TotalSupply)>`.
+/// Resolves a list of contract types and additive extensions to the combined
+/// contract type, e.g. `Compose<(AllowList,)>` or
+/// `Compose<(AllowList, Burnable)>` (both resolve to `AllowList`), or
+/// `Compose<(AllowList, TotalSupply)>` (resolving to the curated combination
+/// of the two).
 ///
 /// This is shorthand for `<L as Composable>::Out`; refer to [`Composable`] for
 /// the valid lists.
 pub type Compose<L> = <L as Composable>::Out;
 
-/// Type-level lookup backing [`Compose`]: each valid contract type list
-/// resolves to its combined contract type through the `Out` associated type.
+/// Type-level lookup backing [`Compose`]: each valid list resolves to its
+/// combined contract type through the `Out` associated type.
 ///
-/// Single contract types resolve to themselves (with or without the
-/// one-element tuple form), and pairs are declared in both orders, making the
-/// list order-insensitive. Mutually exclusive contract types (e.g.
-/// `AllowList` and `BlockList`) have no implementation, so combining them
-/// does not compile.
+/// A list is folded pairwise, left to right. Single contract types resolve to
+/// themselves (with or without the one-element tuple form), curated pairs
+/// resolve to their combined contract type (in either order), and additive
+/// extensions are ignored. Mutually exclusive contract types (e.g.
+/// `AllowList` and `BlockList`) have no pairwise combination, so listing them
+/// together does not compile.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a valid contract type combination",
     note = "valid single contract types: `Base`, `AllowList`, `BlockList`, `TotalSupply`, `RWA`, \
             `Vault`, `FungibleVotes`",
-    note = "valid combinations: `(AllowList, TotalSupply)`, `(BlockList, TotalSupply)`",
-    note = "`AllowList` and `BlockList` are mutually exclusive"
+    note = "curated combinations: `(AllowList, TotalSupply)`, `(BlockList, TotalSupply)`",
+    note = "additive extensions (e.g. `Burnable`) may be listed alongside a contract type; they \
+            do not affect the resolved type",
+    note = "lists of up to 5 entries are supported"
 )]
 pub trait Composable {
     type Out: ContractOverrides;
 }
 
-// Single contract types resolve to themselves. The bare form and the
-// one-element tuple form are equivalent, so a stray trailing comma does not
-// change the meaning.
-impl Composable for Base {
+// The resolution machinery below is internal: contract developers only
+// interact with `Compose`, and the traits in this module are unnameable
+// outside the crate.
+mod fold {
+    /// Identity element of composition: the contribution of an additive
+    /// extension. Folding it into any contribution leaves that contribution
+    /// unchanged, which is how additive extensions are ignored.
+    pub enum Nil {}
+
+    /// Implemented by every name that may appear in a `Compose` list. The
+    /// `Contribution` is what the entry adds to the resolved contract type:
+    /// contract types contribute themselves, additive extensions contribute
+    /// [`Nil`].
+    #[diagnostic::on_unimplemented(
+        message = "`{Self}` cannot appear in a `Compose` list",
+        note = "valid entries are the contract types (`Base`, `AllowList`, `BlockList`, \
+                `TotalSupply`, `RWA`, `Vault`, `FungibleVotes`) and the additive extensions \
+                (`Burnable`)"
+    )]
+    pub trait Extension {
+        type Contribution;
+    }
+
+    /// Pairwise combination table for contributions: the fold reduces a list
+    /// left to right through this table. A missing row means the pair is
+    /// invalid (mutually exclusive, or no curated combination exists).
+    #[diagnostic::on_unimplemented(
+        message = "`{Self}` cannot be combined with `{B}` in a `Compose` list",
+        note = "the contract types are mutually exclusive, or no combination of them is curated"
+    )]
+    pub trait Combine<B> {
+        type Out;
+    }
+
+    /// Final step of the fold: maps the folded contribution to the resolved
+    /// contract type. Its only non-trivial rule is [`Nil`] resolving to
+    /// `Base` (a list of only additive extensions is a vanilla token).
+    pub trait Finalize {
+        type Out: super::ContractOverrides;
+    }
+}
+
+use fold::{Combine, Extension, Finalize, Nil};
+
+type Contrib<T> = <T as Extension>::Contribution;
+type Pair<A, B> = <A as Combine<B>>::Out;
+type Final<T> = <T as Finalize>::Out;
+
+// What each list entry contributes to the resolved contract type.
+impl Extension for Base {
+    type Contribution = Base;
+}
+impl Extension for AllowList {
+    type Contribution = AllowList;
+}
+impl Extension for BlockList {
+    type Contribution = BlockList;
+}
+impl Extension for TotalSupply {
+    type Contribution = TotalSupply;
+}
+impl Extension for RWA {
+    type Contribution = RWA;
+}
+impl Extension for Vault {
+    type Contribution = Vault;
+}
+impl Extension for FungibleVotes {
+    type Contribution = FungibleVotes;
+}
+// Additive extensions contribute nothing.
+impl Extension for Burnable {
+    type Contribution = Nil;
+}
+
+// Identity rows: combining with `Nil` changes nothing. One pair of rows per
+// contract type, plus the `Nil`/`Nil` row for lists of only additive
+// extensions. Curated multi-type combinations are additional rows, declared
+// in both orders so lists stay order-insensitive.
+impl Combine<Nil> for Nil {
+    type Out = Nil;
+}
+impl Combine<Nil> for Base {
     type Out = Base;
 }
-impl Composable for (Base,) {
+impl Combine<Base> for Nil {
+    type Out = Base;
+}
+impl Combine<Nil> for AllowList {
+    type Out = AllowList;
+}
+impl Combine<AllowList> for Nil {
+    type Out = AllowList;
+}
+impl Combine<Nil> for BlockList {
+    type Out = BlockList;
+}
+impl Combine<BlockList> for Nil {
+    type Out = BlockList;
+}
+impl Combine<Nil> for TotalSupply {
+    type Out = TotalSupply;
+}
+impl Combine<TotalSupply> for Nil {
+    type Out = TotalSupply;
+}
+impl Combine<Nil> for RWA {
+    type Out = RWA;
+}
+impl Combine<RWA> for Nil {
+    type Out = RWA;
+}
+impl Combine<Nil> for Vault {
+    type Out = Vault;
+}
+impl Combine<Vault> for Nil {
+    type Out = Vault;
+}
+impl Combine<Nil> for FungibleVotes {
+    type Out = FungibleVotes;
+}
+impl Combine<FungibleVotes> for Nil {
+    type Out = FungibleVotes;
+}
+impl Combine<Nil> for TotalSupplyAllowList {
+    type Out = TotalSupplyAllowList;
+}
+impl Combine<Nil> for TotalSupplyBlockList {
+    type Out = TotalSupplyBlockList;
+}
+
+// Curated pairs.
+impl Combine<TotalSupply> for AllowList {
+    type Out = TotalSupplyAllowList;
+}
+impl Combine<AllowList> for TotalSupply {
+    type Out = TotalSupplyAllowList;
+}
+impl Combine<TotalSupply> for BlockList {
+    type Out = TotalSupplyBlockList;
+}
+impl Combine<BlockList> for TotalSupply {
+    type Out = TotalSupplyBlockList;
+}
+
+impl Finalize for Nil {
+    type Out = Base;
+}
+impl Finalize for Base {
+    type Out = Base;
+}
+impl Finalize for AllowList {
+    type Out = AllowList;
+}
+impl Finalize for BlockList {
+    type Out = BlockList;
+}
+impl Finalize for TotalSupply {
+    type Out = TotalSupply;
+}
+impl Finalize for RWA {
+    type Out = RWA;
+}
+impl Finalize for Vault {
+    type Out = Vault;
+}
+impl Finalize for FungibleVotes {
+    type Out = FungibleVotes;
+}
+impl Finalize for TotalSupplyAllowList {
+    type Out = TotalSupplyAllowList;
+}
+impl Finalize for TotalSupplyBlockList {
+    type Out = TotalSupplyBlockList;
+}
+
+// Bare forms: a single entry may also be written without the one-element
+// tuple, so a stray trailing comma (or its absence) does not change the
+// meaning.
+impl Composable for Base {
     type Out = Base;
 }
 impl Composable for AllowList {
     type Out = AllowList;
 }
-impl Composable for (AllowList,) {
-    type Out = AllowList;
-}
 impl Composable for BlockList {
-    type Out = BlockList;
-}
-impl Composable for (BlockList,) {
     type Out = BlockList;
 }
 impl Composable for TotalSupply {
     type Out = TotalSupply;
 }
-impl Composable for (TotalSupply,) {
-    type Out = TotalSupply;
-}
 impl Composable for RWA {
-    type Out = RWA;
-}
-impl Composable for (RWA,) {
     type Out = RWA;
 }
 impl Composable for Vault {
     type Out = Vault;
 }
-impl Composable for (Vault,) {
-    type Out = Vault;
-}
 impl Composable for FungibleVotes {
     type Out = FungibleVotes;
 }
-impl Composable for (FungibleVotes,) {
-    type Out = FungibleVotes;
+impl Composable for Burnable {
+    type Out = Base;
 }
 
-// Pairs are declared in both orders, so the contract type list is
-// order-insensitive.
-impl Composable for (AllowList, TotalSupply) {
-    type Out = TotalSupplyAllowList;
+// Lists are folded left to right through the `Combine` table; additive
+// entries contribute `Nil`, the identity, so they vanish. Longer lists are
+// supported by adding one impl per arity.
+impl<A> Composable for (A,)
+where
+    A: Extension,
+    Contrib<A>: Finalize,
+{
+    type Out = Final<Contrib<A>>;
 }
-impl Composable for (TotalSupply, AllowList) {
-    type Out = TotalSupplyAllowList;
+
+impl<A, B> Composable for (A, B)
+where
+    A: Extension,
+    B: Extension,
+    Contrib<A>: Combine<Contrib<B>>,
+    Pair<Contrib<A>, Contrib<B>>: Finalize,
+{
+    type Out = Final<Pair<Contrib<A>, Contrib<B>>>;
 }
-impl Composable for (BlockList, TotalSupply) {
-    type Out = TotalSupplyBlockList;
+
+impl<A, B, C> Composable for (A, B, C)
+where
+    A: Extension,
+    B: Extension,
+    C: Extension,
+    Contrib<A>: Combine<Contrib<B>>,
+    Pair<Contrib<A>, Contrib<B>>: Combine<Contrib<C>>,
+    Pair<Pair<Contrib<A>, Contrib<B>>, Contrib<C>>: Finalize,
+{
+    type Out = Final<Pair<Pair<Contrib<A>, Contrib<B>>, Contrib<C>>>;
 }
-impl Composable for (TotalSupply, BlockList) {
-    type Out = TotalSupplyBlockList;
+
+impl<A, B, C, D> Composable for (A, B, C, D)
+where
+    A: Extension,
+    B: Extension,
+    C: Extension,
+    D: Extension,
+    Contrib<A>: Combine<Contrib<B>>,
+    Pair<Contrib<A>, Contrib<B>>: Combine<Contrib<C>>,
+    Pair<Pair<Contrib<A>, Contrib<B>>, Contrib<C>>: Combine<Contrib<D>>,
+    Pair<Pair<Pair<Contrib<A>, Contrib<B>>, Contrib<C>>, Contrib<D>>: Finalize,
+{
+    type Out = Final<Pair<Pair<Pair<Contrib<A>, Contrib<B>>, Contrib<C>>, Contrib<D>>>;
+}
+
+impl<A, B, C, D, E> Composable for (A, B, C, D, E)
+where
+    A: Extension,
+    B: Extension,
+    C: Extension,
+    D: Extension,
+    E: Extension,
+    Contrib<A>: Combine<Contrib<B>>,
+    Pair<Contrib<A>, Contrib<B>>: Combine<Contrib<C>>,
+    Pair<Pair<Contrib<A>, Contrib<B>>, Contrib<C>>: Combine<Contrib<D>>,
+    Pair<Pair<Pair<Contrib<A>, Contrib<B>>, Contrib<C>>, Contrib<D>>: Combine<Contrib<E>>,
+    Pair<Pair<Pair<Pair<Contrib<A>, Contrib<B>>, Contrib<C>>, Contrib<D>>, Contrib<E>>: Finalize,
+{
+    type Out =
+        Final<Pair<Pair<Pair<Pair<Contrib<A>, Contrib<B>>, Contrib<C>>, Contrib<D>>, Contrib<E>>>;
 }

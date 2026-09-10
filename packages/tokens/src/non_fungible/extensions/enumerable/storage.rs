@@ -1,11 +1,22 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::non_fungible::{
-    emit_mint, overrides::BurnableOverrides, Base, ContractOverrides, NonFungibleTokenError,
-    OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
+    emit_mint, overrides::BurnableOverrides, royalties::RoyaltySupport, Base, ContractOverrides,
+    NonFungibleTokenError, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT,
+    TOKEN_TTL_THRESHOLD,
 };
 
 pub struct Enumerable;
+
+/// Marker for the contract types backing the
+/// [`crate::non_fungible::enumerable::NonFungibleEnumerable`] trait:
+/// [`Enumerable`] itself and the curated combinations that include it.
+/// Contract authors never interact with this trait; it only appears as the
+/// bound enforcing that the selected `ContractType` keeps the enumeration
+/// bookkeeping.
+pub trait EnumerableContractType {}
+
+impl EnumerableContractType for Enumerable {}
 
 impl ContractOverrides for Enumerable {
     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
@@ -26,6 +37,10 @@ impl BurnableOverrides for Enumerable {
         Enumerable::burn_from(e, spender, from, token_id);
     }
 }
+
+// Implemented for `Enumerable`, so that the royalty existence check routes
+// through `Enumerable`'s `owner_of` (one `Owner` entry per token).
+impl RoyaltySupport for Enumerable {}
 
 #[contracttype]
 pub struct OwnerTokensKey {

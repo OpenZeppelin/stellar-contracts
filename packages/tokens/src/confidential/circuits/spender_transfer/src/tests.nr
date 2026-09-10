@@ -19,7 +19,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 // transfer) so the three circuits share an ecosystem of pinned curve points
 // for cross-circuit tooling. DVK_I is a placeholder field; in production it
 // comes from S5 of SetSpender and the spender decrypts it from
-// `escrowed_dvk` (Section 7.11).
+// `escrowed_dvk` (docs/protocol/operations/set-spender.md#delegation-key-escrow).
 global SK_OP: Field = 0xdead;
 global DVK_I: Field = 0x44767669; // ASCII "Dvki"
 global SIGMA_A: Field = 0x01;
@@ -397,7 +397,7 @@ fn full_allowance_transfer() {
     // which is a valid commitment to zero. a_tilde' and a_tilde_aud_s both
     // bind to 0 (plus mask) so the owner's auditor sees the post-transfer
     // allowance reach zero. The delegation entry isn't deleted (that's
-    // revoke_spender's job, Section 7.9) -- it now escrows zero value.
+    // revoke_spender's job, docs/protocol/operations/revoke-spender.md) -- it now escrows zero value.
     let pvk_recipient =
         EmbeddedCurvePoint { x: PVK_RECIPIENT_X, y: PVK_RECIPIENT_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
@@ -494,7 +494,7 @@ fn rejects_wrong_dvk_against_contract() {
     // reading might worry that an spender could reuse a proof's witness
     // across contracts. The defense lives in O3.
     //
-    // Mechanism (Section 7.8 final paragraph):
+    // Mechanism (docs/protocol/operations/spender-transfer.md#contract-binding):
     //   * SetSpender derived dvk_i from a contract-specific vk: S2/S5 chain
     //     vk = Poseidon2(VK, sk_owner, addr_f), then dvk_i = Poseidon2(DVK, vk,
     //     op_i). A different `addr_f` produces a different vk, and therefore a
@@ -671,7 +671,7 @@ fn rejects_v_a_new_out_of_range() {
 
 #[test(should_fail)]
 fn rejects_v_a_out_of_range() {
-    // 2^127 is exactly the boundary O4 rules out (Section 2.6 / 3.4 -- SEP-41
+    // 2^127 is exactly the boundary O4 rules out (docs/protocol/primitives.md#integer-embedding-and-range-proofs and docs/protocol/system-model.md#underlying-token-assumptions -- SEP-41
     // i128 non-negative range is [0, 2^127), so 2^127 is the smallest value
     // that must fail). With v_a_huge - V_TRANSFER = 2^127 - 100 still in [0, 2^127),
     // the v_a_new range check passes; only the `v_a.assert_max_bit_size<127>()`
@@ -826,7 +826,7 @@ fn rejects_wrong_recipient_pvk() {
 
 #[test(should_fail)]
 fn rejects_poisoned_c_transfer() {
-    // Anti-poisoning (Section 5.4): a prover that commits C_transfer with arbitrary
+    // Anti-poisoning (docs/protocol/keys-and-commitments.md#anti-poisoning-constraint): a prover that commits C_transfer with arbitrary
     // blinding -- here r_transfer + 1 -- desynchronizes the recipient's accumulated
     // blinding. O7 + O8 together close this attack: r_transfer is uniquely
     // determined by Poseidon2(delta_transfer_blind, s, sigma_a'), so any C_transfer not
@@ -1574,7 +1574,9 @@ fn repeated_r_e_and_sigma_a_new_repeat_every_channel_pad() {
     // publish v_tilde values whose difference is the amount delta. The circuit
     // cannot catch this -- a reused r_e is a well-formed witness and O14 sees
     // only the adjacent salt -- so it is the honest client's obligation
-    // (Section 5.3, Section 9.6, SDK.md Section 10.4).
+    // (docs/protocol/keys-and-commitments.md#ecdh-derived-blinding,
+    // docs/protocol/security.md#revert-safety,
+    // docs/sdk/wallet.md#salt-freshness).
     let v_transfer_2: Field = V_TRANSFER + 40;
     assert((v_transfer_2 + m_s[0]) - V_TILDE_AUD_S == 40);
 }

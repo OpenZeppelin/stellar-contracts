@@ -127,12 +127,9 @@ pub trait NonFungibleToken {
     /// be overridden based on the extensions implemented.
     /// The contract type is selected with
     /// [`crate::non_fungible::combinations::Compose`], by listing the
-    /// contract types providing the overridable behavior: `Compose<(Base,)>`
-    /// for the vanilla case, `Compose<(Enumerable,)>` for an enumerable
-    /// token, and so on. Extensions that add functionality without
-    /// overriding behavior (e.g.
-    /// [`crate::non_fungible::burnable::NonFungibleBurnable`]) have no
-    /// contract type and do not appear in the list.
+    /// extensions the token is made of: `Compose<(Base,)>` for the vanilla
+    /// case, `Compose<(Enumerable,)>` for an enumerable token, and so on.
+    /// Invalid lists are rejected at compile time.
     type ContractType: ContractOverrides;
 
     /// Returns the number of tokens owned by `account`.

@@ -4,6 +4,7 @@ mod storage;
 mod test;
 
 use soroban_sdk::{contractevent, contracttrait, Address, Env};
+pub use storage::Burnable;
 
 use crate::fungible::{overrides::BurnableOverrides, FungibleToken};
 
