@@ -3,7 +3,7 @@ use stellar_access::ownable::{set_owner, Ownable};
 use stellar_governance::votes::Votes;
 use stellar_macros::only_owner;
 use stellar_tokens::fungible::{
-    burnable::FungibleBurnable, votes::FungibleVotes, Base, FungibleToken,
+    burnable::FungibleBurnable, votes::FungibleVotes, Base, Compose, FungibleToken,
 };
 
 #[contract]
@@ -24,7 +24,7 @@ impl ExampleContract {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
-    type ContractType = FungibleVotes;
+    type ContractType = Compose<(FungibleVotes,)>;
 }
 
 #[contractimpl(contracttrait)]

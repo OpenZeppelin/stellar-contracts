@@ -7,7 +7,9 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::{only_admin, only_role};
-use stellar_tokens::non_fungible::{royalties::NonFungibleRoyalties, Base, NonFungibleToken};
+use stellar_tokens::non_fungible::{
+    royalties::NonFungibleRoyalties, Base, Compose, NonFungibleToken,
+};
 
 #[contract]
 pub struct ExampleContract;
@@ -53,7 +55,7 @@ impl ExampleContract {
 
 #[contractimpl(contracttrait)]
 impl NonFungibleToken for ExampleContract {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 }
 
 #[contractimpl(contracttrait)]

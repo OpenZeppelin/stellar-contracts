@@ -74,7 +74,9 @@ mod utils;
 #[cfg(test)]
 mod test;
 
-pub use extensions::{allowlist, blocklist, burnable, capped, votes};
+pub use extensions::{
+    allowlist, blocklist, burnable, capped, combinations, combinations::Compose, votes,
+};
 pub use overrides::{Base, ContractOverrides};
 use soroban_sdk::{
     contracterror, contractevent, contracttrait, Address, Env, MuxedAddress, String,
@@ -103,23 +105,30 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 ///
 /// This trait is implemented for the following Contract Types:
 /// * [`crate::fungible::Base`] (covering the vanilla case, and compatible with
-///   [`crate::fungible::burnable::FungibleBurnable`]) trait
+///   the [`crate::fungible::burnable::FungibleBurnable`] trait)
 /// * [`crate::fungible::allowlist::AllowList`] (enabling the compatibility and
-///   overrides for [`crate::fungible::allowlist::FungibleAllowList`]) trait,
-///   incompatible with [`crate::fungible::blocklist::BlockList`] trait and
-///   [`crate::rwa::RWA`] trait.
+///   overrides for the [`crate::fungible::allowlist::FungibleAllowList`]
+///   trait), incompatible with [`crate::fungible::blocklist::BlockList`] and
+///   [`crate::rwa::RWA`].
 /// * [`crate::fungible::blocklist::BlockList`] (enabling the compatibility and
-///   overrides for [`crate::fungible::blocklist::FungibleBlockList`]) trait,
-///   incompatible with [`crate::fungible::allowlist::AllowList`] trait and
-///   [`crate::rwa::RWA`] trait.
-/// * [`crate::rwa::RWA`] (enabling the compatibility and overrides for
-///   [`crate::rwa::RWAToken`]) trait, incompatible with
-///   [`crate::fungible::allowlist::AllowList`] trait and
-///   [`crate::fungible::blocklist::BlockList`] trait.
+///   overrides for the [`crate::fungible::blocklist::FungibleBlockList`]
+///   trait), incompatible with [`crate::fungible::allowlist::AllowList`] and
+///   [`crate::rwa::RWA`].
+/// * [`crate::rwa::RWA`] (enabling the compatibility and overrides for the
+///   [`crate::rwa::RWAToken`] trait), incompatible with
+///   [`crate::fungible::allowlist::AllowList`] and
+///   [`crate::fungible::blocklist::BlockList`].
+/// * [`crate::vault::Vault`] (enabling the compatibility and overrides for the
+///   [`crate::vault::FungibleVault`] trait).
+/// * [`crate::fungible::votes::FungibleVotes`] (enabling the compatibility and
+///   overrides for the [`stellar_governance::votes::Votes`] trait).
 ///
-/// The default implementations of this trait for `Base`, `Allowlist`,
-/// `Blocklist` and `RWA` can be found by navigating to:
-/// `ContractType::{method_name}`.
+/// The contract type is selected with
+/// [`crate::fungible::combinations::Compose`]; invalid combinations are
+/// rejected at compile time.
+///
+/// The default implementations of this trait for each contract type can be
+/// found by navigating to: `ContractType::{method_name}`.
 ///
 /// For example, the implementation of [`FungibleToken::transfer`] for the
 /// `Allowlist` contract type can be found at
@@ -128,10 +137,11 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 pub trait FungibleToken {
     /// Helper type that allows some of the functionality of the base trait to
     /// be overridden based on the extensions implemented.
-    /// [`crate::fungible::Base`] should be used as the type when
-    /// not using
-    /// [`crate::fungible::allowlist::AllowList`] or
-    /// [`crate::fungible::blocklist::BlockList`] extensions.
+    /// The contract type is selected with
+    /// [`crate::fungible::combinations::Compose`], by listing the extensions
+    /// the token is made of: `Compose<(Base,)>` for the vanilla case,
+    /// `Compose<(AllowList,)>` for an allowlist token, and so on. Invalid
+    /// lists are rejected at compile time.
     type ContractType: ContractOverrides;
 
     /// Returns the total amount of tokens in circulation.

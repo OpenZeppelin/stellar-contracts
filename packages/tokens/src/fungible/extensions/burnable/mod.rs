@@ -7,6 +7,15 @@ use soroban_sdk::{contractevent, contracttrait, Address, Env};
 
 use crate::fungible::{overrides::BurnableOverrides, FungibleToken};
 
+/// Type-level name of the burnable extension, for use in a
+/// [`crate::fungible::combinations::Compose`] list.
+///
+/// Burnable is additive: it does not override the base behavior, so listing
+/// it is purely declarative and does not affect the resolved contract type.
+/// Burning is enabled by implementing [`FungibleBurnable`], whether or not
+/// `Burnable` is listed.
+pub enum Burnable {}
+
 /// Burnable Trait for Fungible Token
 ///
 /// The `FungibleBurnable` trait extends the `FungibleToken` trait to provide
@@ -33,9 +42,10 @@ use crate::fungible::{overrides::BurnableOverrides, FungibleToken};
 ///
 /// The burn logic is selected automatically based on the `ContractType` set
 /// on the `FungibleToken` implementation. If the contract uses
-/// `type ContractType = AllowList`, burning checks the allowlist; with
-/// `type ContractType = Base` it uses the vanilla behavior, and so on. There
-/// is no need to interact with the override machinery, it works in the
+/// `type ContractType = Compose<(AllowList,)>`, burning checks the allowlist;
+/// with `type ContractType = Compose<(Base,)>` it uses the vanilla behavior,
+/// and so on.
+/// There is no need to interact with the override machinery, it works in the
 /// background.
 #[contracttrait]
 pub trait FungibleBurnable: FungibleToken<ContractType: BurnableOverrides> {

@@ -6,6 +6,15 @@ mod test;
 
 use soroban_sdk::{contractevent, contracttrait, Address, Env};
 
+/// Type-level name of the burnable extension, for use in a
+/// [`crate::non_fungible::combinations::Compose`] list.
+///
+/// Burnable is additive: it does not override the base behavior, so listing
+/// it is purely declarative and does not affect the resolved contract type.
+/// Burning is enabled by implementing [`NonFungibleBurnable`], whether or not
+/// `Burnable` is listed.
+pub enum Burnable {}
+
 /// Burnable Trait for Non-Fungible Token
 ///
 /// The `NonFungibleBurnable` trait extends the `NonFungibleToken` trait to
@@ -34,8 +43,9 @@ use soroban_sdk::{contractevent, contracttrait, Address, Env};
 ///
 /// The burn logic is selected automatically based on the `ContractType` set
 /// on the `NonFungibleToken` implementation. If the contract uses
-/// `type ContractType = Consecutive`, burning uses the consecutive bookkeeping;
-/// with `type ContractType = Base` it uses the vanilla behavior, and so on.
+/// `type ContractType = Compose<(Consecutive,)>`, burning uses the consecutive
+/// bookkeeping; with `type ContractType = Compose<(Base,)>` it uses the vanilla
+/// behavior, and so on.
 /// There is no need to interact with the override machinery, it works in the
 /// background.
 #[contracttrait]

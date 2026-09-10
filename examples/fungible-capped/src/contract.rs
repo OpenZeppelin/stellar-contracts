@@ -10,7 +10,7 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, MuxedAddress, String};
 use stellar_tokens::fungible::{
     capped::{check_cap, set_cap},
-    Base, FungibleToken,
+    Base, Compose, FungibleToken,
 };
 
 #[contract]
@@ -30,5 +30,5 @@ impl ExampleContract {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 }
