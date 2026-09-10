@@ -138,12 +138,10 @@ pub trait FungibleToken {
     /// Helper type that allows some of the functionality of the base trait to
     /// be overridden based on the extensions implemented.
     /// The contract type is selected with
-    /// [`crate::fungible::combinations::Compose`], by listing the contract
-    /// types providing the overridable behavior: `Compose<(Base,)>` for the
-    /// vanilla case, `Compose<(AllowList,)>` for an allowlist token, and so
-    /// on. Extensions that add functionality without overriding behavior
-    /// (e.g. [`crate::fungible::burnable::FungibleBurnable`]) have no
-    /// contract type and do not appear in the list.
+    /// [`crate::fungible::combinations::Compose`], by listing the extensions
+    /// the token is made of: `Compose<(Base,)>` for the vanilla case,
+    /// `Compose<(AllowList,)>` for an allowlist token, and so on. Invalid
+    /// lists are rejected at compile time.
     type ContractType: ContractOverrides;
 
     /// Returns the total amount of tokens in circulation.
