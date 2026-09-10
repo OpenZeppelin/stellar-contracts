@@ -15,7 +15,7 @@ use soroban_sdk::{
 };
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_macros::when_not_paused;
-use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, FungibleToken};
+use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, Compose, FungibleToken};
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
 
@@ -90,7 +90,7 @@ impl Pausable for ExampleContract {
 
 #[contractimpl]
 impl FungibleToken for ExampleContract {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 
     fn total_supply(e: &Env) -> i128 {
         Self::ContractType::total_supply(e)

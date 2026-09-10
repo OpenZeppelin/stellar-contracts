@@ -80,7 +80,7 @@ This design makes it **impossible** to implement conflicting extensions:
 ```rust
 // ✅ This works - using Enumerable
 impl NonFungibleToken for MyContract {
-    type ContractType = Enumerable;
+    type ContractType = Compose<(Enumerable,)>;
     // ... implementations
 }
 impl NonFungibleEnumerable for MyContract {
@@ -199,7 +199,17 @@ pub struct MyToken;
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for MyToken {
-    type ContractType = Base;
+    // From a type-safety perspective there are two kinds of extensions:
+    // *overriding* ones change the base behavior and compete for the single
+    // `ContractType` slot, so `Compose` must resolve them; *additive* ones
+    // (e.g. `Burnable`) change nothing and override nothing. Listing an
+    // additive extension in `Compose` serves no type-safety purpose: the
+    // entry is ignored by the resolution, and the extension is enabled by
+    // implementing its trait, listed or not. Listing them is made optional
+    // purely to unify the developer experience: developers can list every
+    // extension they use and never have to figure out which ones are
+    // additive and which ones are overriding.
+    type ContractType = Compose<(Base,)>;
     // The macro fills in every method body, no manual overrides needed.
     // Alternatively, custom overrides can be provided here (optional)
 }

@@ -6,6 +6,15 @@ mod test;
 
 use soroban_sdk::{contractevent, contracttrait, Address, Env};
 
+/// Type-level name of the royalties extension, for use in a
+/// [`crate::non_fungible::combinations::Compose`] list.
+///
+/// Royalties is additive: it does not override the base behavior, so listing
+/// it is purely declarative and does not affect the resolved contract type.
+/// Royalty support is enabled by implementing [`NonFungibleRoyalties`],
+/// whether or not `Royalties` is listed.
+pub enum Royalties {}
+
 /// Royalties Trait for Non-Fungible Token (ERC2981)
 ///
 /// The `NonFungibleRoyalties` trait extends the `NonFungibleToken` trait to

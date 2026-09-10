@@ -8,7 +8,7 @@ use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_macros::{only_admin, only_role};
 use stellar_tokens::{
-    fungible::{Base, FungibleToken},
+    fungible::{Base, Compose, FungibleToken},
     rwa::{RWAError, RWAToken, RWA},
 };
 
@@ -55,7 +55,7 @@ impl Pausable for RWATokenContract {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for RWATokenContract {
-    type ContractType = RWA;
+    type ContractType = Compose<(RWA,)>;
 
     /// Showcase: how to opt out of custodial (muxed) destinations.
     ///
