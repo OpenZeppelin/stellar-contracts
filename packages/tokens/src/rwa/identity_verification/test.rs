@@ -387,8 +387,8 @@ fn verify_identity_fails_no_matched_ids() {
             e.storage().persistent().set(&symbol_short!("claim_ids"), &Vec::from_array(&e, [id3]));
         });
 
-        // Update claim topics and issuers to include issuer1 and issuer2, but not
-        // issuer3
+        // Update claim topics and issuers to include issuer1 and issuer2, but
+        // not issuer3
         e.as_contract(&cti, || {
             e.storage()
                 .persistent()

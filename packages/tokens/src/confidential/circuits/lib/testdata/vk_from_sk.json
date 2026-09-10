@@ -1,7 +1,7 @@
 {
   "primitive": "vk_from_sk",
   "design_doc_refs": ["Section 4.2"],
-  "description": "Viewing key derivation: vk = Poseidon2(VK, sk, wrap). The wrap binding makes proofs wrapper-context-bound (R2/W2/T2/S2/V2).",
+  "description": "Viewing key derivation: vk = Poseidon2(VK, sk, wrap). The wrap binding makes proofs wrapper-context-bound (R2/W2/T2/S2).",
   "vectors": [
     {
       "inputs": { "sk": "0xdead", "wrap": "0xbeef" },

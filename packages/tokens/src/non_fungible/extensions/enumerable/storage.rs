@@ -493,15 +493,16 @@ impl Enumerable {
         };
         e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
 
-        // owner's balance is already decremented by 1, so it will be the index of the
-        // last token in the enumeration list.
+        // owner's balance is already decremented by 1, so it will be the index
+        // of the last token in the enumeration list.
         let last_token_index = Base::balance(e, owner);
 
         // Update the `OwnerTokens`.
         if to_be_removed_index != last_token_index {
             // Before swap: [A, B, C, D]  (burning `B`, which is at index 1)
-            // After swap:  [A, D, C, D]  (`D` moves to index 1, note that `B` isn't moved)
-            // After deletion: [A, D, C]  (last item is deleted, effectively removing `B`)
+            // After swap:  [A, D, C, D]  (`D` moves to index 1, note that `B`
+            // isn't moved) After deletion: [A, D, C]  (last item is
+            // deleted, effectively removing `B`)
             let last_token_id = Enumerable::get_owner_token_id(e, owner, last_token_index);
             e.storage().persistent().set(
                 &NFTEnumerableStorageKey::OwnerTokens(OwnerTokensKey {
@@ -565,12 +566,13 @@ impl Enumerable {
         e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
 
         // unlike `remove_from_owner_enumeration`, we perform the swap without
-        // checking if it's already the last token_id to avoid extra gas cost (being
-        // last item in the global list is far less likely)
+        // checking if it's already the last token_id to avoid extra gas cost
+        // (being last item in the global list is far less likely)
 
         // Before swap: [A, B, C, D]  (burning `B`, which is at index 1)
-        // After swap:  [A, D, C, D]  (`D` moves to index 1, note that `B` isn't moved)
-        // After deletion: [A, D, C]  (last item is deleted, effectively removing `B`)
+        // After swap:  [A, D, C, D]  (`D` moves to index 1, note that `B` isn't
+        // moved) After deletion: [A, D, C]  (last item is deleted,
+        // effectively removing `B`)
         let last_token_id = Enumerable::get_token_id(e, last_token_index);
         e.storage()
             .persistent()

@@ -205,6 +205,57 @@ fn test_mul_overflow() {
     let _ = a * b;
 }
 
+/// The `*` operator's limit is on the *product* of the two values, not on
+/// either operand. Products at or below 170 survive regardless of how they
+/// are split between the operands.
+#[test]
+fn test_mul_operator_product_bound() {
+    let e = Env::default();
+    for (a, b) in [(170, 1), (85, 2), (34, 5), (17, 10), (1, 170), (4, 4)] {
+        let product = Wad::from_integer(&e, a) * Wad::from_integer(&e, b);
+        assert_eq!(product, Wad::from_integer(&e, a * b), "{a} * {b}");
+    }
+}
+
+#[test]
+#[should_panic]
+fn test_mul_operator_product_bound_exceeded() {
+    let e = Env::default();
+    // Product 171 exceeds `i128::MAX / WAD_SCALE^2` ~= 170.1411, even though
+    // both operands are tiny.
+    let _ = Wad::from_integer(&e, 171) * Wad::from_integer(&e, 1);
+}
+
+/// The `/` operator's limit is on the dividend alone; the divisor never
+/// affects it.
+#[test]
+fn test_div_operator_dividend_bound() {
+    let e = Env::default();
+    for divisor in [1, 2, 1000] {
+        let quotient = Wad::from_integer(&e, 170) / Wad::from_integer(&e, divisor);
+        assert_eq!(quotient, Wad::from_ratio(&e, 170, divisor), "170 / {divisor}");
+    }
+}
+
+#[test]
+#[should_panic]
+fn test_div_operator_dividend_bound_exceeded() {
+    let e = Env::default();
+    // A dividend above `i128::MAX / WAD_SCALE^2` ~= 170.1411 overflows even
+    // when dividing by one.
+    let _ = Wad::from_integer(&e, 171) / Wad::from_integer(&e, 1);
+}
+
+/// `checked_mul` promotes to `I256`, so it succeeds well past the point where
+/// the `*` operator overflows.
+#[test]
+fn test_checked_mul_exceeds_operator_bound() {
+    let e = Env::default();
+    let a = Wad::from_integer(&e, 171);
+    let b = Wad::from_integer(&e, 1);
+    assert_eq!(a.checked_mul(&e, b), Some(Wad::from_integer(&e, 171)));
+}
+
 #[test]
 #[should_panic]
 fn test_div_by_zero() {
@@ -381,7 +432,8 @@ fn test_checked_div_overflow() {
     let e = Env::default();
     let a = Wad::from_raw(i128::MAX);
     let b = Wad::from_raw(1);
-    let result = a.checked_div(&e, b); // MAX * WAD_SCALE will overflow even with I256
+    let result = a.checked_div(&e, b); // MAX * WAD_SCALE will overflow even
+                                       // with I256
     assert_eq!(result, None);
 }
 
@@ -389,9 +441,9 @@ fn test_checked_div_overflow() {
 fn test_checked_div_phantom_overflow_handled() {
     let e = Env::default();
     // 5000 WAD / 5000 WAD = 1 WAD
-    // The intermediate calculation (5000 * WAD_SCALE * WAD_SCALE) would overflow
-    // i128 but the final result (1 WAD) fits, so phantom overflow should be
-    // handled
+    // The intermediate calculation (5000 * WAD_SCALE * WAD_SCALE) would
+    // overflow i128 but the final result (1 WAD) fits, so phantom overflow
+    // should be handled
     let a = Wad::from_integer(&e, 5_000);
     let b = Wad::from_integer(&e, 5_000);
     let result = a.checked_div(&e, b);
@@ -452,6 +504,15 @@ fn test_checked_div_int_overflow() {
 }
 
 #[test]
+#[should_panic(expected = "attempt to divide with overflow")]
+fn test_div_int_min_by_negative_one_panics() {
+    // The operator sibling of the case above. `i128` division overflow is
+    // checked in every build profile, so this panic is unconditional.
+    let a = Wad::from_raw(i128::MIN);
+    let _ = a / -1i128;
+}
+
+#[test]
 fn test_neg_positive() {
     let e = Env::default();
     let positive = Wad::from_integer(&e, 5);
@@ -472,6 +533,14 @@ fn test_neg_zero() {
     let zero = Wad::from_raw(0);
     let neg_zero = -zero;
     assert_eq!(neg_zero, Wad::from_raw(0));
+}
+
+#[test]
+#[should_panic(expected = "attempt to negate with overflow")]
+fn test_neg_min_panics() {
+    // `|i128::MIN|` has no `i128` representation.
+    let a = Wad::from_raw(i128::MIN);
+    let _ = -a;
 }
 
 #[test]
@@ -684,7 +753,8 @@ fn test_powi_truncation_behavior() {
     let base = Wad::from_raw(1_414_213_562_373_095_048); // √2 ≈ 1.414213562373095048
     let result = base.powi(&e, 2);
 
-    // (√2)^2 should be very close to 2, but truncation may cause slight deviation
+    // (√2)^2 should be very close to 2, but truncation may cause slight
+    // deviation
     let two = Wad::from_integer(&e, 2);
     let diff = (result.raw() - two.raw()).abs();
 
@@ -1159,7 +1229,8 @@ fn test_powf_compound_interest_fractional() {
 #[test]
 fn test_powf_negative_exponent() {
     let e = Env::default();
-    // 2^(-1) = 0.5 — falls through to general path (negative non-integer-flagged y)
+    // 2^(-1) = 0.5 — falls through to general path (negative
+    // non-integer-flagged y)
     let two = Wad::from_integer(&e, 2);
     let neg_one = Wad::from_integer(&e, -1);
     let result = two.powf(&e, neg_one);
@@ -1236,7 +1307,8 @@ fn test_checked_powf_one_base() {
     // 1^y = 1 for any y, via the x==1 fast path.
     let e = Env::default();
     let one = Wad::from_integer(&e, 1);
-    let weird_y = Wad::from_ratio(&e, 355, 113); // π-ish, definitely non-integer
+    let weird_y = Wad::from_ratio(&e, 355, 113); // π-ish, definitely
+                                                 // non-integer
     assert_eq!(one.checked_powf(&e, weird_y), Some(one));
 }
 

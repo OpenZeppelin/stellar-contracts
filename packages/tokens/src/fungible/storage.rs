@@ -268,8 +268,8 @@ impl Base {
 
         if amount > 0 {
             // NOTE: cannot revert because of the check above;
-            // NOTE: 1 is not added to `live_for` as in the SAC implementation which
-            // is a bug tracked in https://github.com/stellar/rs-soroban-env/issues/1519
+            // NOTE: 1 is not added to `live_for` as in the SAC implementation
+            // which is a bug tracked in https://github.com/stellar/rs-soroban-env/issues/1519
             let live_for = live_until_ledger - current_ledger;
 
             e.storage().temporary().extend_ttl(&key, live_for, live_for);
@@ -428,7 +428,8 @@ impl Base {
         }
 
         if let Some(account) = to {
-            // NOTE: can't overflow because balance + amount is at most total_supply.
+            // NOTE: can't overflow because balance + amount is at most
+            // total_supply.
             let to_balance = Base::balance(e, account) + amount;
             e.storage()
                 .persistent()
@@ -436,8 +437,8 @@ impl Base {
         } else {
             // `to` is None, so we're burning tokens.
 
-            // NOTE: can't overflow because amount <= total_supply or amount <= from_balance
-            // <= total_supply.
+            // NOTE: can't overflow because amount <= total_supply or amount <=
+            // from_balance <= total_supply.
             let total_supply = Base::total_supply(e) - amount;
             e.storage().instance().set(&FungibleStorageKey::TotalSupply, &total_supply);
         }

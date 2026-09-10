@@ -276,7 +276,8 @@ fn base64_url_encode_binary_data() {
 fn base64_url_encode_uses_url_safe_alphabet() {
     // Input that produces characters that differ between standard base64 and
     // base64url
-    let input = [0x3E, 0x3F]; // Should produce '+' and '/' in standard base64, but '-' and '_' in base64url
+    let input = [0x3E, 0x3F]; // Should produce '+' and '/' in standard base64,
+                              // but '-' and '_' in base64url
     let mut output = [0u8; 3];
 
     base64_url_encode(&mut output, &input);
@@ -292,7 +293,8 @@ fn base64_url_encode_32_byte_hash() {
         0x1f, 0x12, 0x91, 0x38, 0xa2, 0xf2, 0xa1, 0x1f, 0x8e, 0x87, 0x02, 0xee, 0xdb, 0xb7, 0x92,
         0x92, 0x2e,
     ];
-    let mut output = [0u8; 43]; // 32 bytes -> 43 chars in base64url (no padding)
+    let mut output = [0u8; 43]; // 32 bytes -> 43 chars in base64url (no
+                                // padding)
 
     base64_url_encode(&mut output, &input);
 

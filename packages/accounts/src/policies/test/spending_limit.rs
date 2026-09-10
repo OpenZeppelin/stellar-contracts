@@ -466,8 +466,8 @@ fn enforce_zero_amount_allowed_after_limit_reduction() {
     });
 
     // A zero-amount transfer moves no funds and must be permitted even though
-    // `cached_total_spent` now exceeds `spending_limit`. It also must not mutate
-    // the spending history or cached total.
+    // `cached_total_spent` now exceeds `spending_limit`. It also must not
+    // mutate the spending history or cached total.
     e.as_contract(&address, || {
         let context = create_transfer_context(&e, 0);
         enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
@@ -574,7 +574,8 @@ fn enforce_non_transfer_context_errors() {
     });
 
     e.as_contract(&address, || {
-        // Try to enforce with a non-transfer context (using a different function name)
+        // Try to enforce with a non-transfer context (using a different
+        // function name)
         let contract_address = Address::generate(&e);
         let args = Vec::new(&e);
         let context = Context::Contract(ContractContext {

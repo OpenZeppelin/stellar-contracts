@@ -308,8 +308,8 @@ pub fn get_validated_context_by_id(
     }
 
     let ContextRule { signers: ref rule_signers, ref policies, .. } = context_rule;
-    // Filters rule signers to find which ones are present in the provided signer
-    // list.
+    // Filters rule signers to find which ones are present in the provided
+    // signer list.
     let matched_signers =
         Vec::from_iter(e, rule_signers.iter().filter(|s| all_signers.contains(s)));
 
@@ -482,8 +482,8 @@ pub fn do_check_auth(
 
     let mut allowed_signers = Map::new(e);
     for (rule, _, _) in validated_contexts.iter() {
-        // Collect all signers from the validated rules to check below for signers that
-        // do not belong to any rule.
+        // Collect all signers from the validated rules to check below for
+        // signers that do not belong to any rule.
         for signer in rule.signers.iter() {
             allowed_signers.set(signer, ());
         }
@@ -699,8 +699,8 @@ pub fn add_context_rule(
         id.checked_add(1).unwrap_or_else(|| panic_with_error!(e, SmartAccountError::MathOverflow));
     e.storage().instance().set(&SmartAccountStorageKey::NextId, &next_id);
 
-    // Increment count, overflow will be caught from next_id, next_id is always >=
-    // count
+    // Increment count, overflow will be caught from next_id, next_id is always
+    // >= count
     e.storage().instance().set(&SmartAccountStorageKey::Count, &(count + 1));
 
     context_rule
@@ -861,10 +861,11 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 
     for (policy, policy_id) in policies.iter().zip(&entry.policy_ids) {
         // `try_uninstall` so that if the policy panics (recoverable failure),
-        // context rule removal can still be completed. Note: this is best-effort
-        // — a malicious policy can still cause non-recoverable failures (e.g.,
-        // resource exhaustion) that revert the entire transaction. Policy
-        // contracts are considered a trust dependency.
+        // context rule removal can still be completed. Note: this is
+        // best-effort — a malicious policy can still cause
+        // non-recoverable failures (e.g., resource exhaustion) that
+        // revert the entire transaction. Policy contracts are
+        // considered a trust dependency.
         let _ = PolicyClient::new(e, &policy)
             .try_uninstall(&context_rule, &e.current_contract_address());
 

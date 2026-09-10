@@ -1,6 +1,6 @@
 use stellar_confidential_lib::{
     H, assert_on_curve_non_identity, commit, derive_spend_r, derive_transfer_blind, domain, ecdh,
-    encrypt_amount, encrypt_balance, scalar_mul, sponge_squeeze_2, vk_from_sk,
+    encrypt_amount, encrypt_balance, scalar_mul, sponge_squeeze_2, sponge_squeeze_3, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 
@@ -68,15 +68,19 @@ mod tests;
 //   T_a5 s_{a,s}    = ecdh(r_e, K_aud_s)                    Sender-auditor ECDH
 //                                                           shared scalar
 //                                                           (reuses r_e).
-//   T_a6 (m_v_s, m_b_s)
-//                  = SpongeSqueeze_2(delta_aud_s,
+//   T_a6 (m_v_s, m_b_s, m_r_s)
+//                  = SpongeSqueeze_3(delta_aud_s,
 //                                    s_{a,s}, sigma)        Sender-channel
-//                                                           sponge: two masks.
+//                                                           sponge: three masks.
 //   T_a7 v_tilde_aud_s = v_transfer + m_v_s                       Sender-auditor
 //                                                           encrypted amount.
 //   T_a8 b_tilde_aud_s = (v_A - v_transfer) + m_b_s               Sender-auditor
 //                                                           encrypted balance
 //                                                           checkpoint.
+//   T_a9 r_tilde_aud_s = r_A' + m_r_s                       Sender-auditor
+//                                                           escrow of the new
+//                                                           spendable blinding,
+//                                                           over T10's r_A'.
 //
 // Point-validation doctrine (Section 10.8)
 // ----------------------------------------
@@ -91,7 +95,7 @@ mod tests;
 // T_a1 / T_a5, so this file explicitly validates both on-curve AND
 // non-identity before the auditor block runs.
 //
-// Public inputs (24 fields, in design-doc canonical order)
+// Public inputs (25 fields, in design-doc canonical order)
 // --------------------------------------------------------
 //   Idx  Param            Symbol          Source / Note
 //   ---  -----            ------          -----------------------------------
@@ -127,6 +131,9 @@ mod tests;
 //   23   b_tilde_aud_s    b_tilde_aud_s   Prover-supplied sender-auditor
 //                                         encrypted balance checkpoint;
 //                                         emitted.
+//   24   r_tilde_aud_s    r_tilde_aud_s   Prover-supplied sender-auditor
+//                                         escrow of the new spendable
+//                                         blinding; emitted.
 //
 // Private witnesses
 // -----------------
@@ -167,6 +174,7 @@ fn main(
     r_tilde_aud_r: pub Field,
     v_tilde_aud_s: pub Field,
     b_tilde_aud_s: pub Field,
+    r_tilde_aud_s: pub Field,
 ) {
     // T13 -- runs first so the r_e = 0 attack is rejected before any
     // scalar mul against it could quietly produce the identity.
@@ -201,10 +209,10 @@ fn main(
     // T5 -- PVK_B is path (2) of Section 10.8 (proof-constrained at the
     // recipient's registration, trusted on read).
     let pvk_b = EmbeddedCurvePoint { x: pvk_b_x, y: pvk_b_y, is_infinite: false };
-    let s_x = ecdh(r_e, pvk_b);
+    let s = ecdh(r_e, pvk_b);
 
     // T7 (anti-poisoning, Section 5.4)
-    let r_transfer = derive_transfer_blind(s_x, sigma);
+    let r_transfer = derive_transfer_blind(s, sigma);
 
     // T8
     let c_transfer_derived = commit(v_transfer, r_transfer);
@@ -212,7 +220,7 @@ fn main(
     assert(c_transfer_derived.y == c_transfer_y);
 
     // T9
-    let v_tilde_derived = encrypt_amount(v_transfer, s_x, sigma);
+    let v_tilde_derived = encrypt_amount(v_transfer, s, sigma);
     assert(v_tilde_derived == v_tilde);
 
     // T10
@@ -234,10 +242,10 @@ fn main(
     assert_on_curve_non_identity(k_aud_s);
 
     // T_a1 (recipient-auditor shared-secret scalar)
-    let s_a_r_x = ecdh(r_e, k_aud_r);
+    let s_a_r = ecdh(r_e, k_aud_r);
 
     // T_a2 (recipient-channel masks: amount, then r_transfer)
-    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r_x, sigma);
+    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, sigma);
 
     // T_a3
     assert(v_transfer + m_r[0] == v_tilde_aud_r);
@@ -246,14 +254,18 @@ fn main(
     assert(r_transfer + m_r[1] == r_tilde_aud_r);
 
     // T_a5 (sender-auditor shared-secret scalar)
-    let s_a_s_x = ecdh(r_e, k_aud_s);
+    let s_a_s = ecdh(r_e, k_aud_s);
 
-    // T_a6 (sender-channel masks: amount, then balance)
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s_x, sigma);
+    // T_a6 (sender-channel masks: amount, balance, then the blinding-escrow
+    // slot)
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, sigma);
 
     // T_a7
     assert(v_transfer + m_s[0] == v_tilde_aud_s);
 
     // T_a8
     assert(v_new + m_s[1] == b_tilde_aud_s);
+
+    // T_a9
+    assert(r_new + m_s[2] == r_tilde_aud_s);
 }

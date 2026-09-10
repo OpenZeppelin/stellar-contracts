@@ -180,7 +180,8 @@ impl CustomAccountInterface for TimelockController {
                         panic_with_error!(&e, TimelockError::Unauthorized)
                     }
 
-                    // If no accounts have EXECUTOR_ROLE, anyone can execute a ready operation
+                    // If no accounts have EXECUTOR_ROLE, anyone can execute a
+                    // ready operation
                     if get_role_member_count(&e, &EXECUTOR_ROLE) != 0 {
                         // Check the role and the authorization of the executor
                         let args_for_auth = (

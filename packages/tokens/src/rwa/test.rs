@@ -2,17 +2,18 @@ extern crate std;
 
 use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short,
-    testutils::{Address as _, Events},
-    Address, Env, Event, String,
+    testutils::{Address as _, Events, MuxedAddress as _},
+    vec, Address, Env, Event, MuxedAddress, String, Vec,
 };
 use stellar_contract_utils::pausable;
 
 use crate::{
-    fungible::{ContractOverrides, Transfer},
+    fungible::{ContractOverrides, MuxedTransfer, Transfer},
     rwa::{
         compliance::{AccountSnapshot, TransferKind},
         storage::RWAStorageKey,
-        IdentityVerifier, RWAError, RecoverySuccess, TokensUnfrozen, RWA,
+        AddressFrozen, Burn, IdentityVerifier, Mint, RWAError, RecoverySuccess, TokensFrozen,
+        TokensUnfrozen, RWA,
     },
 };
 
@@ -22,6 +23,12 @@ pub struct MockIdentityVerifier;
 #[contractimpl]
 impl IdentityVerifier for MockIdentityVerifier {
     fn verify_identity(e: &Env, account: &Address) {
+        // Record how many times each address is verified, so batch tests can
+        // assert that the sender check is lifted out of the loop.
+        let key = (symbol_short!("vcount"), account.clone());
+        let count: u32 = e.storage().persistent().get(&key).unwrap_or(0);
+        e.storage().persistent().set(&key, &(count + 1));
+
         // Per-address denial: if `id_deny` is set and matches, this address
         // fails verification while others still pass. Lets tests exercise
         // the asymmetry between `from` and `to` in privileged operations.
@@ -429,8 +436,8 @@ fn partial_token_freezing() {
         // Unfreeze some tokens
         RWA::unfreeze_partial_tokens(&e, &user, 10);
         assert_eq!(RWA::get_frozen_tokens(&e, &user), 20);
-        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen + 1
-        // TokensUnfrozen
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen +
+        // 1 TokensUnfrozen
         assert_eq!(e.events().all().events().len(), 5);
     });
 }
@@ -608,7 +615,7 @@ fn transfer_with_compliance_and_identity_checks() {
 
         // Mint and transfer
         RWA::mint(&e, &from, 100);
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
 
         assert_eq!(RWA::balance(&e, &from), 50);
         assert_eq!(RWA::balance(&e, &to), 50);
@@ -629,11 +636,164 @@ fn contract_overrides_transfer() {
         RWA::mint(&e, &from, 100);
 
         // Test ContractOverrides::transfer calls RWA::transfer
-        RWA::transfer(&e, &from, &to, 30);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 30);
 
         assert_eq!(RWA::balance(&e, &from), 70);
         assert_eq!(RWA::balance(&e, &to), 30);
     });
+}
+
+#[test]
+fn contract_overrides_transfer_preserves_muxed_id() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let base = MuxedAddress::generate(&e);
+    let to = base.address();
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        RWA::mint(&e, &from, 100);
+
+        <RWA as ContractOverrides>::transfer(&e, &from, &MuxedAddress::new(base.clone(), 42), 30);
+
+        // Balances settle on the base address, exactly as for a plain
+        // transfer.
+        assert_eq!(RWA::balance(&e, &from), 70);
+        assert_eq!(RWA::balance(&e, &to), 30);
+
+        // The muxed ID must survive into the event, so that a custodian can
+        // attribute the transfer to the right off-chain sub-account.
+        //
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 MuxedTransfer
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 4);
+        assert_eq!(
+            events.events().get(3).unwrap(),
+            &MuxedTransfer {
+                from: from.clone(),
+                to: to.clone(),
+                to_muxed_id: Some(42),
+                amount: 30
+            }
+            .to_xdr(&e, &address),
+        );
+    });
+}
+
+#[test]
+fn muxed_ids_do_not_fragment_balance() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let base = MuxedAddress::generate(&e);
+    let to = base.address();
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::mint(&e, &from, 100);
+        // Separate frames: `from.require_auth()` may only run once per
+        // invocation.
+        RWA::transfer(&e, &from, &MuxedAddress::new(base.clone(), 1), 30);
+    });
+    e.as_contract(&address, || {
+        RWA::transfer(&e, &from, &MuxedAddress::new(base.clone(), 999), 20);
+    });
+    e.as_contract(&address, || {
+        // Two sub-accounts of the same base, one aggregate on-chain balance.
+        assert_eq!(RWA::balance(&e, &to), 50);
+        assert_eq!(RWA::balance(&e, &from), 50);
+        assert_eq!(RWA::total_supply(&e), 100);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #302)")]
+fn muxed_destination_cannot_bypass_freeze() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let base = MuxedAddress::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::mint(&e, &from, 100);
+        // Freeze the base address, then try to route around it with a muxed
+        // ID.
+        RWA::set_address_frozen(&e, &base.address(), true);
+        RWA::transfer(&e, &from, &MuxedAddress::new(base.clone(), 42), 30);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #304)")]
+fn muxed_destination_cannot_bypass_identity_verification() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let base = MuxedAddress::generate(&e);
+
+    let verifier = e.as_contract(&address, || {
+        let verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+        verifier
+    });
+    // Deny the base address at the identity verifier.
+    e.as_contract(&verifier, || {
+        e.storage().persistent().set(&symbol_short!("id_deny"), &base.address());
+    });
+
+    e.as_contract(&address, || {
+        RWA::mint(&e, &from, 100);
+        RWA::transfer(&e, &from, &MuxedAddress::new(base.clone(), 42), 30);
+    });
+}
+
+/// An issuer that requires beneficial owners on the on-chain register, and so
+/// refuses custodial sub-account destinations. Mirrors the showcase override
+/// in `rwa-token-example`; the library itself accepts muxed destinations, and
+/// the choice belongs to the implementor.
+#[contract]
+struct NoOmnibusToken;
+
+#[contractimpl(contracttrait)]
+impl crate::fungible::FungibleToken for NoOmnibusToken {
+    type ContractType = RWA;
+
+    fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
+        if to.id().is_some() {
+            panic_with_error!(e, RWAError::IdentityVerificationFailed);
+        }
+        RWA::transfer(e, &from, &to, amount);
+    }
+}
+
+#[test]
+fn issuer_can_refuse_muxed_destinations() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let token = e.register(NoOmnibusToken, ());
+    let holder = Address::generate(&e);
+    e.as_contract(&token, || {
+        setup_all_contracts(&e);
+        RWA::mint(&e, &holder, 100);
+    });
+    let client = NoOmnibusTokenClient::new(&e, &token);
+
+    // A plain destination is accepted.
+    let plain = Address::generate(&e);
+    client.transfer(&holder, MuxedAddress::from(plain.clone()), &10);
+    assert_eq!(client.balance(&plain), 10);
+
+    // A custodial sub-account destination is refused.
+    let custodian = MuxedAddress::generate(&e);
+    assert!(client.try_transfer(&holder, MuxedAddress::new(custodian.clone(), 57), &10).is_err());
+    assert_eq!(client.balance(&custodian.address()), 0);
 }
 
 #[test]
@@ -952,12 +1112,14 @@ fn recover_balance_without_recovery_target_fails() {
         let _ = set_and_return_compliance(&e);
 
         // Do NOT set recovery target - this should cause the test to panic
-        // The mock function will return None, which triggers IdentityMismatch error
+        // The mock function will return None, which triggers IdentityMismatch
+        // error
 
         // Mint tokens to old account
         RWA::mint(&e, &old_account, 100);
 
-        // Attempt recovery without setting recovery target - should fail with #313
+        // Attempt recovery without setting recovery target - should fail with
+        // #313
         RWA::recover_balance(&e, &old_account, &new_account);
     });
 }
@@ -1041,7 +1203,7 @@ fn transfer_fails_when_from_address_frozen() {
         RWA::set_address_frozen(&e, &from, true);
 
         // Try to transfer - should fail with AddressFrozen error
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
 
@@ -1063,7 +1225,7 @@ fn transfer_fails_when_to_address_frozen() {
         RWA::set_address_frozen(&e, &to, true);
 
         // Try to transfer - should fail with AddressFrozen error
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
 
@@ -1086,7 +1248,7 @@ fn transfer_fails_when_insufficient_free_tokens() {
         assert_eq!(RWA::get_free_tokens(&e, &from), 20);
 
         // Try to transfer 50 tokens (more than free) - should fail
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
 
@@ -1108,7 +1270,7 @@ fn transfer_fails_when_contract_paused() {
         pausable::pause(&e);
 
         // Try to transfer - should fail with EnforcedPause error
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
 
@@ -1133,6 +1295,448 @@ fn transfer_fails_when_not_compliant() {
         });
 
         // Try to transfer - should fail with TransferNotCompliant error
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
+    });
+}
+
+// ################## BATCH OPERATIONS ##################
+
+/// Reads the per-address verification counter kept by
+/// [`MockIdentityVerifier`]. Must be called outside the token's contract
+/// context.
+fn verification_count(e: &Env, verifier: &Address, account: &Address) -> u32 {
+    e.as_contract(verifier, || {
+        e.storage().persistent().get(&(symbol_short!("vcount"), account.clone())).unwrap_or(0)
+    })
+}
+
+#[test]
+fn batch_mint_credits_every_recipient() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let first = Address::generate(&e);
+    let second = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        RWA::batch_mint(&e, &vec![&e, first.clone(), second.clone()], &vec![&e, 100, 250]);
+
+        assert_eq!(RWA::balance(&e, &first), 100);
+        assert_eq!(RWA::balance(&e, &second), 250);
+
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Mint per recipient
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 4);
+        assert_eq!(
+            events.events().get(2).unwrap(),
+            &Mint { to: first.clone(), amount: 100 }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(3).unwrap(),
+            &Mint { to: second.clone(), amount: 250 }.to_xdr(&e, &address)
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #314)")]
+fn batch_mint_rejects_length_mismatch() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::batch_mint(&e, &vec![&e, recipient.clone()], &vec![&e, 100, 250]);
+    });
+}
+
+/// A failing item aborts the call. Rolling back the items that already
+/// succeeded is the host's job (the whole invocation reverts), so the
+/// assertion here is only that the batch does not carry on past the failure.
+#[test]
+#[should_panic(expected = "Error(Contract, #302)")]
+fn batch_mint_stops_at_a_frozen_recipient() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let first = Address::generate(&e);
+    let frozen = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::set_address_frozen(&e, &frozen, true);
+
+        RWA::batch_mint(&e, &vec![&e, first.clone(), frozen.clone()], &vec![&e, 100, 100]);
+    });
+}
+
+#[test]
+fn batch_burn_debits_every_account() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let first = Address::generate(&e);
+    let second = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::batch_mint(&e, &vec![&e, first.clone(), second.clone()], &vec![&e, 100, 100]);
+
+        RWA::batch_burn(&e, &vec![&e, first.clone(), second.clone()], &vec![&e, 40, 60]);
+
+        assert_eq!(RWA::balance(&e, &first), 60);
+        assert_eq!(RWA::balance(&e, &second), 40);
+
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Mint and 1 Burn per
+        // account
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 6);
+        assert_eq!(
+            events.events().get(4).unwrap(),
+            &Burn { from: first.clone(), amount: 40 }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(5).unwrap(),
+            &Burn { from: second.clone(), amount: 60 }.to_xdr(&e, &address)
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #314)")]
+fn batch_burn_rejects_length_mismatch() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::batch_burn(&e, &vec![&e, account.clone()], &vec![&e]);
+    });
+}
+
+#[test]
+fn batch_forced_transfer_moves_every_pair() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let first_from = Address::generate(&e);
+    let second_from = Address::generate(&e);
+    let first_to = Address::generate(&e);
+    let second_to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::batch_mint(
+            &e,
+            &vec![&e, first_from.clone(), second_from.clone()],
+            &vec![&e, 100, 100],
+        );
+
+        RWA::batch_forced_transfer(
+            &e,
+            &vec![&e, first_from.clone(), second_from.clone()],
+            &vec![&e, first_to.clone(), second_to.clone()],
+            &vec![&e, 30, 70],
+        );
+
+        assert_eq!(RWA::balance(&e, &first_from), 70);
+        assert_eq!(RWA::balance(&e, &first_to), 30);
+        assert_eq!(RWA::balance(&e, &second_from), 30);
+        assert_eq!(RWA::balance(&e, &second_to), 70);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #314)")]
+fn batch_forced_transfer_rejects_mismatched_endpoints() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::batch_forced_transfer(
+            &e,
+            &vec![&e, from.clone(), from.clone()],
+            &vec![&e, to.clone()],
+            &vec![&e, 10],
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #314)")]
+fn batch_forced_transfer_rejects_mismatched_amounts() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::batch_forced_transfer(
+            &e,
+            &vec![&e, from.clone()],
+            &vec![&e, to.clone()],
+            &vec![&e, 10, 20],
+        );
+    });
+}
+
+#[test]
+fn batch_set_address_frozen_applies_each_status() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let frozen = Address::generate(&e);
+    let thawed = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        RWA::set_address_frozen(&e, &thawed, true);
+
+        RWA::batch_set_address_frozen(
+            &e,
+            &vec![&e, frozen.clone(), thawed.clone()],
+            &vec![&e, true, false],
+        );
+
+        assert!(RWA::is_frozen(&e, &frozen));
+        assert!(!RWA::is_frozen(&e, &thawed));
+
+        let events = e.events().all();
+        assert_eq!(
+            events.events().last().unwrap(),
+            &AddressFrozen { user_address: thawed.clone(), is_frozen: false }.to_xdr(&e, &address)
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #314)")]
+fn batch_set_address_frozen_rejects_length_mismatch() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        RWA::batch_set_address_frozen(&e, &vec![&e, account.clone()], &vec![&e, true, false]);
+    });
+}
+
+#[test]
+fn batch_freeze_and_unfreeze_partial_tokens() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let first = Address::generate(&e);
+    let second = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::batch_mint(&e, &vec![&e, first.clone(), second.clone()], &vec![&e, 100, 100]);
+
+        RWA::batch_freeze_partial_tokens(
+            &e,
+            &vec![&e, first.clone(), second.clone()],
+            &vec![&e, 30, 80],
+        );
+        assert_eq!(RWA::get_frozen_tokens(&e, &first), 30);
+        assert_eq!(RWA::get_frozen_tokens(&e, &second), 80);
+
+        let events = e.events().all();
+        assert_eq!(
+            events.events().last().unwrap(),
+            &TokensFrozen { user_address: second.clone(), amount: 80 }.to_xdr(&e, &address)
+        );
+
+        RWA::batch_unfreeze_partial_tokens(
+            &e,
+            &vec![&e, first.clone(), second.clone()],
+            &vec![&e, 10, 80],
+        );
+        assert_eq!(RWA::get_frozen_tokens(&e, &first), 20);
+        assert_eq!(RWA::get_frozen_tokens(&e, &second), 0);
+
+        let events = e.events().all();
+        assert_eq!(
+            events.events().last().unwrap(),
+            &TokensUnfrozen { user_address: second.clone(), amount: 80 }.to_xdr(&e, &address)
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #314)")]
+fn batch_freeze_partial_tokens_rejects_length_mismatch() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::batch_freeze_partial_tokens(&e, &vec![&e, account.clone()], &vec![&e, 10, 20]);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #314)")]
+fn batch_unfreeze_partial_tokens_rejects_length_mismatch() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::batch_unfreeze_partial_tokens(&e, &vec![&e, account.clone()], &vec![&e, 10, 20]);
+    });
+}
+
+#[test]
+fn batch_transfer_credits_every_recipient() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let first = Address::generate(&e);
+    let second = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::mint(&e, &from, 100);
+
+        RWA::batch_transfer(&e, &from, &vec![&e, first.clone(), second.clone()], &vec![&e, 20, 30]);
+
+        assert_eq!(RWA::balance(&e, &from), 50);
+        assert_eq!(RWA::balance(&e, &first), 20);
+        assert_eq!(RWA::balance(&e, &second), 30);
+
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Mint + 1 Transfer per
+        // recipient
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 5);
+        assert_eq!(
+            events.events().get(3).unwrap(),
+            &Transfer { from: from.clone(), to: first.clone(), amount: 20 }.to_xdr(&e, &address)
+        );
+        assert_eq!(
+            events.events().get(4).unwrap(),
+            &Transfer { from: from.clone(), to: second.clone(), amount: 30 }.to_xdr(&e, &address)
+        );
+    });
+}
+
+/// The sender's identity is verified once for the whole batch, whatever its
+/// size, while each recipient is verified exactly once.
+#[test]
+fn batch_transfer_verifies_sender_independently_of_size() {
+    fn sender_verifications(recipient_count: u32) -> u32 {
+        let e = Env::default();
+        e.mock_all_auths();
+        let address = e.register(MockRWAContract, ());
+        let from = Address::generate(&e);
+
+        let mut recipients = Vec::new(&e);
+        let mut amounts = Vec::new(&e);
+        for _ in 0..recipient_count {
+            recipients.push_back(Address::generate(&e));
+            amounts.push_back(1);
+        }
+
+        let verifier = e.as_contract(&address, || {
+            let verifier = set_and_return_identity_verifier(&e);
+            let _ = set_and_return_compliance(&e);
+            RWA::mint(&e, &from, 100);
+            RWA::batch_transfer(&e, &from, &recipients, &amounts);
+            verifier
+        });
+
+        for recipient in recipients.iter() {
+            assert_eq!(verification_count(&e, &verifier, &recipient), 1);
+        }
+
+        // The single mint above verifies the sender once too, so subtract it.
+        verification_count(&e, &verifier, &from) - 1
+    }
+
+    assert_eq!(sender_verifications(1), 1);
+    assert_eq!(sender_verifications(2), 1);
+    assert_eq!(sender_verifications(8), 1);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #314)")]
+fn batch_transfer_rejects_length_mismatch() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::batch_transfer(&e, &from, &vec![&e, to.clone()], &vec![&e, 10, 20]);
+    });
+}
+
+/// The sender's free balance is re-evaluated per item, so an overspending
+/// batch fails on the item that runs out rather than up front.
+#[test]
+#[should_panic(expected = "Error(Contract, #303)")]
+fn batch_transfer_fails_on_the_item_that_overspends() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let first = Address::generate(&e);
+    let second = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::mint(&e, &from, 15);
+
+        RWA::batch_transfer(&e, &from, &vec![&e, first.clone(), second.clone()], &vec![&e, 10, 10]);
+    });
+}
+
+/// A paused token is rejected before any identity work, so the reported error
+/// is `EnforcedPause` and not whatever the identity stack would have said.
+#[test]
+#[should_panic(expected = "Error(Contract, #1000)")]
+fn batch_transfer_reports_pause_ahead_of_identity() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        // Mint while `from` is still verifiable, then take both its identity
+        // and the token away.
+        RWA::mint(&e, &from, 100);
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("id_deny"), &from);
+        });
+        pausable::pause(&e);
+
+        RWA::batch_transfer(&e, &from, &vec![&e, to.clone()], &vec![&e, 10]);
+    });
+}
+
+/// An empty batch is not a way around the pause either.
+#[test]
+#[should_panic(expected = "Error(Contract, #1000)")]
+fn batch_transfer_rejects_an_empty_batch_when_paused() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        pausable::pause(&e);
+
+        RWA::batch_transfer(&e, &from, &Vec::new(&e), &Vec::new(&e));
     });
 }

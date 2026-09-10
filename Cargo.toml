@@ -39,6 +39,7 @@ members = [
 exclude = [
     "examples/upgradeable/testdata",
     "examples/rwa/sign-claim",       # native CLI tool, not a WASM contract
+    "bench/rwa-batch",               # cost benchmark, run on demand only
 ]
 
 [workspace.package]

@@ -26,8 +26,8 @@
 //!   free functions in [`storage`].
 //! - The on-chain account state types [`ConfidentialAccount`] and
 //!   [`SpenderDelegation`] (DESIGN §6).
-//! - The six XDR payload types carried in the `data: Bytes` parameter (DESIGN
-//!   §11).
+//! - The five XDR payload types carried in the `data: Bytes` parameter (DESIGN
+//!   §11). `revoke_spender` is proofless and carries none.
 //! - Storage helpers and operation-level orchestration under [`storage`].
 //!
 //! ## Public-Input Encoding
@@ -63,7 +63,7 @@
 //! The check is by deliberate design **not** an on-curve check. Prover-
 //! supplied points are constrained on-curve in-circuit by their
 //! `multi_scalar_mul` derivation and pinned to `≠ O` by explicit
-//! nonzero-scalar constraints (DESIGN §10.8: R4/R5, W8, T13, S13, O13, V10).
+//! nonzero-scalar constraints (DESIGN §10.8: R4/R5, W8, T13, S13, O13).
 //! The only proof-less Grumpkin entry point is the auditor key, which the
 //! auditor contract validates canonical-encoding, on-curve, and non-identity
 //! at insertion via [`auditor::storage::validate_point`].
@@ -87,9 +87,11 @@
 //! `amount` units between the two accounts, with no fees deducted in transit
 //! and no rebasing applied. [`storage::deposit`] credits the
 //! confidential receiving balance with `amount · G` after the SEP-41
-//! transfer, and [`storage::withdraw`] debits the confidential
-//! spendable balance by `amount` before transferring the same amount out;
-//! neither call re-measures the contract's own balance. With a
+//! transfer, [`storage::withdraw`] debits the confidential
+//! spendable balance by `amount` before transferring the same amount out,
+//! and [`compliance::storage::clawback`] does the same on its
+//! `Some(destination)` branch; none of the three re-measures the contract's
+//! own balance. With a
 //! fee-on-transfer, rebasing, or otherwise malicious token implementation,
 //! the confidential ledger would drift from the on-chain reserves —
 //! credit a higher amount than was actually received, or pay out less than
@@ -125,6 +127,17 @@
 //! clawback empties the pool, leaving all holders' confidential balances
 //! unbacked and unwithdrawable. Issuer-led SAC deployments must weigh both
 //! powers explicitly alongside the exact-transfer assumption.
+//!
+//! The compliance extension's
+//! [`clawback`](compliance::ConfidentialClawback::clawback) gives the issuer a
+//! *legitimate* reason to make such a call. A seizure with `destination: None`
+//! reduces the target's confidential claim without moving any underlying, so
+//! the pool ends up over-collateralized by exactly that amount, which the
+//! issuer's own SAC clawback against this contract's address then extracts.
+//! The order matters: seizing first passes through surplus, while extracting
+//! first passes through a deficit borne by every other holder. An issuer
+//! extracting more than the accumulated surplus creates the shortfall
+//! described above.
 
 pub mod auditor;
 pub mod compliance;
@@ -137,9 +150,8 @@ mod test;
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Bytes, BytesN, Env};
 pub use storage::{
     ConfidentialAccount, ConfidentialTokenStorageKey, RegisterData, RegisterPayload,
-    RevokeSpenderData, RevokeSpenderPayload, SetSpenderData, SetSpenderPayload, SpenderDelegation,
-    SpenderTransferData, SpenderTransferPayload, TransferData, TransferPayload, WithdrawData,
-    WithdrawPayload,
+    SetSpenderData, SetSpenderPayload, SpenderDelegation, SpenderTransferData,
+    SpenderTransferPayload, TransferData, TransferPayload, WithdrawData, WithdrawPayload,
 };
 
 /// Lifecycle hooks invoked by [`ConfidentialToken`] at each
@@ -155,8 +167,8 @@ pub use storage::{
 /// For ops that carry a `data: Bytes` argument, the last parameter
 /// `payload` on the matching hook is a reference to the decoded operation
 /// payload (e.g. [`TransferPayload`] for [`Self::on_transfer`]). The proof
-/// is not forwarded. The proofless ops [`Self::on_deposit`] and
-/// [`Self::on_merge`] receive no `payload`.
+/// is not forwarded. The proofless ops [`Self::on_deposit`],
+/// [`Self::on_merge`] and [`Self::on_revoke_spender`] receive no `payload`.
 ///
 /// Default bodies are empty no-ops — overriding only the methods relevant
 /// to a given deployment is the expected pattern.
@@ -204,14 +216,8 @@ pub trait Hooks {
     ) {
     }
 
-    /// Invoked after `revoke_spender`'s auth and decode.
-    fn on_revoke_spender(
-        e: &Env,
-        account: &Address,
-        spender: &Address,
-        payload: &RevokeSpenderPayload,
-    ) {
-    }
+    /// Invoked after `revoke_spender`'s auth, before the allowance fold.
+    fn on_revoke_spender(e: &Env, account: &Address, spender: &Address) {}
 }
 
 /// Zero-cost [`Hooks`] implementation whose every callback is an empty
@@ -342,7 +348,8 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["withdraw", from: Address, to: Address]`
     /// * data - `[amount: i128, r_e_point: BytesN<64>, sigma: BytesN<32>,
-    ///   b_tilde: BytesN<32>, b_tilde_aud_s: BytesN<32>]`
+    ///   b_tilde: BytesN<32>, b_tilde_aud_s: BytesN<32>, r_tilde_aud_s:
+    ///   BytesN<32>]`
     fn withdraw(e: &Env, from: Address, to: Address, amount: i128, data: Bytes) {
         from.require_auth();
 
@@ -369,7 +376,7 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[r_e_point, v_tilde, sigma, b_tilde, v_tilde_aud_r,
-    ///   r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s]`
+    ///   r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s]`
     fn confidential_transfer(e: &Env, from: Address, to: Address, data: Bytes) {
         from.require_auth();
 
@@ -400,8 +407,8 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["spender_transfer", spender: Address, from: Address, to:
     ///   Address]`
-    /// * data - `[r_e_point, v_tilde, sigma_a, v_tilde_aud_r, r_tilde_aud_r,
-    ///   v_tilde_aud_s, a_tilde_aud_s]`
+    /// * data - `[r_e_point, v_tilde, sigma_a_new, v_tilde_aud_r,
+    ///   r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s, r_tilde_aud_s]`
     fn confidential_transfer_from(
         e: &Env,
         spender: Address,
@@ -436,7 +443,7 @@ pub trait ConfidentialToken {
     /// * `live_until_ledger` - The ledger number at which the delegation
     ///   expires. Spending is authorized while `ledger.sequence() <=
     ///   live_until_ledger`. The escrowed value persists until
-    ///   `revoke_spender`.
+    ///   [`ConfidentialToken::revoke_spender`].
     /// * `data` - XDR-encoded [`SetSpenderData`].
     ///
     /// # Errors
@@ -448,7 +455,7 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["set_spender", account: Address, spender: Address]`
     /// * data - `[live_until_ledger: u32, r_e_point, sigma, b_tilde,
-    ///   v_tilde_aud_s, b_tilde_aud_s]`
+    ///   v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s, r_a_tilde_aud_s]`
     fn set_spender(
         e: &Env,
         account: Address,
@@ -474,28 +481,28 @@ pub trait ConfidentialToken {
     /// remaining escrowed allowance back into `account`'s spendable balance.
     /// Works for both active and expired-but-not-revoked delegations.
     ///
+    /// No proof is required; correctness follows from the homomorphic
+    /// property of Pedersen commitments.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The owner reclaiming the allowance.
     /// * `spender` - The previously-delegated spender.
-    /// * `data` - XDR-encoded [`RevokeSpenderData`].
     ///
     /// # Errors
     ///
-    /// * refer to [`storage::decode_data`] errors.
     /// * refer to [`storage::revoke_spender`] errors.
     ///
     /// # Events
     ///
     /// * topics - `["revoke_spender", account: Address, spender: Address]`
-    /// * data - `[r_e_point, sigma, b_tilde, v_tilde_aud_s, b_tilde_aud_s]`
-    fn revoke_spender(e: &Env, account: Address, spender: Address, data: Bytes) {
+    /// * data - `[a_tilde: BytesN<32>, allowance_salt: BytesN<32>]`
+    fn revoke_spender(e: &Env, account: Address, spender: Address) {
         account.require_auth();
 
-        let decoded: RevokeSpenderData = storage::decode_data(e, &data);
-        Self::Hooks::on_revoke_spender(e, &account, &spender, &decoded.payload);
-        storage::revoke_spender(e, &account, &spender, &decoded.payload, &decoded.proof);
+        Self::Hooks::on_revoke_spender(e, &account, &spender);
+        storage::revoke_spender(e, &account, &spender);
     }
 
     /// Returns the [`ConfidentialAccount`] stored under `account`.
@@ -663,6 +670,7 @@ pub struct Withdraw {
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `Withdraw` event.
@@ -676,6 +684,7 @@ pub fn emit_withdraw(
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
     b_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
 ) {
     Withdraw {
         from: from.clone(),
@@ -685,6 +694,7 @@ pub fn emit_withdraw(
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),
         b_tilde_aud_s: b_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -705,6 +715,7 @@ pub struct Transfer {
     pub r_tilde_aud_r: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `Transfer` event.
@@ -721,6 +732,7 @@ pub fn emit_transfer(
     r_tilde_aud_r: &BytesN<32>,
     v_tilde_aud_s: &BytesN<32>,
     b_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
 ) {
     Transfer {
         from: from.clone(),
@@ -733,6 +745,7 @@ pub fn emit_transfer(
         r_tilde_aud_r: r_tilde_aud_r.clone(),
         v_tilde_aud_s: v_tilde_aud_s.clone(),
         b_tilde_aud_s: b_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -749,11 +762,12 @@ pub struct SpenderTransfer {
     pub to: Address,
     pub r_e_point: BytesN<64>,
     pub v_tilde: BytesN<32>,
-    pub sigma_a: BytesN<32>,
+    pub sigma_a_new: BytesN<32>,
     pub v_tilde_aud_r: BytesN<32>,
     pub r_tilde_aud_r: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub a_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits an `SpenderTransfer` event.
@@ -765,11 +779,12 @@ pub fn emit_spender_transfer(
     to: &Address,
     r_e_point: &BytesN<64>,
     v_tilde: &BytesN<32>,
-    sigma_a: &BytesN<32>,
+    sigma_a_new: &BytesN<32>,
     v_tilde_aud_r: &BytesN<32>,
     r_tilde_aud_r: &BytesN<32>,
     v_tilde_aud_s: &BytesN<32>,
     a_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
 ) {
     SpenderTransfer {
         spender: spender.clone(),
@@ -777,11 +792,12 @@ pub fn emit_spender_transfer(
         to: to.clone(),
         r_e_point: r_e_point.clone(),
         v_tilde: v_tilde.clone(),
-        sigma_a: sigma_a.clone(),
+        sigma_a_new: sigma_a_new.clone(),
         v_tilde_aud_r: v_tilde_aud_r.clone(),
         r_tilde_aud_r: r_tilde_aud_r.clone(),
         v_tilde_aud_s: v_tilde_aud_s.clone(),
         a_tilde_aud_s: a_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
     }
     .publish(e);
 }
@@ -800,6 +816,8 @@ pub struct SetSpender {
     pub b_tilde: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
+    pub r_a_tilde_aud_s: BytesN<32>,
 }
 
 /// Emits a `SetSpender` event.
@@ -814,6 +832,8 @@ pub fn emit_set_spender(
     b_tilde: &BytesN<32>,
     v_tilde_aud_s: &BytesN<32>,
     b_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
+    r_a_tilde_aud_s: &BytesN<32>,
 ) {
     SetSpender {
         account: account.clone(),
@@ -824,11 +844,16 @@ pub fn emit_set_spender(
         b_tilde: b_tilde.clone(),
         v_tilde_aud_s: v_tilde_aud_s.clone(),
         b_tilde_aud_s: b_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
+        r_a_tilde_aud_s: r_a_tilde_aud_s.clone(),
     }
     .publish(e);
 }
 
-/// Event emitted when an spender is revoked.
+/// Event emitted when a delegation's escrowed allowance is folded back into
+/// the owner's spendable balance and the delegation deleted — by the owner
+/// through [`ConfidentialToken::revoke_spender`], or by the compliance module
+/// through `ConfidentialClawback::force_revoke_spender`.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RevokeSpender {
@@ -836,33 +861,23 @@ pub struct RevokeSpender {
     pub account: Address,
     #[topic]
     pub spender: Address,
-    pub r_e_point: BytesN<64>,
-    pub sigma: BytesN<32>,
-    pub b_tilde: BytesN<32>,
-    pub v_tilde_aud_s: BytesN<32>,
-    pub b_tilde_aud_s: BytesN<32>,
+    pub a_tilde: BytesN<32>,
+    pub allowance_salt: BytesN<32>,
 }
 
 /// Emits a `RevokeSpender` event.
-#[allow(clippy::too_many_arguments)]
 pub fn emit_revoke_spender(
     e: &Env,
     account: &Address,
     spender: &Address,
-    r_e_point: &BytesN<64>,
-    sigma: &BytesN<32>,
-    b_tilde: &BytesN<32>,
-    v_tilde_aud_s: &BytesN<32>,
-    b_tilde_aud_s: &BytesN<32>,
+    a_tilde: &BytesN<32>,
+    allowance_salt: &BytesN<32>,
 ) {
     RevokeSpender {
         account: account.clone(),
         spender: spender.clone(),
-        r_e_point: r_e_point.clone(),
-        sigma: sigma.clone(),
-        b_tilde: b_tilde.clone(),
-        v_tilde_aud_s: v_tilde_aud_s.clone(),
-        b_tilde_aud_s: b_tilde_aud_s.clone(),
+        a_tilde: a_tilde.clone(),
+        allowance_salt: allowance_salt.clone(),
     }
     .publish(e);
 }

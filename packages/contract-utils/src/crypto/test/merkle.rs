@@ -177,7 +177,8 @@ fn verifies_valid_proofs() {
 
 #[test]
 fn sha256_verifies_valid_proofs() {
-    // generated with the same data as above but using sha256 as a hashing function
+    // generated with the same data as above but using sha256 as a hashing
+    // function
     let e = Env::default();
     let root = to_bytes!(e, "b0d388be1fe96067c100c6731770b70f87fa1287c4d6ddf9e107bdd015ae445c");
     let leaf_a = to_bytes!(e, "9c707ca1d6e1963a6a974a40f20c51f899cc96c9a7edef911953f424186641bf");
@@ -221,7 +222,8 @@ fn rejects_invalid_proofs() {
 
 #[test]
 fn sha256_rejects_invalid_proofs() {
-    // generated with the same data as above but using sha256 as a hashing function
+    // generated with the same data as above but using sha256 as a hashing
+    // function
     let e = Env::default();
     let root = to_bytes!(e, "d132af2ab11889f767680c257c81620b4678f10c014eec1c4711991ab7a02ab4");
     let leaf = to_bytes!(e, "b9e9db137d987ce376feabe4acc5ee8b23a2d460699cc8bd7e1fe001cbd99df0");
@@ -259,7 +261,8 @@ fn rejects_proofs_with_invalid_length() {
 
 #[test]
 fn sha256_rejects_proofs_with_invalid_length() {
-    // generated with the same data as above but using sha256 as a hashing function
+    // generated with the same data as above but using sha256 as a hashing
+    // function
     let e = Env::default();
     let root = to_bytes!(e, "d132af2ab11889f767680c257c81620b4678f10c014eec1c4711991ab7a02ab4");
     let leaf = to_bytes!(e, "b9e9db137d987ce376feabe4acc5ee8b23a2d460699cc8bd7e1fe001cbd99df0");
@@ -296,7 +299,8 @@ fn verify_empty_proof_should_mean_leaf_equal_to_root() {
 
 #[test]
 fn sha256_verify_empty_proof_should_mean_leaf_equal_to_root() {
-    // generated with the same data as above but using sha256 as a hashing function
+    // generated with the same data as above but using sha256 as a hashing
+    // function
     let e = Env::default();
     let root = to_bytes!(e, "d132af2ab11889f767680c257c81620b4678f10c014eec1c4711991ab7a02ab4");
     let leaf = to_bytes!(e, "b9e9db137d987ce376feabe4acc5ee8b23a2d460699cc8bd7e1fe001cbd99df0");
