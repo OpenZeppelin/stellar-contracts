@@ -29,14 +29,20 @@
 //!   so two wallets of the same investor each carry their own copy.
 //! - `RecoveredTo(old_wallet) -> new_wallet`: a permanent tombstone written by
 //!   account recovery; recovered wallets can never be registered again.
+//! - `RecoveredFrom(new_wallet) -> old_wallet`: the reverse link, kept only
+//!   while the recovered identity is still linked to `new_wallet`. It pins the
+//!   identity to the new wallet until the old wallet's tokens have been
+//!   recovered.
 //!
 //! ## Lifecycle Operations
 //!
 //! - `add_identity` registers a wallet under an identity contract.
 //! - `remove_identity` deletes a wallet's registration and profile. It is
-//!   rejected while the wallet still holds a balance in any linked token.
+//!   rejected while the wallet still holds a balance in any linked token, and
+//!   while the wallet is a recovery target whose old wallet still holds one.
 //! - `recover_identity` handles wallet loss: the same identity moves to a new
-//!   wallet, and the old wallet is tombstoned.
+//!   wallet, and the old wallet is tombstoned. Recoveries chain, but each hop's
+//!   balance must be recovered before the identity moves on again.
 //!
 //! ## Replacing an Identity
 //!
@@ -478,7 +484,8 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// implementation.
     ///
     /// The library-provided [`remove_identity`] rejects removal while
-    /// `account` holds a non-zero balance in any linked token, so that
+    /// `account` holds a non-zero balance in any linked token, or while it is
+    /// the target of a recovery whose old account still holds one, so that
     /// identity-keyed compliance state is never orphaned; refer to its
     /// documentation.
     fn remove_identity(e: &Env, account: Address, operator: Address);
@@ -507,6 +514,11 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling [`recover_identity`] for the
     /// implementation.
+    ///
+    /// The library-provided [`recover_identity`] rejects moving the identity
+    /// on from `old_account` while `old_account` is itself the target of an
+    /// earlier recovery whose old account still holds a balance in any linked
+    /// token; refer to its documentation.
     fn recover_identity(e: &Env, old_account: Address, new_account: Address, operator: Address);
 
     /// Retrieves the stored identity for a given account.
@@ -672,6 +684,9 @@ pub enum IRSError {
     AccountHasBalance = 328,
     /// The parallel arrays of a batch call have different lengths.
     BatchSizeMismatch = 329,
+    /// The account is a recovery target whose old account still holds a
+    /// balance in a linked token.
+    PendingRecovery = 330,
 }
 
 // ################## CONSTANTS ##################
