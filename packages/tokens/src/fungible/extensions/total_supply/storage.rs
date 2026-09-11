@@ -153,6 +153,9 @@ pub fn mint(e: &Env, to: &Address, amount: i128) {
 ///
 /// # Notes
 ///
+/// This function does not enforce authorization. Ensure that authorization
+/// is handled at a higher level.
+///
 /// This is a raw accounting helper: it does not move any balances and does
 /// not emit events. [`mint`] should be preferred unless a custom minting
 /// flow is being composed.
@@ -181,6 +184,9 @@ pub fn increase_total_supply(e: &Env, amount: i128) {
 ///
 /// # Notes
 ///
+/// This function does not enforce authorization. Ensure that authorization
+/// is handled at a higher level.
+///
 /// This is a raw accounting helper: it does not move any balances and does
 /// not emit events. `amount` can only exceed the recorded supply when
 /// balances were created without supply accounting (e.g. via
@@ -194,5 +200,7 @@ pub fn decrease_total_supply(e: &Env, amount: i128) {
     if amount > supply {
         panic_with_error!(e, FungibleTokenError::MathOverflow);
     }
+    // NOTE: can't underflow because of the checks above (0 <= amount <=
+    // supply).
     e.storage().persistent().set(&TotalSupplyStorageKey::TotalSupply, &(supply - amount));
 }

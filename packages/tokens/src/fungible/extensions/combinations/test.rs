@@ -631,7 +631,7 @@ fn total_supply_allow_list_burn_decreases_supply() {
         AllowList::allow_user(&e, &account);
         <TotalSupplyAllowList as BurnableOverrides>::burn(&e, &account, 40);
         assert_eq!(Base::balance(&e, &account), 60);
-        assert_eq!(total_supply(&e), 60);
+        assert_eq!(TotalSupplyAllowList::total_supply(&e), 60);
     });
 }
 
@@ -670,6 +670,92 @@ fn total_supply_allow_list_transfer_respects_policy() {
 }
 
 #[test]
+fn total_supply_block_list_applies_policy_and_tracks_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        TotalSupplyBlockList::mint(&e, &alice, 100);
+        assert_eq!(TotalSupplyBlockList::total_supply(&e), 100);
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyBlockList as ContractOverrides>::approve(&e, &alice, &spender, 50, 1000);
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyBlockList as ContractOverrides>::transfer(
+            &e,
+            &alice,
+            &MuxedAddress::from(bob.clone()),
+            30,
+        );
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyBlockList as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 20);
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyBlockList as BurnableOverrides>::burn(&e, &alice, 10);
+    });
+
+    e.as_contract(&address, || {
+        assert_eq!(Base::balance(&e, &alice), 40);
+        assert_eq!(Base::balance(&e, &bob), 50);
+        assert_eq!(Base::allowance(&e, &alice, &spender), 30);
+        assert_eq!(TotalSupplyBlockList::total_supply(&e), 90);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn total_supply_block_list_transfer_rejects_blocked_receiver() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        TotalSupplyBlockList::mint(&e, &alice, 100);
+        BlockList::block_user(&e, &bob);
+        <TotalSupplyBlockList as ContractOverrides>::transfer(
+            &e,
+            &alice,
+            &MuxedAddress::from(bob),
+            30,
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn total_supply_block_list_approve_rejects_blocked_owner() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        TotalSupplyBlockList::mint(&e, &alice, 100);
+        BlockList::block_user(&e, &alice);
+        <TotalSupplyBlockList as ContractOverrides>::approve(&e, &alice, &spender, 50, 1000);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn total_supply_block_list_transfer_from_rejects_blocked_sender() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        TotalSupplyBlockList::mint(&e, &alice, 100);
+        Base::approve(&e, &alice, &spender, 50, 1000);
+        BlockList::block_user(&e, &alice);
+        <TotalSupplyBlockList as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 20);
+    });
+}
+
+#[test]
 fn total_supply_block_list_burn_from_decreases_supply() {
     let (e, address) = setup_env();
     let owner = Address::generate(&e);
@@ -704,11 +790,16 @@ fn total_supply_allow_block_list_tracks_supply_under_both_policies() {
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
 
+    let spender = Address::generate(&e);
+
     e.as_contract(&address, || {
         AllowList::allow_user(&e, &alice);
         AllowList::allow_user(&e, &bob);
         TotalSupplyAllowBlockList::mint(&e, &alice, 100);
         assert_eq!(TotalSupplyAllowBlockList::total_supply(&e), 100);
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyAllowBlockList as ContractOverrides>::approve(&e, &alice, &spender, 50, 1000);
     });
     e.as_contract(&address, || {
         <TotalSupplyAllowBlockList as ContractOverrides>::transfer(
@@ -719,13 +810,22 @@ fn total_supply_allow_block_list_tracks_supply_under_both_policies() {
         );
     });
     e.as_contract(&address, || {
+        <TotalSupplyAllowBlockList as ContractOverrides>::transfer_from(
+            &e, &spender, &alice, &bob, 20,
+        );
+    });
+    e.as_contract(&address, || {
         <TotalSupplyAllowBlockList as BurnableOverrides>::burn(&e, &alice, 10);
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyAllowBlockList as BurnableOverrides>::burn_from(&e, &spender, &alice, 10);
     });
 
     e.as_contract(&address, || {
-        assert_eq!(Base::balance(&e, &alice), 60);
-        assert_eq!(Base::balance(&e, &bob), 30);
-        assert_eq!(TotalSupplyAllowBlockList::total_supply(&e), 90);
+        assert_eq!(Base::balance(&e, &alice), 30);
+        assert_eq!(Base::balance(&e, &bob), 50);
+        assert_eq!(Base::allowance(&e, &alice, &spender), 20);
+        assert_eq!(TotalSupplyAllowBlockList::total_supply(&e), 80);
     });
 }
 
