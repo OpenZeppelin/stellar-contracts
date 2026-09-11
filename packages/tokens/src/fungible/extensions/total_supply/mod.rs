@@ -16,7 +16,8 @@
 //!   [`crate::fungible::burnable::FungibleBurnable`] decrease the supply:
 //!   [`TotalSupply`] for the vanilla behavior, or a combination resolved by
 //!   [`crate::fungible::combinations::Compose`] (e.g. `Compose<(AllowList,
-//!   TotalSupply)>`) to pair tracking with the allowlist or blocklist policy.
+//!   TotalSupply)>`) to pair tracking with the allowlist policy, the blocklist
+//!   policy, or both.
 //!
 //! Minting has to be routed through the contract type
 //! (`Self::ContractType::mint`, resolving to [`TotalSupply::mint`] or to the
@@ -46,8 +47,9 @@
 //!
 //! The [`crate::rwa::RWA`], [`crate::vault::Vault`] and
 //! [`crate::fungible::votes::FungibleVotes`] contract types are inherently
-//! supply-aware; [`FungibleTotalSupply`] can be implemented on top of them
-//! directly.
+//! supply-aware; [`FungibleTotalSupply`] is implemented on top of them
+//! directly, and [`crate::rwa::RWAToken`] and [`crate::vault::FungibleVault`]
+//! require it.
 //!
 //! The supply is stored in its own `persistent` entry, ensuring that mints
 //! and burns only conflict with each other and never with plain transfers.
@@ -74,21 +76,28 @@ use crate::fungible::FungibleToken;
 /// The `FungibleTotalSupply` trait extends the `FungibleToken` trait to
 /// expose the total amount of tokens in circulation.
 ///
-/// This trait can only be implemented when the contract's `ContractType`
-/// accounts for the total supply:
+/// Whether the supply is tracked is decided by the contract type selected on
+/// the `FungibleToken` implementation. `Compose<(Base,)>` states that no
+/// behavior is overridden, so the supply is not tracked and this trait cannot
+/// be implemented. [`TotalSupply`] is the contract type that adds the supply
+/// tracking: `Compose<(TotalSupply,)>` on its own, or listed together with
+/// [`crate::fungible::allowlist::AllowList`] and
+/// [`crate::fungible::blocklist::BlockList`] in any of their valid
+/// combinations (refer to [`crate::fungible::combinations::Compose`]).
 ///
-/// * [`TotalSupply`] (vanilla behavior),
-/// * `Compose<(AllowList, TotalSupply)>` and `Compose<(BlockList,
-///   TotalSupply)>` (refer to [`crate::fungible::combinations::Compose`]),
-/// * [`crate::rwa::RWA`],
-/// * [`crate::vault::Vault`],
-/// * [`crate::fungible::votes::FungibleVotes`] (the supply is served from the
-///   voting checkpoints).
+/// [`crate::rwa::RWA`], [`crate::vault::Vault`] and
+/// [`crate::fungible::votes::FungibleVotes`] (alone or combined with the list
+/// policies) track the supply on their own, so this trait is implemented on
+/// top of them directly, without `TotalSupply` in the list. For `RWA` and
+/// `Vault` this is not optional: [`crate::rwa::RWAToken`] and
+/// [`crate::vault::FungibleVault`] have this trait as a supertrait, so
+/// implementing them without it does not compile. In short, this trait is
+/// available with every contract type except `Base`.
 ///
-/// When using one of the `TotalSupply*` contract types, minting has to be
-/// routed through the contract type (`Self::ContractType::mint`) so that the
-/// supply is increased; burns through
-/// [`crate::fungible::burnable::FungibleBurnable`] decrease it automatically.
+/// When `TotalSupply` is part of the contract type, minting has to be routed
+/// through it (`Self::ContractType::mint`) so that the supply is increased;
+/// burns through [`crate::fungible::burnable::FungibleBurnable`] decrease it
+/// automatically.
 #[contracttrait]
 pub trait FungibleTotalSupply: FungibleToken<ContractType: TotalSupplyOverrides> {
     /// Returns the total amount of tokens in circulation.

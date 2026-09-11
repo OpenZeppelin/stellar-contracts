@@ -4,17 +4,9 @@ pub mod storage;
 mod test;
 
 use soroban_sdk::{contractevent, contracttrait, Address, Env};
-pub use storage::BlockList;
+pub use storage::{BlockList, BlockListContractType};
 
 use crate::fungible::FungibleToken;
-
-/// Marker trait for contract types that enforce the blocklist transfer
-/// policy: [`BlockList`] itself, or a combination resolved by
-/// [`crate::fungible::combinations::Compose`] that includes it, e.g.
-/// `Compose<(BlockList, TotalSupply)>`.
-pub trait BlockListContractType {}
-
-impl BlockListContractType for BlockList {}
 
 /// BlockList Trait for Fungible Token
 ///

@@ -131,7 +131,7 @@ use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, Str
 use stellar_contract_utils::pausable::Pausable;
 pub use storage::{FromVerification, RWAStorageKey, RWA};
 
-use crate::fungible::FungibleToken;
+use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 
 /// Real World Asset Token Trait
 ///
@@ -149,11 +149,12 @@ use crate::fungible::FungibleToken;
 /// - Administrative controls for token management
 ///
 /// The `RWA` contract type tracks the total supply (as mandated by T-REX
-/// through the ERC-20 interface), and RWA contracts are expected to also
-/// implement [`crate::fungible::total_supply::FungibleTotalSupply`] to
-/// expose it.
+/// through the ERC-20 interface), and [`RWAToken`] requires
+/// [`crate::fungible::total_supply::FungibleTotalSupply`] to be implemented
+/// alongside it (an empty `impl` block is enough), so that the supply is
+/// exposed by the contract.
 #[contracttrait]
-pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
+pub trait RWAToken: Pausable + FungibleTotalSupply + FungibleToken<ContractType = RWA> {
     // ################## CORE TOKEN FUNCTIONS ##################
 
     /// Transfers tokens to several recipients in a single call, moving

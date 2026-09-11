@@ -16,9 +16,9 @@
 //! ```ignore
 //! #[contractimpl(contracttrait)]
 //! impl FungibleToken for MyToken {
-//!     // resolves to the contract type combining `AllowList` with
-//!     // `TotalSupply`; `Burnable` is declarative
-//!     type ContractType = Compose<(AllowList, TotalSupply, Burnable)>;
+//!     // resolves to the contract type gating transfers by the allowlist
+//!     // and tracking voting units; `Burnable` is declarative
+//!     type ContractType = Compose<(AllowList, FungibleVotes, Burnable)>;
 //! }
 //!
 //! #[contractimpl(contracttrait)]
@@ -27,19 +27,32 @@
 //! }
 //!
 //! #[contractimpl(contracttrait)]
-//! impl FungibleTotalSupply for MyToken {}
+//! impl Votes for MyToken {}
 //!
 //! #[contractimpl(contracttrait)]
 //! impl FungibleBurnable for MyToken {}
 //! ```
 //!
-//! Curated multi-type combinations: [`TotalSupply`] can be combined with
-//! either [`AllowList`] or [`BlockList`], e.g.
-//! `Compose<(AllowList, TotalSupply)>`. The list is order-insensitive:
-//! `Compose<(TotalSupply, AllowList)>` resolves to the same contract type.
-//! Invalid lists do not compile: `AllowList` and `BlockList` are mutually
-//! exclusive, and implementing an extension trait the list does not back
-//! (e.g. [`crate::fungible::total_supply::FungibleTotalSupply`] without
+//! Curated multi-type combinations: [`AllowList`], [`BlockList`] and
+//! [`FungibleVotes`] can be combined with each other, in pairs or all three
+//! together, e.g. `Compose<(AllowList, BlockList)>`,
+//! `Compose<(AllowList, FungibleVotes)>` or
+//! `Compose<(AllowList, BlockList, FungibleVotes)>`. [`TotalSupply`] can be
+//! added to `AllowList`, `BlockList` or both, e.g.
+//! `Compose<(AllowList, TotalSupply)>` or
+//! `Compose<(AllowList, BlockList, TotalSupply)>`. `RWA`, `Vault` and
+//! `FungibleVotes` (alone or combined with the lists) already track the
+//! supply on their own, so listing `TotalSupply` next to them is rejected
+//! with a dedicated compile error. The resolved contract type enforces every
+//! listed transfer
+//! policy, tracks voting units when `FungibleVotes` is listed, tracks the
+//! total supply when `TotalSupply` is listed, and backs the corresponding
+//! extension traits. The list is order-insensitive:
+//! `Compose<(BlockList, AllowList)>` resolves to the same contract type as
+//! `Compose<(AllowList, BlockList)>`. Invalid lists do not compile: contract
+//! types without a curated combination (e.g. `AllowList` with `RWA`) cannot
+//! be listed together, and implementing an extension trait the list does not
+//! back (e.g. [`crate::fungible::total_supply::FungibleTotalSupply`] without
 //! `TotalSupply` in the list) is rejected by that trait's bound.
 
 mod storage;
@@ -47,7 +60,10 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use storage::{TotalSupplyAllowList, TotalSupplyBlockList};
+use storage::{
+    AllowBlockList, AllowBlockListVotes, AllowListVotes, BlockListVotes, TotalSupplyAllowBlockList,
+    TotalSupplyAllowList, TotalSupplyBlockList,
+};
 
 use crate::{
     fungible::{
@@ -55,6 +71,7 @@ use crate::{
             allowlist::AllowList, blocklist::BlockList, burnable::Burnable,
             total_supply::TotalSupply, votes::FungibleVotes,
         },
+        overrides::TotalSupplyOverrides,
         Base, ContractOverrides,
     },
     rwa::RWA,
@@ -64,8 +81,8 @@ use crate::{
 /// Resolves a list of contract types and additive extensions to the combined
 /// contract type, e.g. `Compose<(AllowList,)>` or
 /// `Compose<(AllowList, Burnable)>` (both resolve to `AllowList`), or
-/// `Compose<(AllowList, TotalSupply)>` (resolving to the curated combination
-/// of the two).
+/// `Compose<(AllowList, FungibleVotes)>` (resolving to the curated
+/// combination of the two).
 ///
 /// This is shorthand for `<L as Composable>::Out`; refer to [`Composable`] for
 /// the valid lists.
@@ -77,14 +94,16 @@ pub type Compose<L> = <L as Composable>::Out;
 /// A list is folded pairwise, left to right. Single contract types resolve to
 /// themselves (with or without the one-element tuple form), curated pairs
 /// resolve to their combined contract type (in either order), and additive
-/// extensions are ignored. Mutually exclusive contract types (e.g.
-/// `AllowList` and `BlockList`) have no pairwise combination, so listing them
-/// together does not compile.
+/// extensions are ignored. Contract types without a curated pairwise
+/// combination (e.g. `AllowList` and `RWA`) cannot be listed together, so
+/// such lists do not compile.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a valid contract type combination",
     note = "valid single contract types: `Base`, `AllowList`, `BlockList`, `TotalSupply`, `RWA`, \
             `Vault`, `FungibleVotes`",
-    note = "curated combinations: `(AllowList, TotalSupply)`, `(BlockList, TotalSupply)`",
+    note = "curated combinations: `(AllowList, BlockList)`, `(AllowList, FungibleVotes)`, \
+            `(BlockList, FungibleVotes)`, `(AllowList, BlockList, FungibleVotes)`, `(AllowList, \
+            TotalSupply)`, `(BlockList, TotalSupply)`, `(AllowList, BlockList, TotalSupply)`",
     note = "additive extensions (e.g. `Burnable`) may be listed alongside a contract type; they \
             do not affect the resolved type",
     note = "lists of up to 5 entries are supported"
@@ -118,14 +137,32 @@ mod fold {
 
     /// Pairwise combination table for contributions: the fold reduces a list
     /// left to right through this table. A missing row means the pair is
-    /// invalid (mutually exclusive, or no curated combination exists).
+    /// invalid (no curated combination exists).
     #[diagnostic::on_unimplemented(
         message = "`{Self}` cannot be combined with `{B}` in a `Compose` list",
-        note = "the contract types are mutually exclusive, or no combination of them is curated"
+        note = "no combination of these contract types is curated"
     )]
     pub trait Combine<B> {
         type Out;
     }
+
+    /// Error carrier for `TotalSupply` listed next to a contract type `By`
+    /// that already tracks the supply on its own. It is never implemented:
+    /// the redundancy rows below name it in a `where` clause, so the failure
+    /// is reported with this message instead of the generic [`Combine`] one.
+    /// Each of those rows has to be the only impl unifying with its pair,
+    /// otherwise rustc winnows the candidates and falls back to the generic
+    /// message.
+    #[diagnostic::on_unimplemented(
+        message = "`TotalSupply` is redundant in this `Compose` list: `{By}` already tracks the \
+                   total supply",
+        note = "remove `TotalSupply` from the list; `FungibleTotalSupply` is implemented on the \
+                contract directly (`{By}` requires it)"
+    )]
+    pub trait SupplyAlreadyTracked<By> {}
+
+    /// Contract types built on the `TotalSupply` counter.
+    pub trait CountedSupply {}
 
     /// Final step of the fold: maps the folded contribution to the resolved
     /// contract type. Its only non-trivial rule is [`Nil`] resolving to
@@ -135,7 +172,7 @@ mod fold {
     }
 }
 
-use fold::{Combine, Extension, Finalize, Nil};
+use fold::{Combine, CountedSupply, Extension, Finalize, Nil, SupplyAlreadyTracked};
 
 type Contrib<T> = <T as Extension>::Contribution;
 type Pair<A, B> = <A as Combine<B>>::Out;
@@ -217,14 +254,47 @@ impl Combine<Nil> for FungibleVotes {
 impl Combine<FungibleVotes> for Nil {
     type Out = FungibleVotes;
 }
+impl Combine<Nil> for AllowBlockList {
+    type Out = AllowBlockList;
+}
+impl Combine<Nil> for AllowListVotes {
+    type Out = AllowListVotes;
+}
+impl Combine<Nil> for BlockListVotes {
+    type Out = BlockListVotes;
+}
+impl Combine<Nil> for AllowBlockListVotes {
+    type Out = AllowBlockListVotes;
+}
 impl Combine<Nil> for TotalSupplyAllowList {
     type Out = TotalSupplyAllowList;
 }
 impl Combine<Nil> for TotalSupplyBlockList {
     type Out = TotalSupplyBlockList;
 }
+impl Combine<Nil> for TotalSupplyAllowBlockList {
+    type Out = TotalSupplyAllowBlockList;
+}
 
 // Curated pairs.
+impl Combine<BlockList> for AllowList {
+    type Out = AllowBlockList;
+}
+impl Combine<AllowList> for BlockList {
+    type Out = AllowBlockList;
+}
+impl Combine<FungibleVotes> for AllowList {
+    type Out = AllowListVotes;
+}
+impl Combine<AllowList> for FungibleVotes {
+    type Out = AllowListVotes;
+}
+impl Combine<FungibleVotes> for BlockList {
+    type Out = BlockListVotes;
+}
+impl Combine<BlockList> for FungibleVotes {
+    type Out = BlockListVotes;
+}
 impl Combine<TotalSupply> for AllowList {
     type Out = TotalSupplyAllowList;
 }
@@ -236,6 +306,60 @@ impl Combine<TotalSupply> for BlockList {
 }
 impl Combine<BlockList> for TotalSupply {
     type Out = TotalSupplyBlockList;
+}
+
+// Curated triples: reached from any of their pairs by adding the missing
+// member, so every ordering of the three resolves to the same type.
+impl Combine<FungibleVotes> for AllowBlockList {
+    type Out = AllowBlockListVotes;
+}
+impl Combine<BlockList> for AllowListVotes {
+    type Out = AllowBlockListVotes;
+}
+impl Combine<AllowList> for BlockListVotes {
+    type Out = AllowBlockListVotes;
+}
+impl Combine<TotalSupply> for AllowBlockList {
+    type Out = TotalSupplyAllowBlockList;
+}
+impl Combine<BlockList> for TotalSupplyAllowList {
+    type Out = TotalSupplyAllowBlockList;
+}
+impl Combine<AllowList> for TotalSupplyBlockList {
+    type Out = TotalSupplyAllowBlockList;
+}
+
+// Redundant `TotalSupply`: contract types that already answer
+// `total_supply` (`RWA`, `Vault`, `FungibleVotes` and its combinations, or
+// the counter itself) reject the marker with a dedicated error. The `where`
+// clauses are never satisfied; they only select the message.
+impl CountedSupply for TotalSupply {}
+impl CountedSupply for TotalSupplyAllowList {}
+impl CountedSupply for TotalSupplyBlockList {}
+impl CountedSupply for TotalSupplyAllowBlockList {}
+impl<S: TotalSupplyOverrides> Combine<TotalSupply> for S
+where
+    S: SupplyAlreadyTracked<S>,
+{
+    type Out = S;
+}
+impl<C: CountedSupply> Combine<RWA> for C
+where
+    C: SupplyAlreadyTracked<RWA>,
+{
+    type Out = C;
+}
+impl<C: CountedSupply> Combine<Vault> for C
+where
+    C: SupplyAlreadyTracked<Vault>,
+{
+    type Out = C;
+}
+impl<C: CountedSupply> Combine<FungibleVotes> for C
+where
+    C: SupplyAlreadyTracked<FungibleVotes>,
+{
+    type Out = C;
 }
 
 impl Finalize for Nil {
@@ -262,11 +386,26 @@ impl Finalize for Vault {
 impl Finalize for FungibleVotes {
     type Out = FungibleVotes;
 }
+impl Finalize for AllowBlockList {
+    type Out = AllowBlockList;
+}
+impl Finalize for AllowListVotes {
+    type Out = AllowListVotes;
+}
+impl Finalize for BlockListVotes {
+    type Out = BlockListVotes;
+}
+impl Finalize for AllowBlockListVotes {
+    type Out = AllowBlockListVotes;
+}
 impl Finalize for TotalSupplyAllowList {
     type Out = TotalSupplyAllowList;
 }
 impl Finalize for TotalSupplyBlockList {
     type Out = TotalSupplyBlockList;
+}
+impl Finalize for TotalSupplyAllowBlockList {
+    type Out = TotalSupplyAllowBlockList;
 }
 
 // Bare forms: a single entry may also be written without the one-element
