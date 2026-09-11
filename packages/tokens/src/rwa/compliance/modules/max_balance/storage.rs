@@ -238,7 +238,11 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 /// recovery, the sender is resolved through the IRS recovery record rather than
 /// reverting on the source lookup, so a forced/recovery transfer still updates
 /// the books. Once `from` recovered to `to`, both sides resolve to the same
-/// identity and the movement is a same-identity no-op.
+/// identity and the movement is a same-identity no-op. Reading the recovery
+/// target's current identity is sound because the IRS pins the recovered
+/// identity to the target until `from` has been drained: the target can
+/// neither be re-registered under another identity nor recovered onward
+/// while `from` still holds tokens in a linked token.
 ///
 /// # Arguments
 ///
