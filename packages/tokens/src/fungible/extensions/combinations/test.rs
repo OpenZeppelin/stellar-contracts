@@ -11,6 +11,7 @@ use crate::{
             allowlist::{AllowList, AllowListContractType},
             blocklist::{BlockList, BlockListContractType},
             burnable::Burnable,
+            capped::Capped,
             combinations::{Composable, Compose},
             total_supply::{mint, total_supply, TotalSupply},
             votes::FungibleVotes,
@@ -84,6 +85,24 @@ fn additive_only_lists_resolve_to_base() {
     assert_composes_to::<Burnable, Base>();
     assert_composes_to::<(Burnable,), Base>();
     assert_composes_to::<(Burnable, Burnable), Base>();
+}
+
+// `Capped` is additive but requires `TotalSupply` in the list, like `RWA` and
+// `Vault`. Lists missing it are rejected at compile time and cannot be covered
+// here.
+#[test]
+fn capped_requires_total_supply_in_the_list() {
+    assert_composes_to::<(Capped, TotalSupply), TotalSupply>();
+    assert_composes_to::<(TotalSupply, Capped), TotalSupply>();
+    assert_composes_to::<(Burnable, Capped, TotalSupply), TotalSupply>();
+    assert_composes_to::<(AllowList, Capped, TotalSupply), TotalSupplyAllowList>();
+    assert_composes_to::<(Capped, AllowList, TotalSupply), TotalSupplyAllowList>();
+    assert_composes_to::<(TotalSupply, Capped, AllowList), TotalSupplyAllowList>();
+    assert_composes_to::<(AllowList, TotalSupply, Capped), TotalSupplyAllowList>();
+    assert_composes_to::<(BlockList, Capped, AllowList, TotalSupply), TotalSupplyAllowBlockList>();
+    assert_composes_to::<(RWA, Capped, TotalSupply), RWA>();
+    assert_composes_to::<(Capped, RWA, TotalSupply), RWA>();
+    assert_composes_to::<(Vault, TotalSupply, Capped), Vault>();
 }
 
 #[test]

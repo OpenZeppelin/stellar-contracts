@@ -1,22 +1,86 @@
-/// Unlike other extensions, the `capped` extension does not provide a separate
-/// trait. This is because its methods are not intended to be used
-/// independently, like [`crate::extensions::burnable::burn()`].
-/// Instead, the `capped` extension modifies the business logic of the `mint`
-/// function to enforce a supply cap.
-///
-/// The cap is checked against the tracked total supply, so this extension is
-/// meant to be used together with
-/// [`crate::fungible::total_supply::FungibleTotalSupply`] (or another
-/// supply-aware contract type).
-///
-/// This module provides the following helper functions:
-/// - `set_cap`: Sets the maximum token supply.
-/// - `query_cap`: Returns the maximum token supply.
-/// - `check_cap`: Panics if minting a specified `amount` added to the given
-///   `total_supply` would exceed the cap. Should be used before minting through
-///   the contract type (`Self::ContractType::mint`, e.g.
-///   [`crate::fungible::total_supply::TotalSupply::mint`]).
+//! # Capped Extension for Fungible Token.
+//!
+//! Enforces a maximum total supply on minting. The cap is compared against
+//! the tracked total supply, so this extension builds on
+//! [`crate::fungible::total_supply::FungibleTotalSupply`]:
+//! [`FungibleCapped`] has it as a supertrait, and implementing
+//! [`FungibleCapped`] on a contract that does not expose the supply does not
+//! compile.
+//!
+//! The extension consists of two parts:
+//!
+//! - [`FungibleCapped`]: exposes the `cap()` function on the contract.
+//! - The [`set_cap`] and [`check_cap`] helpers. Minting is not part of any
+//!   trait, so the check is not automatic: the contract's own `mint` function
+//!   calls [`check_cap`] with the current supply before minting through the
+//!   contract type.
+//!
+//! Usage:
+//!
+//! ```ignore
+//! #[contractimpl]
+//! impl MyToken {
+//!     pub fn __constructor(e: &Env, cap: i128) {
+//!         set_cap(e, cap);
+//!     }
+//!
+//!     #[only_owner]
+//!     pub fn mint(e: &Env, to: Address, amount: i128) {
+//!         check_cap(e, amount, <Self as FungibleToken>::ContractType::total_supply(e));
+//!         <Self as FungibleToken>::ContractType::mint(e, &to, amount);
+//!     }
+//! }
+//!
+//! #[contractimpl(contracttrait)]
+//! impl FungibleToken for MyToken {
+//!     type ContractType = Compose<(Capped, TotalSupply)>;
+//! }
+//!
+//! #[contractimpl(contracttrait)]
+//! impl FungibleTotalSupply for MyToken {}
+//!
+//! #[contractimpl(contracttrait)]
+//! impl FungibleCapped for MyToken {}
+//! ```
+//!
+//! In the [`crate::fungible::combinations::Compose`] list, `Capped` is
+//! additive but requires `TotalSupply` next to it, like `RWA` and `Vault`:
+//! `Compose<(Capped, TotalSupply)>` resolves to
+//! [`crate::fungible::total_supply::TotalSupply`], `Compose<(AllowList,
+//! Capped, TotalSupply)>` to the allowlist supply-tracking combination, and a
+//! list with `Capped` but without `TotalSupply` is rejected with a dedicated
+//! compile error.
+
 mod storage;
-pub use self::storage::{check_cap, query_cap, set_cap, CapStorageKey};
+
 #[cfg(test)]
 mod test;
+
+use soroban_sdk::{contracttrait, Env};
+pub use storage::{check_cap, query_cap, set_cap, CapStorageKey, Capped};
+
+use crate::fungible::total_supply::FungibleTotalSupply;
+
+/// Capped Trait for Fungible Token
+///
+/// The `FungibleCapped` trait extends the `FungibleTotalSupply` trait to
+/// expose the maximum total supply of the token.
+///
+/// The cap is checked against the total supply, so this trait can only be
+/// implemented alongside [`FungibleTotalSupply`]. The check itself is
+/// performed by calling [`check_cap`] in the contract's `mint` function.
+#[contracttrait]
+pub trait FungibleCapped: FungibleTotalSupply {
+    /// Returns the maximum total supply of tokens.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`query_cap`] errors.
+    fn cap(e: &Env) -> i128 {
+        query_cap(e)
+    }
+}

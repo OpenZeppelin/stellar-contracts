@@ -2,6 +2,18 @@ use soroban_sdk::{contracttype, panic_with_error, Env};
 
 use crate::fungible::FungibleTokenError;
 
+/// Type-level name of the capped extension, for use in a
+/// [`crate::fungible::combinations::Compose`] list.
+///
+/// Capped is additive: it does not change the resolved contract type. A cap
+/// needs the supply to be tracked, though, so it requires
+/// [`crate::fungible::total_supply::TotalSupply`] in the list, e.g.
+/// `Compose<(Capped, TotalSupply)>`; a list with `Capped` but without
+/// `TotalSupply` is rejected. The cap is exposed by implementing
+/// [`crate::fungible::capped::FungibleCapped`] and enforced by calling
+/// [`check_cap`] before minting.
+pub enum Capped {}
+
 /// Storage key for the cap value
 #[contracttype]
 pub enum CapStorageKey {

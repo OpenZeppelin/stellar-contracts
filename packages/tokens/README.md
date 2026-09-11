@@ -81,8 +81,8 @@ background. There is no need to implement or import it.
 #### Extensions
 
 - **Burnable**: Allow token holders to destroy their tokens
-- **TotalSupply**: Track and expose the total supply (opt-in; `RWA` and `Vault` require it)
-- **Capped**: Set maximum supply limits
+- **TotalSupply**: Track and expose the total supply (opt-in; `RWA`, `Vault` and `Capped` require it)
+- **Capped**: Set maximum supply limits (requires the TotalSupply extension)
 - **Allowlist**: Restrict transfers to approved addresses
 - **Blocklist**: Prevent transfers from/to blocked addresses
 - **Votes**: Track voting power for governance integration

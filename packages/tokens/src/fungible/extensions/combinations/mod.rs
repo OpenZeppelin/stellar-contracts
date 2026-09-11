@@ -11,6 +11,14 @@
 //! implementing their trait, whether or not they are listed. A list holding
 //! only additive extensions resolves to [`Base`].
 //!
+//! [`Capped`] (for [`crate::fungible::capped::FungibleCapped`]) is additive
+//! too, but a cap needs the supply to be tracked, so it requires
+//! `TotalSupply` in the list, like `RWA` and `Vault`:
+//! `Compose<(Capped, TotalSupply)>` resolves to `TotalSupply`,
+//! `Compose<(AllowList, Capped, TotalSupply)>` to the allowlist
+//! supply-tracking combination, and a list with `Capped` but without
+//! `TotalSupply` is rejected.
+//!
 //! Usage:
 //!
 //! ```ignore
@@ -40,10 +48,11 @@
 //! `Compose<(AllowList, BlockList, FungibleVotes)>`. [`TotalSupply`] can be
 //! added to `AllowList`, `BlockList` or both, e.g.
 //! `Compose<(AllowList, TotalSupply)>` or
-//! `Compose<(AllowList, BlockList, TotalSupply)>`. `RWA` and `Vault` require
-//! `TotalSupply` next to them, e.g. `Compose<(RWA, TotalSupply)>`; a list
-//! with `RWA` or `Vault` but without `TotalSupply` is rejected with a
-//! dedicated compile error, as is a list naming `TotalSupply` twice.
+//! `Compose<(AllowList, BlockList, TotalSupply)>`. `RWA`, `Vault` and
+//! `Capped` require `TotalSupply` next to them, e.g.
+//! `Compose<(RWA, TotalSupply)>`; a list with one of them but without
+//! `TotalSupply` is rejected with a dedicated compile error, as is a list
+//! naming `TotalSupply` twice.
 //! `FungibleVotes` tracks voting units, not the token supply, and has no
 //! curated combination with `TotalSupply`. The resolved contract type
 //! enforces every listed transfer
@@ -70,7 +79,7 @@ use storage::{
 use crate::{
     fungible::{
         extensions::{
-            allowlist::AllowList, blocklist::BlockList, burnable::Burnable,
+            allowlist::AllowList, blocklist::BlockList, burnable::Burnable, capped::Capped,
             total_supply::TotalSupply, votes::FungibleVotes,
         },
         Base, ContractOverrides,
@@ -106,7 +115,7 @@ pub type Compose<L> = <L as Composable>::Out;
             `(BlockList, FungibleVotes)`, `(AllowList, BlockList, FungibleVotes)`, `(AllowList, \
             TotalSupply)`, `(BlockList, TotalSupply)`, `(AllowList, BlockList, TotalSupply)`, \
             `(RWA, TotalSupply)`, `(Vault, TotalSupply)`",
-    note = "`RWA` and `Vault` require `TotalSupply` in the list",
+    note = "`RWA`, `Vault` and `Capped` require `TotalSupply` in the list",
     note = "additive extensions (e.g. `Burnable`) may be listed alongside a contract type; they \
             do not affect the resolved type",
     note = "lists of up to 5 entries are supported"
@@ -132,7 +141,7 @@ mod fold {
         message = "`{Self}` cannot appear in a `Compose` list",
         note = "valid entries are the contract types (`Base`, `AllowList`, `BlockList`, \
                 `TotalSupply`, `RWA`, `Vault`, `FungibleVotes`) and the additive extensions \
-                (`Burnable`)"
+                (`Burnable`, `Capped`)"
     )]
     pub trait Extension {
         type Contribution;
@@ -150,8 +159,9 @@ mod fold {
     }
 
     /// Contribution of an entry that only works with the total supply
-    /// tracked (`RWA`, `Vault`): the contribution `C` it stands for, plus an
-    /// open requirement that `TotalSupply` appears somewhere in the list.
+    /// tracked (`RWA`, `Vault`, `Capped`): the contribution `C` it stands
+    /// for, plus an open requirement that `TotalSupply` appears somewhere in
+    /// the list.
     ///
     /// This gives `RWA` and `Vault` two roles inside the fold. The entry a
     /// developer writes contributes `NeedsSupply<RWA>`, never the bare `RWA`.
@@ -185,8 +195,8 @@ mod fold {
     /// how these error rows work.
     #[diagnostic::on_unimplemented(
         message = "this `Compose` list requires `TotalSupply`",
-        note = "`RWA` and `Vault` only work with the total supply tracked; add `TotalSupply` to \
-                the list, e.g. `Compose<(RWA, TotalSupply)>`"
+        note = "`RWA`, `Vault` and `Capped` only work with the total supply tracked; add \
+                `TotalSupply` to the list, e.g. `Compose<(RWA, TotalSupply)>`"
     )]
     pub trait SupplyRequirementMet {}
 
@@ -283,6 +293,12 @@ impl Extension for FungibleVotes {
 // Additive extensions contribute nothing.
 impl Extension for Burnable {
     type Contribution = Nil;
+}
+// `Capped` is additive as well, but a cap needs the supply to be tracked, so
+// it contributes nothing plus the requirement that `TotalSupply` appears in
+// the list.
+impl Extension for Capped {
+    type Contribution = NeedsSupply<Nil>;
 }
 
 // Identity rows: combining with `Nil` changes nothing. One pair of rows per
@@ -668,9 +684,16 @@ impl Composable for BlockList {
 impl Composable for TotalSupply {
     type Out = TotalSupply;
 }
-// `RWA` and `Vault` written bare, i.e. `Compose<RWA>`, miss `TotalSupply` by
-// construction. These rows never succeed; they only select the error message
-// (refer to `Probe`).
+// `RWA`, `Vault` and `Capped` written bare, i.e. `Compose<RWA>`, miss
+// `TotalSupply` by construction. These rows never succeed; they only select
+// the error message (refer to `Probe`).
+impl<T> Composable for Capped
+where
+    Capped: Probe<Never = T>,
+    T: SupplyRequirementMet,
+{
+    type Out = TotalSupply;
+}
 impl<T> Composable for RWA
 where
     RWA: Probe<Never = T>,
