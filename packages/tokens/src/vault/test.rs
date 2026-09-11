@@ -482,6 +482,50 @@ fn convert_zero_assets() {
 }
 
 #[test]
+fn deposit_zero_assets() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        let shares = Vault::deposit(&e, 0, admin.clone(), admin.clone(), admin.clone());
+        assert_eq!(shares, 0);
+        assert_eq!(total_supply(&e), 0);
+        assert_eq!(Vault::total_assets(&e), 0);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #411)")]
+fn deposit_zero_shares_after_donation() {
+    let e = Env::default();
+    let attacker = Address::generate(&e);
+    let victim = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &attacker);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    asset_client.mint(&victim, &1_000);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 1, attacker.clone(), attacker.clone(), attacker.clone());
+    });
+    asset_client.transfer(&attacker, &vault_address, &100);
+
+    e.as_contract(&vault_address, || {
+        assert_eq!(total_supply(&e), 1);
+        assert_eq!(Vault::total_assets(&e), 101);
+        assert_eq!(Vault::preview_deposit(&e, 50), 0);
+
+        Vault::deposit(&e, 50, victim.clone(), victim.clone(), victim.clone());
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #403)")]
 fn invalid_assets_amount() {
     let e = Env::default();
