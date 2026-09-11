@@ -154,7 +154,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// * [`RWAError::InsufficientBalance`] - When the sender has insufficient
     ///   balance.
-    /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`crate::fungible::FungibleTokenError::LessThanZero`] - When the
+    ///   amount is negative.
     /// * [`RWAError::IdentityVerificationFailed`] - When the identity of the
     ///   `to` address cannot be verified.
     ///
@@ -221,7 +222,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// * [`RWAError::InsufficientBalance`] - When the amount to burn exceeds
     ///   the balance.
-    /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`crate::fungible::FungibleTokenError::LessThanZero`] - When the
+    ///   amount is negative.
     ///
     /// # Events
     ///
@@ -242,6 +244,12 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// privileges. RBAC checks are expected to be enforced on the
     /// `operator`.
     ///
+    /// Balances and address freezes are stored per token, so after the
+    /// identity is recovered in the registry, this function should be called on
+    /// each token separately. A token where the old account holds nothing
+    /// still needs the call when the account is frozen there, otherwise the
+    /// freeze status is not carried over to the new account.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
@@ -256,6 +264,11 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Events
     ///
+    /// Emitted when the old account is fully frozen:
+    /// * topics - `["address_frozen", new_account: Address, is_frozen: bool]`
+    /// * data - `[]`
+    ///
+    /// Emitted only when tokens are moved:
     /// * topics - `["transfer", old_account: Address, new_account: Address]`
     /// * data - `[amount: i128]`
     /// * topics - `["recovery_success", old_account: Address, new_account:

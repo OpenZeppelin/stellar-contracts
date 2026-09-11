@@ -132,8 +132,9 @@ impl Consecutive {
             })
             // scan for a set bit and maps it to an ID
             .find_map(|(i, bucket)| {
-                // If we're in the starting bucket, begin search from the token's relative
-                // position; otherwise, start from the beginning of the bucket.
+                // If we're in the starting bucket, begin search from the
+                // token's relative position; otherwise, start
+                // from the beginning of the bucket.
                 let from_id = if i == bucket_index { relative_id } else { 0 };
                 find_bit_in_bucket(bucket, from_id)
                     .map(|pos_in_bucket| i * ids_in_bucket + pos_in_bucket)
@@ -432,9 +433,10 @@ impl Consecutive {
             let approval_key = NFTConsecutiveStorageKey::Approval(token_id);
             e.storage().temporary().remove(&approval_key);
 
-            // Set the token_id - 1 to previous owner to preserve the ownership inference.
-            // `set_owner_for_previous_token` does this, but will skip it if the previous id
-            // doesn't exist, was burned or has already an owner.
+            // Set the token_id - 1 to previous owner to preserve the ownership
+            // inference. `set_owner_for_previous_token` does this,
+            // but will skip it if the previous id doesn't exist,
+            // was burned or has already an owner.
             Consecutive::set_owner_for_previous_token(e, from_address, token_id);
         } else {
             // nothing to do for the `None` case, since we don't track
@@ -535,8 +537,8 @@ impl Consecutive {
         let mask: u32 = 1 << (ids_in_item - bit_index - 1);
         let mut item = bucket.get(item_index).expect("token_id out of allowed range");
 
-        // return early if the bit was already set in a previous action (transfer, burn
-        // or batch_mint)
+        // return early if the bit was already set in a previous action
+        // (transfer, burn or batch_mint)
         if item & mask != 0 {
             return;
         }
@@ -613,8 +615,8 @@ pub(crate) fn find_bit_in_item(input: Option<u32>, start: u32) -> Option<u32> {
 
         for i in (0..=(last - start)).rev() {
             if (num & (1 << i)) != 0 {
-                // i goes from MSB toward LSB relative to `start`, but we want to return
-                // MSB-relative index
+                // i goes from MSB toward LSB relative to `start`, but we want
+                // to return MSB-relative index
                 return Some(last - i);
             }
         }

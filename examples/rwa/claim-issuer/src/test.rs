@@ -185,7 +185,8 @@ fn remove_nonexistent_key_panics() {
 fn allow_key_for_unregistered_topic_panics() {
     let e = Env::default();
     e.mock_all_auths();
-    // Registry only knows about topic 1; trying to allow key for topic 99 fails.
+    // Registry only knows about topic 1; trying to allow key for topic 99
+    // fails.
     let (client, registry) = setup(&e, 1u32);
 
     let kp = Ed25519KeyPair::generate([1u8; 32]);
@@ -277,7 +278,8 @@ fn is_claim_valid_expired_claim_panics() {
     let raw = Bytes::from_array(&e, &[1u8, 2, 3]);
     let claim_data = encode_claim_data_expiration(&e, 100, 500, &raw);
 
-    // Build message and sign while ledger is still at the default (0) timestamp.
+    // Build message and sign while ledger is still at the default (0)
+    // timestamp.
     let issuer_addr = client.address.clone();
     let message = e.as_contract(&issuer_addr, || {
         Ed25519Verifier::build_message(&e, &identity, claim_topic, &claim_data)

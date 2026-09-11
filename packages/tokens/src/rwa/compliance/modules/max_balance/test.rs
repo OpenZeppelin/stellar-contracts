@@ -433,7 +433,8 @@ fn recovery_transfer_after_identity_recovery_is_noop_and_does_not_revert() {
         // `TransferKind::Recovery` by `recover_balance`.
         on_transfer(&e, &old_wallet, &new_wallet, 80, &TransferKind::Recovery, &token);
 
-        // Same identity on both sides => the aggregate is unchanged and correct.
+        // Same identity on both sides => the aggregate is unchanged and
+        // correct.
         assert_eq!(get_id_balance(&e, &token, &identity), 80);
     });
 }

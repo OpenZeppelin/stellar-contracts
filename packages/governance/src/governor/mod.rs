@@ -907,6 +907,8 @@ pub enum GovernorError {
     DescriptionTooLong = 5021,
     /// Queuing is not enabled for this governor.
     QueueNotEnabled = 5022,
+    /// The voting period is zero, which would leave every proposal unvotable.
+    InvalidVotingPeriod = 5023,
 }
 
 // ################## CONSTANTS ##################

@@ -429,8 +429,8 @@ fn partial_token_freezing() {
         // Unfreeze some tokens
         RWA::unfreeze_partial_tokens(&e, &user, 10);
         assert_eq!(RWA::get_frozen_tokens(&e, &user), 20);
-        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen + 1
-        // TokensUnfrozen
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen +
+        // 1 TokensUnfrozen
         assert_eq!(e.events().all().events().len(), 5);
     });
 }
@@ -578,6 +578,7 @@ fn recovery_with_zero_balance_returns_false() {
         // No tokens in old account
         let success = RWA::recover_balance(&e, &old_account, &new_account);
         assert!(!success); // Should return false for zero balance
+        assert!(!RWA::is_frozen(&e, &new_account));
     });
 }
 
@@ -940,6 +941,35 @@ fn recover_balance_with_both_frozen_tokens_and_address() {
 }
 
 #[test]
+fn recover_balance_with_zero_balance_preserves_frozen_address() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let old_account = Address::generate(&e);
+    let new_account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        // Set recovery target in the identity verifier contract's storage
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("recovery"), &new_account);
+        });
+
+        // Freeze the address while it holds no tokens
+        RWA::set_address_frozen(&e, &old_account, true);
+        assert!(RWA::is_frozen(&e, &old_account));
+
+        // Nothing to move, but the address freeze must still follow
+        let success = RWA::recover_balance(&e, &old_account, &new_account);
+        assert!(!success);
+
+        assert_eq!(RWA::balance(&e, &new_account), 0);
+        assert!(RWA::is_frozen(&e, &new_account));
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #313)")]
 fn recover_balance_without_recovery_target_fails() {
     let e = Env::default();
@@ -952,12 +982,14 @@ fn recover_balance_without_recovery_target_fails() {
         let _ = set_and_return_compliance(&e);
 
         // Do NOT set recovery target - this should cause the test to panic
-        // The mock function will return None, which triggers IdentityMismatch error
+        // The mock function will return None, which triggers IdentityMismatch
+        // error
 
         // Mint tokens to old account
         RWA::mint(&e, &old_account, 100);
 
-        // Attempt recovery without setting recovery target - should fail with #313
+        // Attempt recovery without setting recovery target - should fail with
+        // #313
         RWA::recover_balance(&e, &old_account, &new_account);
     });
 }

@@ -381,7 +381,8 @@ fn test_checked_div_overflow() {
     let e = Env::default();
     let a = Wad::from_raw(i128::MAX);
     let b = Wad::from_raw(1);
-    let result = a.checked_div(&e, b); // MAX * WAD_SCALE will overflow even with I256
+    let result = a.checked_div(&e, b); // MAX * WAD_SCALE will overflow even
+                                       // with I256
     assert_eq!(result, None);
 }
 
@@ -389,9 +390,9 @@ fn test_checked_div_overflow() {
 fn test_checked_div_phantom_overflow_handled() {
     let e = Env::default();
     // 5000 WAD / 5000 WAD = 1 WAD
-    // The intermediate calculation (5000 * WAD_SCALE * WAD_SCALE) would overflow
-    // i128 but the final result (1 WAD) fits, so phantom overflow should be
-    // handled
+    // The intermediate calculation (5000 * WAD_SCALE * WAD_SCALE) would
+    // overflow i128 but the final result (1 WAD) fits, so phantom overflow
+    // should be handled
     let a = Wad::from_integer(&e, 5_000);
     let b = Wad::from_integer(&e, 5_000);
     let result = a.checked_div(&e, b);
@@ -684,7 +685,8 @@ fn test_powi_truncation_behavior() {
     let base = Wad::from_raw(1_414_213_562_373_095_048); // √2 ≈ 1.414213562373095048
     let result = base.powi(&e, 2);
 
-    // (√2)^2 should be very close to 2, but truncation may cause slight deviation
+    // (√2)^2 should be very close to 2, but truncation may cause slight
+    // deviation
     let two = Wad::from_integer(&e, 2);
     let diff = (result.raw() - two.raw()).abs();
 
@@ -1159,7 +1161,8 @@ fn test_powf_compound_interest_fractional() {
 #[test]
 fn test_powf_negative_exponent() {
     let e = Env::default();
-    // 2^(-1) = 0.5 — falls through to general path (negative non-integer-flagged y)
+    // 2^(-1) = 0.5 — falls through to general path (negative
+    // non-integer-flagged y)
     let two = Wad::from_integer(&e, 2);
     let neg_one = Wad::from_integer(&e, -1);
     let result = two.powf(&e, neg_one);
@@ -1236,7 +1239,8 @@ fn test_checked_powf_one_base() {
     // 1^y = 1 for any y, via the x==1 fast path.
     let e = Env::default();
     let one = Wad::from_integer(&e, 1);
-    let weird_y = Wad::from_ratio(&e, 355, 113); // π-ish, definitely non-integer
+    let weird_y = Wad::from_ratio(&e, 355, 113); // π-ish, definitely
+                                                 // non-integer
     assert_eq!(one.checked_powf(&e, weird_y), Some(one));
 }
 

@@ -162,8 +162,8 @@ fn remove_identity_success() {
         assert_eq!(get_country_data_entries(&e, &account).len(), 1);
 
         remove_identity(&e, &account);
-        // 1 IdentityStored + 1 CountryDataAdded (from add) + 1 IdentityUnstored + 1
-        // CountryDataRemoved (from remove)
+        // 1 IdentityStored + 1 CountryDataAdded (from add) + 1 IdentityUnstored
+        // + 1 CountryDataRemoved (from remove)
         assert_eq!(e.events().all().events().len(), 4);
 
         stored_identity(&e, &account);
@@ -1047,8 +1047,8 @@ fn recover_to_already_recovered_account_panics() {
         // Recover account1 to account2
         recover_identity(&e, &account1, &account2);
 
-        // Try to recover account3 to account1 (account1 was already recovered, should
-        // panic)
+        // Try to recover account3 to account1 (account1 was already recovered,
+        // should panic)
         recover_identity(&e, &account3, &account1);
     });
 }

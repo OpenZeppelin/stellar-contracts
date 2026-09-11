@@ -79,7 +79,8 @@ fn set_document_update_existing() {
         assert_eq!(doc2.document_hash, hash2);
         assert!(doc2.timestamp >= doc1.timestamp);
 
-        // Verify document count didn't increase (it's an update, not a new document)
+        // Verify document count didn't increase (it's an update, not a new
+        // document)
         assert_eq!(get_document_count(&e), 1);
     });
 }
@@ -428,7 +429,8 @@ fn swap_and_pop_across_different_buckets() {
         let uri = String::from_str(&e, "https://example.com/doc.pdf");
         let hash = create_test_hash(&e, "content");
 
-        // Add 75 documents (will span 2 buckets: 50 in bucket 0, 25 in bucket 1)
+        // Add 75 documents (will span 2 buckets: 50 in bucket 0, 25 in bucket
+        // 1)
         for i in 0..75 {
             let name = create_test_name(&e, &std::format!("doc_{}", i));
             set_document(&e, &name, &uri, &hash);
@@ -437,7 +439,8 @@ fn swap_and_pop_across_different_buckets() {
         assert_eq!(get_document_count(&e), 75);
 
         // Remove a document from bucket 0 (index 10)
-        // This should swap with the last document (doc_74 at index 74 in bucket 1)
+        // This should swap with the last document (doc_74 at index 74 in bucket
+        // 1)
         let name_to_remove = create_test_name(&e, "doc_10");
         remove_document(&e, &name_to_remove);
 

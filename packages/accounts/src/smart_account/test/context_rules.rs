@@ -399,8 +399,8 @@ fn add_context_rule_multiple_rules() {
         assert_eq!(rule2.policies.len(), 2);
         assert_eq!(rule2.valid_until, None);
 
-        // Events: 2 ContextRuleAdded + 2 SignerRegistered (shared) + 2 PolicyRegistered
-        // = 6
+        // Events: 2 ContextRuleAdded + 2 SignerRegistered (shared) + 2
+        // PolicyRegistered = 6
         assert_eq!(e.events().all().events().len(), 6);
         assert_eq!(get_context_rules_count(&e), 2);
     });
@@ -678,8 +678,8 @@ fn remove_context_rule_success() {
     // Removal succeeds
     e.as_contract(&address, || {
         remove_context_rule(&e, rule.id);
-        // Events: 1 ContextRuleRemoved + 2 SignerDeregistered + 2 PolicyDeregistered =
-        // 5
+        // Events: 1 ContextRuleRemoved + 2 SignerDeregistered + 2
+        // PolicyDeregistered = 5
         assert_eq!(e.events().all().events().len(), 5);
         assert_eq!(get_context_rules_count(&e), 0);
     });
