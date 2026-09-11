@@ -65,18 +65,28 @@ pub enum VaultStorageKey {
 /// representation between the underlying asset's decimals and the vault
 /// decimals.
 ///
-/// While not fully preventing the attack, analysis shows that the default
-/// offset (0) makes it non-profitable even if an attacker is able to capture
-/// value from multiple user deposits, as a result of the value being captured
-/// by the virtual shares (out of the attacker's donation) matching the
-/// attacker's expected gains. With a larger offset, the attack becomes orders
-/// of magnitude more expensive than it is profitable.
+/// The virtual shares and assets do not fully prevent the attack. With the
+/// default offset (0), diluting a single deposit costs the attacker at least
+/// as much as that deposit, so a single victim is never profitable. The
+/// rounding loss of each deposit, however, accrues to the existing
+/// shareholders, and an attacker holding most of the real shares profits once
+/// enough deposits land on the inflated price. With a larger offset, the
+/// attack becomes orders of magnitude more expensive than it is profitable.
 ///
 /// The drawback of this approach is that the virtual shares do capture (a very
 /// small) part of the value being accrued to the vault. Also, if the vault
 /// experiences losses, the users try to exit the vault, the virtual shares and
 /// assets will cause the first user to exit to experience reduced losses in
 /// detriment to the last users that will experience bigger losses.
+///
+/// ### 3. Zero-Share Deposit Rejection
+///
+/// [`Vault::deposit()`] rejects a positive deposit that would mint zero
+/// shares, so no depositor can lose their entire deposit to an inflated
+/// price. Each deposit still loses up to one share's worth of assets to
+/// rounding. Integrators that need a tighter bound should compare
+/// [`Vault::preview_deposit()`] against a caller-supplied minimum before
+/// depositing.
 ///
 /// If this is not the preferred solution, implementers can still use the
 /// default offset of 0 and implement their own safeguards.
@@ -325,6 +335,8 @@ impl Vault {
     ///
     /// * [`VaultTokenError::VaultExceededMaxDeposit`] - When attempting to
     ///   deposit more assets than the maximum allowed for the receiver.
+    /// * [`VaultTokenError::VaultZeroShares`] - When a positive amount of
+    ///   assets would mint zero shares.
     /// * also refer to [`Self::preview_deposit()`] errors.
     ///
     /// # Events
@@ -350,6 +362,9 @@ impl Vault {
             panic_with_error!(e, VaultTokenError::VaultExceededMaxDeposit);
         }
         let shares: i128 = Self::preview_deposit(e, assets);
+        if shares == 0 && assets > 0 {
+            panic_with_error!(e, VaultTokenError::VaultZeroShares);
+        }
         Self::deposit_internal(e, &receiver, assets, shares, &from, &operator);
         emit_deposit(e, &operator, &from, &receiver, assets, shares);
 

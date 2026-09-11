@@ -159,6 +159,8 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType = Vaul
     /// * [`crate::vault::VaultTokenError::VaultExceededMaxDeposit`] - When
     ///   attempting to deposit more assets than the maximum allowed for the
     ///   receiver.
+    /// * [`crate::vault::VaultTokenError::VaultZeroShares`] - When a positive
+    ///   amount of assets would mint zero shares.
     /// * [`crate::vault::VaultTokenError::VaultInvalidAssetsAmount`] - When
     ///   `assets < 0`.
     /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
@@ -414,6 +416,9 @@ pub enum VaultTokenError {
     VaultMaxDecimalsOffsetExceeded = 409,
     /// Indicates overflow due to mathematical operations
     MathOverflow = 410,
+    /// Attempted to deposit a positive amount of assets that would mint zero
+    /// shares.
+    VaultZeroShares = 411,
 }
 
 // ################## CONSTANTS ##################
