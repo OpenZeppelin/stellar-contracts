@@ -10,10 +10,11 @@
 //! The extension consists of two parts:
 //!
 //! - [`FungibleCapped`]: exposes the `cap()` function on the contract.
-//! - The [`set_cap`] and [`check_cap`] helpers. Minting is not part of any
-//!   trait, so the check is not automatic: the contract's own `mint` function
-//!   calls [`check_cap`] with the current supply before minting through the
-//!   contract type.
+//! - The [`Capped`] type: [`Capped::set_cap`] in the constructor and
+//!   [`Capped::mint`] in the contract's own `mint` function, which checks the
+//!   cap and then mints through the supply counter. Minting is not part of any
+//!   trait, so the check is not automatic. Contract types with a mint of their
+//!   own, such as `RWA`, call [`check_cap`] before that mint instead.
 //!
 //! Usage:
 //!
@@ -21,13 +22,12 @@
 //! #[contractimpl]
 //! impl MyToken {
 //!     pub fn __constructor(e: &Env, cap: i128) {
-//!         set_cap(e, cap);
+//!         Capped::set_cap(e, cap);
 //!     }
 //!
 //!     #[only_owner]
 //!     pub fn mint(e: &Env, to: Address, amount: i128) {
-//!         check_cap(e, amount, <Self as FungibleToken>::ContractType::total_supply(e));
-//!         <Self as FungibleToken>::ContractType::mint(e, &to, amount);
+//!         Capped::mint(e, &to, amount);
 //!     }
 //! }
 //!
@@ -68,7 +68,7 @@ use crate::fungible::total_supply::FungibleTotalSupply;
 ///
 /// The cap is checked against the total supply, so this trait can only be
 /// implemented alongside [`FungibleTotalSupply`]. The check itself is
-/// performed by calling [`check_cap`] in the contract's `mint` function.
+/// performed by [`Capped::mint`] in the contract's `mint` function.
 #[contracttrait]
 pub trait FungibleCapped: FungibleTotalSupply {
     /// Returns the maximum total supply of tokens.
@@ -81,6 +81,6 @@ pub trait FungibleCapped: FungibleTotalSupply {
     ///
     /// * refer to [`query_cap`] errors.
     fn cap(e: &Env) -> i128 {
-        query_cap(e)
+        Capped::cap(e)
     }
 }

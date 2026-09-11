@@ -1,6 +1,9 @@
-use soroban_sdk::{contracttype, panic_with_error, Env};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
-use crate::fungible::FungibleTokenError;
+use crate::fungible::{
+    total_supply::{mint, total_supply},
+    FungibleTokenError,
+};
 
 /// Type-level name of the capped extension, for use in a
 /// [`crate::fungible::combinations::Compose`] list.
@@ -10,9 +13,39 @@ use crate::fungible::FungibleTokenError;
 /// [`crate::fungible::total_supply::TotalSupply`] in the list, e.g.
 /// `Compose<(Capped, TotalSupply)>`; a list with `Capped` but without
 /// `TotalSupply` is rejected. The cap is exposed by implementing
-/// [`crate::fungible::capped::FungibleCapped`] and enforced by calling
-/// [`check_cap`] before minting.
+/// [`crate::fungible::capped::FungibleCapped`] and enforced by minting
+/// through [`Capped::mint`].
 pub enum Capped {}
+
+impl Capped {
+    /// Returns the maximum supply of tokens.
+    ///
+    /// refer to [`query_cap`] for the inline documentation.
+    pub fn cap(e: &Env) -> i128 {
+        query_cap(e)
+    }
+
+    /// Sets the maximum supply of tokens.
+    ///
+    /// refer to [`set_cap`] for the inline documentation.
+    pub fn set_cap(e: &Env, cap: i128) {
+        set_cap(e, cap);
+    }
+
+    /// Creates `amount` of tokens and assigns them to `to` if the cap allows
+    /// it, increasing the total supply accordingly.
+    ///
+    /// Mints through the total supply counter, which is the minting path of
+    /// [`crate::fungible::total_supply::TotalSupply`] and of its list
+    /// combinations. Contract types with a mint of their own, such as
+    /// [`crate::rwa::RWA`], call [`check_cap`] before that mint instead.
+    ///
+    /// refer to [`check_cap`] and [`mint`] for the inline documentation.
+    pub fn mint(e: &Env, to: &Address, amount: i128) {
+        check_cap(e, amount, total_supply(e));
+        mint(e, to, amount);
+    }
+}
 
 /// Storage key for the cap value
 #[contracttype]
