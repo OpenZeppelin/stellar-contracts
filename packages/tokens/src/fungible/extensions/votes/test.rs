@@ -24,7 +24,6 @@ fn mint_updates_voting_units() {
         FungibleVotes::mint(&e, &alice, 100);
 
         assert_eq!(Base::balance(&e, &alice), 100);
-        assert_eq!(Base::total_supply(&e), 100);
         assert_eq!(get_voting_units(&e, &alice), 100);
     });
 }
@@ -55,7 +54,6 @@ fn burn_updates_voting_units() {
         FungibleVotes::burn(&e, &alice, 30);
 
         assert_eq!(Base::balance(&e, &alice), 70);
-        assert_eq!(Base::total_supply(&e), 70);
         assert_eq!(get_voting_units(&e, &alice), 70);
     });
 }

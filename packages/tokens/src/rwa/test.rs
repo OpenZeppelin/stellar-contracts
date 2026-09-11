@@ -8,7 +8,7 @@ use soroban_sdk::{
 use stellar_contract_utils::pausable;
 
 use crate::{
-    fungible::{ContractOverrides, MuxedTransfer, Transfer},
+    fungible::{total_supply::TotalSupplyOverrides, ContractOverrides, MuxedTransfer, Transfer},
     rwa::{
         compliance::{AccountSnapshot, TransferKind},
         storage::RWAStorageKey,

@@ -18,7 +18,7 @@ Refer to the [OpenZeppelin for Stellar Contracts](https://docs.openzeppelin.com/
 
 ### Fungible
 
-The `fungible` module provides functionalities for fungible tokens: balance management, transfer operations, allowance delegation, total supply tracking.
+The `fungible` module provides functionalities for fungible tokens: balance management, transfer operations and allowance delegation. Total supply tracking is available as an opt-in extension.
 
 #### Usage Examples
 
@@ -81,6 +81,7 @@ background. There is no need to implement or import it.
 #### Extensions
 
 - **Burnable**: Allow token holders to destroy their tokens
+- **TotalSupply**: Track and expose the total supply (opt-in; `RWA` and `Vault` require it)
 - **Capped**: Set maximum supply limits
 - **Allowlist**: Restrict transfers to approved addresses
 - **Blocklist**: Prevent transfers from/to blocked addresses

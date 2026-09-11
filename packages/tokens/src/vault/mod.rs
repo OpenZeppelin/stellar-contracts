@@ -6,7 +6,7 @@ mod test;
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env};
 pub use storage::Vault;
 
-use crate::fungible::FungibleToken;
+use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 
 /// Vault Trait for Fungible Token
 ///
@@ -17,6 +17,12 @@ use crate::fungible::FungibleToken;
 ///
 /// The vault maintains a conversion rate between shares and assets based on
 /// the total supply of shares and total assets held by the vault contract.
+/// The `Vault` contract type is therefore inherently supply-aware, and
+/// [`FungibleVault`] requires
+/// [`crate::fungible::total_supply::FungibleTotalSupply`] to be implemented
+/// alongside it (an empty `impl` block is enough), so that the supply of
+/// shares is exposed by the contract. `TotalSupply` has to be listed in the
+/// contract type as well, e.g. `Compose<(Vault, TotalSupply)>`.
 ///
 /// # Design Overview
 ///
@@ -40,7 +46,7 @@ use crate::fungible::FungibleToken;
 /// providing familiar interfaces for Ethereum developers while leveraging
 /// Stellar's unique capabilities.
 #[contracttrait]
-pub trait FungibleVault: FungibleToken<ContractType = Vault> {
+pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType = Vault> {
     /// Returns the address of the underlying asset that the vault manages.
     ///
     /// # Arguments

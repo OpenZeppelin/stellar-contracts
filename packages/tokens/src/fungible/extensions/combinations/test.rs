@@ -12,9 +12,10 @@ use crate::{
             blocklist::{BlockList, BlockListContractType},
             burnable::Burnable,
             combinations::{Composable, Compose},
+            total_supply::{mint, total_supply, TotalSupply},
             votes::FungibleVotes,
         },
-        overrides::BurnableOverrides,
+        overrides::{BurnableOverrides, TotalSupplyOverrides},
         Base, ContractOverrides,
     },
     rwa::RWA,
@@ -27,6 +28,9 @@ type AllowBlockList = Compose<(BlockList, AllowList)>;
 type AllowListVotes = Compose<(FungibleVotes, AllowList)>;
 type BlockListVotes = Compose<(BlockList, FungibleVotes)>;
 type AllowBlockListVotes = Compose<(FungibleVotes, BlockList, AllowList)>;
+type TotalSupplyAllowList = Compose<(AllowList, TotalSupply)>;
+type TotalSupplyBlockList = Compose<(TotalSupply, BlockList)>;
+type TotalSupplyAllowBlockList = Compose<(BlockList, TotalSupply, AllowList)>;
 
 // Pins every `Composable` mapping: the resolved `Out` type must be exactly the
 // expected contract type. Invalid lists are rejected at compile time and
@@ -45,8 +49,7 @@ fn bare_forms_resolve_to_themselves() {
     assert_composes_to::<Base, Base>();
     assert_composes_to::<AllowList, AllowList>();
     assert_composes_to::<BlockList, BlockList>();
-    assert_composes_to::<RWA, RWA>();
-    assert_composes_to::<Vault, Vault>();
+    assert_composes_to::<TotalSupply, TotalSupply>();
     assert_composes_to::<FungibleVotes, FungibleVotes>();
 }
 
@@ -55,8 +58,7 @@ fn tuple_forms_resolve_to_themselves() {
     assert_composes_to::<(Base,), Base>();
     assert_composes_to::<(AllowList,), AllowList>();
     assert_composes_to::<(BlockList,), BlockList>();
-    assert_composes_to::<(RWA,), RWA>();
-    assert_composes_to::<(Vault,), Vault>();
+    assert_composes_to::<(TotalSupply,), TotalSupply>();
     assert_composes_to::<(FungibleVotes,), FungibleVotes>();
 }
 
@@ -66,12 +68,15 @@ fn additive_extensions_are_ignored() {
     // resolution.
     assert_composes_to::<(AllowList, Burnable), AllowList>();
     assert_composes_to::<(Burnable, AllowList), AllowList>();
-    assert_composes_to::<(Vault, Burnable), Vault>();
-    assert_composes_to::<(RWA, Burnable), RWA>();
+    assert_composes_to::<(Vault, TotalSupply, Burnable), Vault>();
+    assert_composes_to::<(RWA, Burnable, TotalSupply), RWA>();
     // Higher arities, covering every tuple impl.
     assert_composes_to::<(Burnable, FungibleVotes, Burnable), FungibleVotes>();
     assert_composes_to::<(BlockList, Burnable, Burnable, Burnable), BlockList>();
     assert_composes_to::<(Burnable, Burnable, Base, Burnable, Burnable), Base>();
+    // Curated pairs are not disturbed by additive markers either.
+    assert_composes_to::<(AllowList, TotalSupply, Burnable), TotalSupplyAllowList>();
+    assert_composes_to::<(Burnable, TotalSupply, BlockList), TotalSupplyBlockList>();
 }
 
 #[test]
@@ -141,6 +146,60 @@ fn combinations_back_their_list_extensions() {
     assert_blocklist::<AllowBlockList>();
     assert_blocklist::<BlockListVotes>();
     assert_blocklist::<AllowBlockListVotes>();
+    assert_allowlist::<TotalSupplyAllowList>();
+    assert_allowlist::<TotalSupplyAllowBlockList>();
+    assert_blocklist::<TotalSupplyBlockList>();
+    assert_blocklist::<TotalSupplyAllowBlockList>();
+}
+
+#[test]
+fn total_supply_combinations_are_order_insensitive() {
+    assert_eq!(
+        TypeId::of::<Compose<(AllowList, TotalSupply)>>(),
+        TypeId::of::<Compose<(TotalSupply, AllowList)>>(),
+    );
+    assert_eq!(
+        TypeId::of::<Compose<(BlockList, TotalSupply)>>(),
+        TypeId::of::<Compose<(TotalSupply, BlockList)>>(),
+    );
+    // every ordering of the triple resolves to the same type
+    assert_composes_to::<(AllowList, BlockList, TotalSupply), TotalSupplyAllowBlockList>();
+    assert_composes_to::<(AllowList, TotalSupply, BlockList), TotalSupplyAllowBlockList>();
+    assert_composes_to::<(BlockList, AllowList, TotalSupply), TotalSupplyAllowBlockList>();
+    assert_composes_to::<(TotalSupply, AllowList, BlockList), TotalSupplyAllowBlockList>();
+    assert_composes_to::<(TotalSupply, BlockList, AllowList), TotalSupplyAllowBlockList>();
+    // the combined types are distinct from their members and from each other
+    assert_ne!(TypeId::of::<TotalSupplyAllowList>(), TypeId::of::<AllowList>());
+    assert_ne!(TypeId::of::<TotalSupplyAllowList>(), TypeId::of::<TotalSupply>());
+    assert_ne!(TypeId::of::<TotalSupplyAllowBlockList>(), TypeId::of::<AllowBlockList>());
+    assert_ne!(TypeId::of::<TotalSupplyAllowBlockList>(), TypeId::of::<TotalSupplyAllowList>());
+}
+
+// `RWA` and `Vault` require `TotalSupply` in the list and resolve to
+// themselves once it is there, in any position. Lists missing it are rejected
+// at compile time and cannot be covered here.
+#[test]
+fn rwa_and_vault_require_total_supply_in_the_list() {
+    assert_composes_to::<(RWA, TotalSupply), RWA>();
+    assert_composes_to::<(TotalSupply, RWA), RWA>();
+    assert_composes_to::<(Burnable, RWA, Burnable, TotalSupply), RWA>();
+    assert_composes_to::<(Vault, TotalSupply), Vault>();
+    assert_composes_to::<(TotalSupply, Vault), Vault>();
+    assert_composes_to::<(TotalSupply, Burnable, Vault), Vault>();
+}
+
+// Every supply-aware contract type has to back `FungibleTotalSupply`. A
+// missing impl fails here at compile time instead of at some downstream
+// contract's build.
+#[test]
+fn supply_aware_contract_types_back_total_supply() {
+    fn assert_supply<T: TotalSupplyOverrides>() {}
+    assert_supply::<TotalSupply>();
+    assert_supply::<TotalSupplyAllowList>();
+    assert_supply::<TotalSupplyBlockList>();
+    assert_supply::<TotalSupplyAllowBlockList>();
+    assert_supply::<RWA>();
+    assert_supply::<Vault>();
 }
 
 #[contract]
@@ -559,6 +618,248 @@ fn allow_block_list_votes_rejects_not_allowed_receiver() {
         AllowBlockListVotes::mint(&e, &alice, 100);
         // `bob` is not allowed
         <AllowBlockListVotes as ContractOverrides>::transfer(
+            &e,
+            &alice,
+            &MuxedAddress::from(bob),
+            30,
+        );
+    });
+}
+
+#[test]
+fn total_supply_allow_list_burn_decreases_supply() {
+    let (e, address) = setup_env();
+    let account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint(&e, &account, 100);
+        AllowList::allow_user(&e, &account);
+        <TotalSupplyAllowList as BurnableOverrides>::burn(&e, &account, 40);
+        assert_eq!(Base::balance(&e, &account), 60);
+        assert_eq!(TotalSupplyAllowList::total_supply(&e), 60);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #113)")]
+fn total_supply_allow_list_burn_respects_policy() {
+    let (e, address) = setup_env();
+    let account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint(&e, &account, 100);
+        // `account` is not allowed, the allowlist policy has to reject the
+        // burn
+        <TotalSupplyAllowList as BurnableOverrides>::burn(&e, &account, 40);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #113)")]
+fn total_supply_allow_list_transfer_respects_policy() {
+    let (e, address) = setup_env();
+    let from = Address::generate(&e);
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint(&e, &from, 100);
+        // neither account is allowed, the allowlist policy has to reject the
+        // transfer
+        <TotalSupplyAllowList as ContractOverrides>::transfer(
+            &e,
+            &from,
+            &MuxedAddress::from(recipient),
+            30,
+        );
+    });
+}
+
+#[test]
+fn total_supply_block_list_applies_policy_and_tracks_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        TotalSupplyBlockList::mint(&e, &alice, 100);
+        assert_eq!(TotalSupplyBlockList::total_supply(&e), 100);
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyBlockList as ContractOverrides>::approve(&e, &alice, &spender, 50, 1000);
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyBlockList as ContractOverrides>::transfer(
+            &e,
+            &alice,
+            &MuxedAddress::from(bob.clone()),
+            30,
+        );
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyBlockList as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 20);
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyBlockList as BurnableOverrides>::burn(&e, &alice, 10);
+    });
+
+    e.as_contract(&address, || {
+        assert_eq!(Base::balance(&e, &alice), 40);
+        assert_eq!(Base::balance(&e, &bob), 50);
+        assert_eq!(Base::allowance(&e, &alice, &spender), 30);
+        assert_eq!(TotalSupplyBlockList::total_supply(&e), 90);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn total_supply_block_list_transfer_rejects_blocked_receiver() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        TotalSupplyBlockList::mint(&e, &alice, 100);
+        BlockList::block_user(&e, &bob);
+        <TotalSupplyBlockList as ContractOverrides>::transfer(
+            &e,
+            &alice,
+            &MuxedAddress::from(bob),
+            30,
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn total_supply_block_list_approve_rejects_blocked_owner() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        TotalSupplyBlockList::mint(&e, &alice, 100);
+        BlockList::block_user(&e, &alice);
+        <TotalSupplyBlockList as ContractOverrides>::approve(&e, &alice, &spender, 50, 1000);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn total_supply_block_list_transfer_from_rejects_blocked_sender() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        TotalSupplyBlockList::mint(&e, &alice, 100);
+        Base::approve(&e, &alice, &spender, 50, 1000);
+        BlockList::block_user(&e, &alice);
+        <TotalSupplyBlockList as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 20);
+    });
+}
+
+#[test]
+fn total_supply_block_list_burn_from_decreases_supply() {
+    let (e, address) = setup_env();
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint(&e, &owner, 100);
+        Base::approve(&e, &owner, &spender, 40, e.ledger().sequence() + 100);
+        <TotalSupplyBlockList as BurnableOverrides>::burn_from(&e, &spender, &owner, 40);
+        assert_eq!(Base::balance(&e, &owner), 60);
+        assert_eq!(total_supply(&e), 60);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn total_supply_block_list_burn_respects_policy() {
+    let (e, address) = setup_env();
+    let account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint(&e, &account, 100);
+        BlockList::block_user(&e, &account);
+        // `account` is blocked, the blocklist policy has to reject the burn
+        <TotalSupplyBlockList as BurnableOverrides>::burn(&e, &account, 40);
+    });
+}
+
+#[test]
+fn total_supply_allow_block_list_tracks_supply_under_both_policies() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        AllowList::allow_user(&e, &alice);
+        AllowList::allow_user(&e, &bob);
+        TotalSupplyAllowBlockList::mint(&e, &alice, 100);
+        assert_eq!(TotalSupplyAllowBlockList::total_supply(&e), 100);
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyAllowBlockList as ContractOverrides>::approve(&e, &alice, &spender, 50, 1000);
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyAllowBlockList as ContractOverrides>::transfer(
+            &e,
+            &alice,
+            &MuxedAddress::from(bob.clone()),
+            30,
+        );
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyAllowBlockList as ContractOverrides>::transfer_from(
+            &e, &spender, &alice, &bob, 20,
+        );
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyAllowBlockList as BurnableOverrides>::burn(&e, &alice, 10);
+    });
+    e.as_contract(&address, || {
+        <TotalSupplyAllowBlockList as BurnableOverrides>::burn_from(&e, &spender, &alice, 10);
+    });
+
+    e.as_contract(&address, || {
+        assert_eq!(Base::balance(&e, &alice), 30);
+        assert_eq!(Base::balance(&e, &bob), 50);
+        assert_eq!(Base::allowance(&e, &alice, &spender), 20);
+        assert_eq!(TotalSupplyAllowBlockList::total_supply(&e), 80);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn total_supply_allow_block_list_burn_rejects_blocked_account() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        AllowList::allow_user(&e, &alice);
+        TotalSupplyAllowBlockList::mint(&e, &alice, 100);
+        BlockList::block_user(&e, &alice);
+        <TotalSupplyAllowBlockList as BurnableOverrides>::burn(&e, &alice, 10);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #113)")]
+fn total_supply_allow_block_list_transfer_rejects_not_allowed_receiver() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        AllowList::allow_user(&e, &alice);
+        TotalSupplyAllowBlockList::mint(&e, &alice, 100);
+        // `bob` is not allowed
+        <TotalSupplyAllowBlockList as ContractOverrides>::transfer(
             &e,
             &alice,
             &MuxedAddress::from(bob),
