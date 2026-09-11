@@ -48,14 +48,6 @@ impl BurnableOverrides for AllowBlockList {
 }
 
 impl AllowBlockList {
-    /// Transfers `amount` of tokens from `from` to `to`, applying both list
-    /// policies.
-    ///
-    /// # Errors
-    ///
-    /// * [`FungibleTokenError::UserBlocked`] - When either `from` or `to` is
-    ///   blocked.
-    /// * refer to [`AllowList::transfer`] errors.
     pub fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         if BlockList::blocked(e, from) || BlockList::blocked(e, &to.address()) {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
@@ -63,14 +55,6 @@ impl AllowBlockList {
         AllowList::transfer(e, from, to, amount);
     }
 
-    /// Transfers `amount` of tokens from `from` to `to` using the allowance
-    /// mechanism, applying both list policies.
-    ///
-    /// # Errors
-    ///
-    /// * [`FungibleTokenError::UserBlocked`] - When either `from` or `to` is
-    ///   blocked.
-    /// * refer to [`AllowList::transfer_from`] errors.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         if BlockList::blocked(e, from) || BlockList::blocked(e, to) {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
@@ -78,13 +62,6 @@ impl AllowBlockList {
         AllowList::transfer_from(e, spender, from, to, amount);
     }
 
-    /// Sets the allowance of `spender` over the tokens of `owner`, applying
-    /// both list policies to `owner`.
-    ///
-    /// # Errors
-    ///
-    /// * [`FungibleTokenError::UserBlocked`] - When `owner` is blocked.
-    /// * refer to [`AllowList::approve`] errors.
     pub fn approve(
         e: &Env,
         owner: &Address,
@@ -98,12 +75,6 @@ impl AllowBlockList {
         AllowList::approve(e, owner, spender, amount, live_until_ledger);
     }
 
-    /// Destroys `amount` of tokens from `from`, applying both list policies.
-    ///
-    /// # Errors
-    ///
-    /// * [`FungibleTokenError::UserBlocked`] - When `from` is blocked.
-    /// * refer to [`AllowList::burn`] errors.
     pub fn burn(e: &Env, from: &Address, amount: i128) {
         if BlockList::blocked(e, from) {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
@@ -111,13 +82,6 @@ impl AllowBlockList {
         AllowList::burn(e, from, amount);
     }
 
-    /// Destroys `amount` of tokens from `from` using the allowance mechanism,
-    /// applying both list policies.
-    ///
-    /// # Errors
-    ///
-    /// * [`FungibleTokenError::UserBlocked`] - When `from` is blocked.
-    /// * refer to [`AllowList::burn_from`] errors.
     pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         if BlockList::blocked(e, from) {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
@@ -157,36 +121,25 @@ impl BurnableOverrides for AllowListVotes {
 }
 
 impl AllowListVotes {
-    /// refer to [`AllowList::transfer`] and [`transfer_voting_units`] for the
-    /// inline documentation.
     pub fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         AllowList::transfer(e, from, to, amount);
         move_voting_units(e, Some(from), Some(&to.address()), amount);
     }
 
-    /// refer to [`AllowList::transfer_from`] and [`transfer_voting_units`] for
-    /// the inline documentation.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         AllowList::transfer_from(e, spender, from, to, amount);
         move_voting_units(e, Some(from), Some(to), amount);
     }
 
-    /// Minting is not gated by the list policy.
-    ///
-    /// refer to [`FungibleVotes::mint`] for the inline documentation.
     pub fn mint(e: &Env, to: &Address, amount: i128) {
         FungibleVotes::mint(e, to, amount);
     }
 
-    /// refer to [`AllowList::burn`] and [`transfer_voting_units`] for the
-    /// inline documentation.
     pub fn burn(e: &Env, from: &Address, amount: i128) {
         AllowList::burn(e, from, amount);
         move_voting_units(e, Some(from), None, amount);
     }
 
-    /// refer to [`AllowList::burn_from`] and [`transfer_voting_units`] for the
-    /// inline documentation.
     pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         AllowList::burn_from(e, spender, from, amount);
         move_voting_units(e, Some(from), None, amount);
@@ -224,36 +177,25 @@ impl BurnableOverrides for BlockListVotes {
 }
 
 impl BlockListVotes {
-    /// refer to [`BlockList::transfer`] and [`transfer_voting_units`] for the
-    /// inline documentation.
     pub fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         BlockList::transfer(e, from, to, amount);
         move_voting_units(e, Some(from), Some(&to.address()), amount);
     }
 
-    /// refer to [`BlockList::transfer_from`] and [`transfer_voting_units`] for
-    /// the inline documentation.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         BlockList::transfer_from(e, spender, from, to, amount);
         move_voting_units(e, Some(from), Some(to), amount);
     }
 
-    /// Minting is not gated by the list policy.
-    ///
-    /// refer to [`FungibleVotes::mint`] for the inline documentation.
     pub fn mint(e: &Env, to: &Address, amount: i128) {
         FungibleVotes::mint(e, to, amount);
     }
 
-    /// refer to [`BlockList::burn`] and [`transfer_voting_units`] for the
-    /// inline documentation.
     pub fn burn(e: &Env, from: &Address, amount: i128) {
         BlockList::burn(e, from, amount);
         move_voting_units(e, Some(from), None, amount);
     }
 
-    /// refer to [`BlockList::burn_from`] and [`transfer_voting_units`] for the
-    /// inline documentation.
     pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         BlockList::burn_from(e, spender, from, amount);
         move_voting_units(e, Some(from), None, amount);
@@ -291,36 +233,25 @@ impl BurnableOverrides for AllowBlockListVotes {
 }
 
 impl AllowBlockListVotes {
-    /// refer to [`AllowBlockList::transfer`] and [`transfer_voting_units`] for
-    /// the inline documentation.
     pub fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         AllowBlockList::transfer(e, from, to, amount);
         move_voting_units(e, Some(from), Some(&to.address()), amount);
     }
 
-    /// refer to [`AllowBlockList::transfer_from`] and [`transfer_voting_units`]
-    /// for the inline documentation.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         AllowBlockList::transfer_from(e, spender, from, to, amount);
         move_voting_units(e, Some(from), Some(to), amount);
     }
 
-    /// Minting is not gated by the list policy.
-    ///
-    /// refer to [`FungibleVotes::mint`] for the inline documentation.
     pub fn mint(e: &Env, to: &Address, amount: i128) {
         FungibleVotes::mint(e, to, amount);
     }
 
-    /// refer to [`AllowBlockList::burn`] and [`transfer_voting_units`] for the
-    /// inline documentation.
     pub fn burn(e: &Env, from: &Address, amount: i128) {
         AllowBlockList::burn(e, from, amount);
         move_voting_units(e, Some(from), None, amount);
     }
 
-    /// refer to [`AllowBlockList::burn_from`] and [`transfer_voting_units`] for
-    /// the inline documentation.
     pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         AllowBlockList::burn_from(e, spender, from, amount);
         move_voting_units(e, Some(from), None, amount);
