@@ -4,7 +4,7 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use crate::fungible::{
     extensions::{
-        capped::{check_cap, query_cap, set_cap},
+        capped::{check_cap, query_cap, set_cap, Capped},
         total_supply::{mint, total_supply},
     },
     Base,
@@ -136,5 +136,45 @@ fn test_cap_not_set() {
         // Try to query cap without setting it first, which should trigger
         // CapNotSet error
         let _ = query_cap(&e);
+    });
+}
+
+#[test]
+fn capped_mint_respects_cap() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        assert_eq!(Capped::cap(&e), 1000);
+
+        Capped::mint(&e, &user, 600);
+        Capped::mint(&e, &user, 400);
+        assert_eq!(Base::balance(&e, &user), 1000);
+        assert_eq!(total_supply(&e), 1000);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #106)")]
+fn capped_mint_exceeds_cap() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        Capped::mint(&e, &user, 600);
+        Capped::mint(&e, &user, 401);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #108)")]
+fn capped_mint_requires_a_cap() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    e.as_contract(&address, || {
+        Capped::mint(&e, &user, 1);
     });
 }
