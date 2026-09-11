@@ -21,7 +21,8 @@ use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 /// [`FungibleVault`] requires
 /// [`crate::fungible::total_supply::FungibleTotalSupply`] to be implemented
 /// alongside it (an empty `impl` block is enough), so that the supply of
-/// shares is exposed by the contract.
+/// shares is exposed by the contract. `TotalSupply` has to be listed in the
+/// contract type as well, e.g. `Compose<(Vault, TotalSupply)>`.
 ///
 /// # Design Overview
 ///

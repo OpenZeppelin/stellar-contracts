@@ -126,8 +126,7 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 ///   [`crate::vault::FungibleVault`] and
 ///   [`crate::fungible::total_supply::FungibleTotalSupply`] traits).
 /// * [`crate::fungible::votes::FungibleVotes`] (enabling the compatibility and
-///   overrides for the [`stellar_governance::votes::Votes`] and
-///   [`crate::fungible::total_supply::FungibleTotalSupply`] traits).
+///   overrides for the [`stellar_governance::votes::Votes`] trait).
 ///
 /// The chosen contract type is declared through the `ContractType`
 /// associated type, wrapped in [`crate::fungible::combinations::Compose`].

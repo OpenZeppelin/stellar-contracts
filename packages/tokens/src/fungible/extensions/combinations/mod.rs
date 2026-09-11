@@ -40,11 +40,13 @@
 //! `Compose<(AllowList, BlockList, FungibleVotes)>`. [`TotalSupply`] can be
 //! added to `AllowList`, `BlockList` or both, e.g.
 //! `Compose<(AllowList, TotalSupply)>` or
-//! `Compose<(AllowList, BlockList, TotalSupply)>`. `RWA`, `Vault` and
-//! `FungibleVotes` (alone or combined with the lists) already track the
-//! supply on their own, so listing `TotalSupply` next to them is rejected
-//! with a dedicated compile error. The resolved contract type enforces every
-//! listed transfer
+//! `Compose<(AllowList, BlockList, TotalSupply)>`. `RWA` and `Vault` require
+//! `TotalSupply` next to them, e.g. `Compose<(RWA, TotalSupply)>`; a list
+//! with `RWA` or `Vault` but without `TotalSupply` is rejected with a
+//! dedicated compile error, as is a list naming `TotalSupply` twice.
+//! `FungibleVotes` tracks voting units, not the token supply, and has no
+//! curated combination with `TotalSupply`. The resolved contract type
+//! enforces every listed transfer
 //! policy, tracks voting units when `FungibleVotes` is listed, tracks the
 //! total supply when `TotalSupply` is listed, and backs the corresponding
 //! extension traits. The list is order-insensitive:
@@ -71,7 +73,6 @@ use crate::{
             allowlist::AllowList, blocklist::BlockList, burnable::Burnable,
             total_supply::TotalSupply, votes::FungibleVotes,
         },
-        overrides::TotalSupplyOverrides,
         Base, ContractOverrides,
     },
     rwa::RWA,
@@ -99,11 +100,13 @@ pub type Compose<L> = <L as Composable>::Out;
 /// such lists do not compile.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a valid contract type combination",
-    note = "valid single contract types: `Base`, `AllowList`, `BlockList`, `TotalSupply`, `RWA`, \
-            `Vault`, `FungibleVotes`",
+    note = "valid single contract types: `Base`, `AllowList`, `BlockList`, `TotalSupply`, \
+            `FungibleVotes`",
     note = "curated combinations: `(AllowList, BlockList)`, `(AllowList, FungibleVotes)`, \
             `(BlockList, FungibleVotes)`, `(AllowList, BlockList, FungibleVotes)`, `(AllowList, \
-            TotalSupply)`, `(BlockList, TotalSupply)`, `(AllowList, BlockList, TotalSupply)`",
+            TotalSupply)`, `(BlockList, TotalSupply)`, `(AllowList, BlockList, TotalSupply)`, \
+            `(RWA, TotalSupply)`, `(Vault, TotalSupply)`",
+    note = "`RWA` and `Vault` require `TotalSupply` in the list",
     note = "additive extensions (e.g. `Burnable`) may be listed alongside a contract type; they \
             do not affect the resolved type",
     note = "lists of up to 5 entries are supported"
@@ -146,23 +149,93 @@ mod fold {
         type Out;
     }
 
-    /// Error carrier for `TotalSupply` listed next to a contract type `By`
-    /// that already tracks the supply on its own. It is never implemented:
-    /// the redundancy rows below name it in a `where` clause, so the failure
-    /// is reported with this message instead of the generic [`Combine`] one.
-    /// Each of those rows has to be the only impl unifying with its pair,
-    /// otherwise rustc winnows the candidates and falls back to the generic
-    /// message.
-    #[diagnostic::on_unimplemented(
-        message = "`TotalSupply` is redundant in this `Compose` list: `{By}` already tracks the \
-                   total supply",
-        note = "remove `TotalSupply` from the list; `FungibleTotalSupply` is implemented on the \
-                contract directly (`{By}` requires it)"
-    )]
-    pub trait SupplyAlreadyTracked<By> {}
+    /// Contribution of an entry that only works with the total supply
+    /// tracked (`RWA`, `Vault`): the contribution `C` it stands for, plus an
+    /// open requirement that `TotalSupply` appears somewhere in the list.
+    ///
+    /// This gives `RWA` and `Vault` two roles inside the fold. The entry a
+    /// developer writes contributes `NeedsSupply<RWA>`, never the bare `RWA`.
+    /// The bare `RWA` only shows up as the running result after `TotalSupply`
+    /// has been met. So every row below with a bare `RWA` or `Vault` on its
+    /// left-hand side applies to a list that already contains `TotalSupply`.
+    ///
+    /// Meeting `TotalSupply` removes the wrapper (refer to [`WithSupply`]);
+    /// other entries fold into `C` and keep the requirement open; a list that
+    /// ends with it open is rejected by [`Finalize`] through
+    /// [`SupplyRequirementMet`].
+    #[allow(dead_code)] // type-level marker, never constructed
+    pub struct NeedsSupply<C>(core::marker::PhantomData<C>);
 
-    /// Contract types built on the `TotalSupply` counter.
-    pub trait CountedSupply {}
+    /// Resolution of a contribution once `TotalSupply` joins it: the list
+    /// policies resolve to their supply-tracking combination, the
+    /// self-tracking contract types to themselves, and [`Nil`] to
+    /// `TotalSupply`.
+    #[diagnostic::on_unimplemented(
+        message = "`{Self}` cannot be combined with `TotalSupply` in a `Compose` list",
+        note = "no combination of these contract types is curated"
+    )]
+    pub trait WithSupply {
+        type Out;
+    }
+
+    /// Error carrier for a list that ends with the `TotalSupply` requirement
+    /// open, e.g. `Compose<(RWA,)>`. Nothing implements it, on purpose: it
+    /// exists only so that its message is printed when the [`Finalize`] row
+    /// for [`NeedsSupply`] fails its `where` clause. Refer to [`Probe`] for
+    /// how these error rows work.
+    #[diagnostic::on_unimplemented(
+        message = "this `Compose` list requires `TotalSupply`",
+        note = "`RWA` and `Vault` only work with the total supply tracked; add `TotalSupply` to \
+                the list, e.g. `Compose<(RWA, TotalSupply)>`"
+    )]
+    pub trait SupplyRequirementMet {}
+
+    /// Error carrier for `TotalSupply` appearing twice in a list, e.g.
+    /// `Compose<(RWA, TotalSupply, TotalSupply)>`. Nothing implements it, on
+    /// purpose: it exists only so that its message is printed when one of the
+    /// duplicate rows fails its `where` clause. Refer to [`Probe`] for how
+    /// these error rows work.
+    #[diagnostic::on_unimplemented(
+        message = "`TotalSupply` is listed more than once in this `Compose` list",
+        note = "list `TotalSupply` once"
+    )]
+    pub trait SupplyListedOnce {}
+
+    /// Lends a type parameter to the error rows. It carries no meaning of
+    /// its own. Why it is needed, step by step, using the row that rejects a
+    /// second `TotalSupply` after `RWA`:
+    ///
+    /// 1. An error row is an impl that can never succeed. Its `where` clause
+    ///    demands a trait nothing implements ([`SupplyListedOnce`]), and that
+    ///    trait's `on_unimplemented` attribute carries the message. When the
+    ///    compiler selects the row and fails that clause, it prints the message
+    ///    instead of the generic [`Combine`] one.
+    /// 2. The obvious spelling, `impl Combine<TotalSupply> for RWA where RWA:
+    ///    SupplyListedOnce`, does not compile. A `where` clause that mentions
+    ///    no type parameter is evaluated while the library itself is being
+    ///    compiled, and since it is false, the crate is rejected (Rust calls
+    ///    these trivial bounds).
+    /// 3. Making the row generic in `Self` or in the trait argument defers the
+    ///    check but breaks the message. The compiler picks candidate impls by
+    ///    shape alone, so a generic row is the candidate for every unrelated
+    ///    pair as well, and prints its message for them.
+    /// 4. The row therefore has to stay concrete in both positions and still
+    ///    name a type parameter. `impl<T>` provides it and defers the check.
+    ///    The clause `RWA: Probe<Never = T>` ties `T` to the impl, which Rust
+    ///    requires of every type parameter, and pins it to [`Never`], since
+    ///    every type implements `Probe` that way. `T: SupplyListedOnce` is the
+    ///    clause that fails at the use site and selects the message.
+    pub trait Probe {
+        type Never;
+    }
+
+    /// The type every [`Probe`] projects to. Empty because nothing is ever
+    /// constructed from it; it only exists to be the `T` of the error rows.
+    pub enum Never {}
+
+    impl<T> Probe for T {
+        type Never = Never;
+    }
 
     /// Final step of the fold: maps the folded contribution to the resolved
     /// contract type. Its only non-trivial rule is [`Nil`] resolving to
@@ -172,7 +245,10 @@ mod fold {
     }
 }
 
-use fold::{Combine, CountedSupply, Extension, Finalize, Nil, SupplyAlreadyTracked};
+use fold::{
+    Combine, Extension, Finalize, NeedsSupply, Nil, Probe, SupplyListedOnce, SupplyRequirementMet,
+    WithSupply,
+};
 
 type Contrib<T> = <T as Extension>::Contribution;
 type Pair<A, B> = <A as Combine<B>>::Out;
@@ -191,11 +267,15 @@ impl Extension for BlockList {
 impl Extension for TotalSupply {
     type Contribution = TotalSupply;
 }
+// `RWA` and `Vault` only work with the total supply tracked, so they open a
+// requirement that `TotalSupply` appears in the list. Inside the fold, the
+// bare `RWA` and `Vault` mean that requirement has been met (refer to
+// `NeedsSupply`).
 impl Extension for RWA {
-    type Contribution = RWA;
+    type Contribution = NeedsSupply<RWA>;
 }
 impl Extension for Vault {
-    type Contribution = Vault;
+    type Contribution = NeedsSupply<Vault>;
 }
 impl Extension for FungibleVotes {
     type Contribution = FungibleVotes;
@@ -329,40 +409,205 @@ impl Combine<AllowList> for TotalSupplyBlockList {
     type Out = TotalSupplyAllowBlockList;
 }
 
-// Redundant `TotalSupply`: contract types that already answer
-// `total_supply` (`RWA`, `Vault`, `FungibleVotes` and its combinations, or
-// the counter itself) reject the marker with a dedicated error. The `where`
-// clauses are never satisfied; they only select the message.
-impl CountedSupply for TotalSupply {}
-impl CountedSupply for TotalSupplyAllowList {}
-impl CountedSupply for TotalSupplyBlockList {}
-impl CountedSupply for TotalSupplyAllowBlockList {}
-impl<S: TotalSupplyOverrides> Combine<TotalSupply> for S
-where
-    S: SupplyAlreadyTracked<S>,
-{
-    type Out = S;
+// What a contribution resolves to once `TotalSupply` joins it.
+impl WithSupply for Nil {
+    type Out = TotalSupply;
 }
-impl<C: CountedSupply> Combine<RWA> for C
-where
-    C: SupplyAlreadyTracked<RWA>,
-{
-    type Out = C;
+impl WithSupply for AllowList {
+    type Out = TotalSupplyAllowList;
 }
-impl<C: CountedSupply> Combine<Vault> for C
-where
-    C: SupplyAlreadyTracked<Vault>,
-{
-    type Out = C;
+impl WithSupply for BlockList {
+    type Out = TotalSupplyBlockList;
 }
-impl<C: CountedSupply> Combine<FungibleVotes> for C
+impl WithSupply for AllowBlockList {
+    type Out = TotalSupplyAllowBlockList;
+}
+impl WithSupply for RWA {
+    type Out = RWA;
+}
+impl WithSupply for Vault {
+    type Out = Vault;
+}
+
+// Open `TotalSupply` requirement, seen from the accumulator side: the running
+// result is `NeedsSupply<X>` and the next entry arrives.
+//
+// `TotalSupply` closes it.
+impl<X: WithSupply> Combine<TotalSupply> for NeedsSupply<X> {
+    type Out = <X as WithSupply>::Out;
+}
+// Any other entry folds into the wrapped contribution and keeps it open.
+impl<X: Combine<Nil>> Combine<Nil> for NeedsSupply<X> {
+    type Out = NeedsSupply<Pair<X, Nil>>;
+}
+impl<X: Combine<Base>> Combine<Base> for NeedsSupply<X> {
+    type Out = NeedsSupply<Pair<X, Base>>;
+}
+impl<X: Combine<AllowList>> Combine<AllowList> for NeedsSupply<X> {
+    type Out = NeedsSupply<Pair<X, AllowList>>;
+}
+impl<X: Combine<BlockList>> Combine<BlockList> for NeedsSupply<X> {
+    type Out = NeedsSupply<Pair<X, BlockList>>;
+}
+impl<X: Combine<FungibleVotes>> Combine<FungibleVotes> for NeedsSupply<X> {
+    type Out = NeedsSupply<Pair<X, FungibleVotes>>;
+}
+impl<X: Combine<Y>, Y> Combine<NeedsSupply<Y>> for NeedsSupply<X> {
+    type Out = NeedsSupply<Pair<X, Y>>;
+}
+
+// Open `TotalSupply` requirement, seen from the entry side: the next entry is
+// `RWA` or `Vault`, contributing `NeedsSupply<Y>`.
+//
+// An accumulator that already holds the supply satisfies it on the spot.
+impl<Y: WithSupply> Combine<NeedsSupply<Y>> for TotalSupply {
+    type Out = <Y as WithSupply>::Out;
+}
+impl<Y> Combine<NeedsSupply<Y>> for TotalSupplyAllowList
 where
-    C: SupplyAlreadyTracked<FungibleVotes>,
+    TotalSupplyAllowList: Combine<Y>,
 {
-    type Out = C;
+    type Out = Pair<TotalSupplyAllowList, Y>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for TotalSupplyBlockList
+where
+    TotalSupplyBlockList: Combine<Y>,
+{
+    type Out = Pair<TotalSupplyBlockList, Y>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for TotalSupplyAllowBlockList
+where
+    TotalSupplyAllowBlockList: Combine<Y>,
+{
+    type Out = Pair<TotalSupplyAllowBlockList, Y>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for RWA
+where
+    RWA: Combine<Y>,
+{
+    type Out = Pair<RWA, Y>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for Vault
+where
+    Vault: Combine<Y>,
+{
+    type Out = Pair<Vault, Y>;
+}
+// An accumulator without the supply takes the requirement over.
+impl<Y> Combine<NeedsSupply<Y>> for Nil
+where
+    Nil: Combine<Y>,
+{
+    type Out = NeedsSupply<Pair<Nil, Y>>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for Base
+where
+    Base: Combine<Y>,
+{
+    type Out = NeedsSupply<Pair<Base, Y>>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for AllowList
+where
+    AllowList: Combine<Y>,
+{
+    type Out = NeedsSupply<Pair<AllowList, Y>>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for BlockList
+where
+    BlockList: Combine<Y>,
+{
+    type Out = NeedsSupply<Pair<BlockList, Y>>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for AllowBlockList
+where
+    AllowBlockList: Combine<Y>,
+{
+    type Out = NeedsSupply<Pair<AllowBlockList, Y>>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for FungibleVotes
+where
+    FungibleVotes: Combine<Y>,
+{
+    type Out = NeedsSupply<Pair<FungibleVotes, Y>>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for AllowListVotes
+where
+    AllowListVotes: Combine<Y>,
+{
+    type Out = NeedsSupply<Pair<AllowListVotes, Y>>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for BlockListVotes
+where
+    BlockListVotes: Combine<Y>,
+{
+    type Out = NeedsSupply<Pair<BlockListVotes, Y>>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for AllowBlockListVotes
+where
+    AllowBlockListVotes: Combine<Y>,
+{
+    type Out = NeedsSupply<Pair<AllowBlockListVotes, Y>>;
+}
+
+// `TotalSupply` listed twice. These rows never succeed: they exist only to
+// select the error message (refer to `Probe`). Their left-hand side is the
+// running result, not the entry a developer wrote, and a bare `RWA` or `Vault`
+// only becomes the running result after `TotalSupply` was met (refer to
+// `NeedsSupply`), so a `TotalSupply` arriving here is always a second one. One
+// concrete row per pair.
+impl<T> Combine<TotalSupply> for TotalSupply
+where
+    TotalSupply: Probe<Never = T>,
+    T: SupplyListedOnce,
+{
+    type Out = TotalSupply;
+}
+impl<T> Combine<TotalSupply> for TotalSupplyAllowList
+where
+    TotalSupplyAllowList: Probe<Never = T>,
+    T: SupplyListedOnce,
+{
+    type Out = TotalSupplyAllowList;
+}
+impl<T> Combine<TotalSupply> for TotalSupplyBlockList
+where
+    TotalSupplyBlockList: Probe<Never = T>,
+    T: SupplyListedOnce,
+{
+    type Out = TotalSupplyBlockList;
+}
+impl<T> Combine<TotalSupply> for TotalSupplyAllowBlockList
+where
+    TotalSupplyAllowBlockList: Probe<Never = T>,
+    T: SupplyListedOnce,
+{
+    type Out = TotalSupplyAllowBlockList;
+}
+impl<T> Combine<TotalSupply> for RWA
+where
+    RWA: Probe<Never = T>,
+    T: SupplyListedOnce,
+{
+    type Out = RWA;
+}
+impl<T> Combine<TotalSupply> for Vault
+where
+    Vault: Probe<Never = T>,
+    T: SupplyListedOnce,
+{
+    type Out = Vault;
 }
 
 impl Finalize for Nil {
+    type Out = Base;
+}
+// A list that ends with the `TotalSupply` requirement open, e.g. `(RWA,)`.
+// This row never succeeds; it only selects the error message (refer to
+// `Probe`).
+impl<X> Finalize for NeedsSupply<X>
+where
+    NeedsSupply<X>: SupplyRequirementMet,
+{
     type Out = Base;
 }
 impl Finalize for Base {
@@ -423,10 +668,21 @@ impl Composable for BlockList {
 impl Composable for TotalSupply {
     type Out = TotalSupply;
 }
-impl Composable for RWA {
+// `RWA` and `Vault` written bare, i.e. `Compose<RWA>`, miss `TotalSupply` by
+// construction. These rows never succeed; they only select the error message
+// (refer to `Probe`).
+impl<T> Composable for RWA
+where
+    RWA: Probe<Never = T>,
+    T: SupplyRequirementMet,
+{
     type Out = RWA;
 }
-impl Composable for Vault {
+impl<T> Composable for Vault
+where
+    Vault: Probe<Never = T>,
+    T: SupplyRequirementMet,
+{
     type Out = Vault;
 }
 impl Composable for FungibleVotes {

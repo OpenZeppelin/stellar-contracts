@@ -50,8 +50,6 @@ fn bare_forms_resolve_to_themselves() {
     assert_composes_to::<AllowList, AllowList>();
     assert_composes_to::<BlockList, BlockList>();
     assert_composes_to::<TotalSupply, TotalSupply>();
-    assert_composes_to::<RWA, RWA>();
-    assert_composes_to::<Vault, Vault>();
     assert_composes_to::<FungibleVotes, FungibleVotes>();
 }
 
@@ -61,8 +59,6 @@ fn tuple_forms_resolve_to_themselves() {
     assert_composes_to::<(AllowList,), AllowList>();
     assert_composes_to::<(BlockList,), BlockList>();
     assert_composes_to::<(TotalSupply,), TotalSupply>();
-    assert_composes_to::<(RWA,), RWA>();
-    assert_composes_to::<(Vault,), Vault>();
     assert_composes_to::<(FungibleVotes,), FungibleVotes>();
 }
 
@@ -72,8 +68,8 @@ fn additive_extensions_are_ignored() {
     // resolution.
     assert_composes_to::<(AllowList, Burnable), AllowList>();
     assert_composes_to::<(Burnable, AllowList), AllowList>();
-    assert_composes_to::<(Vault, Burnable), Vault>();
-    assert_composes_to::<(RWA, Burnable), RWA>();
+    assert_composes_to::<(Vault, TotalSupply, Burnable), Vault>();
+    assert_composes_to::<(RWA, Burnable, TotalSupply), RWA>();
     // Higher arities, covering every tuple impl.
     assert_composes_to::<(Burnable, FungibleVotes, Burnable), FungibleVotes>();
     assert_composes_to::<(BlockList, Burnable, Burnable, Burnable), BlockList>();
@@ -179,6 +175,19 @@ fn total_supply_combinations_are_order_insensitive() {
     assert_ne!(TypeId::of::<TotalSupplyAllowBlockList>(), TypeId::of::<TotalSupplyAllowList>());
 }
 
+// `RWA` and `Vault` require `TotalSupply` in the list and resolve to
+// themselves once it is there, in any position. Lists missing it are rejected
+// at compile time and cannot be covered here.
+#[test]
+fn rwa_and_vault_require_total_supply_in_the_list() {
+    assert_composes_to::<(RWA, TotalSupply), RWA>();
+    assert_composes_to::<(TotalSupply, RWA), RWA>();
+    assert_composes_to::<(Burnable, RWA, Burnable, TotalSupply), RWA>();
+    assert_composes_to::<(Vault, TotalSupply), Vault>();
+    assert_composes_to::<(TotalSupply, Vault), Vault>();
+    assert_composes_to::<(TotalSupply, Burnable, Vault), Vault>();
+}
+
 // Every supply-aware contract type has to back `FungibleTotalSupply`. A
 // missing impl fails here at compile time instead of at some downstream
 // contract's build.
@@ -189,10 +198,6 @@ fn supply_aware_contract_types_back_total_supply() {
     assert_supply::<TotalSupplyAllowList>();
     assert_supply::<TotalSupplyBlockList>();
     assert_supply::<TotalSupplyAllowBlockList>();
-    assert_supply::<FungibleVotes>();
-    assert_supply::<AllowListVotes>();
-    assert_supply::<BlockListVotes>();
-    assert_supply::<AllowBlockListVotes>();
     assert_supply::<RWA>();
     assert_supply::<Vault>();
 }
@@ -860,25 +865,5 @@ fn total_supply_allow_block_list_transfer_rejects_not_allowed_receiver() {
             &MuxedAddress::from(bob),
             30,
         );
-    });
-}
-
-#[test]
-fn votes_combinations_serve_total_supply_from_checkpoints() {
-    let (e, address) = setup_env();
-    let alice = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        AllowList::allow_user(&e, &alice);
-        AllowBlockListVotes::mint(&e, &alice, 100);
-        assert_eq!(<AllowListVotes as TotalSupplyOverrides>::total_supply(&e), 100);
-        assert_eq!(<BlockListVotes as TotalSupplyOverrides>::total_supply(&e), 100);
-        assert_eq!(<AllowBlockListVotes as TotalSupplyOverrides>::total_supply(&e), 100);
-    });
-    e.as_contract(&address, || {
-        <AllowBlockListVotes as BurnableOverrides>::burn(&e, &alice, 40);
-    });
-    e.as_contract(&address, || {
-        assert_eq!(<AllowBlockListVotes as TotalSupplyOverrides>::total_supply(&e), 60);
     });
 }

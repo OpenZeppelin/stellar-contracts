@@ -433,22 +433,3 @@ impl TotalSupplyAllowBlockList {
         decrease_total_supply(e, amount);
     }
 }
-
-// The voting checkpoints already track the total supply of the votes
-// combinations; the query is served from them, exactly as for
-// [`FungibleVotes`].
-impl TotalSupplyOverrides for AllowListVotes {
-    fn total_supply(e: &Env) -> i128 {
-        <FungibleVotes as TotalSupplyOverrides>::total_supply(e)
-    }
-}
-impl TotalSupplyOverrides for BlockListVotes {
-    fn total_supply(e: &Env) -> i128 {
-        <FungibleVotes as TotalSupplyOverrides>::total_supply(e)
-    }
-}
-impl TotalSupplyOverrides for AllowBlockListVotes {
-    fn total_supply(e: &Env) -> i128 {
-        <FungibleVotes as TotalSupplyOverrides>::total_supply(e)
-    }
-}

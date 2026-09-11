@@ -45,11 +45,13 @@
 //! impl FungibleTotalSupply for MyToken {}
 //! ```
 //!
-//! The [`crate::rwa::RWA`], [`crate::vault::Vault`] and
-//! [`crate::fungible::votes::FungibleVotes`] contract types are inherently
-//! supply-aware; [`FungibleTotalSupply`] is implemented on top of them
-//! directly, and [`crate::rwa::RWAToken`] and [`crate::vault::FungibleVault`]
-//! require it.
+//! The [`crate::rwa::RWA`] and [`crate::vault::Vault`] contract types track
+//! the supply as part of their own accounting. They require `TotalSupply`
+//! next to them in the list, e.g. `Compose<(RWA, TotalSupply)>`, and
+//! [`crate::rwa::RWAToken`] and [`crate::vault::FungibleVault`] require
+//! [`FungibleTotalSupply`] as well.
+//! [`crate::fungible::votes::FungibleVotes`] tracks voting units, which are
+//! not the token supply, so it does not back this extension.
 //!
 //! The supply is stored in its own `persistent` entry, ensuring that mints
 //! and burns only conflict with each other and never with plain transfers.
@@ -85,14 +87,15 @@ use crate::fungible::FungibleToken;
 /// [`crate::fungible::blocklist::BlockList`] in any of their valid
 /// combinations (refer to [`crate::fungible::combinations::Compose`]).
 ///
-/// [`crate::rwa::RWA`], [`crate::vault::Vault`] and
+/// [`crate::rwa::RWA`] and [`crate::vault::Vault`] track the supply as part
+/// of their own accounting. They require `TotalSupply` next to them in the
+/// list, e.g. `Compose<(RWA, TotalSupply)>`, and this trait alongside:
+/// [`crate::rwa::RWAToken`] and [`crate::vault::FungibleVault`] have it as a
+/// supertrait, so implementing them without it does not compile.
+///
 /// [`crate::fungible::votes::FungibleVotes`] (alone or combined with the list
-/// policies) track the supply on their own, so this trait is implemented on
-/// top of them directly, without `TotalSupply` in the list. For `RWA` and
-/// `Vault` this is not optional: [`crate::rwa::RWAToken`] and
-/// [`crate::vault::FungibleVault`] have this trait as a supertrait, so
-/// implementing them without it does not compile. In short, this trait is
-/// available with every contract type except `Base`.
+/// policies) tracks voting units rather than the token supply and does not
+/// back this trait.
 ///
 /// When `TotalSupply` is part of the contract type, minting has to be routed
 /// through it (`Self::ContractType::mint`) so that the supply is increased;

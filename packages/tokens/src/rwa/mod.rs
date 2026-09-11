@@ -152,7 +152,8 @@ use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 /// through the ERC-20 interface), and [`RWAToken`] requires
 /// [`crate::fungible::total_supply::FungibleTotalSupply`] to be implemented
 /// alongside it (an empty `impl` block is enough), so that the supply is
-/// exposed by the contract.
+/// exposed by the contract. `TotalSupply` has to be listed in the contract
+/// type as well, e.g. `Compose<(RWA, TotalSupply)>`.
 #[contracttrait]
 pub trait RWAToken: Pausable + FungibleTotalSupply + FungibleToken<ContractType = RWA> {
     // ################## CORE TOKEN FUNCTIONS ##################
