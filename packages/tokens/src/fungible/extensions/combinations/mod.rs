@@ -16,8 +16,9 @@
 //! ```ignore
 //! #[contractimpl(contracttrait)]
 //! impl FungibleToken for MyToken {
-//!     // resolves to `AllowList`; `Burnable` is declarative
-//!     type ContractType = Compose<(AllowList, Burnable)>;
+//!     // resolves to the contract type gating transfers by the allowlist
+//!     // and tracking voting units; `Burnable` is declarative
+//!     type ContractType = Compose<(AllowList, FungibleVotes, Burnable)>;
 //! }
 //!
 //! #[contractimpl(contracttrait)]
@@ -26,19 +27,33 @@
 //! }
 //!
 //! #[contractimpl(contracttrait)]
+//! impl Votes for MyToken {}
+//!
+//! #[contractimpl(contracttrait)]
 //! impl FungibleBurnable for MyToken {}
 //! ```
 //!
-//! No multi-type combinations of contract types are curated for fungible
-//! tokens yet; every valid list currently holds at most one contract type
-//! (plus any additive extensions). Invalid lists do not compile: `AllowList`
-//! and `BlockList` are mutually exclusive, and implementing an extension
-//! trait the list does not back (e.g.
+//! Curated multi-type combinations: [`AllowList`], [`BlockList`] and
+//! [`FungibleVotes`] can be combined with each other, in pairs or all three
+//! together, e.g. `Compose<(AllowList, BlockList)>`,
+//! `Compose<(AllowList, FungibleVotes)>` or
+//! `Compose<(AllowList, BlockList, FungibleVotes)>`. The resolved contract
+//! type enforces every listed transfer policy, tracks voting units when
+//! `FungibleVotes` is listed, and backs the corresponding extension traits.
+//! The list is order-insensitive: `Compose<(BlockList, AllowList)>` resolves
+//! to the same contract type as `Compose<(AllowList, BlockList)>`. Invalid
+//! lists do not compile: contract types without a curated combination (e.g.
+//! `AllowList` with `RWA`) cannot be listed together, and implementing an
+//! extension trait the list does not back (e.g.
 //! [`crate::fungible::allowlist::FungibleAllowList`] without `AllowList` in
 //! the list) is rejected by that trait's bound.
 
+mod storage;
+
 #[cfg(test)]
 mod test;
+
+use storage::{AllowBlockList, AllowBlockListVotes, AllowListVotes, BlockListVotes};
 
 use crate::{
     fungible::{
@@ -53,7 +68,9 @@ use crate::{
 
 /// Resolves a list of contract types and additive extensions to the combined
 /// contract type, e.g. `Compose<(AllowList,)>` or
-/// `Compose<(AllowList, Burnable)>` (both resolve to `AllowList`).
+/// `Compose<(AllowList, Burnable)>` (both resolve to `AllowList`), or
+/// `Compose<(AllowList, FungibleVotes)>` (resolving to the curated
+/// combination of the two).
 ///
 /// This is shorthand for `<L as Composable>::Out`; refer to [`Composable`] for
 /// the valid lists.
@@ -63,14 +80,17 @@ pub type Compose<L> = <L as Composable>::Out;
 /// combined contract type through the `Out` associated type.
 ///
 /// A list is folded pairwise, left to right. Single contract types resolve to
-/// themselves (with or without the one-element tuple form), and additive
-/// extensions are ignored. Mutually exclusive contract types (e.g.
-/// `AllowList` and `BlockList`) have no pairwise combination, so listing them
-/// together does not compile.
+/// themselves (with or without the one-element tuple form), curated pairs
+/// resolve to their combined contract type (in either order), and additive
+/// extensions are ignored. Contract types without a curated pairwise
+/// combination (e.g. `AllowList` and `RWA`) cannot be listed together, so
+/// such lists do not compile.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a valid contract type combination",
     note = "valid single contract types: `Base`, `AllowList`, `BlockList`, `RWA`, `Vault`, \
             `FungibleVotes`",
+    note = "curated combinations: `(AllowList, BlockList)`, `(AllowList, FungibleVotes)`, \
+            `(BlockList, FungibleVotes)`, `(AllowList, BlockList, FungibleVotes)`",
     note = "additive extensions (e.g. `Burnable`) may be listed alongside a contract type; they \
             do not affect the resolved type",
     note = "lists of up to 5 entries are supported"
@@ -103,10 +123,10 @@ mod fold {
 
     /// Pairwise combination table for contributions: the fold reduces a list
     /// left to right through this table. A missing row means the pair is
-    /// invalid (mutually exclusive, or no curated combination exists).
+    /// invalid (no curated combination exists).
     #[diagnostic::on_unimplemented(
         message = "`{Self}` cannot be combined with `{B}` in a `Compose` list",
-        note = "the contract types are mutually exclusive, or no combination of them is curated"
+        note = "no combination of these contract types is curated"
     )]
     pub trait Combine<B> {
         type Out;
@@ -152,8 +172,8 @@ impl Extension for Burnable {
 
 // Identity rows: combining with `Nil` changes nothing. One pair of rows per
 // contract type, plus the `Nil`/`Nil` row for lists of only additive
-// extensions. Curated multi-type combinations would be added here as
-// additional rows (in both orders, so lists stay order-insensitive).
+// extensions. Curated multi-type combinations are additional rows, declared
+// in both orders so lists stay order-insensitive.
 impl Combine<Nil> for Nil {
     type Out = Nil;
 }
@@ -193,6 +213,50 @@ impl Combine<Nil> for FungibleVotes {
 impl Combine<FungibleVotes> for Nil {
     type Out = FungibleVotes;
 }
+impl Combine<Nil> for AllowBlockList {
+    type Out = AllowBlockList;
+}
+impl Combine<Nil> for AllowListVotes {
+    type Out = AllowListVotes;
+}
+impl Combine<Nil> for BlockListVotes {
+    type Out = BlockListVotes;
+}
+impl Combine<Nil> for AllowBlockListVotes {
+    type Out = AllowBlockListVotes;
+}
+
+// Curated pairs.
+impl Combine<BlockList> for AllowList {
+    type Out = AllowBlockList;
+}
+impl Combine<AllowList> for BlockList {
+    type Out = AllowBlockList;
+}
+impl Combine<FungibleVotes> for AllowList {
+    type Out = AllowListVotes;
+}
+impl Combine<AllowList> for FungibleVotes {
+    type Out = AllowListVotes;
+}
+impl Combine<FungibleVotes> for BlockList {
+    type Out = BlockListVotes;
+}
+impl Combine<BlockList> for FungibleVotes {
+    type Out = BlockListVotes;
+}
+
+// Curated triple: reached from any of its pairs by adding the missing
+// member, so every ordering of the three resolves to the same type.
+impl Combine<FungibleVotes> for AllowBlockList {
+    type Out = AllowBlockListVotes;
+}
+impl Combine<BlockList> for AllowListVotes {
+    type Out = AllowBlockListVotes;
+}
+impl Combine<AllowList> for BlockListVotes {
+    type Out = AllowBlockListVotes;
+}
 
 impl Finalize for Nil {
     type Out = Base;
@@ -214,6 +278,18 @@ impl Finalize for Vault {
 }
 impl Finalize for FungibleVotes {
     type Out = FungibleVotes;
+}
+impl Finalize for AllowBlockList {
+    type Out = AllowBlockList;
+}
+impl Finalize for AllowListVotes {
+    type Out = AllowListVotes;
+}
+impl Finalize for BlockListVotes {
+    type Out = BlockListVotes;
+}
+impl Finalize for AllowBlockListVotes {
+    type Out = AllowBlockListVotes;
 }
 
 // Bare forms: a single entry may also be written without the one-element

@@ -8,6 +8,16 @@ use crate::fungible::{
 
 pub struct BlockList;
 
+/// Marker for the contract types backing the
+/// [`crate::fungible::blocklist::FungibleBlockList`] trait: [`BlockList`]
+/// itself and the curated combinations that include it (e.g.
+/// `Compose<(AllowList, BlockList)>`). Contract authors never interact with
+/// this trait; it only appears as the bound enforcing that the selected
+/// `ContractType` enforces the blocklist transfer policy.
+pub trait BlockListContractType {}
+
+impl BlockListContractType for BlockList {}
+
 impl ContractOverrides for BlockList {
     fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         BlockList::transfer(e, from, to, amount);
