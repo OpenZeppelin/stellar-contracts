@@ -42,8 +42,9 @@ cargo clippy --release --locked --all-targets -- -D warnings
 # Test the workspace
 cargo test
 
-# WASM release build (per-package; see CI note in .github/workflows/generic.yml)
-cargo build --target wasm32v1-none --release --package <name>
+# WASM release build (per-package; plain `cargo build --target wasm32v1-none`
+# fails since soroban-sdk 28 — spec shaking needs stellar-cli >= 25.2.0)
+stellar contract build --package <name>
 
 # Coverage (CI threshold: 90% line coverage)
 cargo llvm-cov --workspace --fail-under-lines 90

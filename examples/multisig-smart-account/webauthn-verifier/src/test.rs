@@ -94,7 +94,7 @@ fn verify_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Object, UnexpectedSize)")]
+#[should_panic(expected = "WebAuthnSigData with correct format")]
 fn verify_sig_data_invalid_fails() {
     let e = Env::default();
     let contract_id = e.register(WebauthnVerifierContract, ());
