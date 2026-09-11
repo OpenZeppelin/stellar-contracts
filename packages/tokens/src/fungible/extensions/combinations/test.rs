@@ -488,10 +488,14 @@ fn block_list_votes_gates_transfers_and_moves_voting_units() {
     let (e, address) = setup_env();
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
         BlockListVotes::mint(&e, &alice, 100);
         assert_eq!(get_voting_units(&e, &alice), 100);
+    });
+    e.as_contract(&address, || {
+        <BlockListVotes as ContractOverrides>::approve(&e, &alice, &spender, 50, 1000);
     });
     e.as_contract(&address, || {
         <BlockListVotes as ContractOverrides>::transfer(
@@ -502,13 +506,21 @@ fn block_list_votes_gates_transfers_and_moves_voting_units() {
         );
     });
     e.as_contract(&address, || {
+        <BlockListVotes as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 20);
+    });
+    e.as_contract(&address, || {
         <BlockListVotes as BurnableOverrides>::burn(&e, &alice, 10);
+    });
+    e.as_contract(&address, || {
+        <BlockListVotes as BurnableOverrides>::burn_from(&e, &spender, &alice, 10);
     });
 
     e.as_contract(&address, || {
-        assert_eq!(Base::balance(&e, &alice), 60);
-        assert_eq!(get_voting_units(&e, &alice), 60);
-        assert_eq!(get_voting_units(&e, &bob), 30);
+        assert_eq!(Base::balance(&e, &alice), 30);
+        assert_eq!(Base::balance(&e, &bob), 50);
+        assert_eq!(Base::allowance(&e, &alice, &spender), 20);
+        assert_eq!(get_voting_units(&e, &alice), 30);
+        assert_eq!(get_voting_units(&e, &bob), 50);
     });
 }
 
