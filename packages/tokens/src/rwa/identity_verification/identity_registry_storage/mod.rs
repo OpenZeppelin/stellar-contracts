@@ -26,7 +26,10 @@
 //!   identity: the identity represents the investor, the wallets are its keys.
 //! - `IdentityProfile(wallet)`: registry-side metadata, an [`IdentityType`]
 //!   plus the country data entries. This is kept per wallet, not per identity,
-//!   so two wallets of the same investor each carry their own copy.
+//!   so two wallets of the same investor each carry their own copy. The copies
+//!   are not reconciled: a jurisdiction change for an investor is applied by
+//!   the operator to every wallet registered under that identity, which the
+//!   `identity_stored` and `identity_recovered` events enumerate.
 //! - `RecoveredTo(old_wallet) -> new_wallet`: a permanent tombstone written by
 //!   account recovery; recovered wallets can never be registered again.
 //! - `RecoveredFrom(new_wallet) -> old_wallet`: the reverse link, kept only
