@@ -493,7 +493,7 @@ fn deposit_zero_assets() {
     e.as_contract(&vault_address, || {
         let shares = Vault::deposit(&e, 0, admin.clone(), admin.clone(), admin.clone());
         assert_eq!(shares, 0);
-        assert_eq!(Base::total_supply(&e), 0);
+        assert_eq!(total_supply(&e), 0);
         assert_eq!(Vault::total_assets(&e), 0);
     });
 }
@@ -517,7 +517,7 @@ fn deposit_zero_shares_after_donation() {
     asset_client.transfer(&attacker, &vault_address, &100);
 
     e.as_contract(&vault_address, || {
-        assert_eq!(Base::total_supply(&e), 1);
+        assert_eq!(total_supply(&e), 1);
         assert_eq!(Vault::total_assets(&e), 101);
         assert_eq!(Vault::preview_deposit(&e, 50), 0);
 
