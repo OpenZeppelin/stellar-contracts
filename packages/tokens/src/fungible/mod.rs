@@ -103,29 +103,65 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// A function, [`crate::fungible::Base::mint`], is provided for minting to
 /// cover the general use case.
 ///
-/// This trait is implemented for the following Contract Types:
+/// `FungibleToken` can be implemented with any of the following contract
+/// types, each one defining how the token behaves:
 /// * [`crate::fungible::Base`] (covering the vanilla case, and compatible with
 ///   the [`crate::fungible::burnable::FungibleBurnable`] trait)
 /// * [`crate::fungible::allowlist::AllowList`] (enabling the compatibility and
 ///   overrides for the [`crate::fungible::allowlist::FungibleAllowList`]
-///   trait), incompatible with [`crate::fungible::blocklist::BlockList`] and
-///   [`crate::rwa::RWA`].
+///   trait).
 /// * [`crate::fungible::blocklist::BlockList`] (enabling the compatibility and
 ///   overrides for the [`crate::fungible::blocklist::FungibleBlockList`]
-///   trait), incompatible with [`crate::fungible::allowlist::AllowList`] and
-///   [`crate::rwa::RWA`].
+///   trait).
 /// * [`crate::rwa::RWA`] (enabling the compatibility and overrides for the
-///   [`crate::rwa::RWAToken`] trait), incompatible with
-///   [`crate::fungible::allowlist::AllowList`] and
-///   [`crate::fungible::blocklist::BlockList`].
+///   [`crate::rwa::RWAToken`] trait).
 /// * [`crate::vault::Vault`] (enabling the compatibility and overrides for the
 ///   [`crate::vault::FungibleVault`] trait).
 /// * [`crate::fungible::votes::FungibleVotes`] (enabling the compatibility and
 ///   overrides for the [`stellar_governance::votes::Votes`] trait).
 ///
-/// The contract type is selected with
-/// [`crate::fungible::combinations::Compose`]; invalid combinations are
-/// rejected at compile time.
+/// The chosen contract type is declared through the `ContractType`
+/// associated type, wrapped in [`crate::fungible::combinations::Compose`].
+/// For example, a token whose transfers are gated by an allowlist:
+///
+/// ```ignore
+/// #[contractimpl(contracttrait)]
+/// impl FungibleToken for MyToken {
+///     type ContractType = Compose<(AllowList,)>;
+/// }
+///
+/// // Enabled by the contract type above; `allow_user` and `disallow_user`
+/// // are implemented with the desired access control.
+/// #[contractimpl(contracttrait)]
+/// impl FungibleAllowList for MyToken {
+///     // ...
+/// }
+/// ```
+///
+/// `Compose` takes a tuple, so contract types that are compatible with each
+/// other can be listed together. `AllowList` and `FungibleVotes` are such a
+/// pair: listing both (in any order) yields a governance token whose
+/// transfers are gated by the allowlist and whose balances count as voting
+/// units, so both `FungibleAllowList` and `Votes` can be implemented:
+///
+/// ```ignore
+/// #[contractimpl(contracttrait)]
+/// impl FungibleToken for MyToken {
+///     type ContractType = Compose<(AllowList, FungibleVotes)>;
+/// }
+///
+/// #[contractimpl(contracttrait)]
+/// impl FungibleAllowList for MyToken {
+///     // ...
+/// }
+///
+/// #[contractimpl(contracttrait)]
+/// impl Votes for MyToken {}
+/// ```
+///
+/// Not every contract type can be combined with every other one. A
+/// `Compose<(...)>` list that is not supported is rejected at compile time,
+/// and the error names the offending list.
 ///
 /// The default implementations of this trait for each contract type can be
 /// found by navigating to: `ContractType::{method_name}`.
