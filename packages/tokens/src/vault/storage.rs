@@ -79,6 +79,13 @@ pub enum VaultStorageKey {
 /// assets will cause the first user to exit to experience reduced losses in
 /// detriment to the last users that will experience bigger losses.
 ///
+/// The virtual shares also lower the ceiling of the share supply cap. Every
+/// conversion computes `total_supply + 10^offset`, so the real supply has to
+/// stay at least `10^offset` below `i128::MAX` for the vault to keep working.
+/// [`Vault::deposit_internal()`] enforces this bound before minting. Contracts
+/// that mint shares through any other path (for example, a mintable extension
+/// on the share token) are expected to preserve it themselves.
+///
 /// ### 3. Zero-Share Deposit Rejection
 ///
 /// [`Vault::deposit()`] rejects a positive deposit that would mint zero
@@ -338,6 +345,7 @@ impl Vault {
     /// * [`VaultTokenError::VaultZeroShares`] - When a positive amount of
     ///   assets would mint zero shares.
     /// * also refer to [`Self::preview_deposit()`] errors.
+    /// * also refer to [`Self::deposit_internal()`] errors.
     ///
     /// # Events
     ///
@@ -388,6 +396,7 @@ impl Vault {
     /// * [`VaultTokenError::VaultExceededMaxMint`] - When attempting to mint
     ///   more shares than the maximum allowed for the receiver.
     /// * also refer to [`Self::preview_mint()`] errors.
+    /// * also refer to [`Self::deposit_internal()`] errors.
     ///
     /// # Events
     ///
@@ -730,6 +739,12 @@ impl Vault {
     /// * `from` - The address that will provide the underlying assets.
     /// * `operator` - The address performing the deposit operation.
     ///
+    /// # Errors
+    ///
+    /// * [`VaultTokenError::MathOverflow`] - When minting `shares` would push
+    ///   the share supply plus the virtual shares (`10^offset`) past
+    ///   `i128::MAX`, which would make every later conversion fail.
+    ///
     /// # Events
     ///
     /// * topics - `["deposit", operator: Address, from: Address, receiver:
@@ -753,6 +768,21 @@ impl Vault {
     ) {
         // This function assumes prior authorization of the operator and
         // validation of amounts.
+
+        // Every conversion computes `total_supply + 10^offset`, so the real
+        // share supply has to stay at least `10^offset` below `i128::MAX`.
+        // `increase_total_supply` only guards `total_supply + shares`; a mint
+        // that passes that check but breaks this stricter bound would leave
+        // every later conversion, and therefore every exit, failing with
+        // `MathOverflow`, locking the assets in the vault.
+        let pow = 10_i128
+            .checked_pow(Self::get_decimals_offset(e))
+            .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
+        Self::total_supply(e)
+            .checked_add(shares)
+            .and_then(|new_supply| new_supply.checked_add(pow))
+            .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
+
         let token_client = token::Client::new(e, &Self::query_asset(e));
         // `safeTransfer` mechanism is not present in the base module, (will be
         // provided as an extension)

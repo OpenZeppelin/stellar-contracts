@@ -3,9 +3,12 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, testutils::Address as _, Address, Env, MuxedAddress, String,
+    contract, contractimpl, testutils::Address as _, Address, Env, Error, MuxedAddress, String,
 };
-use stellar_tokens::fungible::{Base, Compose, FungibleToken};
+use stellar_tokens::{
+    fungible::{Base, Compose, FungibleToken},
+    vault::VaultTokenError,
+};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
@@ -400,4 +403,44 @@ fn test_redeem_exceeds_max() {
 
     // Try to redeem more shares than user has
     vault_client.redeem(&(shares + 1), &user, &user, &user);
+}
+
+#[test]
+fn test_deposit_exceeding_virtual_supply_bound_is_rejected() {
+    let e = Env::default();
+    let depositor = Address::generate(&e);
+    let attacker = Address::generate(&e);
+    let decimals_offset = 10;
+    let virtual_shares = 10_i128.pow(decimals_offset);
+    // Every conversion computes `total_supply + 10^offset`, so the vault hits
+    // the `i128` ceiling once it holds this many asset base units.
+    let boundary = i128::MAX / virtual_shares;
+
+    let asset_client = create_asset_client(&e, boundary, &depositor);
+    let vault_client = create_vault_client(&e, &asset_client.address, decimals_offset);
+
+    e.mock_all_auths();
+    asset_client.transfer(&depositor, &attacker, &1);
+
+    let shares = vault_client.deposit(&(boundary - 1), &depositor, &depositor, &depositor);
+    assert_eq!(shares, (boundary - 1) * virtual_shares);
+
+    // One more base unit would mint exactly `10^offset` shares. That supply
+    // fits in `i128`, but `total_supply + 10^offset` would not, freezing every
+    // later conversion. Both entry points reject it before minting.
+    let math_overflow = Error::from_contract_error(VaultTokenError::MathOverflow as u32);
+    assert_eq!(
+        vault_client.try_deposit(&1, &attacker, &attacker, &attacker),
+        Err(Ok(math_overflow))
+    );
+    assert_eq!(
+        vault_client.try_mint(&virtual_shares, &attacker, &attacker, &attacker),
+        Err(Ok(math_overflow))
+    );
+    assert_eq!(asset_client.balance(&attacker), 1);
+    assert_eq!(vault_client.total_assets(), boundary - 1);
+
+    // Existing holders can still exit.
+    assert_eq!(vault_client.redeem(&virtual_shares, &depositor, &depositor, &depositor), 1);
+    assert_eq!(vault_client.withdraw(&1, &depositor, &depositor, &depositor), virtual_shares);
 }
