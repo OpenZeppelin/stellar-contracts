@@ -170,8 +170,17 @@ pub trait Policy {
 
 /// Compact projection of an authorization [`Context`] for policy events.
 ///
-/// Contract and constructor arguments are intentionally omitted so event size
-/// does not grow with caller-controlled input.
+/// Contract-call and constructor arguments are omitted, so their size does not
+/// affect this projection.
+///
+/// # Size Limitation
+///
+/// [`ContractExecutable::ExternalRef`] retains its tag unchanged; this
+/// projection does not bound the tag's size. In Protocol 28, the host can pass
+/// deployment authorizations to `__check_auth` before validating the reference
+/// key, including child authorizations that are never executed. An oversized
+/// tag can therefore still cause an enforcement event to exceed the
+/// transaction's event-size limit even when no deployment takes place.
 #[contracttype]
 #[derive(Clone, Debug)]
 pub enum EnforcedContext {
