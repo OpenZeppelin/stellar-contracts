@@ -5,7 +5,13 @@
 //! utility functions for `simple_threshold` (basic M-of-N multisig),
 //! `weighted_threshold` (complex weighted voting), and `spending_limit`
 //! (rolling window spending limits) that can be used to build policy contracts.
-use soroban_sdk::{auth::Context, contractclient, Address, Env, FromVal, Val, Vec};
+use soroban_sdk::{
+    auth::{
+        Context, ContractContext, ContractExecutable, CreateContractHostFnContext,
+        CreateContractWithConstructorHostFnContext,
+    },
+    contractclient, contracttype, Address, BytesN, Env, FromVal, Symbol, Val, Vec,
+};
 
 use crate::smart_account::{ContextRule, Signer};
 
@@ -160,6 +166,63 @@ pub trait Policy {
     /// policy-specific (e.g., removing threshold parameters, clearing
     /// spending windows).
     fn uninstall(e: &Env, context_rule: ContextRule, smart_account: Address);
+}
+
+/// Compact projection of an authorization [`Context`] for policy events.
+///
+/// Contract and constructor arguments are intentionally omitted so event size
+/// does not grow with caller-controlled input.
+#[contracttype]
+#[derive(Clone, Debug)]
+pub enum EnforcedContext {
+    /// Target contract and function name of a contract invocation.
+    CallContract(Address, Symbol),
+    /// Executable and salt of a contract creation, with or without constructor
+    /// arguments.
+    CreateContract(ContractExecutable, BytesN<32>),
+}
+
+impl From<&Context> for EnforcedContext {
+    fn from(context: &Context) -> Self {
+        match context {
+            Context::Contract(ContractContext { contract, fn_name, .. }) => {
+                Self::CallContract(contract.clone(), fn_name.clone())
+            }
+            Context::CreateContractHostFn(CreateContractHostFnContext { executable, salt }) => {
+                Self::CreateContract(executable.clone(), salt.clone())
+            }
+            Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
+                executable,
+                salt,
+                ..
+            }) => Self::CreateContract(executable.clone(), salt.clone()),
+        }
+    }
+}
+
+/// Resolves authenticated signers to their positionally aligned IDs in a
+/// context rule.
+///
+/// The smart-account authorization path constructs `authenticated_signers` by
+/// filtering `context_rule.signers`, so every signer in this vector belongs to
+/// the rule and preserves the rule's order. The signer and signer-ID vectors
+/// are kept positionally aligned when a context rule is loaded. A signer with
+/// no aligned ID is omitted, keeping direct calls with a malformed
+/// [`ContextRule`] from panicking while leaving the standard path unchanged.
+fn authenticated_signer_ids(
+    e: &Env,
+    authenticated_signers: &Vec<Signer>,
+    context_rule: &ContextRule,
+) -> Vec<u32> {
+    Vec::from_iter(
+        e,
+        authenticated_signers.iter().filter_map(|signer| {
+            context_rule
+                .signers
+                .first_index_of(&signer)
+                .and_then(|index| context_rule.signer_ids.get(index))
+        }),
+    )
 }
 
 // A `PolicyClientInterface` must be declared here instead of using the public
