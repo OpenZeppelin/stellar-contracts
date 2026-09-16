@@ -15,8 +15,10 @@ use soroban_sdk::{
 
 use crate::{
     policies::{
-        simple_threshold::SimpleEnforced, test::ENFORCED_EVENT_SIZE_CEILING_BYTES,
-        weighted_threshold::WeightedEnforced, EnforcedContext,
+        simple_threshold::SimpleEnforced,
+        test::{ENFORCED_EVENT_SIZE_CEILING_BYTES, TX_MAX_CONTRACT_EVENTS_SIZE_BYTES},
+        weighted_threshold::WeightedEnforced,
+        EnforcedContext,
     },
     smart_account::MAX_SIGNERS,
 };
@@ -198,5 +200,5 @@ fn external_ref_event_size_still_grows_with_tag() {
     });
 
     assert_eq!(sizes[1] - sizes[0], 20_000);
-    assert!(sizes[1] > 16_384);
+    assert!(sizes[1] > TX_MAX_CONTRACT_EVENTS_SIZE_BYTES);
 }
