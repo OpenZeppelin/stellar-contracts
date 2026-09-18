@@ -71,6 +71,29 @@ pub fn identity_registry_storage(e: &Env) -> Address {
 ///
 /// * [`RWAError::IdentityVerificationFailed`] - When the identity of the
 ///   account cannot be verified.
+///
+/// # Notes
+///
+/// The claim topics and issuers contract is the single source of truth for
+/// what is required, and the configuration is enforced exactly as declared.
+/// Two empty states follow from this, and both are by design:
+///
+/// * No claim topics registered: nothing is required, so every account that
+///   resolves to an identity passes.
+/// * A claim topic with no trusted issuers: the requirement is declared, but
+///   nobody is trusted to attest it. There is no candidate claim to look for,
+///   so the topic is skipped instead of failing every account. Trusted issuers
+///   can only be added for topics that already exist, so every topic goes
+///   through this state during setup, and returns to it when its last issuer is
+///   removed.
+///
+/// A topic is therefore enforced from the moment its first issuer is trusted
+/// until its last issuer is removed. The registry is not validated for
+/// completeness here; keeping every required topic backed by at least one
+/// trusted issuer is the operator's responsibility. This differs from the
+/// T-REX reference implementation, which rejects every account while a
+/// required topic has no trusted issuers. Accounts without a registered
+/// identity fail regardless of configuration.
 pub fn verify_identity(e: &Env, account: &Address) {
     let irs_addr = identity_registry_storage(e);
     let irs_client = IdentityRegistryStorageClient::new(e, &irs_addr);
@@ -83,6 +106,11 @@ pub fn verify_identity(e: &Env, account: &Address) {
 
     let topics_and_issuers = cti_client.get_claim_topics_and_issuers();
 
+    // The configuration is enforced as declared, not validated for
+    // completeness. An empty map means nothing is required. A topic with an
+    // empty issuer list has nobody trusted to attest it, so the inner loop has
+    // no candidates and the topic is skipped rather than failing every
+    // account. Both are by design; see `# Notes` above.
     for (claim_topic, issuers) in topics_and_issuers.iter() {
         let issuers_with_claim_ids = issuers.iter().enumerate().map(|(i, issuer)| {
             (

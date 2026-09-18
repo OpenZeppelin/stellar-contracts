@@ -58,6 +58,18 @@
 //! wallets can neither send nor receive. Country data is not part of this
 //! baseline check; it is consumed by the compliance country modules instead.
 //!
+//! Step 3 enforces the registry exactly as configured, and two empty states
+//! are intentional. With no claim topics registered, nothing is required and
+//! every registered identity passes. With a registered topic that has no
+//! trusted issuers, nobody is trusted to attest that topic, so it is skipped
+//! rather than blocking every account. Trusted issuers can only be added for
+//! topics that already exist, so every topic passes through the no-issuer
+//! state during setup. In short, a topic is enforced from its first trusted
+//! issuer to its last; keeping required topics backed by issuers is the
+//! operator's responsibility. This differs from the T-REX reference
+//! implementation, which rejects every account while a required topic has no
+//! trusted issuers.
+//!
 //! ## Architecture & Implementation Approaches
 //!
 //! Identity verification systems can be implemented in various ways depending
