@@ -1,7 +1,7 @@
 use soroban_sdk::{
     auth::{
-        Context, ContractContext, ContractExecutable, CreateContractHostFnContext,
-        CreateContractWithConstructorHostFnContext,
+        Context, ContractContext, ContractExecutable, ContractExecutableRef,
+        CreateContractHostFnContext, CreateContractWithConstructorHostFnContext,
     },
     contracttype,
     crypto::Hash,
@@ -147,6 +147,9 @@ pub enum ContextRuleType {
     CallContract(Address),
     /// Rules specific to creating a contract with a particular WASM hash.
     CreateContract(BytesN<32>),
+    /// Rules specific to creating a contract from the executable reference that
+    /// `owner` stores under `tag`.
+    CreateContractExternalRef(Address, String),
 }
 
 /// A complete context rule defining authorization requirements.
@@ -290,14 +293,16 @@ pub fn get_validated_context_by_id(
         Context::Contract(ContractContext { contract, .. }) => {
             ContextRuleType::CallContract(contract)
         }
-        Context::CreateContractHostFn(CreateContractHostFnContext {
-            executable: ContractExecutable::Wasm(wasm),
+        Context::CreateContractHostFn(CreateContractHostFnContext { executable, .. })
+        | Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
+            executable,
             ..
-        }) => ContextRuleType::CreateContract(wasm),
-        Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
-            executable: ContractExecutable::Wasm(wasm),
-            ..
-        }) => ContextRuleType::CreateContract(wasm),
+        }) => match executable {
+            ContractExecutable::Wasm(wasm) => ContextRuleType::CreateContract(wasm),
+            ContractExecutable::ExternalRef(ContractExecutableRef { owner, tag }) => {
+                ContextRuleType::CreateContractExternalRef(owner, tag)
+            }
+        },
     };
 
     let context_type_matches = context_rule.context_type == ContextRuleType::Default

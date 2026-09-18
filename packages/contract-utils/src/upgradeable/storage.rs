@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, BytesN, Env};
+use soroban_sdk::{contracttype, BytesN, ContractExecutable, Env};
 
 #[contracttype]
 pub enum UpgradeableStorageKey {
@@ -52,5 +52,5 @@ pub fn set_schema_version(e: &Env, version: u32) {
 /// **IMPORTANT**: This function lacks authorization checks and should only
 /// be used in admin functions that implement their own authorization logic.
 pub fn upgrade(e: &Env, new_wasm_hash: &BytesN<32>) {
-    e.deployer().update_current_contract_wasm(new_wasm_hash.clone());
+    e.deployer().update_current_contract(ContractExecutable::Wasm(new_wasm_hash.clone()));
 }
