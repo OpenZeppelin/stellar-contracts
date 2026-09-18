@@ -743,7 +743,7 @@ impl Vault {
     ///
     /// * [`VaultTokenError::MathOverflow`] - When minting `shares` would push
     ///   the share supply plus the virtual shares (`10^offset`) past
-    ///   `i128::MAX`, which would make every later conversion fail.
+    ///   `i128::MAX`.
     ///
     /// # Events
     ///
