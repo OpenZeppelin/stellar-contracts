@@ -83,8 +83,8 @@ pub enum VaultStorageKey {
 /// conversion computes `total_supply + 10^offset`, so the real supply has to
 /// stay at least `10^offset` below `i128::MAX` for the vault to keep working.
 /// [`Vault::deposit_internal()`] enforces this bound before minting. Contracts
-/// that mint shares through any other path (for example, a mintable extension
-/// on the share token) are expected to preserve it themselves.
+/// that mint shares through any other path are expected to preserve it
+/// themselves.
 ///
 /// ### 3. Zero-Share Deposit Rejection
 ///
@@ -744,6 +744,9 @@ impl Vault {
     /// * [`VaultTokenError::MathOverflow`] - When minting `shares` would push
     ///   the share supply plus the virtual shares (`10^offset`) past
     ///   `i128::MAX`.
+    /// * refer to [`Self::query_asset()`] errors.
+    /// * refer to [`increase_total_supply`] errors.
+    /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///
