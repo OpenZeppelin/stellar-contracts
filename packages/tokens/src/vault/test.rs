@@ -691,3 +691,89 @@ fn mint_transfer_from_not_enough_allowance() {
         Vault::mint(&e, shares_to_mint, user.clone(), admin.clone(), operator.clone());
     });
 }
+
+// With offset `MAX_DECIMALS_OFFSET`, every conversion computes
+// `total_supply + 10^offset`, so the vault reaches the `i128` ceiling once it
+// holds `i128::MAX / 10^offset` asset base units.
+fn virtual_shares() -> i128 {
+    10_i128.pow(MAX_DECIMALS_OFFSET)
+}
+
+fn assets_at_virtual_bound() -> i128 {
+    i128::MAX / virtual_shares()
+}
+
+#[test]
+fn deposit_one_below_virtual_bound_keeps_vault_operational() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let boundary = assets_at_virtual_bound();
+    let asset_address = create_asset_contract(&e, boundary, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, MAX_DECIMALS_OFFSET);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        let shares = Vault::deposit(&e, boundary - 1, user.clone(), user.clone(), user.clone());
+        assert_eq!(shares, (boundary - 1) * virtual_shares());
+
+        // `total_supply + 10^offset` is exactly representable here, so every
+        // conversion still works.
+        assert_eq!(Vault::preview_redeem(&e, virtual_shares()), 1);
+        assert_eq!(Vault::preview_deposit(&e, 1), virtual_shares());
+    });
+
+    // Separate frame: `deposit` and `redeem` both `require_auth` for `user`.
+    e.as_contract(&vault_address, || {
+        assert_eq!(
+            Vault::redeem(&e, virtual_shares(), user.clone(), user.clone(), user.clone()),
+            1
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #410)")]
+fn deposit_exceeding_virtual_bound_is_rejected() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let attacker = Address::generate(&e);
+    let boundary = assets_at_virtual_bound();
+    let asset_address = create_asset_contract(&e, boundary - 1, &user);
+    MockAssetContractClient::new(&e, &asset_address).mint(&attacker, &1);
+    let vault_address = create_vault_contract(&e, &asset_address, MAX_DECIMALS_OFFSET);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Vault::deposit(&e, boundary - 1, user.clone(), user.clone(), user.clone());
+
+        // The mint alone would fit (`total_supply` would land exactly on
+        // `boundary * 10^offset`), but `total_supply + 10^offset` would not,
+        // and every later conversion would fail. The deposit has to be
+        // rejected before the shares are minted.
+        Vault::deposit(&e, 1, attacker.clone(), attacker.clone(), attacker.clone());
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #410)")]
+fn mint_exceeding_virtual_bound_is_rejected() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let attacker = Address::generate(&e);
+    let boundary = assets_at_virtual_bound();
+    let asset_address = create_asset_contract(&e, boundary - 1, &user);
+    MockAssetContractClient::new(&e, &asset_address).mint(&attacker, &1);
+    let vault_address = create_vault_contract(&e, &asset_address, MAX_DECIMALS_OFFSET);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Vault::deposit(&e, boundary - 1, user.clone(), user.clone(), user.clone());
+
+        // Same boundary through the `mint` entry point: `10^offset` shares
+        // cost exactly one asset here and would land on the same supply.
+        Vault::mint(&e, virtual_shares(), attacker.clone(), attacker.clone(), attacker.clone());
+    });
+}
