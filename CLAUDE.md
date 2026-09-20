@@ -55,7 +55,7 @@ workspace.
 ## Conventions you must follow
 
 These are non-obvious rules where AI-generated drafts most often go wrong.
-For the full checklist see `.claude/skills/code-quality.md`.
+For the full checklist see `.claude/commands/code-quality.md`.
 
 ### Storage TTL
 
@@ -198,9 +198,15 @@ Reversing the two is a common mistake.
   checklist. Lists violations and offers to apply fixes (all, a subset,
   or none), then runs `cargo +nightly fmt` / `cargo clippy` /
   `cargo test`. Local maintainer tool — not wired into CI. See
-  `.claude/skills/code-quality.md`.
-- `/release-prep` — version bumps, README updates, build for a release
-  cut. See `.claude/skills/release-prep.md`.
+  `.claude/commands/code-quality.md`.
+- `/release` — the full release checklist end to end: READMEs, version
+  bump, audit report, Wizard PR, docs site, release branch, release
+  notes. Confirms with the user before every step. See
+  `.claude/commands/release.md`.
+- `/version-bump` — just the version bump: README version strings,
+  `Cargo.toml`, and a build to refresh `Cargo.lock`. Steps 1–2 of
+  `/release`, also runnable on its own. See
+  `.claude/commands/version-bump.md`.
 
 ## Working on contributions
 
