@@ -17,7 +17,7 @@ The module ships one token contract plus three satellites, each with the standar
 
 Balances are Pedersen commitments on Grumpkin. Every operation that opens or re-randomizes a commitment carries a proof the contract forwards to the verifier contract; `deposit`, `merge`, and `revoke_spender` are proofless homomorphic folds.
 
-**Not production ready.** The UltraHonk backend (`rs-soroban-ultrahonk`) is unfinished and unaudited. The `# ⚠️ Not Production Ready` blocks in `mod.rs` and `verifier/mod.rs` are load-bearing — do not remove or soften them.
+**Not production ready.** The UltraHonk backend (`rs-soroban-ultrahonk`) has no tagged release and the circuits are unaudited. The `# ⚠️ Not Production Ready` blocks in `mod.rs` and `verifier/mod.rs` are load-bearing — do not remove or soften them.
 
 ## Errors
 

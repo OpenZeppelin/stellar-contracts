@@ -16,12 +16,14 @@
 //! [`ConfidentialVerifier::verify_proof`] is backed by the UltraHonk verifier
 //! from
 //! [`NethermindEth/rs-soroban-ultrahonk`](https://github.com/NethermindEth/rs-soroban-ultrahonk),
-//! pinned to a specific commit in the workspace `Cargo.toml`. That backend is
-//! **pre-release and has not been audited**, and neither have the circuits the
-//! verification keys are derived from. Do **not** deploy a contract built on
-//! this trait to mainnet or any environment that handles real value until both
-//! the backend and the circuits have been audited and the dependency is pinned
-//! to a released, reviewed version.
+//! pinned to a specific commit in the workspace `Cargo.toml`. That backend was
+//! audited by OpenZeppelin at commit `661db07` and the pinned commit carries
+//! the remediation of every finding, but it is still **pre-release** with no
+//! tagged version, and the circuits the verification keys are derived from
+//! have **not been audited**. Do **not** deploy a contract built on this trait
+//! to mainnet or any environment that handles real value until the circuits
+//! have been audited and the dependency is pinned to a released, reviewed
+//! version.
 //!
 //! ## Why a Separate Contract
 //!

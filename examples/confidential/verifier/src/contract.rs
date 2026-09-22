@@ -9,8 +9,9 @@
 //!
 //! # ⚠️ Not Production Ready
 //!
-//! The UltraHonk backend and the circuits the verification keys are derived
-//! from are **not audited**. Do not deploy this anywhere handling real value.
+//! The UltraHonk backend has no tagged release and the circuits the
+//! verification keys are derived from are **not audited**. Do not deploy this
+//! anywhere handling real value.
 //!
 //! # Security
 //!

@@ -65,7 +65,7 @@ pub fn verify_proof(
     let verifier = UltraHonkVerifier::new(e, &vk)
         .unwrap_or_else(|_| panic_with_error!(e, VerifierError::InvalidVerificationKey));
 
-    verifier.verify(e, proof, public_inputs).is_ok()
+    verifier.verify(proof, public_inputs).is_ok()
 }
 
 // ################## CHANGE STATE ##################
