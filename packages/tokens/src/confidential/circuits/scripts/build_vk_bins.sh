@@ -6,9 +6,8 @@
 #
 # Why a separate binary artifact:
 #   - `vks/*.vk.json` is bb's `fields` output (a JSON array of hex `Fr`
-#     elements). It is committed for cross-platform-stable code review and is
-#     the format diffed by CI, but it is NOT the byte layout the verifier
-#     parses.
+#     elements). It is committed for cross-platform-stable code review, but
+#     it is NOT the byte layout the verifier parses.
 #   - `ultrahonk-soroban-verifier::load_vk_from_bytes` expects exactly 1760
 #     bytes: a 32-byte header of four big-endian u64s
 #     (circuit_size, log_circuit_size, public_inputs_size, pub_inputs_offset)
