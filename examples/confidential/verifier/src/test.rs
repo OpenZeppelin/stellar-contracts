@@ -9,10 +9,22 @@ use crate::contract::{ConfidentialVerifierContract, ConfidentialVerifierContract
 // from the committed circuits by `circuits/scripts/build_vk_bins.sh`. Using
 // real keys here exercises the wired UltraHonk backend end to end: a malformed
 // key would be rejected by `UltraHonkVerifier::new` with `#3403`.
-const REGISTER_VK: &[u8; 1760] =
-    include_bytes!("../../../../packages/tokens/src/confidential/circuits/vks/register.vk.bin");
-const WITHDRAW_VK: &[u8; 1760] =
-    include_bytes!("../../../../packages/tokens/src/confidential/circuits/vks/withdraw.vk.bin");
+macro_rules! vk_bin {
+    ($name:literal) => {
+        include_bytes!(concat!(
+            "../../../../packages/tokens/src/confidential/circuits/vks/",
+            $name,
+            ".vk.bin"
+        ))
+    };
+}
+
+const REGISTER_VK: &[u8; 1760] = vk_bin!("register");
+const WITHDRAW_VK: &[u8; 1760] = vk_bin!("withdraw");
+const TRANSFER_VK: &[u8; 1760] = vk_bin!("transfer");
+const SET_SPENDER_VK: &[u8; 1760] = vk_bin!("set_spender");
+const SPENDER_TRANSFER_VK: &[u8; 1760] = vk_bin!("spender_transfer");
+const REVOKE_SPENDER_VK: &[u8; 1760] = vk_bin!("revoke_spender");
 
 fn create_client<'a>(
     e: &Env,
@@ -56,6 +68,31 @@ fn verify_proof_runs_backend_on_real_vk() {
     // matching proof + public inputs produced by the prover toolchain.
     let junk = Bytes::from_array(&e, &[0u8; 32]);
     assert!(!client.verify_proof(&CircuitType::Register, &junk, &junk));
+}
+
+#[test]
+fn every_committed_vk_parses_under_the_backend() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+
+    // The backend validates header ranges and every G1 commitment when the
+    // key is loaded, so a `verify_proof` that returns `false` instead of
+    // panicking with `#3403` proves each committed key is accepted as-is.
+    let junk = Bytes::from_array(&e, &[0u8; 32]);
+    for (circuit, vk) in [
+        (CircuitType::Register, REGISTER_VK),
+        (CircuitType::Withdraw, WITHDRAW_VK),
+        (CircuitType::Transfer, TRANSFER_VK),
+        (CircuitType::SetSpender, SET_SPENDER_VK),
+        (CircuitType::SpenderTransfer, SPENDER_TRANSFER_VK),
+        (CircuitType::RevokeSpender, REVOKE_SPENDER_VK),
+    ] {
+        client.register_verification_key(&circuit, &Bytes::from_array(&e, vk), &manager);
+        assert!(!client.verify_proof(&circuit, &junk, &junk));
+    }
 }
 
 #[test]
