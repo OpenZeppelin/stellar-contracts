@@ -49,9 +49,8 @@ bb prove -s ultra_honk --oracle_hash keccak \
 - Do **not** pass `--zk`: the verifier currently implements only the non-zk
   `ultra_flavor`.
 
-The verifier backend is pre-release (see the module-level warning in
-`../../verifier/mod.rs`). This recipe is provisional and will be finalized
-together with the verifier, including the zero-knowledge setting.
+This recipe is provisional and will be finalized together with the verifier,
+including the zero-knowledge setting.
 
 ## Regenerating
 

@@ -11,19 +11,10 @@
 //! the same VK set is reusable across every confidential token that targets the
 //! same protocol version.
 //!
-//! # ⚠️ Not Production Ready
-//!
 //! [`ConfidentialVerifier::verify_proof`] is backed by the UltraHonk verifier
 //! from
 //! [`NethermindEth/rs-soroban-ultrahonk`](https://github.com/NethermindEth/rs-soroban-ultrahonk),
-//! pinned to a specific commit in the workspace `Cargo.toml`. That backend was
-//! audited by OpenZeppelin at commit `661db07` and the pinned commit carries
-//! the remediation of every finding, but it is still **pre-release** with no
-//! tagged version, and the circuits the verification keys are derived from
-//! have **not been audited**. Do **not** deploy a contract built on this trait
-//! to mainnet or any environment that handles real value until the circuits
-//! have been audited and the dependency is pinned to a released, reviewed
-//! version.
+//! pinned to a specific commit in the workspace `Cargo.toml`.
 //!
 //! ## Why a Separate Contract
 //!
@@ -132,11 +123,6 @@ pub enum CircuitType {
 /// [`ConfidentialVerifier::register_verification_key`] and
 /// [`ConfidentialVerifier::update_verification_key`] are privileged operations
 /// expected to be gated by the implementor's access-control scheme.
-///
-/// # ⚠️ Not Production Ready
-///
-/// See the module-level warning. `verify_proof` cannot be wired to a real
-/// UltraHonk backend until `rs-soroban-ultrahonk` is released and audited.
 #[contracttrait]
 pub trait ConfidentialVerifier {
     /// Registers an UltraHonk verification key under a fresh [`CircuitType`].
@@ -249,10 +235,6 @@ pub trait ConfidentialVerifier {
     /// The default implementation delegates to [`storage::verify_proof`], which
     /// runs the UltraHonk verifier from
     /// [`NethermindEth/rs-soroban-ultrahonk`](https://github.com/NethermindEth/rs-soroban-ultrahonk).
-    /// That backend and the circuits the verification keys are derived from are
-    /// **not yet audited** (see the module-level warning); the default
-    /// implementation MUST NOT be relied upon in any environment that handles
-    /// real value until they are.
     fn verify_proof(
         e: &Env,
         circuit_type: CircuitType,

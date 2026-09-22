@@ -8,15 +8,6 @@
 //! and dual auditor ciphertexts are emitted in each transfer event. See
 //! `docs/README.md` for the full specification.
 //!
-//! # ⚠️ Not Production Ready
-//!
-//! This module depends on
-//! [`verifier::ConfidentialVerifier::verify_proof`], whose UltraHonk
-//! backend (`rs-soroban-ultrahonk`) is still under development and has not been
-//! audited. Do **not** deploy a contract built on this trait to mainnet or any
-//! environment that handles real value. See the verifier module-level warning
-//! for details.
-//!
 //! ## What This Crate Provides
 //!
 //! - The [`ConfidentialToken`] trait — eleven entry points (register, deposit,

@@ -7,12 +7,6 @@
 //! and `get_verification_key` use the trait's default implementations, which
 //! run the UltraHonk backend from `NethermindEth/rs-soroban-ultrahonk`.
 //!
-//! # ⚠️ Not Production Ready
-//!
-//! The UltraHonk backend has no tagged release and the circuits the
-//! verification keys are derived from are **not audited**. Do not deploy this
-//! anywhere handling real value.
-//!
 //! # Security
 //!
 //! `update_verification_key` is a soundness-critical break-glass operation: a
