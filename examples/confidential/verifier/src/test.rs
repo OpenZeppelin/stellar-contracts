@@ -24,7 +24,7 @@ const WITHDRAW_VK: &[u8; 1760] = vk_bin!("withdraw");
 const TRANSFER_VK: &[u8; 1760] = vk_bin!("transfer");
 const SET_SPENDER_VK: &[u8; 1760] = vk_bin!("set_spender");
 const SPENDER_TRANSFER_VK: &[u8; 1760] = vk_bin!("spender_transfer");
-const REVOKE_SPENDER_VK: &[u8; 1760] = vk_bin!("revoke_spender");
+const CLAWBACK_VK: &[u8; 1760] = vk_bin!("clawback");
 
 fn create_client<'a>(
     e: &Env,
@@ -88,7 +88,7 @@ fn every_committed_vk_parses_under_the_backend() {
         (CircuitType::Transfer, TRANSFER_VK),
         (CircuitType::SetSpender, SET_SPENDER_VK),
         (CircuitType::SpenderTransfer, SPENDER_TRANSFER_VK),
-        (CircuitType::RevokeSpender, REVOKE_SPENDER_VK),
+        (CircuitType::Clawback, CLAWBACK_VK),
     ] {
         client.register_verification_key(&circuit, &Bytes::from_array(&e, vk), &manager);
         assert!(!client.verify_proof(&circuit, &junk, &junk));
