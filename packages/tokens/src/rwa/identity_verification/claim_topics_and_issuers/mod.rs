@@ -13,6 +13,14 @@ use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, Map
 /// checks these requirements against the claims found on the holder's
 /// identity contract.
 ///
+/// A topic is enforced only while it has at least one trusted issuer. A
+/// registered topic with no issuers is a declared requirement that nobody is
+/// trusted to attest, and verification skips it by design instead of failing
+/// every account. Since issuers can only be trusted for topics that already
+/// exist, every topic passes through this state during setup. See
+/// [`crate::rwa::identity_verification::storage::verify_identity`] for the
+/// full rationale.
+///
 /// [`ClaimTopicsAndIssuers`] trait is not expected to be an extension to a RWA
 /// smart contract, but it is a separate contract on its own. This design allows
 /// it to be shared across many RWA tokens. Note that, there is no `RWA` bound
@@ -167,6 +175,10 @@ pub trait ClaimTopicsAndIssuers {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
     /// [`storage::remove_trusted_issuer`] for the implementation.
+    ///
+    /// Removing the last trusted issuer of a claim topic leaves that topic
+    /// with nobody to attest it, and verification stops enforcing it until a
+    /// new issuer is trusted for it. See the trait-level documentation.
     fn remove_trusted_issuer(e: &Env, trusted_issuer: Address, operator: Address);
 
     /// Updates the set of claim topics that a trusted issuer is allowed to
