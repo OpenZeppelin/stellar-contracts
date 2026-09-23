@@ -1322,3 +1322,123 @@ fn batch_add_identity_accepts_an_empty_batch() {
         assert_eq!(e.events().all().events().len(), 0);
     });
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #330)")] // PendingRecovery
+fn remove_identity_recovery_target_with_undrained_old_account_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token = e.register(MockToken, ());
+
+    let old_account = Address::generate(&e);
+    let new_account = Address::generate(&e);
+    let identity = Address::generate(&e);
+    MockTokenClient::new(&e, &token).set_balance(&old_account, &100);
+
+    e.as_contract(&contract_id, || {
+        let country = CountryData { country: residence(840), metadata: None };
+
+        bind_token(&e, &token);
+        add_identity(&e, &old_account, &identity, IdentityType::Individual, &vec![&e, country]);
+        recover_identity(&e, &old_account, &new_account);
+
+        // The recovered identity is pinned to `new_account` until the old
+        // account's tokens have been recovered into it.
+        remove_identity(&e, &new_account);
+    });
+}
+
+#[test]
+fn remove_identity_recovery_target_after_old_account_drained_succeeds() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token = e.register(MockToken, ());
+    let token_client = MockTokenClient::new(&e, &token);
+
+    let old_account = Address::generate(&e);
+    let new_account = Address::generate(&e);
+    let identity = Address::generate(&e);
+    let other_identity = Address::generate(&e);
+
+    e.as_contract(&contract_id, || {
+        let country = CountryData { country: residence(840), metadata: None };
+
+        bind_token(&e, &token);
+        add_identity(&e, &old_account, &identity, IdentityType::Individual, &vec![&e, country]);
+        recover_identity(&e, &old_account, &new_account);
+
+        remove_identity(&e, &new_account);
+        assert_eq!(get_recovered_to(&e, &old_account), Some(new_account.clone()));
+    });
+
+    // Once released, the target is an ordinary wallet again and no longer
+    // tracks the old account: a later balance on the old account does not
+    // block its removal.
+    token_client.set_balance(&old_account, &100);
+
+    e.as_contract(&contract_id, || {
+        let country = CountryData { country: residence(840), metadata: None };
+
+        add_identity(
+            &e,
+            &new_account,
+            &other_identity,
+            IdentityType::Individual,
+            &vec![&e, country],
+        );
+        assert_eq!(stored_identity(&e, &new_account), other_identity);
+
+        remove_identity(&e, &new_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #330)")] // PendingRecovery
+fn recover_identity_from_undrained_recovery_target_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token = e.register(MockToken, ());
+
+    let account1 = Address::generate(&e);
+    let account2 = Address::generate(&e);
+    let account3 = Address::generate(&e);
+    let identity = Address::generate(&e);
+    MockTokenClient::new(&e, &token).set_balance(&account1, &100);
+
+    e.as_contract(&contract_id, || {
+        let country = CountryData { country: residence(840), metadata: None };
+
+        bind_token(&e, &token);
+        add_identity(&e, &account1, &identity, IdentityType::Individual, &vec![&e, country]);
+        recover_identity(&e, &account1, &account2);
+
+        // account1's tokens can only be recovered into account2, so the
+        // identity may not move on before they are.
+        recover_identity(&e, &account2, &account3);
+    });
+}
+
+#[test]
+fn recover_identity_from_drained_recovery_target_succeeds() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token = e.register(MockToken, ());
+
+    let account1 = Address::generate(&e);
+    let account2 = Address::generate(&e);
+    let account3 = Address::generate(&e);
+    let identity = Address::generate(&e);
+
+    e.as_contract(&contract_id, || {
+        let country = CountryData { country: residence(840), metadata: None };
+
+        bind_token(&e, &token);
+        add_identity(&e, &account1, &identity, IdentityType::Individual, &vec![&e, country]);
+        recover_identity(&e, &account1, &account2);
+        recover_identity(&e, &account2, &account3);
+
+        assert_eq!(stored_identity(&e, &account3), identity);
+        assert_eq!(get_recovered_to(&e, &account1), Some(account2.clone()));
+        assert_eq!(get_recovered_to(&e, &account2), Some(account3.clone()));
+    });
+}

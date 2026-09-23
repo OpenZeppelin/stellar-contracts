@@ -32,6 +32,11 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// the sender or scale with amount, those belong in a different compliance
 /// module that you register alongside this one.
 ///
+/// Country data is read for the recipient wallet, not for its identity: the
+/// Identity Registry Storage keeps a profile per wallet, so sibling wallets of
+/// one investor are admitted on their own entries. A jurisdiction change for
+/// an investor must reach every wallet registered under that identity.
+///
 /// Countries are identified by ISO 3166-1 numeric codes and tracked
 /// per-`token`, so a single compliance module contract can serve multiple
 /// tokens with independent allowlists.

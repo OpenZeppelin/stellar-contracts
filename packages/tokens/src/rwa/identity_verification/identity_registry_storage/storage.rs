@@ -214,6 +214,10 @@ pub enum IRSStorageKey {
     IdentityProfile(Address),
     /// Maps old account to new account after recovery
     RecoveredTo(Address),
+    /// Maps a recovery target back to the old account whose identity it
+    /// received. Present only while the recovered identity is still linked to
+    /// the target.
+    RecoveredFrom(Address),
 }
 
 // ################## QUERY STATE ##################
@@ -471,6 +475,9 @@ pub fn batch_add_identity(
 ///   `account`.
 /// * [`IRSError::AccountHasBalance`] - If `account` holds a non-zero balance in
 ///   any linked token.
+/// * [`IRSError::PendingRecovery`] - If `account` is the target of an identity
+///   recovery whose old account still holds a non-zero balance in any linked
+///   token.
 ///
 /// # Events
 ///
@@ -483,11 +490,20 @@ pub fn batch_add_identity(
 ///
 /// # Notes
 ///
-/// One cross-contract `balance` call is made per linked token; the token
-/// binder's `MAX_TOKENS` cap is sized so this sweep fits within a single
-/// transaction. The zero balance check is only as complete as the token
-/// binder registry: a token that resolves identities through this contract
-/// without being bound to it is not checked.
+/// One cross-contract `balance` call is made per linked token, and one more
+/// per linked token when `account` is a recovery target, since the old
+/// account's balance is checked as well; the token binder's `MAX_TOKENS` cap
+/// is sized so this sweep fits within a single transaction. The zero balance
+/// check is only as complete as the token binder registry: a token that
+/// resolves identities through this contract without being bound to it is
+/// not checked.
+///
+/// A recovery target keeps the recovered identity until the old account has
+/// been drained. Balance recovery on the token side moves the old account's
+/// tokens to the target under the identity the target currently resolves to,
+/// so re-registering the target under another identity beforehand would hand
+/// those tokens to a different investor and desynchronize identity-keyed
+/// compliance accounting.
 ///
 /// The check covers balance-backed module state. Time-windowed transfer
 /// counters are flow-based and stay keyed to the old identity: a wallet
@@ -519,6 +535,8 @@ pub fn remove_identity(e: &Env, account: &Address) {
             panic_with_error!(e, IRSError::AccountHasBalance);
         }
     }
+
+    settle_recovery_target(e, account);
 
     e.storage().persistent().remove(&identity_key);
 
@@ -557,12 +575,22 @@ pub fn remove_identity(e: &Env, account: &Address) {
 ///   recovered to another account.
 /// * [`IRSError::IdentityOverwrite`] - If the `new_account` is already linked
 ///   to an identity.
+/// * [`IRSError::PendingRecovery`] - If `old_account` is itself the target of
+///   an earlier recovery whose old account still holds a non-zero balance in
+///   any linked token.
 ///
 /// # Events
 ///
 /// * topics - `["identity_recovered", old_account: Address, new_account:
 ///   Address]`
 /// * data - `[]`
+///
+/// # Notes
+///
+/// Recoveries can be chained, but the balance of each hop must be recovered
+/// before the identity moves on: a wallet whose identity has left it can no
+/// longer be the destination of a balance recovery, so the tokens of an
+/// undrained earlier hop would otherwise be stranded.
 ///
 /// # Security Warning
 ///
@@ -591,8 +619,11 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
         panic_with_error!(e, IRSError::IdentityOverwrite)
     }
 
+    settle_recovery_target(e, old_account);
+
     e.storage().persistent().set(&new_identity_key, &identity);
     e.storage().persistent().remove(&old_identity_key);
+    e.storage().persistent().set(&IRSStorageKey::RecoveredFrom(new_account.clone()), old_account);
 
     // Recover identity profile
     let old_profile_key = IRSStorageKey::IdentityProfile(old_account.clone());
@@ -770,6 +801,36 @@ pub fn delete_country_data(e: &Env, account: &Address, index: u32) {
 }
 
 // ################## HELPERS ##################
+
+/// Releases `account` from its role as a recovery target, if it has one, so
+/// that the recovered identity may leave it. Panics while the old account the
+/// identity came from still holds tokens in any linked token, since those
+/// tokens can only be recovered into `account` under the identity it holds
+/// now.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account whose identity is about to be removed or moved.
+///
+/// # Errors
+///
+/// * [`IRSError::PendingRecovery`] - If `account` is a recovery target whose
+///   old account holds a non-zero balance in any linked token.
+fn settle_recovery_target(e: &Env, account: &Address) {
+    let key = IRSStorageKey::RecoveredFrom(account.clone());
+    let Some(old_account) = e.storage().persistent().get::<_, Address>(&key) else {
+        return;
+    };
+
+    for token in linked_tokens(e).iter() {
+        if TokenClient::new(e, &token).balance(&old_account) != 0 {
+            panic_with_error!(e, IRSError::PendingRecovery);
+        }
+    }
+
+    e.storage().persistent().remove(&key);
+}
 
 /// Validates a single country data entry to ensure metadata constraints are
 /// met.
