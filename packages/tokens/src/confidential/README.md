@@ -10,14 +10,6 @@ per-transfer ephemeral ECDH.
 The protocol provides **confidentiality, not anonymity** — sender and
 recipient addresses remain visible on-chain; amounts and balances do not.
 
-## ⚠️ Not Production Ready
-
-The [`verifier`](./verifier/) module's UltraHonk backend
-([`rs-soroban-ultrahonk`](https://github.com/NethermindEth/rs-soroban-ultrahonk))
-is still under development and has **not been audited**. Do **not** deploy
-a contract built on this trait to mainnet or any environment that handles
-real value.
-
 ## Layout
 
 ```text

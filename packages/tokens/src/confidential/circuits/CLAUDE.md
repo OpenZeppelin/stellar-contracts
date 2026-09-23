@@ -48,7 +48,7 @@ The `G` and `H` generators are hardcoded but provenance-checked at runtime by th
 
 ## Committed artifacts
 
-Three kinds of generated file are committed and diffed by CI: `constraints.baseline`, `vks/*.vk.json`, and `lib/testdata/*.json`. (`Architecture.md` claims `testdata/*.json` is the only one — that statement is stale.) `target/` and `Prover.toml` are gitignored.
+Four kinds of generated file are committed: `constraints.baseline`, `vks/*.vk.json`, `vks/*.vk.bin`, and `lib/testdata/*.json`. CI regenerates and diffs all four. (`Architecture.md` claims `testdata/*.json` is the only one — that statement is stale.) `target/` and `Prover.toml` are gitignored.
 
 ### `constraints.baseline`
 
@@ -66,9 +66,9 @@ One non-obvious consequence: adding or removing a **gadget** changes the baselin
 
 `./scripts/extract_vks.sh` compiles each circuit and runs `bb write_vk -s ultra_honk --output_format fields`. The `fields` format is required, not a preference: bb's `bytes` format carries platform-dependent header bytes that break macOS↔Linux diffs.
 
-Adding a circuit means **three** edits — the package itself, the `members` list in `Nargo.toml`, and the hardcoded `CIRCUITS` array in `scripts/extract_vks.sh` — then regenerating both the baseline and the VKs.
+Adding a circuit means **four** edits — the package itself, the `members` list in `Nargo.toml`, and the hardcoded `CIRCUITS` arrays in `scripts/extract_vks.sh` and `scripts/build_vk_bins.sh` — then regenerating the baseline and both VK formats.
 
-Proving uses non-default flags: `bb prove -s ultra_honk --oracle_hash keccak`. Keccak is required because the on-chain verifier reproduces the Fiat-Shamir transcript with Keccak while bb defaults to `poseidon2`. Do **not** pass `--zk`; the verifier implements only the non-zk `ultra_flavor`. This recipe is provisional until the verifier is finished.
+Proving uses non-default flags: `bb prove -s ultra_honk --oracle_hash keccak`. Keccak is required because the on-chain verifier reproduces the Fiat-Shamir transcript with Keccak while bb defaults to `poseidon2`. Do **not** pass `--zk`; the verifier implements only the non-zk `ultra_flavor`. This recipe is provisional until the verifier settles the zero-knowledge setting.
 
 Drift policy: if the circuit changed, regenerate in the same PR. If the **toolchain** drifted, do not regenerate — investigate first.
 

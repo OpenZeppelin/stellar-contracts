@@ -69,6 +69,11 @@ p256 = "0.13.2"
 serde = { version = "1", default-features = false }
 serde-json-core = { version = "0.6.0", default-features = false }
 
+# UltraHonk proof-verification backend for the confidential token. Pinned to a
+# specific commit because the upstream crate has no tagged release. The pinned
+# commit carries the remediation of the OpenZeppelin audit performed at 661db07.
+ultrahonk-soroban-verifier = { git = "https://github.com/NethermindEth/rs-soroban-ultrahonk", rev = "c2160987260284c656ffbdad8344210fc162b177", package = "ultrahonk_soroban_verifier", default-features = false }
+
 # members
 stellar-access = { path = "packages/access", version = "0.7.1" }
 stellar-accounts = { path = "packages/accounts", version = "0.7.1" }
