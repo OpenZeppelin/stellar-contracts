@@ -6,7 +6,8 @@
 //! contract can create in that namespace, and the chain salt hashes the
 //! constructor arguments.
 use soroban_sdk::{
-    contract, contractimpl, contracttype, xdr::ToXdr, Address, BytesN, Env, IntoVal, Map, Val, Vec,
+    contract, contractimpl, contracttype, xdr::ToXdr, Address, BytesN, ContractExecutable, Env,
+    IntoVal, Map, Val, Vec,
 };
 use stellar_accounts::smart_account::{validate_no_canonical_duplicates, Signer};
 
@@ -83,7 +84,9 @@ impl AccountFactoryContract {
         let signers = canonical_signers(e, &signers);
         let chain_salt = chain_salt(e, &signers, &policies, salt);
 
-        e.deployer().with_current_contract(chain_salt).deploy_v2(wasm_hash, (signers, policies))
+        e.deployer()
+            .with_current_contract(chain_salt)
+            .deploy_contract(ContractExecutable::Wasm(wasm_hash), (signers, policies))
     }
 }
 
