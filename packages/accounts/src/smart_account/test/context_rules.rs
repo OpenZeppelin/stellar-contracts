@@ -2,8 +2,8 @@ extern crate std;
 
 use soroban_sdk::{
     auth::{
-        Context, ContractContext, ContractExecutable, CreateContractHostFnContext,
-        CreateContractWithConstructorHostFnContext,
+        Context, ContractContext, ContractExecutable, ContractExecutableRef,
+        CreateContractHostFnContext, CreateContractWithConstructorHostFnContext,
     },
     contract, contractimpl, symbol_short,
     testutils::{Address as _, Events, Ledger},
@@ -910,6 +910,157 @@ fn get_validated_context_by_id_create_contract_with_ctor_success() {
         let (validated_rule, _, _) =
             get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
         assert_eq!(validated_rule.id, rule.id);
+    });
+}
+
+#[test]
+fn get_validated_context_by_id_create_contract_external_ref_success() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let owner = Address::generate(&e);
+        let tag = String::from_str(&e, "pool");
+        let context_type = ContextRuleType::CreateContractExternalRef(owner.clone(), tag.clone());
+
+        let rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "external_ref_rule"),
+            None,
+            &create_test_signers(&e),
+            &Map::new(&e),
+        );
+
+        let context = Context::CreateContractHostFn(CreateContractHostFnContext {
+            salt: BytesN::from_array(&e, &[3u8; 32]),
+            executable: ContractExecutable::ExternalRef(ContractExecutableRef { owner, tag }),
+        });
+
+        let (validated_rule, _, _) =
+            get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
+        assert_eq!(validated_rule.id, rule.id);
+    });
+}
+
+#[test]
+fn get_validated_context_by_id_create_contract_external_ref_with_ctor_success() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let owner = Address::generate(&e);
+        let tag = String::from_str(&e, "pool");
+        let context_type = ContextRuleType::CreateContractExternalRef(owner.clone(), tag.clone());
+
+        let rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "ext_ref_ctor_rule"),
+            None,
+            &create_test_signers(&e),
+            &Map::new(&e),
+        );
+
+        let context =
+            Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
+                salt: BytesN::from_array(&e, &[4u8; 32]),
+                executable: ContractExecutable::ExternalRef(ContractExecutableRef { owner, tag }),
+                constructor_args: Vec::new(&e),
+            });
+
+        let (validated_rule, _, _) =
+            get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
+        assert_eq!(validated_rule.id, rule.id);
+    });
+}
+
+#[test]
+fn get_validated_context_by_id_default_rule_matches_external_ref() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let rule = add_context_rule(
+            &e,
+            &ContextRuleType::Default,
+            &String::from_str(&e, "default_rule"),
+            None,
+            &create_test_signers(&e),
+            &Map::new(&e),
+        );
+
+        let context = Context::CreateContractHostFn(CreateContractHostFnContext {
+            salt: BytesN::from_array(&e, &[5u8; 32]),
+            executable: ContractExecutable::ExternalRef(ContractExecutableRef {
+                owner: Address::generate(&e),
+                tag: String::from_str(&e, "pool"),
+            }),
+        });
+
+        let (validated_rule, _, _) =
+            get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
+        assert_eq!(validated_rule.id, rule.id);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3002)")]
+fn get_validated_context_by_id_wasm_rule_rejects_external_ref() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let rule = add_context_rule(
+            &e,
+            &ContextRuleType::CreateContract(BytesN::from_array(&e, &[9u8; 32])),
+            &String::from_str(&e, "wasm_rule"),
+            None,
+            &create_test_signers(&e),
+            &Map::new(&e),
+        );
+
+        let context = Context::CreateContractHostFn(CreateContractHostFnContext {
+            salt: BytesN::from_array(&e, &[6u8; 32]),
+            executable: ContractExecutable::ExternalRef(ContractExecutableRef {
+                owner: Address::generate(&e),
+                tag: String::from_str(&e, "pool"),
+            }),
+        });
+
+        get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3002)")]
+fn get_validated_context_by_id_external_ref_rule_rejects_other_tag() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let owner = Address::generate(&e);
+        let rule = add_context_rule(
+            &e,
+            &ContextRuleType::CreateContractExternalRef(
+                owner.clone(),
+                String::from_str(&e, "pool"),
+            ),
+            &String::from_str(&e, "external_ref_rule"),
+            None,
+            &create_test_signers(&e),
+            &Map::new(&e),
+        );
+
+        let context = Context::CreateContractHostFn(CreateContractHostFnContext {
+            salt: BytesN::from_array(&e, &[7u8; 32]),
+            executable: ContractExecutable::ExternalRef(ContractExecutableRef {
+                owner,
+                tag: String::from_str(&e, "vault"),
+            }),
+        });
+
+        get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
     });
 }
 

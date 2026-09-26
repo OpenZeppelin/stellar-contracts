@@ -52,10 +52,8 @@ categories = ["no-std", "wasm"]
 version = "0.7.1"
 
 [workspace.dependencies]
-soroban-sdk = { version = "27.0.2", features = [
-    "experimental_spec_shaking_v2",
-] }
-soroban-poseidon = "27.0.0"
+soroban-sdk = "28.0.0"
+soroban-poseidon = "28.0.0"
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
