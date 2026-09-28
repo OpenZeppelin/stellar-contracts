@@ -1,14 +1,16 @@
 ---
-name: release-prep
-description: Prepare the stellar-contracts repo for a new release (READMEs, version bump, build)
+name: version-bump
+description: Bump the stellar-contracts version across READMEs and Cargo.toml, then build to refresh Cargo.lock
 user_invocable: true
 ---
 
-# Release Preparation
+# Version Bump
 
 ## Context
 
-Before publishing a new release of stellar-contracts, the repo needs version bumps, README updates, and a clean build. This skill handles the mechanical parts of release prep.
+Moving stellar-contracts to a new version number means updating every README that pins a version, the workspace `Cargo.toml`, and then building to refresh `Cargo.lock`. This skill handles those mechanical edits.
+
+It covers steps 1–2 of the full release checklist in `.claude/commands/release.md`, and is safe to run on its own for a version bump outside a release cut.
 
 ## Workflow
 
