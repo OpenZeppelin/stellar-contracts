@@ -49,19 +49,23 @@ use soroban_sdk::{
     auth::Context, contracterror, contractevent, contracttype, panic_with_error, Address, Env, Vec,
 };
 
-use crate::smart_account::ContextRule;
 // re-export
 pub use crate::smart_account::Signer;
+use crate::{
+    policies::{authenticated_signer_ids, EnforcedContext},
+    smart_account::ContextRule,
+};
 
 /// Event emitted when a simple threshold policy is enforced.
 #[contractevent]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SimpleEnforced {
     #[topic]
     pub smart_account: Address,
-    pub context: Context,
+    #[topic]
     pub context_rule_id: u32,
-    pub authenticated_signers: Vec<Signer>,
+    pub context: EnforcedContext,
+    pub signer_ids: Vec<u32>,
 }
 
 /// Event emitted when a simple threshold policy is installed.
@@ -167,7 +171,8 @@ pub fn get_threshold(e: &Env, context_rule_id: u32, smart_account: &Address) -> 
 /// * `e` - Access to the Soroban environment.
 /// * `context` - The authorization context.
 /// * `authenticated_signers` - The list of authenticated signers.
-/// * `context_rule` - The context rule for this policy.
+/// * `context_rule` - The context rule for this policy. Its positionally
+///   aligned `signer_ids` are included in the enforcement event.
 /// * `smart_account` - The address of the smart account.
 ///
 /// # Errors
@@ -178,9 +183,9 @@ pub fn get_threshold(e: &Env, context_rule_id: u32, smart_account: &Address) -> 
 ///
 /// # Events
 ///
-/// * topics - `["simple_enforced", smart_account: Address]`
-/// * data - `[context: Context, context_rule_id: u32 authenticated_signers:
-///   Vec<Signer>]`
+/// * topics - `["simple_enforced", smart_account: Address, context_rule_id:
+///   u32]`
+/// * data - `[context: EnforcedContext, signer_ids: Vec<u32>]`
 pub fn enforce(
     e: &Env,
     context: &Context,
@@ -197,9 +202,9 @@ pub fn enforce(
         // emit event
         SimpleEnforced {
             smart_account: smart_account.clone(),
-            context: context.clone(),
             context_rule_id: context_rule.id,
-            authenticated_signers: authenticated_signers.clone(),
+            context: context.into(),
+            signer_ids: authenticated_signer_ids(e, authenticated_signers, context_rule),
         }
         .publish(e);
     } else {

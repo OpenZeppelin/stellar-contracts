@@ -38,16 +38,20 @@ use soroban_sdk::{
     TryFromVal, Vec,
 };
 
-use crate::smart_account::{ContextRule, ContextRuleType, Signer};
+use crate::{
+    policies::EnforcedContext,
+    smart_account::{ContextRule, ContextRuleType, Signer},
+};
 
 /// Event emitted when a spending limit policy is enforced.
 #[contractevent]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SpendingLimitEnforced {
     #[topic]
     pub smart_account: Address,
-    pub context: Context,
+    #[topic]
     pub context_rule_id: u32,
+    pub context: EnforcedContext,
     pub amount: i128,
     pub total_spent_in_period: i128,
 }
@@ -227,9 +231,10 @@ pub fn get_spending_limit_data(
 ///
 /// # Events
 ///
-/// * topics - `["spending_limit_enforced", smart_account: Address]`
-/// * data - `[context: Context, context_rule_id: u32, amount: i128,
-///   total_spent_in_period: i128]`
+/// * topics - `["spending_limit_enforced", smart_account: Address,
+///   context_rule_id: u32]`
+/// * data - `[context: EnforcedContext, amount: i128, total_spent_in_period:
+///   i128]`
 pub fn enforce(
     e: &Env,
     context: &Context,
@@ -299,8 +304,8 @@ pub fn enforce(
 
                         SpendingLimitEnforced {
                             smart_account: smart_account.clone(),
-                            context: context.clone(),
                             context_rule_id: context_rule.id,
+                            context: context.into(),
                             amount,
                             total_spent_in_period: data.cached_total_spent,
                         }
