@@ -29,7 +29,7 @@ impl ExampleContract {
         let owner: Address =
             e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
         owner.require_auth();
-        Consecutive::batch_mint(e, &to, amount)
+        <Self as NonFungibleToken>::ContractType::mint(e, &to, amount)
     }
 }
 

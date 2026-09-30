@@ -1,7 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::fungible::{
-    overrides::{BurnableOverrides, TotalSupplyOverrides},
+    overrides::{BurnableOverrides, MintOverrides, TotalSupplyOverrides},
     Base, ContractOverrides, FungibleTokenError, TOTAL_SUPPLY_EXTEND_AMOUNT,
     TOTAL_SUPPLY_TTL_THRESHOLD,
 };
@@ -33,6 +33,12 @@ impl BurnableOverrides for TotalSupply {
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         TotalSupply::burn_from(e, spender, from, amount);
+    }
+}
+
+impl MintOverrides for TotalSupply {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        TotalSupply::mint(e, to, amount);
     }
 }
 

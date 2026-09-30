@@ -5,7 +5,7 @@ use crate::{
     fungible::{
         emit_transfer,
         total_supply::{decrease_total_supply, increase_total_supply, TotalSupplyOverrides},
-        Base, ContractOverrides,
+        Base, ContractOverrides, MintOverrides,
     },
     rwa::{
         compliance::{AccountSnapshot, ComplianceClient, TransferKind},
@@ -63,6 +63,14 @@ impl ContractOverrides for RWA {
 // T-REX (ERC-3643) tokens expose the total supply, so the RWA contract type
 // is inherently supply-aware.
 impl TotalSupplyOverrides for RWA {}
+
+// Minting through the contract type runs RWA's full mint path: identity
+// verification, freezing checks, supply accounting and the compliance hook.
+impl MintOverrides for RWA {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        RWA::mint(e, to, amount);
+    }
+}
 
 impl RWA {
     // ################## QUERY STATE ##################

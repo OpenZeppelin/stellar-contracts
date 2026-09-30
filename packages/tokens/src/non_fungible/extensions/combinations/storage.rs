@@ -6,7 +6,10 @@ use crate::non_fungible::{
         consecutive::{Consecutive, ConsecutiveContractType},
         enumerable::{Enumerable, EnumerableContractType},
     },
-    overrides::{BurnableOverrides, ContractOverrides},
+    overrides::{
+        BatchMintOverrides, BurnableOverrides, ContractOverrides, MintOverrides,
+        MintWithIdOverrides,
+    },
     royalties::RoyaltySupport,
 };
 
@@ -43,15 +46,27 @@ impl BurnableOverrides for EnumerableVotes {
 // token).
 impl RoyaltySupport for EnumerableVotes {}
 
+impl MintWithIdOverrides for EnumerableVotes {
+    fn mint_with_id(e: &Env, to: &Address, token_id: u32) {
+        EnumerableVotes::mint_with_id(e, to, token_id);
+    }
+}
+
+impl MintOverrides for EnumerableVotes {
+    fn mint(e: &Env, to: &Address) -> u32 {
+        EnumerableVotes::mint(e, to)
+    }
+}
+
 impl EnumerableVotes {
-    pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
-        let token_id = Enumerable::sequential_mint(e, to);
+    pub fn mint(e: &Env, to: &Address) -> u32 {
+        let token_id = Enumerable::mint(e, to);
         transfer_voting_units(e, None, Some(to), 1);
         token_id
     }
 
-    pub fn non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
-        Enumerable::non_sequential_mint(e, to, token_id);
+    pub fn mint_with_id(e: &Env, to: &Address, token_id: u32) {
+        Enumerable::mint_with_id(e, to, token_id);
         transfer_voting_units(e, None, Some(to), 1);
     }
 
@@ -130,9 +145,15 @@ impl BurnableOverrides for ConsecutiveVotes {
 // entry lookup.
 impl RoyaltySupport for ConsecutiveVotes {}
 
+impl BatchMintOverrides for ConsecutiveVotes {
+    fn mint(e: &Env, to: &Address, amount: u32) -> u32 {
+        ConsecutiveVotes::mint(e, to, amount)
+    }
+}
+
 impl ConsecutiveVotes {
-    pub fn batch_mint(e: &Env, to: &Address, amount: u32) -> u32 {
-        let last_id = Consecutive::batch_mint(e, to, amount);
+    pub fn mint(e: &Env, to: &Address, amount: u32) -> u32 {
+        let last_id = Consecutive::mint(e, to, amount);
         transfer_voting_units(e, None, Some(to), u128::from(amount));
         last_id
     }

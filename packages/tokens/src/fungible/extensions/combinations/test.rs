@@ -16,7 +16,7 @@ use crate::{
             total_supply::{mint, total_supply, TotalSupply},
             votes::FungibleVotes,
         },
-        overrides::{BurnableOverrides, TotalSupplyOverrides},
+        overrides::{BurnableOverrides, MintOverrides, TotalSupplyOverrides},
         Base, ContractOverrides,
     },
     rwa::RWA,
@@ -103,6 +103,27 @@ fn capped_requires_total_supply_in_the_list() {
     assert_composes_to::<(RWA, Capped, TotalSupply), RWA>();
     assert_composes_to::<(Capped, RWA, TotalSupply), RWA>();
     assert_composes_to::<(Vault, TotalSupply, Capped), Vault>();
+}
+
+// Every contract type that can mint freely has to implement `MintOverrides`,
+// so that `Self::ContractType::mint` resolves for every valid list without
+// `Vault`.
+#[test]
+fn free_minting_contract_types_implement_mint_overrides() {
+    fn assert_mint<T: MintOverrides>() {}
+    assert_mint::<Base>();
+    assert_mint::<AllowList>();
+    assert_mint::<BlockList>();
+    assert_mint::<AllowBlockList>();
+    assert_mint::<TotalSupply>();
+    assert_mint::<TotalSupplyAllowList>();
+    assert_mint::<TotalSupplyBlockList>();
+    assert_mint::<TotalSupplyAllowBlockList>();
+    assert_mint::<FungibleVotes>();
+    assert_mint::<AllowListVotes>();
+    assert_mint::<BlockListVotes>();
+    assert_mint::<AllowBlockListVotes>();
+    assert_mint::<RWA>();
 }
 
 #[test]

@@ -667,7 +667,7 @@ impl Base {
     /// determine the next `token_id`, but it does NOT check if that
     /// `token_id` is already in use. If other minting paths or `token_id`
     /// generation strategies exist, uniqueness should be enforced before use.
-    pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
+    pub fn mint(e: &Env, to: &Address) -> u32 {
         let token_id = increment_token_id(e, 1);
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
@@ -714,7 +714,7 @@ impl Base {
     /// `token_id` already exists. `token_id` uniqueness should be ensured
     /// before passing it to this function. The strategy for generating
     /// `token_id`s varies by project and must be implemented accordingly.
-    pub fn mint(e: &Env, to: &Address, token_id: u32) {
+    pub fn mint_with_id(e: &Env, to: &Address, token_id: u32) {
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
     }
