@@ -7,7 +7,7 @@
 //! constructor arguments.
 use soroban_sdk::{
     contract, contractimpl, contracttype, xdr::ToXdr, Address, BytesN, ContractExecutable, Env,
-    IntoVal, Map, Val, Vec,
+    IntoVal, Map, String, Val, Vec,
 };
 use stellar_accounts::smart_account::{validate_no_canonical_duplicates, Signer};
 
@@ -45,6 +45,7 @@ impl AccountFactoryContract {
     ///
     /// # Arguments
     ///
+    /// * `name` - Name of the account's default context rule.
     /// * `signers` - Signers of the account's default context rule, in any
     ///   order. Duplicate identities are rejected.
     /// * `policies` - Policy contract addresses mapped to their install
@@ -53,12 +54,13 @@ impl AccountFactoryContract {
     ///   accounts.
     pub fn predict_address(
         e: &Env,
+        name: String,
         signers: Vec<Signer>,
         policies: Map<Address, Val>,
         salt: u32,
     ) -> Address {
         let signers = canonical_signers(e, &signers);
-        let chain_salt = chain_salt(e, &signers, &policies, salt);
+        let chain_salt = chain_salt(e, &name, &signers, &policies, salt);
 
         e.deployer().with_current_contract(chain_salt).deployed_address()
     }
@@ -68,6 +70,7 @@ impl AccountFactoryContract {
     ///
     /// # Arguments
     ///
+    /// * `name` - Name of the account's default context rule.
     /// * `signers` - Signers of the account's default context rule, in any
     ///   order. Duplicate identities are rejected.
     /// * `policies` - Policy contract addresses mapped to their install
@@ -76,17 +79,18 @@ impl AccountFactoryContract {
     ///   accounts.
     pub fn deploy(
         e: &Env,
+        name: String,
         signers: Vec<Signer>,
         policies: Map<Address, Val>,
         salt: u32,
     ) -> Address {
         let wasm_hash = Self::pinned_account_wasm_hash(e);
         let signers = canonical_signers(e, &signers);
-        let chain_salt = chain_salt(e, &signers, &policies, salt);
+        let chain_salt = chain_salt(e, &name, &signers, &policies, salt);
 
         e.deployer()
             .with_current_contract(chain_salt)
-            .deploy_contract(ContractExecutable::Wasm(wasm_hash), (signers, policies))
+            .deploy_contract(ContractExecutable::Wasm(wasm_hash), (name, signers, policies))
     }
 }
 
@@ -101,14 +105,15 @@ fn canonical_signers(e: &Env, signers: &Vec<Signer>) -> Vec<Signer> {
     set.keys()
 }
 
-/// SHA-256 of the canonical XDR of `(signers, policies, salt)`.
+/// SHA-256 of the canonical XDR of `(name, signers, policies, salt)`.
 fn chain_salt(
     e: &Env,
+    name: &String,
     signers: &Vec<Signer>,
     policies: &Map<Address, Val>,
     salt: u32,
 ) -> BytesN<32> {
-    let salt_data: Vec<Val> = (signers.clone(), policies.clone(), salt).into_val(e);
+    let salt_data: Vec<Val> = (name.clone(), signers.clone(), policies.clone(), salt).into_val(e);
 
     e.crypto().sha256(&salt_data.to_xdr(e)).to_bytes()
 }

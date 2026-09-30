@@ -6,7 +6,7 @@ use soroban_sdk::{
     testutils::Address as _,
     vec,
     xdr::{ScErrorCode, ScErrorType},
-    Address, Bytes, BytesN, Env, Error, IntoVal, Map, TryFromVal, Val, Vec,
+    Address, Bytes, BytesN, Env, Error, IntoVal, Map, String, TryFromVal, Val, Vec,
 };
 use stellar_accounts::{
     policies::Policy,
@@ -108,6 +108,10 @@ fn setup(e: &Env) -> (Address, Address, Address) {
     (factory, verifier, policy)
 }
 
+fn name(e: &Env) -> String {
+    String::from_str(e, "multisig")
+}
+
 fn external(e: &Env, verifier: &Address, key: u8) -> Signer {
     Signer::External(verifier.clone(), Bytes::from_array(e, &[key; 32]))
 }
@@ -154,8 +158,8 @@ fn predict_address_and_deploy_agree() {
     let client = AccountFactoryContractClient::new(&e, &factory);
     let signers = vec![&e, external(&e, &verifier, 1)];
 
-    let predicted = client.predict_address(&signers, &no_policies(&e), &0);
-    let deployed = client.deploy(&signers, &no_policies(&e), &0);
+    let predicted = client.predict_address(&name(&e), &signers, &no_policies(&e), &0);
+    let deployed = client.deploy(&name(&e), &signers, &no_policies(&e), &0);
 
     assert_eq!(deployed, predicted);
     assert_eq!(deployed_signers(&e, &deployed), signers);
@@ -170,8 +174,11 @@ fn deployed_account_holds_exactly_the_requested_configuration() {
     let b = external(&e, &verifier, 2);
     let policies = map![&e, (policy.clone(), 2u32.into_val(&e))];
 
-    let deployed = client.deploy(&vec![&e, b.clone(), a.clone()], &policies, &0);
+    let treasury = String::from_str(&e, "treasury");
 
+    let deployed = client.deploy(&treasury, &vec![&e, b.clone(), a.clone()], &policies, &0);
+
+    assert_eq!(account::Client::new(&e, &deployed).get_context_rule(&0).name, treasury);
     let signers = deployed_signers(&e, &deployed);
     assert_eq!(signers.len(), 2);
     assert!(signers.contains(&a));
@@ -192,12 +199,12 @@ fn signer_order_does_not_change_the_address() {
     let b = external(&e, &verifier, 2);
 
     let order_first_second =
-        client.predict_address(&vec![&e, a.clone(), b.clone()], &no_policies(&e), &0);
+        client.predict_address(&name(&e), &vec![&e, a.clone(), b.clone()], &no_policies(&e), &0);
     let order_second_first =
-        client.predict_address(&vec![&e, b.clone(), a.clone()], &no_policies(&e), &0);
+        client.predict_address(&name(&e), &vec![&e, b.clone(), a.clone()], &no_policies(&e), &0);
     assert_eq!(order_first_second, order_second_first);
 
-    let deployed = client.deploy(&vec![&e, b.clone(), a.clone()], &no_policies(&e), &0);
+    let deployed = client.deploy(&name(&e), &vec![&e, b.clone(), a.clone()], &no_policies(&e), &0);
     assert_eq!(deployed, order_first_second);
     let signers = deployed_signers(&e, &deployed);
     assert_eq!(signers.len(), 2);
@@ -214,16 +221,19 @@ fn exact_duplicate_signers_are_rejected() {
     let b = external(&e, &verifier, 2);
 
     assert_duplicate_signer(client.try_predict_address(
+        &name(&e),
         &vec![&e, a.clone(), a.clone()],
         &no_policies(&e),
         &0,
     ));
     assert_duplicate_signer(client.try_deploy(
+        &name(&e),
         &vec![&e, a.clone(), a.clone()],
         &no_policies(&e),
         &0,
     ));
     assert_duplicate_signer(client.try_predict_address(
+        &name(&e),
         &vec![&e, a.clone(), b.clone(), a.clone()],
         &no_policies(&e),
         &0,
@@ -247,8 +257,8 @@ fn canonical_duplicate_external_signers_are_rejected() {
     let signers =
         vec![&e, Signer::External(verifier.clone(), key_a), Signer::External(verifier, key_b)];
 
-    assert_duplicate_signer(client.try_predict_address(&signers, &no_policies(&e), &0));
-    assert_duplicate_signer(client.try_deploy(&signers, &no_policies(&e), &0));
+    assert_duplicate_signer(client.try_predict_address(&name(&e), &signers, &no_policies(&e), &0));
+    assert_duplicate_signer(client.try_deploy(&name(&e), &signers, &no_policies(&e), &0));
 }
 
 #[test]
@@ -264,8 +274,8 @@ fn policy_map_order_does_not_change_the_address() {
     let other_way = map![&e, (other_policy, 2u32.into_val(&e)), (policy, 1u32.into_val(&e))];
 
     assert_eq!(
-        client.predict_address(&signers, &one_way, &0),
-        client.predict_address(&signers, &other_way, &0)
+        client.predict_address(&name(&e), &signers, &one_way, &0),
+        client.predict_address(&name(&e), &signers, &other_way, &0)
     );
 }
 
@@ -279,21 +289,29 @@ fn every_part_of_the_tuple_changes_the_address() {
     let delegated = Signer::Delegated(Address::generate(&e));
 
     let addresses = [
-        client.predict_address(&vec![&e, a.clone()], &no_policies(&e), &0),
-        client.predict_address(&vec![&e, b.clone()], &no_policies(&e), &0),
-        client.predict_address(&vec![&e, a.clone(), b.clone()], &no_policies(&e), &0),
+        client.predict_address(&name(&e), &vec![&e, a.clone()], &no_policies(&e), &0),
+        client.predict_address(&name(&e), &vec![&e, b.clone()], &no_policies(&e), &0),
+        client.predict_address(&name(&e), &vec![&e, a.clone(), b.clone()], &no_policies(&e), &0),
         client.predict_address(
+            &name(&e),
             &vec![&e, a.clone()],
             &map![&e, (policy.clone(), 1u32.into_val(&e))],
             &0,
         ),
         client.predict_address(
+            &name(&e),
             &vec![&e, a.clone()],
             &map![&e, (policy.clone(), 2u32.into_val(&e))],
             &0,
         ),
-        client.predict_address(&vec![&e, a.clone()], &no_policies(&e), &1),
-        client.predict_address(&vec![&e, delegated], &no_policies(&e), &0),
+        client.predict_address(&name(&e), &vec![&e, a.clone()], &no_policies(&e), &1),
+        client.predict_address(
+            &String::from_str(&e, "treasury"),
+            &vec![&e, a.clone()],
+            &no_policies(&e),
+            &0,
+        ),
+        client.predict_address(&name(&e), &vec![&e, delegated], &no_policies(&e), &0),
     ];
 
     for (i, address) in addresses.iter().enumerate() {
@@ -310,8 +328,8 @@ fn extra_salt_gives_one_configuration_several_accounts() {
     let client = AccountFactoryContractClient::new(&e, &factory);
     let signers = vec![&e, external(&e, &verifier, 1)];
 
-    let first = client.deploy(&signers, &no_policies(&e), &0);
-    let second = client.deploy(&signers, &no_policies(&e), &1);
+    let first = client.deploy(&name(&e), &signers, &no_policies(&e), &0);
+    let second = client.deploy(&name(&e), &signers, &no_policies(&e), &1);
 
     assert_ne!(first, second);
     assert_eq!(deployed_signers(&e, &first), signers);
@@ -325,14 +343,14 @@ fn deploying_the_same_tuple_twice_traps() {
     let client = AccountFactoryContractClient::new(&e, &factory);
     let signers = vec![&e, external(&e, &verifier, 1)];
 
-    let deployed = client.deploy(&signers, &no_policies(&e), &0);
+    let deployed = client.deploy(&name(&e), &signers, &no_policies(&e), &0);
 
-    let again = client.try_deploy(&signers, &no_policies(&e), &0);
+    let again = client.try_deploy(&name(&e), &signers, &no_policies(&e), &0);
     assert_eq!(
         again,
         Err(Ok(Error::from_type_and_code(ScErrorType::Context, ScErrorCode::InvalidAction)))
     );
-    assert_eq!(client.predict_address(&signers, &no_policies(&e), &0), deployed);
+    assert_eq!(client.predict_address(&name(&e), &signers, &no_policies(&e), &0), deployed);
 }
 
 #[test]
@@ -342,7 +360,7 @@ fn account_constructor_errors_fail_deployment() {
     let client = AccountFactoryContractClient::new(&e, &factory);
 
     // Empty signers and policies fails account construction
-    let res = client.try_deploy(&Vec::new(&e), &no_policies(&e), &0);
+    let res = client.try_deploy(&name(&e), &Vec::new(&e), &no_policies(&e), &0);
     assert_eq!(
         res,
         Err(Ok(Error::from_type_and_code(ScErrorType::Context, ScErrorCode::InvalidAction)))
@@ -361,8 +379,8 @@ fn every_deploy_uses_the_pinned_wasm() {
     let other_client = AccountFactoryContractClient::new(&e, &other_factory);
     assert_eq!(other_client.pinned_account_wasm_hash(), bogus_hash);
 
-    let other_predicted = other_client.predict_address(&signers, &no_policies(&e), &0);
-    assert!(other_client.try_deploy(&signers, &no_policies(&e), &0).is_err());
+    let other_predicted = other_client.predict_address(&name(&e), &signers, &no_policies(&e), &0);
+    assert!(other_client.try_deploy(&name(&e), &signers, &no_policies(&e), &0).is_err());
 
-    assert_ne!(client.predict_address(&signers, &no_policies(&e), &0), other_predicted);
+    assert_ne!(client.predict_address(&name(&e), &signers, &no_policies(&e), &0), other_predicted);
 }
