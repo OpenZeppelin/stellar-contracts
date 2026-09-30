@@ -196,8 +196,14 @@ fn max_functions() {
 
     e.as_contract(&vault_address, || {
         // Test max functions with empty vault
-        assert_eq!(Vault::max_deposit(&e, user.clone()), i128::MAX);
-        assert_eq!(Vault::max_mint(&e, user.clone()), i128::MAX);
+        // Empty vault: the only limit is the virtual bound, `i128::MAX -
+        // 10^offset` shares, worth that many assets divided by `10^offset`.
+        let virtual_shares = 10i128.pow(decimals_offset);
+        assert_eq!(Vault::max_mint(&e, user.clone()), i128::MAX - virtual_shares);
+        assert_eq!(
+            Vault::max_deposit(&e, user.clone()),
+            (i128::MAX - virtual_shares) / virtual_shares
+        );
         assert_eq!(Vault::max_withdraw(&e, user.clone()), 0); // No shares yet
         assert_eq!(Vault::max_redeem(&e, user.clone()), 0); // No shares yet
     });
@@ -738,8 +744,11 @@ fn deposit_one_below_virtual_bound_keeps_vault_operational() {
     });
 }
 
+// `max_deposit` reports the room left under the virtual bound, so the deposit
+// is rejected by the entry point's limit check (`VaultExceededMaxDeposit`)
+// before reaching the guard in `deposit_internal`.
 #[test]
-#[should_panic(expected = "Error(Contract, #410)")]
+#[should_panic(expected = "Error(Contract, #405)")]
 fn deposit_exceeding_virtual_bound_is_rejected() {
     let e = Env::default();
     let user = Address::generate(&e);
@@ -762,8 +771,9 @@ fn deposit_exceeding_virtual_bound_is_rejected() {
     });
 }
 
+// Same through `mint`: rejected by its limit check (`VaultExceededMaxMint`).
 #[test]
-#[should_panic(expected = "Error(Contract, #410)")]
+#[should_panic(expected = "Error(Contract, #406)")]
 fn mint_exceeding_virtual_bound_is_rejected() {
     let e = Env::default();
     let user = Address::generate(&e);
@@ -781,6 +791,64 @@ fn mint_exceeding_virtual_bound_is_rejected() {
         // Same boundary through the `mint` entry point: `10^offset` shares
         // cost exactly one asset here and would land on the same supply.
         Vault::mint(&e, virtual_shares(), attacker.clone(), attacker.clone(), attacker.clone());
+    });
+}
+
+// The guard in `deposit_internal` stays as the second line of defense, for
+// contracts that call the low-level function directly and skip the entry
+// point's limit check.
+#[test]
+#[should_panic(expected = "Error(Contract, #410)")]
+fn deposit_internal_rejects_exceeding_virtual_bound() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let attacker = Address::generate(&e);
+    let boundary = assets_at_virtual_bound();
+    let asset_address = create_asset_contract(&e, boundary - 1, &user);
+    MockAssetContractClient::new(&e, &asset_address).mint(&attacker, &1);
+    let vault_address = create_vault_contract(&e, &asset_address, MAX_DECIMALS_OFFSET);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Vault::deposit(&e, boundary - 1, user.clone(), user.clone(), user.clone());
+        Vault::deposit_internal(&e, &attacker, 1, virtual_shares(), &attacker, &attacker);
+    });
+}
+
+// At the virtual bound, the limits the vault reports are exactly what its
+// entry points accept.
+#[test]
+fn limits_match_the_virtual_bound() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let boundary = assets_at_virtual_bound();
+    let asset_address = create_asset_contract(&e, boundary, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, MAX_DECIMALS_OFFSET);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Vault::deposit(&e, boundary - 1, user.clone(), user.clone(), user.clone());
+        let room = i128::MAX - virtual_shares() - total_supply(&e);
+        assert_eq!(Vault::max_mint(&e, user.clone()), room);
+        // less than one asset's worth of shares is left
+        assert!(room < virtual_shares());
+        assert_eq!(Vault::max_deposit(&e, user.clone()), 0);
+    });
+    e.as_contract(&vault_address, || {
+        // minting exactly the reported room succeeds and fills the bound
+        Vault::mint(
+            &e,
+            Vault::max_mint(&e, user.clone()),
+            user.clone(),
+            user.clone(),
+            user.clone(),
+        );
+        assert_eq!(total_supply(&e), i128::MAX - virtual_shares());
+        assert_eq!(Vault::max_mint(&e, user.clone()), 0);
+        // and the vault keeps converting
+        assert_eq!(Vault::preview_redeem(&e, virtual_shares()), 1);
     });
 }
 
@@ -956,7 +1024,8 @@ fn capped_vault_max_deposit_does_not_overflow() {
 
     e.as_contract(&vault_address, || {
         Capped::set_cap(&e, i128::MAX);
-        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), i128::MAX);
+        // offset 0: one virtual share below `i128::MAX`
+        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), i128::MAX - 1);
         assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), i128::MAX);
     });
 }

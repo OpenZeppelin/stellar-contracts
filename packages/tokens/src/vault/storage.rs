@@ -196,18 +196,10 @@ impl CappedVault {
     /// Returns the amount of underlying assets that can still be deposited
     /// before the cap is reached, and never more than [`Vault::max_deposit`].
     ///
-    /// The remaining shares are converted to assets rounding down, so
-    /// depositing this amount never mints more shares than
-    /// [`CappedVault::max_mint`] allows.
-    ///
-    /// Two edge cases, both far outside normal operation:
-    ///
-    /// * Returns `0` when the vault's totals are too large for any deposit to
-    ///   succeed: `deposit` computes `total_assets + 1` and `total_supply +
-    ///   10^offset`, and panics when either overflows.
-    /// * Returns `i128::MAX` when the remaining room under the cap, in assets,
-    ///   is larger than any `i128` amount (a very high share price with a large
-    ///   cap): every deposit amount then fits under the cap.
+    /// The remaining shares ([`CappedVault::max_mint`]) are converted to
+    /// assets rounding down, so depositing this amount never mints more shares
+    /// than the cap allows. The edge cases are those of
+    /// [`Vault::max_deposit`].
     ///
     /// # Arguments
     ///
@@ -218,29 +210,9 @@ impl CappedVault {
     ///
     /// * refer to [`query_cap`] errors.
     pub fn max_deposit(e: &Env, receiver: Address) -> i128 {
-        let remaining_shares = CappedVault::max_mint(e, receiver.clone());
-        if remaining_shares == 0 {
-            return 0;
-        }
-
-        // Same formula as `Vault::convert_to_assets_with_rounding`, with every
-        // step checked instead of panicking, since this is a view.
-        let (Some(y), Some(denominator)) = (
-            Vault::total_assets(e).checked_add(1),
-            10_i128
-                .checked_pow(Vault::get_decimals_offset(e))
-                .and_then(|pow| total_supply(e).checked_add(pow)),
-        ) else {
-            // `deposit` computes these same two sums and panics when they
-            // overflow, so no deposit is possible in this state.
-            return 0;
-        };
-        // Past this point, overflow only means the remaining room under the
-        // cap, in assets, is larger than any `i128` amount: every deposit fits.
-        let remaining_assets =
-            checked_mul_div_with_rounding(e, remaining_shares, y, denominator, Rounding::Floor)
-                .unwrap_or(i128::MAX);
-        remaining_assets.min(Vault::max_deposit(e, receiver))
+        // `CappedVault::max_mint` is never above `Vault::max_mint`, and the
+        // conversion is monotonic, so this is never above `Vault::max_deposit`.
+        Vault::max_assets_for_shares(e, CappedVault::max_mint(e, receiver))
     }
 
     /// Deposits `assets` if the shares it mints fit under the cap.
@@ -506,14 +478,25 @@ impl Vault {
     }
 
     /// Returns the maximum amount of underlying assets that can be deposited
-    /// for the given receiver address (currently `i128::MAX`).
+    /// for the given receiver address.
+    ///
+    /// This is the room left under [`Self::max_mint`], converted to assets
+    /// rounding down, so depositing this amount never mints more shares than
+    /// the vault accepts. Two edge cases, both far outside normal operation:
+    ///
+    /// * Returns `0` when the vault's totals are too large for any deposit to
+    ///   succeed: `deposit` computes `total_assets + 1` and `total_supply +
+    ///   10^offset`, and panics when either overflows.
+    /// * Returns `i128::MAX` when the room, in assets, is larger than any
+    ///   `i128` amount (a very high share price): every deposit amount then
+    ///   fits.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that would receive the vault shares.
-    pub fn max_deposit(_e: &Env, _receiver: Address) -> i128 {
-        i128::MAX
+    pub fn max_deposit(e: &Env, receiver: Address) -> i128 {
+        Self::max_assets_for_shares(e, Self::max_mint(e, receiver))
     }
 
     /// Simulates and returns the amount of vault shares that would be minted
@@ -536,14 +519,30 @@ impl Vault {
     }
 
     /// Returns the maximum amount of vault shares that can be minted
-    /// for the given receiver address (currently `i128::MAX`).
+    /// for the given receiver address.
+    ///
+    /// Every conversion computes `total_supply + 10^offset`, so the share
+    /// supply has to stay at least `10^offset` below `i128::MAX`, and
+    /// [`Self::deposit_internal()`] rejects any mint that would break this
+    /// bound. This returns exactly the shares still allowed under it:
+    /// `i128::MAX - 10^offset - total_supply`, and `0` once the bound is
+    /// reached. In practice the bound only matters for vaults holding close to
+    /// `i128::MAX / 10^offset` asset base units.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that would receive the vault shares.
-    pub fn max_mint(_e: &Env, _receiver: Address) -> i128 {
-        i128::MAX
+    pub fn max_mint(e: &Env, _receiver: Address) -> i128 {
+        // `get_decimals_offset` is at most `MAX_DECIMALS_OFFSET` (10), so the
+        // power always fits; the fallback only keeps this view panic-free.
+        let Some(virtual_shares) = 10_i128.checked_pow(Self::get_decimals_offset(e)) else {
+            return 0;
+        };
+        // Both terms are non-negative and at most `i128::MAX`, so the
+        // subtraction cannot overflow; a negative result means the bound is
+        // already reached.
+        (i128::MAX - virtual_shares - Self::total_supply(e)).max(0)
     }
 
     /// Simulates and returns the amount of underlying assets required to mint
@@ -637,8 +636,9 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`VaultTokenError::VaultExceededMaxDeposit`] - When attempting to
-    ///   deposit more assets than the maximum allowed for the receiver.
+    /// * [`VaultTokenError::VaultExceededMaxDeposit`] - When the deposit would
+    ///   mint more shares than [`Self::max_mint`] allows, i.e. when depositing
+    ///   more assets than [`Self::max_deposit`] (up to rounding).
     /// * [`VaultTokenError::VaultZeroShares`] - When a positive amount of
     ///   assets would mint zero shares.
     /// * also refer to [`Self::preview_deposit()`] errors.
@@ -662,11 +662,16 @@ impl Vault {
     ) -> i128 {
         operator.require_auth();
 
-        let max_assets = Self::max_deposit(e, receiver.clone());
-        if assets > max_assets {
+        let shares: i128 = Self::preview_deposit(e, assets);
+        // The limit is a limit on shares (refer to `max_mint`), so it is
+        // checked on the shares this deposit mints. Comparing `assets`
+        // with `max_deposit` would check the same limit, but converting
+        // the room to assets reads `total_assets` a second time. Every
+        // amount up to `max_deposit` still passes: it is rounded down
+        // so that its shares fit under `max_mint`.
+        if shares > Self::max_mint(e, receiver.clone()) {
             panic_with_error!(e, VaultTokenError::VaultExceededMaxDeposit);
         }
-        let shares: i128 = Self::preview_deposit(e, assets);
         if shares == 0 && assets > 0 {
             panic_with_error!(e, VaultTokenError::VaultZeroShares);
         }
@@ -1184,5 +1189,36 @@ impl Vault {
     pub fn get_underlying_asset_decimals(e: &Env) -> u32 {
         let token_client = token::Client::new(e, &Self::query_asset(e));
         token_client.decimals()
+    }
+
+    /// Converts `shares` to assets rounding down, like
+    /// [`Self::convert_to_assets()`], but never panics: this backs the
+    /// `max_deposit` views, which report a limit instead of failing.
+    ///
+    /// Returns `0` for `shares == 0`, and also when `total_assets + 1` or
+    /// `total_supply + 10^offset` overflows: `deposit` computes these same two
+    /// sums and panics when they overflow, so no deposit is possible in that
+    /// state. Returns `i128::MAX` when only the final conversion overflows:
+    /// the amount of assets is then larger than any `i128`, so every deposit
+    /// amount fits.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `shares` - The amount of vault shares still allowed to be minted.
+    fn max_assets_for_shares(e: &Env, shares: i128) -> i128 {
+        if shares <= 0 {
+            return 0;
+        }
+        let (Some(y), Some(denominator)) = (
+            Self::total_assets(e).checked_add(1),
+            10_i128
+                .checked_pow(Self::get_decimals_offset(e))
+                .and_then(|pow| Self::total_supply(e).checked_add(pow)),
+        ) else {
+            return 0;
+        };
+        checked_mul_div_with_rounding(e, shares, y, denominator, Rounding::Floor)
+            .unwrap_or(i128::MAX)
     }
 }
