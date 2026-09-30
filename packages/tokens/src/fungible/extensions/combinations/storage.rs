@@ -5,6 +5,7 @@ use crate::fungible::{
     extensions::{
         allowlist::{AllowList, AllowListContractType},
         blocklist::{BlockList, BlockListContractType},
+        capped::{Capped, CappedContractType},
         total_supply::{decrease_total_supply, mint, total_supply, TotalSupplyOverrides},
         votes::FungibleVotes,
     },
@@ -479,5 +480,192 @@ impl TotalSupplyAllowBlockList {
     pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         AllowBlockList::burn_from(e, spender, from, amount);
         decrease_total_supply(e, amount);
+    }
+}
+
+/// Contract type combining the [`AllowList`] transfer policy with a capped
+/// total supply: minting checks the cap (refer to [`Capped`]), transfers and
+/// approvals go through the list policy.
+pub struct CappedAllowList;
+
+impl TotalSupplyOverrides for CappedAllowList {}
+
+// The combined contract type keeps enforcing the list policy and the cap.
+impl AllowListContractType for CappedAllowList {}
+impl CappedContractType for CappedAllowList {}
+
+// Transfers and approvals never touch the supply, so they are routed to
+// the list policy unchanged.
+impl ContractOverrides for CappedAllowList {
+    fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
+        AllowList::transfer(e, from, to, amount);
+    }
+
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        AllowList::transfer_from(e, spender, from, to, amount);
+    }
+
+    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+        AllowList::approve(e, owner, spender, amount, live_until_ledger);
+    }
+}
+
+impl BurnableOverrides for CappedAllowList {
+    fn burn(e: &Env, from: &Address, amount: i128) {
+        CappedAllowList::burn(e, from, amount);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        CappedAllowList::burn_from(e, spender, from, amount);
+    }
+}
+
+impl MintOverrides for CappedAllowList {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        CappedAllowList::mint(e, to, amount);
+    }
+}
+
+impl CappedAllowList {
+    pub fn total_supply(e: &Env) -> i128 {
+        total_supply(e)
+    }
+
+    pub fn mint(e: &Env, to: &Address, amount: i128) {
+        Capped::mint(e, to, amount);
+    }
+
+    // Burning under a cap is plain supply-tracked burning.
+    pub fn burn(e: &Env, from: &Address, amount: i128) {
+        TotalSupplyAllowList::burn(e, from, amount);
+    }
+
+    pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        TotalSupplyAllowList::burn_from(e, spender, from, amount);
+    }
+}
+
+/// Contract type combining the [`BlockList`] transfer policy with a capped
+/// total supply: minting checks the cap (refer to [`Capped`]), transfers and
+/// approvals go through the list policy.
+pub struct CappedBlockList;
+
+impl TotalSupplyOverrides for CappedBlockList {}
+
+// The combined contract type keeps enforcing the list policy and the cap.
+impl BlockListContractType for CappedBlockList {}
+impl CappedContractType for CappedBlockList {}
+
+// Transfers and approvals never touch the supply, so they are routed to
+// the list policy unchanged.
+impl ContractOverrides for CappedBlockList {
+    fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
+        BlockList::transfer(e, from, to, amount);
+    }
+
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        BlockList::transfer_from(e, spender, from, to, amount);
+    }
+
+    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+        BlockList::approve(e, owner, spender, amount, live_until_ledger);
+    }
+}
+
+impl BurnableOverrides for CappedBlockList {
+    fn burn(e: &Env, from: &Address, amount: i128) {
+        CappedBlockList::burn(e, from, amount);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        CappedBlockList::burn_from(e, spender, from, amount);
+    }
+}
+
+impl MintOverrides for CappedBlockList {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        CappedBlockList::mint(e, to, amount);
+    }
+}
+
+impl CappedBlockList {
+    pub fn total_supply(e: &Env) -> i128 {
+        total_supply(e)
+    }
+
+    pub fn mint(e: &Env, to: &Address, amount: i128) {
+        Capped::mint(e, to, amount);
+    }
+
+    // Burning under a cap is plain supply-tracked burning.
+    pub fn burn(e: &Env, from: &Address, amount: i128) {
+        TotalSupplyBlockList::burn(e, from, amount);
+    }
+
+    pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        TotalSupplyBlockList::burn_from(e, spender, from, amount);
+    }
+}
+
+/// Contract type combining both list policies ([`AllowBlockList`]) with a
+/// capped total supply: minting checks the cap (refer to [`Capped`]), transfers
+/// and approvals go through the list policies.
+pub struct CappedAllowBlockList;
+
+impl TotalSupplyOverrides for CappedAllowBlockList {}
+
+// The combined contract type keeps enforcing the list policies and the cap.
+impl AllowListContractType for CappedAllowBlockList {}
+impl BlockListContractType for CappedAllowBlockList {}
+impl CappedContractType for CappedAllowBlockList {}
+
+// Transfers and approvals never touch the supply, so they are routed to
+// the list policies unchanged.
+impl ContractOverrides for CappedAllowBlockList {
+    fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
+        AllowBlockList::transfer(e, from, to, amount);
+    }
+
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        AllowBlockList::transfer_from(e, spender, from, to, amount);
+    }
+
+    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+        AllowBlockList::approve(e, owner, spender, amount, live_until_ledger);
+    }
+}
+
+impl BurnableOverrides for CappedAllowBlockList {
+    fn burn(e: &Env, from: &Address, amount: i128) {
+        CappedAllowBlockList::burn(e, from, amount);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        CappedAllowBlockList::burn_from(e, spender, from, amount);
+    }
+}
+
+impl MintOverrides for CappedAllowBlockList {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        CappedAllowBlockList::mint(e, to, amount);
+    }
+}
+
+impl CappedAllowBlockList {
+    pub fn total_supply(e: &Env) -> i128 {
+        total_supply(e)
+    }
+
+    pub fn mint(e: &Env, to: &Address, amount: i128) {
+        Capped::mint(e, to, amount);
+    }
+
+    // Burning under a cap is plain supply-tracked burning.
+    pub fn burn(e: &Env, from: &Address, amount: i128) {
+        TotalSupplyAllowBlockList::burn(e, from, amount);
+    }
+
+    pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        TotalSupplyAllowBlockList::burn_from(e, spender, from, amount);
     }
 }
