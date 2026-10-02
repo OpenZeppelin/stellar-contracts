@@ -189,7 +189,7 @@ fn consecutive_owner_of_works() {
 }
 
 #[test]
-fn consecutive_batch_mint_works() {
+fn consecutive_mint_range_works() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
@@ -197,7 +197,7 @@ fn consecutive_batch_mint_works() {
     let amount = MAX_TOKENS_IN_BATCH as u32;
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, amount);
+        Consecutive::mint_range(&e, &owner, amount);
 
         let events = e.events().all();
         assert_eq!(events.events().len(), 1);
@@ -221,7 +221,7 @@ fn consecutive_batch_mint_works() {
         assert_eq!(Consecutive::owner_of(&e, 31_999), owner);
 
         // new mint
-        let last_id = Consecutive::mint(&e, &owner, amount);
+        let last_id = Consecutive::mint_range(&e, &owner, amount);
         assert_eq!(last_id, 2 * amount - 1);
         assert_eq!(Base::balance(&e, &owner), 2 * amount);
         assert_eq!(Consecutive::owner_of(&e, 2 * amount - 1), owner);
@@ -230,7 +230,7 @@ fn consecutive_batch_mint_works() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #207)")]
-fn consecutive_batch_mint_amount_0_fails() {
+fn consecutive_mint_range_amount_0_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
@@ -238,13 +238,13 @@ fn consecutive_batch_mint_amount_0_fails() {
     let amount = 0;
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, amount);
+        Consecutive::mint_range(&e, &owner, amount);
     });
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #207)")]
-fn consecutive_batch_mint_amount_max_fails() {
+fn consecutive_mint_range_amount_max_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
@@ -252,7 +252,7 @@ fn consecutive_batch_mint_amount_max_fails() {
     let amount = MAX_TOKENS_IN_BATCH as u32 + 1;
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, amount);
+        Consecutive::mint_range(&e, &owner, amount);
     });
 }
 
@@ -275,7 +275,7 @@ fn consecutive_owner_of_on_nonexistent_token_fails() {
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &user, 5);
+        Consecutive::mint_range(&e, &user, 5);
         // token 5 is out of range
         Consecutive::owner_of(&e, 5);
     });
@@ -290,7 +290,7 @@ fn consecutive_owner_of_panics_on_burnt_token_fails() {
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &user, 10);
+        Consecutive::mint_range(&e, &user, 10);
         Consecutive::burn(&e, &user, 2);
         Consecutive::owner_of(&e, 2);
     });
@@ -307,7 +307,7 @@ fn consecutive_transfer_works() {
     let amount = 100;
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, amount);
+        Consecutive::mint_range(&e, &owner, amount);
         assert_eq!(Base::balance(&e, &owner), amount);
 
         Consecutive::transfer(&e, &owner, &recipient, 50);
@@ -349,7 +349,7 @@ fn consecutive_transfer_edge_works() {
     let amount = 100;
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, amount);
+        Consecutive::mint_range(&e, &owner, amount);
 
         let events = e.events().all();
         assert_eq!(events.events().len(), 1);
@@ -385,7 +385,7 @@ fn consecutive_transfer_from_works() {
     let token_id = 50;
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, amount);
+        Consecutive::mint_range(&e, &owner, amount);
         assert_eq!(Base::balance(&e, &owner), amount);
 
         Consecutive::approve(&e, &owner, &spender, token_id, 100);
@@ -430,7 +430,7 @@ fn consecutive_burn_works() {
     let token_id = 50;
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, amount);
+        Consecutive::mint_range(&e, &owner, amount);
         assert_eq!(Base::balance(&e, &owner), amount);
 
         Consecutive::burn(&e, &owner, token_id);
@@ -482,7 +482,7 @@ fn consecutive_burn_from_works() {
     let token_id = 42;
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, amount);
+        Consecutive::mint_range(&e, &owner, amount);
         Consecutive::approve(&e, &owner, &spender, token_id, 100);
         Consecutive::burn_from(&e, &spender, &owner, token_id);
 
@@ -530,7 +530,7 @@ fn consecutive_set_owner_for_previous_token_works() {
     let user3 = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &user1, 5); // 0,1,2,3,4
+        Consecutive::mint_range(&e, &user1, 5); // 0,1,2,3,4
 
         // existing ID
         Consecutive::set_owner_for_previous_token(&e, &user2, 3);
@@ -608,7 +608,7 @@ fn consecutive_token_uri_panics_for_burned_id_fails() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, 1);
+        Consecutive::mint_range(&e, &owner, 1);
         Consecutive::burn(&e, &owner, 0);
         Consecutive::token_uri(&e, 0);
     });

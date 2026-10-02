@@ -134,11 +134,9 @@ impl ContractOverrides for Consecutive {
 
 #### Minting Through the Contract Type
 
-Minting is not part of any public trait, because the entry point's signature
-and authorization vary per contract (an `#[only_owner]` mint with no extra
-argument, a role-gated mint taking an `operator`, ...). The underlying
-primitive is fixed, though, and the contract type decides what it does:
-`TotalSupply` also increases the supply counter, `FungibleVotes` also moves
+Minting is not part of any public trait, because no single `mint` signature
+fits every contract type. The contract type decides what the underlying primitive
+does: `TotalSupply` also increases the supply counter, `FungibleVotes` also moves
 voting units, `Enumerable` also records the token in its enumeration lists, and so on.
 
 The contract's own mint function reaches that primitive through the contract
@@ -157,8 +155,7 @@ has to be imported for it. Calling a specific primitive such as `Base::mint`
 instead would compile and skip the bookkeeping of the selected contract type
 (the supply counter, the voting units, the enumeration).
 
-Every contract type names its mint `mint`, and the signature follows the
-contract type:
+The mint primitives each contract type provides follow its storage model:
 
 - fungible: `mint(to, amount)`, on every contract type except `Vault`, which
   has no free mint (its shares are only created against deposited assets);
@@ -167,13 +164,13 @@ contract type:
   counter; `mint_with_id(to, token_id)` is also provided for ids chosen by the
   caller;
 - non-fungible, ownership stored per batch (`Consecutive` and its votes
-  variant): `mint(to, amount) -> u32` mints `amount` consecutive ids.
+  variant): `mint_range(to, amount) -> u32` mints `amount` consecutive ids.
 
-The two non-fungible `mint` signatures have different arities on purpose:
-switching a contract between the two storage models breaks the build at the
-mint call, instead of silently turning "mint the next token" into "mint a
-batch". Internally, the `MintOverrides` traits (`MintOverrides`,
-`MintWithIdOverrides` and `BatchMintOverrides` on the non-fungible side) are
+The non-fungible primitives have distinct names on purpose: switching a
+contract between the two storage models breaks the build at the mint call,
+instead of silently turning "mint one token" into "mint a range". Internally,
+the `MintOverrides` traits (`MintOverrides`, `MintWithIdOverrides` and
+`MintRangeOverrides` on the non-fungible side) are
 the checked promise that each contract type has these primitives with these
 exact signatures, and the path for library code that is generic over the
 contract type. Like `ContractOverrides`, contract authors never name them.

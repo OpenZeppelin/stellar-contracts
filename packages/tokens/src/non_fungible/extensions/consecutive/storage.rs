@@ -6,7 +6,7 @@ use crate::non_fungible::{
     burnable::emit_burn,
     emit_transfer,
     extensions::consecutive::emit_consecutive_mint,
-    overrides::{BatchMintOverrides, BurnableOverrides},
+    overrides::{BurnableOverrides, MintRangeOverrides},
     royalties::RoyaltySupport,
     sequential::{self as sequential},
     Base, ContractOverrides, NonFungibleTokenError, OWNERSHIP_EXTEND_AMOUNT,
@@ -69,9 +69,9 @@ impl BurnableOverrides for Consecutive {
 // instead of `Base`'s direct entry lookup.
 impl RoyaltySupport for Consecutive {}
 
-impl BatchMintOverrides for Consecutive {
-    fn mint(e: &Env, to: &Address, amount: u32) -> u32 {
-        Consecutive::mint(e, to, amount)
+impl MintRangeOverrides for Consecutive {
+    fn mint_range(e: &Env, to: &Address, amount: u32) -> u32 {
+        Consecutive::mint_range(e, to, amount)
     }
 }
 
@@ -98,7 +98,7 @@ pub const IDS_IN_ITEM: usize = mem::size_of::<u32>() * 8; // 32
 /// Total number of IDs in the whole bucket
 pub const IDS_IN_BUCKET: usize = ITEMS_IN_BUCKET * IDS_IN_ITEM; // 3,200
 /// Max. amount of tokens allowed to be minted at once in
-/// [`Consecutive::mint`]
+/// [`Consecutive::mint_range`]
 pub const MAX_TOKENS_IN_BATCH: usize = 32_000; // 10 buckets * 100 items * 32
 
 /// Storage keys for the data associated with the consecutive extension of
@@ -222,18 +222,18 @@ impl Consecutive {
     /// must be implemented in the calling function. For example:
     ///
     /// ```ignore,rust
-    /// fn mint_batch(e: &Env, to: &Address, amount: u32) {
+    /// fn mint_range(e: &Env, to: &Address, amount: u32) {
     ///     // 1. Verify admin has minting privileges (optional)
     ///     let admin = e.storage().instance().get(&ADMIN_KEY).unwrap();
     ///     admin.require_auth();
     ///
     ///     // 2. Only then call the actual mint function
-    ///     Consecutive::mint(e, &to, amount);
+    ///     Consecutive::mint_range(e, &to, amount);
     /// }
     /// ```
     ///
     /// Failure to add proper authorization could allow anyone to mint tokens.
-    pub fn mint(e: &Env, to: &Address, amount: u32) -> u32 {
+    pub fn mint_range(e: &Env, to: &Address, amount: u32) -> u32 {
         if amount == 0 || amount > MAX_TOKENS_IN_BATCH as u32 {
             panic_with_error!(&e, NonFungibleTokenError::InvalidAmount);
         }

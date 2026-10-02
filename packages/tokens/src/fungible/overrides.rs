@@ -97,14 +97,11 @@ impl BurnableOverrides for Base {}
 ///
 /// # Why this trait exists
 ///
-/// Minting is not part of any public trait: the entry point is written by the
-/// contract author, because its signature and authorization vary per contract
-/// (`#[only_owner]` with no extra argument, a role check with an `operator`
-/// argument, ...). Only the underlying primitive, "create `amount` tokens for
-/// `to`", is the same everywhere, and what it has to do depends on the
-/// contract type: `Base` only updates the balance, `TotalSupply` also
-/// increases the supply counter, `FungibleVotes` also moves voting units,
-/// `RWA` also runs its compliance checks.
+/// Minting is not part of any public trait, because no single `mint`
+/// signature fits every contract type. The underlying business logic depends on
+/// the contract type: `Base` only updates the balance, `TotalSupply` also
+/// increases the supply counter, `FungibleVotes` also moves voting units, `RWA`
+/// also runs its compliance checks.
 ///
 /// This trait gives that primitive a single dispatch point. The author's
 /// entry point calls `Self::ContractType::mint`, which reaches the mint of
