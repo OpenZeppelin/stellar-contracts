@@ -75,7 +75,7 @@ pub use extensions::{
     burnable, combinations, combinations::Compose, consecutive, enumerable, royalties, votes,
 };
 pub use overrides::{
-    Base, BatchMintOverrides, ContractOverrides, MintOverrides, MintWithIdOverrides,
+    Base, ContractOverrides, MintOverrides, MintRangeOverrides, MintWithIdOverrides,
 };
 // ################## TRAIT ##################
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, String};
@@ -94,13 +94,7 @@ pub use utils::sequential;
 ///
 /// The contract's own mint function mints through `Self::ContractType::mint`,
 /// which reaches the mint of the selected contract type (no import needed,
-/// refer to [`MintOverrides`]). Its signature follows the contract type's
-/// storage model: `mint(to) -> u32` mints the next id of the sequential
-/// counter on the per-token contract types ([`crate::non_fungible::Base`],
-/// `Enumerable`, ...), and `mint(to, amount) -> u32` mints a batch on
-/// `Consecutive`. For ids chosen by the caller instead of the counter, the
-/// per-token contract types also provide `mint_with_id(to, token_id)`, e.g.
-/// [`crate::non_fungible::Base::mint_with_id`].
+/// refer to [`MintOverrides`]).
 ///
 /// This trait is implemented for the following Contract Types:
 /// * [`crate::non_fungible::Base`] (covering the vanilla case, and compatible

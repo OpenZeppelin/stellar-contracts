@@ -25,11 +25,11 @@ impl ExampleContract {
         Base::set_metadata(e, uri, name, symbol);
     }
 
-    pub fn batch_mint(e: &Env, to: Address, amount: u32) -> u32 {
+    pub fn mint_range(e: &Env, to: Address, amount: u32) -> u32 {
         let owner: Address =
             e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
         owner.require_auth();
-        <Self as NonFungibleToken>::ContractType::mint(e, &to, amount)
+        <Self as NonFungibleToken>::ContractType::mint_range(e, &to, amount)
     }
 }
 

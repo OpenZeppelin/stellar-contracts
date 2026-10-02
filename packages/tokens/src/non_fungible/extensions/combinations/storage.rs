@@ -7,7 +7,7 @@ use crate::non_fungible::{
         enumerable::{Enumerable, EnumerableContractType},
     },
     overrides::{
-        BatchMintOverrides, BurnableOverrides, ContractOverrides, MintOverrides,
+        BurnableOverrides, ContractOverrides, MintOverrides, MintRangeOverrides,
         MintWithIdOverrides,
     },
     royalties::RoyaltySupport,
@@ -145,15 +145,15 @@ impl BurnableOverrides for ConsecutiveVotes {
 // entry lookup.
 impl RoyaltySupport for ConsecutiveVotes {}
 
-impl BatchMintOverrides for ConsecutiveVotes {
-    fn mint(e: &Env, to: &Address, amount: u32) -> u32 {
-        ConsecutiveVotes::mint(e, to, amount)
+impl MintRangeOverrides for ConsecutiveVotes {
+    fn mint_range(e: &Env, to: &Address, amount: u32) -> u32 {
+        ConsecutiveVotes::mint_range(e, to, amount)
     }
 }
 
 impl ConsecutiveVotes {
-    pub fn mint(e: &Env, to: &Address, amount: u32) -> u32 {
-        let last_id = Consecutive::mint(e, to, amount);
+    pub fn mint_range(e: &Env, to: &Address, amount: u32) -> u32 {
+        let last_id = Consecutive::mint_range(e, to, amount);
         transfer_voting_units(e, None, Some(to), u128::from(amount));
         last_id
     }

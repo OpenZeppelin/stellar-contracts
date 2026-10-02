@@ -221,6 +221,45 @@ fn mint_tokens() {
     });
 }
 
+// Minting through `MintOverrides` runs RWA's full mint path, the same as the
+// inherent `RWA::mint`: supply accounting and the `Mint` event.
+#[test]
+fn mint_through_mint_overrides_runs_the_rwa_mint() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        <RWA as MintOverrides>::mint(&e, &to, 100);
+        assert_eq!(RWA::balance(&e, &to), 100);
+        assert_eq!(RWA::total_supply(&e), 100);
+        let events = e.events().all();
+        assert_eq!(
+            events.events().last().unwrap(),
+            &Mint { to: to.clone(), amount: 100 }.to_xdr(&e, &address)
+        );
+    });
+}
+
+// Minting through `MintOverrides` keeps RWA's checks: a frozen recipient is
+// rejected.
+#[test]
+#[should_panic(expected = "Error(Contract, #302)")]
+fn mint_through_mint_overrides_keeps_rwa_checks() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::set_address_frozen(&e, &to, true);
+
+        <RWA as MintOverrides>::mint(&e, &to, 100);
+    });
+}
+
 #[test]
 #[should_panic(expected = "Error(Contract, #307)")]
 fn mint_without_compliance_fails() {

@@ -103,13 +103,11 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// as a method in this trait because it is not a part of the SEP-41 standard,
 /// the function signature may change depending on the implementation.
 ///
-/// Minting is not part of this trait, since the entry point's signature and
-/// authorization vary per contract. The contract's own mint function mints
-/// through `Self::ContractType::mint`, which reaches the mint of the selected
-/// contract type (no import needed, refer to [`MintOverrides`]), e.g.
-/// increasing the supply counter for
-/// [`crate::fungible::total_supply::TotalSupply`] or checking the
-/// cap for [`crate::fungible::capped::Capped`].
+/// The contract's own mint function mints through `Self::ContractType::mint`,
+/// which reaches the mint of the selected contract type (no import needed,
+/// refer to [`MintOverrides`]), e.g. increasing the supply counter for
+/// [`crate::fungible::total_supply::TotalSupply`] or checking the cap for
+/// [`crate::fungible::capped::Capped`].
 ///
 /// `FungibleToken` can be implemented with any of the following contract
 /// types, each one defining how the token behaves:
