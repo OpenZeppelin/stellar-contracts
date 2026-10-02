@@ -9,12 +9,16 @@
 //!
 //! The extension consists of two parts:
 //!
-//! - [`FungibleCapped`]: exposes the `cap()` function on the contract.
-//! - The [`Capped`] type: [`Capped::set_cap`] in the constructor and
-//!   [`Capped::mint`] in the contract's own `mint` function, which checks the
-//!   cap and then mints through the supply counter. Minting is not part of any
-//!   trait, so the check is not automatic. Contract types with a mint of their
-//!   own, such as `RWA`, call [`check_cap`] before that mint instead.
+//! - The [`Capped`] contract type, selected by listing `Capped` in the
+//!   [`crate::fungible::combinations::Compose`] list. Its mint checks the cap
+//!   and then mints through the supply counter. [`Capped::set_cap`] is called
+//!   in the constructor, and the contract's own `mint` function mints through
+//!   `Self::ContractType::mint`, which resolves to the capped mint, so the cap
+//!   is enforced without being called explicitly.
+//! - [`FungibleCapped`]: exposes the `cap()` function on the contract. It can
+//!   only be implemented when the resolved contract type enforces the cap
+//!   (refer to [`CappedContractType`]), so a contract cannot report a cap it
+//!   does not enforce.
 //!
 //! Usage:
 //!
@@ -27,7 +31,7 @@
 //!
 //!     #[only_owner]
 //!     pub fn mint(e: &Env, to: Address, amount: i128) {
-//!         Capped::mint(e, &to, amount);
+//!         <Self as FungibleToken>::ContractType::mint(e, &to, amount);
 //!     }
 //! }
 //!
@@ -43,13 +47,16 @@
 //! impl FungibleCapped for MyToken {}
 //! ```
 //!
-//! In the [`crate::fungible::combinations::Compose`] list, `Capped` is
-//! additive but requires `TotalSupply` next to it, like `RWA` and `Vault`:
-//! `Compose<(Capped, TotalSupply)>` resolves to
-//! [`crate::fungible::total_supply::TotalSupply`], `Compose<(AllowList,
-//! Capped, TotalSupply)>` to the allowlist supply-tracking combination, and a
-//! list with `Capped` but without `TotalSupply` is rejected with a dedicated
-//! compile error.
+//! In the [`crate::fungible::combinations::Compose`] list, `Capped` requires
+//! `TotalSupply` next to it, like `RWA` and `Vault`, and a list with `Capped`
+//! but without `TotalSupply` is rejected with a dedicated compile error.
+//! `Compose<(Capped, TotalSupply)>` resolves to [`Capped`]; `Capped` combined
+//! with `AllowList`, `BlockList` (or both), `RWA` or `Vault` resolves to the
+//! matching capped combination, e.g. `Compose<(AllowList, Capped,
+//! TotalSupply)>` to `CappedAllowList`.
+//!
+//! On a capped vault, the cap bounds the supply of shares: it is enforced on
+//! `deposit` and `mint`, and reflected in `max_deposit` and `max_mint`.
 
 mod storage;
 
@@ -57,9 +64,9 @@ mod storage;
 mod test;
 
 use soroban_sdk::{contracttrait, Env};
-pub use storage::{check_cap, query_cap, set_cap, CapStorageKey, Capped};
+pub use storage::{check_cap, query_cap, set_cap, CapStorageKey, Capped, CappedContractType};
 
-use crate::fungible::total_supply::FungibleTotalSupply;
+use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 
 /// Capped Trait for Fungible Token
 ///
@@ -67,10 +74,13 @@ use crate::fungible::total_supply::FungibleTotalSupply;
 /// expose the maximum total supply of the token.
 ///
 /// The cap is checked against the total supply, so this trait can only be
-/// implemented alongside [`FungibleTotalSupply`]. The check itself is
-/// performed by [`Capped::mint`] in the contract's `mint` function.
+/// implemented alongside [`FungibleTotalSupply`]. It can also only be
+/// implemented when the contract's `ContractType` enforces the cap (refer to
+/// [`CappedContractType`]), i.e. when `Capped` is in the `Compose` list.
 #[contracttrait]
-pub trait FungibleCapped: FungibleTotalSupply {
+pub trait FungibleCapped:
+    FungibleTotalSupply + FungibleToken<ContractType: CappedContractType>
+{
     /// Returns the maximum total supply of tokens.
     ///
     /// # Arguments

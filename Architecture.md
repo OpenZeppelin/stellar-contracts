@@ -136,8 +136,9 @@ impl ContractOverrides for Consecutive {
 
 Minting is not part of any public trait, because no single `mint` signature
 fits every contract type. The contract type decides what the underlying primitive
-does: `TotalSupply` also increases the supply counter, `FungibleVotes` also moves
-voting units, `Enumerable` also records the token in its enumeration lists, and so on.
+does: `TotalSupply` also increases the supply counter, `Capped` also checks the
+cap, `FungibleVotes` also moves voting units, `Enumerable` also records the token
+in its enumeration lists, and so on.
 
 The contract's own mint function reaches that primitive through the contract
 type:
@@ -150,10 +151,10 @@ pub fn mint(e: &Env, to: Address, amount: i128) {
 ```
 
 In the contract, `Self::ContractType` is the concrete type `Compose` resolved
-to (e.g. `TotalSupplyAllowList`), so this call is that type's own `mint`. Nothing
+to (e.g. `CappedAllowList`), so this call is that type's own `mint`. Nothing
 has to be imported for it. Calling a specific primitive such as `Base::mint`
 instead would compile and skip the bookkeeping of the selected contract type
-(the supply counter, the voting units, the enumeration).
+(the supply counter, the cap, the enumeration).
 
 The mint primitives each contract type provides follow its storage model:
 
