@@ -1873,3 +1873,29 @@ fn capped_rwa_transfer_keeps_rwa_checks() {
         <CappedRWA as ContractOverrides>::transfer(&e, &from, &MuxedAddress::from(to), 10);
     });
 }
+
+#[test]
+fn capped_rwa_transfer_from_moves_tokens_through_rwa() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        Capped::set_cap(&e, 1000);
+
+        CappedRWA::mint(&e, &owner, 100);
+        RWA::approve(&e, &owner, &spender, 50, 1000);
+    });
+
+    e.as_contract(&address, || {
+        <CappedRWA as ContractOverrides>::transfer_from(&e, &spender, &owner, &to, 30);
+
+        assert_eq!(RWA::balance(&e, &owner), 70);
+        assert_eq!(RWA::balance(&e, &to), 30);
+        assert_eq!(RWA::allowance(&e, &owner, &spender), 20);
+    });
+}

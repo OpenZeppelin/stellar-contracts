@@ -1279,3 +1279,88 @@ fn capped_mint_rejected_after_cap_lowered_below_supply() {
         mint_through::<Capped>(&e, &alice, 1);
     });
 }
+
+// Burning under a cap is plain supply-tracked burning, and frees room under
+// the cap again.
+#[test]
+fn capped_burn_decreases_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 100);
+        mint_through::<Capped>(&e, &alice, 100);
+        <Capped as ContractOverrides>::approve(&e, &alice, &spender, 50, 1000);
+    });
+    e.as_contract(&address, || {
+        <Capped as BurnableOverrides>::burn(&e, &alice, 30);
+    });
+    e.as_contract(&address, || {
+        <Capped as BurnableOverrides>::burn_from(&e, &spender, &alice, 20);
+        assert_eq!(Capped::total_supply(&e), 50);
+        assert_eq!(Base::balance(&e, &alice), 50);
+        // the burned amount can be minted again
+        mint_through::<Capped>(&e, &alice, 50);
+        assert_eq!(Capped::total_supply(&e), 100);
+    });
+}
+
+// Every capped contract type reads the same supply counter.
+#[test]
+fn capped_combinations_report_the_tracked_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 100);
+        mint_through::<Capped>(&e, &alice, 40);
+        assert_eq!(Capped::total_supply(&e), 40);
+        assert_eq!(CappedAllowList::total_supply(&e), 40);
+        assert_eq!(CappedBlockList::total_supply(&e), 40);
+        assert_eq!(CappedAllowBlockList::total_supply(&e), 40);
+    });
+}
+
+#[test]
+fn capped_block_list_transfer_from_and_burn_from_apply_policy_and_track_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        mint_through::<CappedBlockList>(&e, &alice, 100);
+        <CappedBlockList as ContractOverrides>::approve(&e, &alice, &spender, 60, 1000);
+    });
+    e.as_contract(&address, || {
+        <CappedBlockList as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 30);
+    });
+    e.as_contract(&address, || {
+        <CappedBlockList as BurnableOverrides>::burn_from(&e, &spender, &alice, 20);
+        assert_eq!(Base::balance(&e, &alice), 50);
+        assert_eq!(Base::balance(&e, &bob), 30);
+        assert_eq!(Base::allowance(&e, &alice, &spender), 10);
+        assert_eq!(total_supply(&e), 80);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn capped_block_list_transfer_from_rejects_blocked_receiver() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        mint_through::<CappedBlockList>(&e, &alice, 100);
+        <CappedBlockList as ContractOverrides>::approve(&e, &alice, &spender, 60, 1000);
+        BlockList::block_user(&e, &bob);
+    });
+    e.as_contract(&address, || {
+        <CappedBlockList as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 30);
+    });
+}
