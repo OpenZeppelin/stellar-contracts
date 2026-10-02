@@ -10,7 +10,10 @@ use crate::{
         total_supply::{total_supply, FungibleTotalSupply, TotalSupply},
         Base, Compose, FungibleToken,
     },
-    vault::{CappedVault, FungibleVault, Vault, VaultOverrides, MAX_DECIMALS_OFFSET},
+    vault::{
+        storage::VaultStorageKey, CappedVault, FungibleVault, Vault, VaultOverrides,
+        MAX_DECIMALS_OFFSET,
+    },
 };
 
 // Simple mock contract for vault testing
@@ -849,6 +852,25 @@ fn limits_match_the_virtual_bound() {
         assert_eq!(Vault::max_mint(&e, user.clone()), 0);
         // and the vault keeps converting
         assert_eq!(Vault::preview_redeem(&e, virtual_shares()), 1);
+    });
+}
+
+// `set_decimals_offset` caps the offset at `MAX_DECIMALS_OFFSET`, so
+// `10^offset` always fits in `i128`. The limits stay panic-free even if that
+// invariant were broken: with an offset written past the cap directly into
+// storage, they report no room instead of overflowing.
+#[test]
+fn limits_report_no_room_when_virtual_shares_overflow() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.as_contract(&vault_address, || {
+        // 10^39 does not fit in `i128`
+        e.storage().instance().set(&VaultStorageKey::VirtualDecimalsOffset, &39_u32);
+        assert_eq!(Vault::max_mint(&e, user.clone()), 0);
+        assert_eq!(Vault::max_deposit(&e, user.clone()), 0);
     });
 }
 
