@@ -1,9 +1,11 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::non_fungible::{
-    emit_mint, overrides::BurnableOverrides, royalties::RoyaltySupport, Base, ContractOverrides,
-    NonFungibleTokenError, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT,
-    TOKEN_TTL_THRESHOLD,
+    emit_mint,
+    overrides::{BurnableOverrides, MintOverrides, MintWithIdOverrides},
+    royalties::RoyaltySupport,
+    Base, ContractOverrides, NonFungibleTokenError, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
+    TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
 };
 
 pub struct Enumerable;
@@ -41,6 +43,18 @@ impl BurnableOverrides for Enumerable {
 // Implemented for `Enumerable`, so that the royalty existence check routes
 // through `Enumerable`'s `owner_of` (one `Owner` entry per token).
 impl RoyaltySupport for Enumerable {}
+
+impl MintWithIdOverrides for Enumerable {
+    fn mint_with_id(e: &Env, to: &Address, token_id: u32) {
+        Enumerable::mint_with_id(e, to, token_id);
+    }
+}
+
+impl MintOverrides for Enumerable {
+    fn mint(e: &Env, to: &Address) -> u32 {
+        Enumerable::mint(e, to)
+    }
+}
 
 #[contracttype]
 pub struct OwnerTokensKey {
@@ -131,7 +145,7 @@ impl Enumerable {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::sequential_mint`] errors.
+    /// * refer to [`Base::mint`] errors.
     /// * refer to [`Enumerable::increment_total_supply`] errors.
     ///
     /// # Events
@@ -141,7 +155,7 @@ impl Enumerable {
     ///
     /// # Notes
     ///
-    /// This is a wrapper around [`Base::sequential_mint()`], that
+    /// This is a wrapper around [`Base::mint()`], that
     /// also handles the storage updates for:
     /// * total supply
     /// * global token list
@@ -169,8 +183,8 @@ impl Enumerable {
     /// the next `token_id`, but it does NOT check if that `token_id` is
     /// already in use. If other minting paths or `token_id` generation
     /// strategies exist, uniqueness should be enforced before use.
-    pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
-        let token_id = Base::sequential_mint(e, to);
+    pub fn mint(e: &Env, to: &Address) -> u32 {
+        let token_id = Base::mint(e, to);
 
         Enumerable::add_to_enumerations(e, to, token_id);
 
@@ -222,7 +236,7 @@ impl Enumerable {
     /// `token_id` already exists. `token_id` uniqueness should be ensured
     /// before passing it to this function. The strategy for generating
     /// `token_id`s varies by project and must be implemented accordingly.
-    pub fn non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
+    pub fn mint_with_id(e: &Env, to: &Address, token_id: u32) {
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
 

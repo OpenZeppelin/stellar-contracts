@@ -260,7 +260,7 @@ fn transfer_nft_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         Base::transfer(&e, &owner, &recipient, token_id);
 
@@ -291,7 +291,7 @@ fn transfer_from_nft_approved_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         // Approve the spender
         Base::approve(&e, &owner, &spender, token_id, 1000);
@@ -336,7 +336,7 @@ fn transfer_from_nft_operator_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         // Approve the spender
         Base::approve_for_all(&e, &owner, &spender, 1000);
@@ -379,7 +379,7 @@ fn transfer_from_nft_owner_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         // Attempt to transfer from the owner without approval
         Base::transfer_from(&e, &owner, &owner, &recipient, token_id);
@@ -412,7 +412,7 @@ fn transfer_nft_invalid_owner_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         // Attempt to transfer without authorization
         Base::transfer(&e, &unauthorized, &recipient, token_id);
@@ -430,7 +430,7 @@ fn transfer_from_nft_insufficient_approval_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         // Attempt to transfer from the owner without approval
         Base::transfer_from(&e, &spender, &owner, &recipient, token_id);
@@ -461,7 +461,7 @@ fn approve_with_invalid_live_until_ledger_fails() {
     let approved = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         e.ledger().set_sequence_number(10);
 
@@ -480,7 +480,7 @@ fn approve_with_invalid_approver_fails() {
     let invalid_approver = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         // Attempt to approve with an invalid approver
         Base::approve(&e, &invalid_approver, &owner, token_id, 1000);
@@ -497,7 +497,7 @@ fn update_with_math_overflow_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         e.storage().persistent().set(&NFTStorageKey::Balance(recipient.clone()), &u32::MAX);
 
@@ -532,7 +532,7 @@ fn transfer_from_incorrect_owner_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         // Approve the spender
         Base::approve(&e, &owner, &spender, token_id, 1000);
@@ -553,7 +553,7 @@ fn transfer_from_unauthorized_spender_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         // Attempt to transfer from the owner using an unauthorized spender
         Base::transfer_from(&e, &unauthorized_spender, &owner, &recipient, token_id);
@@ -567,7 +567,7 @@ fn mint_works() {
     let address = e.register(MockContract, ());
     let account = Address::generate(&e);
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &account);
+        let token_id = Base::mint(&e, &account);
         assert_eq!(Base::balance(&e, &account), 1);
 
         let events = e.events().all();
@@ -587,8 +587,8 @@ fn test_counter_works() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id1 = Base::sequential_mint(&e, &owner);
-        let token_id2 = Base::sequential_mint(&e, &owner);
+        let token_id1 = Base::mint(&e, &owner);
+        let token_id2 = Base::mint(&e, &owner);
 
         let events = e.events().all();
         assert_eq!(events.events().len(), 2);
@@ -622,7 +622,7 @@ fn mint_base_implementation_has_no_auth() {
 
     // This should NOT panic even without authorization
     e.as_contract(&address, || {
-        Base::sequential_mint(&e, &account);
+        Base::mint(&e, &account);
         assert_eq!(Base::balance(&e, &account), 1);
     });
 }

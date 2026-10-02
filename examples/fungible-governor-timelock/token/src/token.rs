@@ -21,7 +21,7 @@ impl TokenContract {
 
     #[only_owner]
     pub fn mint(e: &Env, to: &Address, amount: i128) {
-        FungibleVotes::mint(e, to, amount);
+        <Self as FungibleToken>::ContractType::mint(e, to, amount);
     }
 }
 

@@ -2,7 +2,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, MuxedAddress};
 
 use crate::fungible::{
     extensions::allowlist::{emit_user_allowed, emit_user_disallowed},
-    overrides::{Base, BurnableOverrides, ContractOverrides},
+    overrides::{Base, BurnableOverrides, ContractOverrides, MintOverrides},
     FungibleTokenError, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
 
@@ -39,6 +39,12 @@ impl BurnableOverrides for AllowList {
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         AllowList::burn_from(e, spender, from, amount);
+    }
+}
+
+impl MintOverrides for AllowList {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        AllowList::mint(e, to, amount);
     }
 }
 
@@ -218,6 +224,18 @@ impl AllowList {
         }
 
         Base::approve(e, owner, spender, amount, live_until_ledger);
+    }
+
+    /// Creates `amount` of tokens and assigns them to `to`.
+    ///
+    /// The allowlist policy is not checked on mint: the recipient is chosen by
+    /// the contract's own (authorized) mint entry point. This function
+    /// exists so that `Self::ContractType::mint` resolves on every
+    /// fungible contract type, refer to [`MintOverrides`].
+    ///
+    /// Please refer to [`Base::mint`] for the inline documentation.
+    pub fn mint(e: &Env, to: &Address, amount: i128) {
+        Base::mint(e, to, amount);
     }
 
     /// This is a wrapper around [`Base::burn()`] to enable

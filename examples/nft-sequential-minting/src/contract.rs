@@ -26,7 +26,7 @@ impl ExampleContract {
         let owner: Address =
             e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
         owner.require_auth();
-        Base::sequential_mint(e, &to)
+        <Self as NonFungibleToken>::ContractType::mint(e, &to)
     }
 }
 

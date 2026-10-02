@@ -19,8 +19,8 @@ fn test_total_supply() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id1 = Enumerable::sequential_mint(&e, &owner);
-        let token_id2 = Enumerable::sequential_mint(&e, &owner);
+        let token_id1 = Enumerable::mint(&e, &owner);
+        let token_id2 = Enumerable::mint(&e, &owner);
 
         assert_eq!(Enumerable::total_supply(&e), 2);
 
@@ -45,8 +45,8 @@ fn test_get_owner_token_id() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id1 = Enumerable::sequential_mint(&e, &owner);
-        let token_id2 = Enumerable::sequential_mint(&e, &owner);
+        let token_id1 = Enumerable::mint(&e, &owner);
+        let token_id2 = Enumerable::mint(&e, &owner);
 
         assert_eq!(Enumerable::get_owner_token_id(&e, &owner, 0), token_id1);
         assert_eq!(Enumerable::get_owner_token_id(&e, &owner, 1), token_id2);
@@ -63,8 +63,8 @@ fn test_get_token_id() {
     let token_id2 = 83;
 
     e.as_contract(&address, || {
-        Enumerable::non_sequential_mint(&e, &owner, token_id1);
-        Enumerable::non_sequential_mint(&e, &owner, token_id2);
+        Enumerable::mint_with_id(&e, &owner, token_id1);
+        Enumerable::mint_with_id(&e, &owner, token_id2);
 
         assert_eq!(Enumerable::get_token_id(&e, 0), token_id1);
         assert_eq!(Enumerable::get_token_id(&e, 1), token_id2);
@@ -79,7 +79,7 @@ fn test_sequential_mint() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Enumerable::sequential_mint(&e, &owner);
+        let token_id = Enumerable::mint(&e, &owner);
         assert_eq!(Enumerable::get_owner_token_id(&e, &owner, 0), token_id);
         assert_eq!(Enumerable::get_token_id(&e, 0), token_id);
         assert_eq!(Enumerable::total_supply(&e), 1);
@@ -95,7 +95,7 @@ fn test_non_sequential_mint() {
 
     e.as_contract(&address, || {
         let token_id = 42;
-        Enumerable::non_sequential_mint(&e, &owner, token_id);
+        Enumerable::mint_with_id(&e, &owner, token_id);
         assert_eq!(Enumerable::get_owner_token_id(&e, &owner, 0), token_id);
         assert_eq!(Enumerable::get_token_id(&e, 0), token_id);
         assert_eq!(Enumerable::total_supply(&e), 1);
@@ -110,7 +110,7 @@ fn test_burn() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Enumerable::sequential_mint(&e, &owner);
+        let token_id = Enumerable::mint(&e, &owner);
         Enumerable::burn(&e, &owner, token_id);
         assert_eq!(Enumerable::total_supply(&e), 0);
     });
@@ -126,7 +126,7 @@ fn test_burn_from() {
 
     e.as_contract(&address, || {
         let token_id = 42;
-        Enumerable::non_sequential_mint(&e, &owner, token_id);
+        Enumerable::mint_with_id(&e, &owner, token_id);
         Base::approve(&e, &owner, &spender, token_id, 1000);
         Enumerable::burn_from(&e, &spender, &owner, token_id);
         assert_eq!(Enumerable::total_supply(&e), 0);
@@ -235,7 +235,7 @@ fn test_enumerable_transfer() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Enumerable::sequential_mint(&e, &owner);
+        let token_id = Enumerable::mint(&e, &owner);
         Enumerable::transfer(&e, &owner, &recipient, token_id);
 
         assert_eq!(Enumerable::get_owner_token_id(&e, &recipient, 0), token_id);
@@ -253,7 +253,7 @@ fn test_enumerable_transfer_from() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Enumerable::sequential_mint(&e, &owner);
+        let token_id = Enumerable::mint(&e, &owner);
         Base::approve(&e, &owner, &spender, token_id, 1000);
         Enumerable::transfer_from(&e, &spender, &owner, &recipient, token_id);
 

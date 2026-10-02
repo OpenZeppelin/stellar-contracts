@@ -114,6 +114,130 @@ pub trait BurnableOverrides {
 
 impl BurnableOverrides for Base {}
 
+// ################## MINT OVERRIDES ##################
+//
+// How minting is routed, and why there are three mint traits:
+//
+// Minting is not part of any public trait, because no single `mint` signature
+// fits every contract type: What the underlying primitive has to do
+// depends on the contract type (`Enumerable` also records the token in its
+// enumeration lists, `NonFungibleVotes` also moves a voting unit, ...). The
+// author's entry point calls `Self::ContractType::mint`, which reaches the
+// mint of whatever contract type `Compose` resolved to. Calling `Base::mint`
+// on an `Enumerable` token instead would compile, and silently leave the token
+// out of the enumeration.
+//
+// The primitives a contract type offers depend on how it stores ownership:
+//
+// - `Base`, `Enumerable`, `NonFungibleVotes`, `EnumerableVotes` store one owner
+//   per token: `mint(to) -> u32` mints the next id of the sequential counter
+//   and returns it, and `mint_with_id(to, token_id)` mints an id chosen by the
+//   caller.
+// - `Consecutive`, `ConsecutiveVotes` store ownership per batch:
+//   `mint_range(to, amount) -> u32` mints `amount` consecutive ids at once and
+//   returns the last one. They have no single-token mint.
+//
+// Each primitive has its own name, so switching a contract between the two
+// storage models breaks the build at the mint call, and the change of meaning
+// (one token vs a range) cannot go unnoticed. In particular, `mint_with_id(to,
+// token_id: u32)` and `mint_range(to, amount: u32)` take the same parameter
+// types; under a shared name, a list change would silently turn "mint token id
+// 5" into "mint 5 tokens".
+//
+// A trait has exactly one signature per method, so each primitive gets its own
+// trait: [`MintOverrides`] (`mint(to)`), [`MintWithIdOverrides`]
+// (`mint_with_id(to, token_id)`) and [`MintRangeOverrides`]
+// (`mint_range(to, amount)`). A contract type implements only the ones it
+// supports, so minting in a way the contract type does not support is a compile
+// error rather than a silent bookkeeping bug.
+//
+// All three methods are required, with no default body: a default falling
+// back to `Base` would let a new contract type compile while skipping its own
+// bookkeeping.
+//
+// Like `ContractOverrides`, these traits are internal plumbing: contract
+// authors never implement, name or import them. Every contract type keeps an
+// inherent function under each primitive name it supports, and in the
+// contract `Self::ContractType` is already the concrete type `Compose`
+// resolved to, so the author's call reaches that inherent function directly.
+// Choosing the right mint is done by the `ContractType` associated type; the
+// traits are the checked promise that each contract type has the primitive
+// with this exact signature, and the path for code that is generic over the
+// contract type. Each implementation delegates to the inherent function, so
+// both paths run the same code.
+
+/// Internal override hook for minting the next token id of the sequential
+/// counter, returning that id.
+///
+/// This is the `mint` of the contract types that store one owner per token.
+/// Refer to the comment above this trait for how minting is routed.
+///
+/// ```ignore
+/// #[only_owner]
+/// pub fn mint(e: &Env, to: Address) -> u32 {
+///     <Self as NonFungibleToken>::ContractType::mint(e, &to)
+/// }
+/// ```
+///
+/// Implemented by `Base`, `Enumerable`, `NonFungibleVotes` and their
+/// combination. Not implemented by `Consecutive`, whose `mint` takes an
+/// `amount` (refer to [`MintRangeOverrides`]).
+pub trait MintOverrides {
+    fn mint(e: &Env, to: &Address) -> u32;
+}
+
+/// Internal override hook for minting a token with an id chosen by the
+/// caller.
+///
+/// For contracts with their own id scheme instead of the sequential counter.
+/// Refer to the comment above [`MintOverrides`] for how minting is routed.
+///
+/// ```ignore
+/// #[only_owner]
+/// pub fn mint(e: &Env, to: Address, token_id: u32) {
+///     <Self as NonFungibleToken>::ContractType::mint_with_id(e, &to, token_id);
+/// }
+/// ```
+///
+/// Implemented by `Base`, `Enumerable`, `NonFungibleVotes` and their
+/// combination. Not implemented by `Consecutive`, whose ownership is stored
+/// per batch and which only mints ranges (refer to [`MintRangeOverrides`]).
+pub trait MintWithIdOverrides {
+    fn mint_with_id(e: &Env, to: &Address, token_id: u32);
+}
+
+/// Internal override hook for minting `amount` consecutive token ids at once,
+/// returning the last id minted.
+///
+/// This is the mint of the contract types that store ownership per batch.
+/// Refer to the comment above [`MintOverrides`] for how minting is routed.
+///
+/// ```ignore
+/// #[only_owner]
+/// pub fn mint_range(e: &Env, to: Address, amount: u32) -> u32 {
+///     <Self as NonFungibleToken>::ContractType::mint_range(e, &to, amount)
+/// }
+/// ```
+///
+/// Implemented by `Consecutive` and its combination with votes only: the
+/// other contract types store ownership per token and mint one token at a
+/// time.
+pub trait MintRangeOverrides {
+    fn mint_range(e: &Env, to: &Address, amount: u32) -> u32;
+}
+
+impl MintOverrides for Base {
+    fn mint(e: &Env, to: &Address) -> u32 {
+        Base::mint(e, to)
+    }
+}
+
+impl MintWithIdOverrides for Base {
+    fn mint_with_id(e: &Env, to: &Address, token_id: u32) {
+        Base::mint_with_id(e, to, token_id);
+    }
+}
+
 /// Contract-type-dependent entry points of the royalties extension.
 ///
 /// Every royalty operation must first establish that the token
