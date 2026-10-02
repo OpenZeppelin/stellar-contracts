@@ -269,7 +269,7 @@ fn test_consecutive_royalty_info_resolves_every_token() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, 10);
+        Consecutive::mint_range(&e, &owner, 10);
     });
     client.set_default_royalty(&receiver, &500, &operator); // 5%
 
@@ -297,7 +297,7 @@ fn test_consecutive_set_and_remove_token_royalty_on_non_boundary_token() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, 10);
+        Consecutive::mint_range(&e, &owner, 10);
     });
     client.set_default_royalty(&default_receiver, &1000, &operator); // 10%
 
@@ -325,7 +325,7 @@ fn test_consecutive_royalty_info_non_existent_token() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, 10);
+        Consecutive::mint_range(&e, &owner, 10);
     });
 
     // The batch covers ids 0..=9; id 10 does not exist.
@@ -344,7 +344,7 @@ fn test_consecutive_set_token_royalty_non_existent_token() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Consecutive::mint(&e, &owner, 10);
+        Consecutive::mint_range(&e, &owner, 10);
     });
 
     // The batch covers ids 0..=9; id 10 does not exist.

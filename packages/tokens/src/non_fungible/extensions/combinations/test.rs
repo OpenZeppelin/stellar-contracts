@@ -15,7 +15,7 @@ use crate::non_fungible::{
         votes::NonFungibleVotes,
     },
     overrides::{
-        BatchMintOverrides, BurnableOverrides, ContractOverrides, MintOverrides,
+        BurnableOverrides, ContractOverrides, MintOverrides, MintRangeOverrides,
         MintWithIdOverrides,
     },
     Base,
@@ -159,7 +159,7 @@ fn consecutive_votes_tracks_batches_and_voting_units() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        let last_id = ConsecutiveVotes::mint(&e, &alice, 5);
+        let last_id = ConsecutiveVotes::mint_range(&e, &alice, 5);
         // one checkpoint update covers the whole batch
         assert_eq!(get_voting_units(&e, &alice), 5);
         // ownership resolves for non-boundary tokens of the batch
@@ -222,7 +222,7 @@ fn consecutive_votes_queries_and_transfer_from() {
     let spender = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        let last_id = ConsecutiveVotes::mint(&e, &alice, 3);
+        let last_id = ConsecutiveVotes::mint_range(&e, &alice, 3);
 
         // queries route through the consecutive bucket model unchanged
         assert_eq!(<ConsecutiveVotes as ContractOverrides>::owner_of(&e, last_id - 1), alice);
@@ -252,7 +252,7 @@ fn consecutive_votes_burn_from() {
     let spender = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        let last_id = ConsecutiveVotes::mint(&e, &alice, 2);
+        let last_id = ConsecutiveVotes::mint_range(&e, &alice, 2);
 
         Base::approve(&e, &alice, &spender, last_id, e.ledger().sequence() + 100);
         <ConsecutiveVotes as BurnableOverrides>::burn_from(&e, &spender, &alice, last_id);
@@ -269,13 +269,13 @@ fn consecutive_votes_burn_from() {
 #[test]
 fn contract_types_implement_their_mint_primitives() {
     fn assert_per_token<T: MintOverrides + MintWithIdOverrides>() {}
-    fn assert_batch<T: BatchMintOverrides>() {}
+    fn assert_range<T: MintRangeOverrides>() {}
     assert_per_token::<Base>();
     assert_per_token::<Enumerable>();
     assert_per_token::<NonFungibleVotes>();
     assert_per_token::<EnumerableVotes>();
-    assert_batch::<Consecutive>();
-    assert_batch::<ConsecutiveVotes>();
+    assert_range::<Consecutive>();
+    assert_range::<ConsecutiveVotes>();
 }
 
 fn mint_through<T: MintOverrides>(e: &Env, to: &Address) -> u32 {
@@ -336,16 +336,60 @@ fn votes_mint_overrides_move_voting_units() {
 }
 
 #[test]
-fn batch_mint_overrides_mint_a_range() {
+fn mint_range_overrides_mint_a_range() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let last = <ConsecutiveVotes as BatchMintOverrides>::mint(&e, &owner, 5);
+        let last = <ConsecutiveVotes as MintRangeOverrides>::mint_range(&e, &owner, 5);
         assert_eq!(<ConsecutiveVotes as ContractOverrides>::balance(&e, &owner), 5);
         assert_eq!(<ConsecutiveVotes as ContractOverrides>::owner_of(&e, last), owner);
         assert_eq!(get_voting_units(&e, &owner), 5);
+    });
+}
+
+#[test]
+fn base_mint_with_id_override_mints_the_given_id() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint_with_id_through::<Base>(&e, &owner, 42);
+        assert_eq!(<Base as ContractOverrides>::owner_of(&e, 42), owner);
+        assert_eq!(<Base as ContractOverrides>::balance(&e, &owner), 1);
+    });
+}
+
+#[test]
+fn non_fungible_votes_mint_overrides_move_voting_units() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint_with_id_through::<NonFungibleVotes>(&e, &owner, 42);
+        let id = mint_through::<NonFungibleVotes>(&e, &owner);
+        assert_eq!(<NonFungibleVotes as ContractOverrides>::owner_of(&e, 42), owner);
+        assert_eq!(<NonFungibleVotes as ContractOverrides>::owner_of(&e, id), owner);
+        assert_eq!(get_voting_units(&e, &owner), 2);
+    });
+}
+
+#[test]
+fn consecutive_mint_range_override_mints_a_range() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let last = <Consecutive as MintRangeOverrides>::mint_range(&e, &owner, 5);
+        assert_eq!(<Consecutive as ContractOverrides>::balance(&e, &owner), 5);
+        assert_eq!(<Consecutive as ContractOverrides>::owner_of(&e, last), owner);
     });
 }

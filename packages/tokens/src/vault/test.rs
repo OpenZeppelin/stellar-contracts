@@ -8,7 +8,7 @@ use crate::{
     fungible::{
         capped::{Capped, FungibleCapped},
         total_supply::{total_supply, FungibleTotalSupply, TotalSupply},
-        Base, Compose, FungibleToken,
+        Base, Compose, ContractOverrides, FungibleToken,
     },
     vault::{
         storage::VaultStorageKey, CappedVault, FungibleVault, Vault, VaultOverrides,
@@ -1094,6 +1094,21 @@ fn capped_vault_deposit_panics_when_total_assets_overflow() {
             admin.clone(),
             admin.clone(),
         );
+    });
+}
+
+// The share token's decimals stay the vault's (underlying decimals plus the
+// offset) on the capped contract type.
+#[test]
+fn capped_vault_decimals_are_the_vault_decimals() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, 6);
+
+    e.as_contract(&vault_address, || {
+        assert_eq!(<CappedVault as ContractOverrides>::decimals(&e), Vault::decimals(&e));
+        assert_eq!(<CappedVault as ContractOverrides>::decimals(&e), 18 + 6);
     });
 }
 

@@ -58,9 +58,9 @@
 //! - It is not recommended to use this model if each token is expected to be
 //!   minted separately. It is rather best suited for NFTs where minting happens
 //!   in large batches.
-//! - **IMPORTANT**: For minting tokens ONLY [`Consecutive::mint`] (reached
-//!   through `Self::ContractType::mint`) must be used. Using other minting
-//!   functions will break the logic of tracking ownership.
+//! - **IMPORTANT**: For minting tokens ONLY [`Consecutive::mint_range`]
+//!   (reached through `Self::ContractType::mint`) must be used. Using other
+//!   minting functions will break the logic of tracking ownership.
 pub mod storage;
 use soroban_sdk::{contractevent, Address, Env};
 pub use storage::{Consecutive, ConsecutiveContractType};

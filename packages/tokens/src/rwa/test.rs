@@ -221,6 +221,45 @@ fn mint_tokens() {
     });
 }
 
+// Minting through `MintOverrides` runs RWA's full mint path, the same as the
+// inherent `RWA::mint`: supply accounting and the `Mint` event.
+#[test]
+fn mint_through_mint_overrides_runs_the_rwa_mint() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        <RWA as MintOverrides>::mint(&e, &to, 100);
+        assert_eq!(RWA::balance(&e, &to), 100);
+        assert_eq!(RWA::total_supply(&e), 100);
+        let events = e.events().all();
+        assert_eq!(
+            events.events().last().unwrap(),
+            &Mint { to: to.clone(), amount: 100 }.to_xdr(&e, &address)
+        );
+    });
+}
+
+// Minting through `MintOverrides` keeps RWA's checks: a frozen recipient is
+// rejected.
+#[test]
+#[should_panic(expected = "Error(Contract, #302)")]
+fn mint_through_mint_overrides_keeps_rwa_checks() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::set_address_frozen(&e, &to, true);
+
+        <RWA as MintOverrides>::mint(&e, &to, 100);
+    });
+}
+
 #[test]
 #[should_panic(expected = "Error(Contract, #307)")]
 fn mint_without_compliance_fails() {
@@ -1871,5 +1910,31 @@ fn capped_rwa_transfer_keeps_rwa_checks() {
         RWA::set_address_frozen(&e, &from, true);
 
         <CappedRWA as ContractOverrides>::transfer(&e, &from, &MuxedAddress::from(to), 10);
+    });
+}
+
+#[test]
+fn capped_rwa_transfer_from_moves_tokens_through_rwa() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        Capped::set_cap(&e, 1000);
+
+        CappedRWA::mint(&e, &owner, 100);
+        RWA::approve(&e, &owner, &spender, 50, 1000);
+    });
+
+    e.as_contract(&address, || {
+        <CappedRWA as ContractOverrides>::transfer_from(&e, &spender, &owner, &to, 30);
+
+        assert_eq!(RWA::balance(&e, &owner), 70);
+        assert_eq!(RWA::balance(&e, &to), 30);
+        assert_eq!(RWA::allowance(&e, &owner, &spender), 20);
     });
 }
