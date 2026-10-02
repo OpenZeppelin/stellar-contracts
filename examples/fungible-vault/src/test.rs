@@ -270,9 +270,11 @@ fn test_max_functions() {
 
     e.mock_all_auths();
 
-    // Test max functions with empty vault
-    assert_eq!(vault_client.max_deposit(&user), i128::MAX);
-    assert_eq!(vault_client.max_mint(&user), i128::MAX);
+    // Test max functions with empty vault: the only limit is the virtual
+    // bound, `i128::MAX - 10^offset` shares
+    let virtual_shares = 10i128.pow(decimals_offset);
+    assert_eq!(vault_client.max_mint(&user), i128::MAX - virtual_shares);
+    assert_eq!(vault_client.max_deposit(&user), (i128::MAX - virtual_shares) / virtual_shares);
     assert_eq!(vault_client.max_withdraw(&user), 0); // No shares yet
     assert_eq!(vault_client.max_redeem(&user), 0); // No shares yet
 
@@ -343,9 +345,10 @@ fn test_deposit_max_validation() {
 
     e.mock_all_auths();
 
-    // Test that max_deposit returns i128::MAX
+    // Test that max_deposit only reflects the virtual bound on an empty vault
+    let virtual_shares = 10i128.pow(decimals_offset);
     let max_deposit = vault_client.max_deposit(&user);
-    assert_eq!(max_deposit, i128::MAX);
+    assert_eq!(max_deposit, (i128::MAX - virtual_shares) / virtual_shares);
 
     // Test normal deposit works fine
     let deposit_amount = 100_000_000_000_000_000i128;
@@ -427,15 +430,17 @@ fn test_deposit_exceeding_virtual_supply_bound_is_rejected() {
 
     // One more base unit would mint exactly `10^offset` shares. That supply
     // fits in `i128`, but `total_supply + 10^offset` would not, freezing every
-    // later conversion. Both entry points reject it before minting.
-    let math_overflow = Error::from_contract_error(VaultTokenError::MathOverflow as u32);
+    // later conversion. The reported limits already exclude it, so both entry
+    // points reject it through their limit checks before minting.
+    assert_eq!(vault_client.max_deposit(&attacker), 0);
+    assert!(vault_client.max_mint(&attacker) < virtual_shares);
     assert_eq!(
         vault_client.try_deposit(&1, &attacker, &attacker, &attacker),
-        Err(Ok(math_overflow))
+        Err(Ok(Error::from_contract_error(VaultTokenError::VaultExceededMaxDeposit as u32)))
     );
     assert_eq!(
         vault_client.try_mint(&virtual_shares, &attacker, &attacker, &attacker),
-        Err(Ok(math_overflow))
+        Err(Ok(Error::from_contract_error(VaultTokenError::VaultExceededMaxMint as u32)))
     );
     assert_eq!(asset_client.balance(&attacker), 1);
     assert_eq!(vault_client.total_assets(), boundary - 1);
