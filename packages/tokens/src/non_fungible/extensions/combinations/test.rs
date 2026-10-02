@@ -349,3 +349,47 @@ fn mint_range_overrides_mint_a_range() {
         assert_eq!(get_voting_units(&e, &owner), 5);
     });
 }
+
+#[test]
+fn base_mint_with_id_override_mints_the_given_id() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint_with_id_through::<Base>(&e, &owner, 42);
+        assert_eq!(<Base as ContractOverrides>::owner_of(&e, 42), owner);
+        assert_eq!(<Base as ContractOverrides>::balance(&e, &owner), 1);
+    });
+}
+
+#[test]
+fn non_fungible_votes_mint_overrides_move_voting_units() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint_with_id_through::<NonFungibleVotes>(&e, &owner, 42);
+        let id = mint_through::<NonFungibleVotes>(&e, &owner);
+        assert_eq!(<NonFungibleVotes as ContractOverrides>::owner_of(&e, 42), owner);
+        assert_eq!(<NonFungibleVotes as ContractOverrides>::owner_of(&e, id), owner);
+        assert_eq!(get_voting_units(&e, &owner), 2);
+    });
+}
+
+#[test]
+fn consecutive_mint_range_override_mints_a_range() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let last = <Consecutive as MintRangeOverrides>::mint_range(&e, &owner, 5);
+        assert_eq!(<Consecutive as ContractOverrides>::balance(&e, &owner), 5);
+        assert_eq!(<Consecutive as ContractOverrides>::owner_of(&e, last), owner);
+    });
+}

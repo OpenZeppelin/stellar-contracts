@@ -907,3 +907,58 @@ fn total_supply_allow_block_list_transfer_rejects_not_allowed_receiver() {
         );
     });
 }
+
+// ################## MINT OVERRIDES ##################
+
+// Mints through `MintOverrides`, the path code that is generic over the
+// contract type takes, so each impl is exercised and not only its existence.
+fn mint_through<T: MintOverrides>(e: &Env, to: &Address, amount: i128) {
+    T::mint(e, to, amount);
+}
+
+// Contract types without supply tracking or voting units only credit the
+// balance; the list policies are not checked on mint.
+#[test]
+fn mint_overrides_of_plain_and_list_types_credit_the_balance() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint_through::<Base>(&e, &alice, 1);
+        mint_through::<AllowList>(&e, &alice, 2);
+        mint_through::<BlockList>(&e, &alice, 3);
+        mint_through::<AllowBlockList>(&e, &alice, 4);
+        assert_eq!(Base::balance(&e, &alice), 10);
+        assert_eq!(total_supply(&e), 0);
+    });
+}
+
+#[test]
+fn mint_overrides_of_supply_types_track_the_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint_through::<TotalSupply>(&e, &alice, 1);
+        mint_through::<TotalSupplyAllowList>(&e, &alice, 2);
+        mint_through::<TotalSupplyBlockList>(&e, &alice, 3);
+        mint_through::<TotalSupplyAllowBlockList>(&e, &alice, 4);
+        assert_eq!(Base::balance(&e, &alice), 10);
+        assert_eq!(total_supply(&e), 10);
+    });
+}
+
+#[test]
+fn mint_overrides_of_votes_types_move_voting_units() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint_through::<FungibleVotes>(&e, &alice, 1);
+        mint_through::<AllowListVotes>(&e, &alice, 2);
+        mint_through::<BlockListVotes>(&e, &alice, 3);
+        mint_through::<AllowBlockListVotes>(&e, &alice, 4);
+        assert_eq!(Base::balance(&e, &alice), 10);
+        assert_eq!(get_voting_units(&e, &alice), 10);
+    });
+}
