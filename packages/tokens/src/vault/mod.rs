@@ -323,12 +323,21 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType = Vaul
     }
 
     /// Returns the maximum amount of vault shares that can be redeemed
-    /// by the given owner (equal to their vault share balance).
+    /// by the given owner.
+    ///
+    /// This is the owner's vault share balance, or `0` when that balance is
+    /// worth zero assets (see
+    /// [`crate::vault::VaultTokenError::VaultZeroAssets`]).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - The address that owns the vault shares.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
+    ///   operations result in overflow.
     fn max_redeem(e: &Env, owner: Address) -> i128 {
         Self::ContractType::max_redeem(e, owner)
     }
@@ -367,6 +376,8 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType = Vaul
     /// * [`crate::vault::VaultTokenError::VaultExceededMaxRedeem`] - When
     ///   attempting to redeem more shares than the maximum allowed for the
     ///   owner.
+    /// * [`crate::vault::VaultTokenError::VaultZeroAssets`] - When a positive
+    ///   amount of shares would redeem zero assets.
     /// * [`crate::vault::VaultTokenError::VaultInvalidSharesAmount`] - When
     ///   `shares < 0`.
     /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
@@ -419,6 +430,9 @@ pub enum VaultTokenError {
     /// Attempted to deposit a positive amount of assets that would mint zero
     /// shares.
     VaultZeroShares = 411,
+    /// Attempted to redeem a positive amount of shares that would return zero
+    /// assets.
+    VaultZeroAssets = 412,
 }
 
 // ################## CONSTANTS ##################
