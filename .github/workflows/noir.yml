@@ -80,20 +80,22 @@ jobs:
         run: nargo test
 
       - name: Diff extracted VKs against committed artifacts
-        # Re-extracts the VK for each per-operation circuit using the pinned
-        # bb version and compares against the committed `vks/*.vk.json`.
-        # Mirrors the constraint-baseline diff: drift means either the
-        # circuit changed (regenerate and commit in this PR) or the
-        # toolchain drifted (don't regenerate -- investigate).
+        # Re-extracts both VK forms for each per-operation circuit using the
+        # pinned bb version and compares against the committed `vks/*.vk.json`
+        # and `vks/*.vk.bin`. Mirrors the constraint-baseline diff: drift
+        # means either the circuit changed (regenerate and commit in this PR)
+        # or the toolchain drifted (don't regenerate -- investigate).
         run: |
           mkdir -p /tmp/vks-current
-          cp vks/*.vk.json /tmp/vks-current/ 2>/dev/null || true
-          rm -f vks/*.vk.json
+          cp vks/*.vk.json vks/*.vk.bin /tmp/vks-current/ 2>/dev/null || true
+          rm -f vks/*.vk.json vks/*.vk.bin
           ./scripts/extract_vks.sh
+          ./scripts/build_vk_bins.sh
 
-          # Exclude README.md from the diff; only `.vk.json` artifacts
-          # should be compared.
+          # Exclude README.md from the diff; only the `.vk.json` and `.vk.bin`
+          # artifacts should be compared.
           if ! diff -q --exclude='*.md' /tmp/vks-current vks > /tmp/vks-diff 2>&1; then
+            cat /tmp/vks-diff
             {
               echo ""
               echo "### ❌ VK artifact drift detected"
@@ -105,6 +107,7 @@ jobs:
               echo '```'
               echo "cd packages/tokens/src/confidential/circuits"
               echo "./scripts/extract_vks.sh"
+              echo "./scripts/build_vk_bins.sh"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1

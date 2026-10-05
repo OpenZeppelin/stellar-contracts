@@ -14,7 +14,7 @@ use stellar_macros::only_role;
 use stellar_tokens::fungible::{
     blocklist::{BlockList, FungibleBlockList},
     burnable::FungibleBurnable,
-    Base, FungibleToken,
+    Base, Compose, FungibleToken,
 };
 
 #[contract]
@@ -46,13 +46,13 @@ impl ExampleContract {
         access_control::grant_role_no_auth(e, &manager, &symbol_short!("manager"), &admin);
 
         // Mint initial supply to the admin
-        Base::mint(e, &admin, initial_supply);
+        <Self as FungibleToken>::ContractType::mint(e, &admin, initial_supply);
     }
 }
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
-    type ContractType = BlockList;
+    type ContractType = Compose<(BlockList,)>;
 }
 
 #[contractimpl(contracttrait)]

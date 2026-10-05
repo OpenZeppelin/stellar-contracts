@@ -1,13 +1,13 @@
 use stellar_confidential_lib::{
     H, assert_on_curve_non_identity, commit, derive_allow_r, derive_spend_r, domain,
-    dvk_from_vk_op, ecdh, encrypt_allowance, encrypt_balance, encrypt_esc_dvk, scalar_mul,
-    sponge_squeeze_2, vk_from_sk,
+    dvk_from_vk_op, ecdh, encrypt_allowance, encrypt_balance, encrypt_esc_allow_r_auditor,
+    encrypt_esc_dvk, scalar_mul, sponge_squeeze_3, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 mod tests;
 
-// SetSpender circuit -- design doc Section 7.7.
+// SetSpender circuit -- docs/protocol/operations/set-spender.md.
 //
 // Constraints
 // -----------
@@ -19,11 +19,11 @@ mod tests;
 //   S3  C_spend    = v * G + r * H                       Opening of current
 //                                                        spendable balance.
 //   S4  v, v_a, v - v_a in [0, 2^127)                    Range validity
-//                                                        (Section 2.6); the
+//                                                        (docs/protocol/primitives.md#integer-embedding-and-range-proofs); the
 //                                                        [0, 2^127) bound is
 //                                                        the SEP-41 i128
 //                                                        non-negative range
-//                                                        (Section 3.4).
+//                                                        (docs/protocol/system-model.md#underlying-token-assumptions).
 //   S9  r'         = Poseidon2(delta_spend_r, vk, sigma) Deterministic
 //                                                        randomness for the
 //                                                        new spendable
@@ -47,7 +47,7 @@ mod tests;
 //                                                        Encrypted allowance
 //                                                        scalar (emitted).
 //   S12 Escrowed dvk_i correctly encrypts under Y_op via ECDH.
-//       Expanded per Section 7.11 into three sub-constraints over the
+//       Expanded per docs/protocol/operations/set-spender.md#delegation-key-escrow into three sub-constraints over the
 //       prover-supplied escrowed_dvk = (R_x, dvk_cipher):
 //         (a) R_x          = R_e.x                       Same r_e as the
 //                                                        auditor block
@@ -59,44 +59,55 @@ mod tests;
 //                              + Poseidon2(delta_esc_dvk, s_esc, op_i)
 //                                                        Masked dvk_i for the
 //                                                        spender.
+//   S14 r_a_tilde_aud_s = r_a
+//                      + Poseidon2(delta_esc_allow_r_aud, s_{a,s}, op_i)
+//                                                        Auditor-side escrow
+//                                                        of the allowance
+//                                                        blinding S6 derived
+//                                                        (docs/protocol/auditing.md#spender-allowance-auditing).
 //   S13 r_e != 0                                         Rules out R_e = O,
 //                                                        S_{a,s} = O, and a
 //                                                        trivial escrow
 //                                                        shared secret
 //                                                        (same r_e is reused
 //                                                        for the dvk escrow
-//                                                        ECDH; Section 7.11).
-// Auditor block (owner-auditor visibility, Section 8.1)
+//                                                        ECDH; docs/protocol/operations/set-spender.md#delegation-key-escrow).
+// Auditor block (owner-auditor visibility, docs/protocol/auditing.md#per-transfer-auditor-ciphertexts)
 //   S_a1 R_e        = r_e * H                            Ephemeral key for
 //                                                        auditor ECDH (also
 //                                                        the escrow ephemeral
 //                                                        key; see S12(a)).
 //   S_a2 s_{a,s}    = ecdh(r_e, K_aud_s)                 Owner-auditor ECDH
 //                                                        shared scalar.
-//   S_a3 (m_v, m_b) = SpongeSqueeze_2(delta_aud_s,
+//   S_a3 (m_v, m_b, m_r)
+//                   = SpongeSqueeze_3(delta_aud_s,
 //                                    s_{a,s}, sigma)     Owner-channel
-//                                                        sponge: two masks.
+//                                                        sponge: three masks.
 //   S_a4 v_tilde_aud_s = v_a + m_v                       Owner-auditor
 //                                                        encrypted escrow
 //                                                        amount.
 //   S_a5 b_tilde_aud_s = (v - v_a) + m_b                 Owner-auditor
 //                                                        encrypted balance
 //                                                        checkpoint.
+//   S_a6 r_tilde_aud_s = r' + m_r                        Owner-auditor escrow
+//                                                        of the new spendable
+//                                                        blinding, over S9's
+//                                                        r'.
 //
-// Point-validation doctrine (Section 10.8)
+// Point-validation doctrine (docs/protocol/proof-system.md#on-chain-point-arithmetic)
 // ----------------------------------------
 // Y, C_spend, C_spend', C_a, R_e, and S_{a,s} are bound to in-circuit
 // multi_scalar_mul outputs (S1, S3, S10, S7, S_a1, S_a2) and are therefore
 // on-curve by construction -- no explicit check needed. Y_op was constrained
-// on-curve when the spender registered (R1, Section 7.2) and is loaded by
-// the contract from trusted storage, so it is path (2) of Section 10.8 and the
+// on-curve when the spender registered (R1, docs/protocol/operations/register.md) and is loaded by
+// the contract from trusted storage, so it is path (2) of docs/protocol/proof-system.md#on-chain-point-arithmetic and the
 // contract trusts it on read. K_aud_s is a public-input key consumed by an
 // ECDH multiplication (path (3)); the verifier doesn't check curve membership
 // and an off-curve K_aud_s would break the soundness of S_a2, so this file
 // explicitly validates it on-curve AND non-identity before the auditor block
 // runs.
 //
-// Public inputs (24 fields, in design-doc canonical order)
+// Public inputs (26 fields, in design-doc canonical order)
 // --------------------------------------------------------
 //   Idx  Param                Symbol            Source / Note
 //   ---  -----                ------            -----------------------------
@@ -109,7 +120,7 @@ mod tests;
 //                                                Spender must be registered.
 //   6    op_i                 op_i              address_to_field(`spender`),
 //                                                computed off-circuit by the
-//                                                contract (Section 2.7).
+//                                                contract (docs/protocol/primitives.md#address-to-field-encoding).
 //   7    addr_f                 addr_f              `env.current_contract_address()`.
 //   8    k_aud_s_x            K_aud_s.x         Fetched from the auditor
 //   9    k_aud_s_y            K_aud_s.y           contract by `from.auditor_id`.
@@ -120,7 +131,7 @@ mod tests;
 //   14   escrowed_dvk_r_x     R_x               Prover-supplied; the first
 //                                                32-byte limb of the on-chain
 //                                                escrowed_dvk encoding
-//                                                (Section 7.11); forced equal
+//                                                (docs/protocol/operations/set-spender.md#delegation-key-escrow); forced equal
 //                                                to R_e.x by S12(a).
 //   15   escrowed_dvk_cipher  dvk_cipher        Prover-supplied; second limb
 //                                                of escrowed_dvk; stored.
@@ -140,6 +151,12 @@ mod tests;
 //   23   b_tilde_aud_s        b_tilde_aud_s     Prover-supplied owner-auditor
 //                                                encrypted balance checkpoint;
 //                                                emitted.
+//   24   r_tilde_aud_s        r_tilde_aud_s     Prover-supplied owner-auditor
+//                                                escrow of the new spendable
+//                                                blinding; emitted.
+//   25   r_a_tilde_aud_s      r_a_tilde_aud_s   Prover-supplied owner-auditor
+//                                                escrow of the allowance
+//                                                blinding; emitted.
 //
 // Private witnesses
 // -----------------
@@ -180,6 +197,8 @@ fn main(
     r_e_y: pub Field,
     v_tilde_aud_s: pub Field,
     b_tilde_aud_s: pub Field,
+    r_tilde_aud_s: pub Field,
+    r_a_tilde_aud_s: pub Field,
 ) {
     // S13 -- runs first so the r_e = 0 attack is rejected before any
     // scalar mul against it could quietly produce the identity (R_e, S_{a,s},
@@ -199,7 +218,7 @@ fn main(
     assert(c_spend_derived.x == c_spend_x);
     assert(c_spend_derived.y == c_spend_y);
 
-    // S4 -- Section 2.6 spells out the 127-bit decomposition / recomposition
+    // S4 -- docs/protocol/primitives.md#integer-embedding-and-range-proofs spells out the 127-bit decomposition / recomposition
     // pattern; `assert_max_bit_size` is the Noir stdlib primitive that
     // implements it directly.
     v.assert_max_bit_size::<127>();
@@ -240,12 +259,12 @@ fn main(
     assert(r_e_derived.y == r_e_y);
 
     // S12(a) -- escrowed_dvk's R_x limb is forced equal to R_e.x, which is
-    // the auditor-block ephemeral. Section 7.11: "the escrow's R_x and the
+    // the auditor-block ephemeral. docs/protocol/operations/set-spender.md#delegation-key-escrow: "the escrow's R_x and the
     // auditor channel's R_e.x are forced equal" -- this constraint is what
     // forces it.
     assert(escrowed_dvk_r_x == r_e_x);
 
-    // Y_op is path (2) of Section 10.8: bound to scalar_mul(sk_op, H) when
+    // Y_op is path (2) of docs/protocol/proof-system.md#on-chain-point-arithmetic: bound to scalar_mul(sk_op, H) when
     // the spender registered (R1), trusted on read from the contract.
     let y_op = EmbeddedCurvePoint { x: y_op_x, y: y_op_y, is_infinite: false };
 
@@ -256,19 +275,27 @@ fn main(
     let escrowed_dvk_cipher_derived = encrypt_esc_dvk(dvk, s_esc, op_i);
     assert(escrowed_dvk_cipher_derived == escrowed_dvk_cipher);
 
-    // K_aud_s point validation (Section 10.8: public-input key).
+    // K_aud_s point validation (docs/protocol/proof-system.md#on-chain-point-arithmetic: public-input key).
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_s);
 
     // S_a2 (owner-auditor shared-secret scalar)
     let s_a_s = ecdh(r_e, k_aud_s);
 
-    // S_a3 (owner-channel masks: amount, then balance)
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, sigma);
+    // S_a3 (owner-channel masks: amount, balance, then the blinding-escrow
+    // slot)
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, sigma);
 
     // S_a4
     assert(v_a + m_s[0] == v_tilde_aud_s);
 
     // S_a5
     assert(v_new + m_s[1] == b_tilde_aud_s);
+
+    // S_a6
+    assert(r_new + m_s[2] == r_tilde_aud_s);
+
+    // S14 (reuses s_a_s from S_a2)
+    let r_a_tilde_aud_s_derived = encrypt_esc_allow_r_auditor(r_a, s_a_s, op_i);
+    assert(r_a_tilde_aud_s_derived == r_a_tilde_aud_s);
 }

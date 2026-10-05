@@ -1,0 +1,15 @@
+{
+  "primitive": "encrypt_esc_allow_r_auditor",
+  "design_doc_refs": ["Section 8.5", "Constraint S14"],
+  "description": "Auditor-side allowance-blinding escrow: r_a_tilde_aud_s = r_a + Poseidon2(ESC_ALLOW_R_AUD, s_a_s, op_i) where s_a_s = ecdh(r_e, K_aud_s) is the owner-auditor shared scalar. Same additive-pad shape as encrypt_esc_dvk but a different plaintext under a different tag (17 rather than 10) and a different shared scalar: this one hands the owner's auditor the blinding of the allowance commitment the operation writes, the other hands the spender the delegation viewing key. Paired with the emitted v_tilde_aud_s it is the full opening of C_a for that one state -- not the key from which every state's opening derives.",
+  "vectors": [
+    {
+      "inputs": {
+        "r_a": "0x0afda20e062a277afc0c86e31ea22597ee2c094b1b9cd08b8d8a2a212a8af1ee",
+        "s_a_s": "0x12345",
+        "op_i": "0xabcd"
+      },
+      "output": "0x2d97a37cb8d103eb9231907e292a954e22e7fa56165a6b3b9f639252557bf7a2"
+    }
+  ]
+}

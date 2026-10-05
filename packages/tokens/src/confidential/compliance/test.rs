@@ -1,23 +1,30 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl,
+    contract, contractimpl, symbol_short,
     testutils::{Address as _, Events},
     token::StellarAssetClient,
     xdr::{AccountFlags, ToXdr},
     Address, Bytes, BytesN, Env,
 };
+use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
 use crate::confidential::{
     compliance::{
-        storage::{compliance_config, freeze, is_frozen, set_compliance_config, unfreeze},
-        ComplianceConfig, ComplianceHooks, ComplianceStorageKey, ConfidentialCompliance,
+        storage::{
+            clawback, compliance_config, force_revoke_spender, freeze, is_frozen,
+            set_compliance_config, unfreeze,
+        },
+        ClawbackData, ComplianceConfig, ComplianceHooks, ComplianceStorageKey,
+        ConfidentialClawback, ConfidentialClawbackClient, ConfidentialCompliance,
         ConfidentialComplianceClient, Policy,
     },
-    storage::{set_address_as_field_element, set_auditor, set_underlying_asset, set_verifier},
+    storage::{
+        decode_data, set_address_as_field_element, set_auditor, set_underlying_asset, set_verifier,
+    },
     verifier::CircuitType,
-    ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, Hooks, RegisterData,
-    RegisterPayload, RevokeSpenderPayload, SetSpenderPayload, SpenderDelegation,
+    ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, ConfidentialTokenStorageKey,
+    Hooks, RegisterData, RegisterPayload, SetSpenderPayload, SpenderDelegation,
     SpenderTransferPayload, TransferPayload, WithdrawPayload,
 };
 
@@ -56,6 +63,27 @@ impl ConfidentialCompliance for TokenHost {
     fn set_compliance_config(e: &Env, config: ComplianceConfig, admin: Address) {
         admin.require_auth();
         set_compliance_config(e, &config);
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl ConfidentialClawback for TokenHost {
+    fn clawback(
+        e: &Env,
+        account: Address,
+        amount: i128,
+        destination: Option<Address>,
+        data: Bytes,
+        admin: Address,
+    ) {
+        admin.require_auth();
+        let d: ClawbackData = decode_data(e, &data);
+        clawback(e, &account, amount, &destination, &d.proof);
+    }
+
+    fn force_revoke_spender(e: &Env, account: Address, spender: Address, admin: Address) {
+        admin.require_auth();
+        force_revoke_spender(e, &account, &spender);
     }
 }
 
@@ -128,12 +156,41 @@ impl crate::confidential::verifier::ConfidentialVerifier for MockVerifier {
     }
 }
 
+/// Models the clawback proof's binding to its public inputs for replay tests.
+///
+/// A real UltraHonk proof absorbs every public input into its transcript, so
+/// it verifies only against the blob it was produced for. The first blob this
+/// mock accepts becomes that statement; every later verification succeeds
+/// only when the contract assembles the identical blob.
+#[contract]
+struct ClawbackReplayGuardVerifier;
+
+#[contractimpl(contracttrait)]
+impl crate::confidential::verifier::ConfidentialVerifier for ClawbackReplayGuardVerifier {
+    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn verify_proof(e: &Env, _ct: CircuitType, pi: Bytes, _proof: Bytes) -> bool {
+        let key = symbol_short!("bound");
+        match e.storage().instance().get::<_, Bytes>(&key) {
+            None => {
+                e.storage().instance().set(&key, &pi);
+                true
+            }
+            Some(bound) => bound == pi,
+        }
+    }
+}
+
 #[contract]
 struct MockAuditor;
 
 #[contractimpl(contracttrait)]
 impl crate::confidential::auditor::ConfidentialAuditor for MockAuditor {
-    fn register_key(_e: &Env, _auditor_id: u32, _point: BytesN<64>, _operator: Address) {}
+    fn register_key(e: &Env, auditor_id: u32, point: BytesN<64>, _operator: Address) {
+        crate::confidential::auditor::storage::register_key(e, auditor_id, &point);
+    }
 
     fn rotate_key(_e: &Env, _auditor_id: u32, _new_point: BytesN<64>, _operator: Address) {}
 }
@@ -149,6 +206,10 @@ struct Harness<'a> {
 }
 
 fn setup<'a>() -> Harness<'a> {
+    setup_with(|e| e.register(MockVerifier, ()))
+}
+
+fn setup_with<'a>(register_verifier: impl FnOnce(&Env) -> Address) -> Harness<'a> {
     let e = Env::default();
     e.mock_all_auths();
 
@@ -160,10 +221,17 @@ fn setup<'a>() -> Harness<'a> {
     sac.issuer().set_flag(AccountFlags::RevocableFlag);
     let sac_client = StellarAssetClient::new(&e, &sac_addr);
 
-    let verifier = e.register(MockVerifier, ());
+    let verifier = register_verifier(&e);
     let auditor = e.register(MockAuditor, ());
-    let host = e.register(TokenHost, (sac_addr.clone(), verifier, auditor));
     let admin = Address::generate(&e);
+    // Auditor 0 is the `auditor_id` every account in this suite binds to;
+    // `clawback` fetches its key for the public-input blob.
+    crate::confidential::auditor::ConfidentialAuditorClient::new(&e, &auditor).register_key(
+        &0,
+        &Grumpkin::generator(&e),
+        &admin,
+    );
+    let host = e.register(TokenHost, (sac_addr.clone(), verifier, auditor));
 
     Harness { e, host, sac_addr, sac: sac_client, admin }
 }
@@ -191,6 +259,7 @@ fn withdraw_payload(e: &Env) -> WithdrawPayload {
         r_e_point: pt(e),
         sigma: fr(e),
         b_tilde_aud_s: fr(e),
+        r_tilde_aud_s: fr(e),
     }
 }
 
@@ -206,6 +275,7 @@ fn transfer_payload(e: &Env) -> TransferPayload {
         r_tilde_aud_r: fr(e),
         v_tilde_aud_s: fr(e),
         b_tilde_aud_s: fr(e),
+        r_tilde_aud_s: fr(e),
     }
 }
 
@@ -221,6 +291,7 @@ fn spender_transfer_payload(e: &Env) -> SpenderTransferPayload {
         r_tilde_aud_r: fr(e),
         v_tilde_aud_s: fr(e),
         a_tilde_aud_s: fr(e),
+        r_tilde_aud_s: fr(e),
     }
 }
 
@@ -236,17 +307,8 @@ fn set_spender_payload(e: &Env) -> SetSpenderPayload {
         sigma_a: fr(e),
         v_tilde_aud_s: fr(e),
         b_tilde_aud_s: fr(e),
-    }
-}
-
-fn revoke_spender_payload(e: &Env) -> RevokeSpenderPayload {
-    RevokeSpenderPayload {
-        c_spend_new: pt(e),
-        b_tilde: fr(e),
-        r_e_point: pt(e),
-        sigma: fr(e),
-        v_tilde_aud_s: fr(e),
-        b_tilde_aud_s: fr(e),
+        r_tilde_aud_s: fr(e),
+        r_a_tilde_aud_s: fr(e),
     }
 }
 
@@ -273,7 +335,7 @@ fn hooks_short_circuit_without_config() {
             &spender_transfer_payload(&h.e),
         );
         ComplianceHooks::on_set_spender(&h.e, &alice, &op, 0, &set_spender_payload(&h.e));
-        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, &revoke_spender_payload(&h.e));
+        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op);
         assert!(compliance_config(&h.e).is_none());
         assert!(!is_frozen(&h.e, &alice));
     });
@@ -452,7 +514,7 @@ fn on_revoke_spender_panics_when_account_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &alice);
-        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, &revoke_spender_payload(&h.e));
+        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op);
     });
 }
 
@@ -464,7 +526,7 @@ fn on_revoke_spender_when_spender_frozen() {
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &base_config());
         freeze(&h.e, &op);
-        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, &revoke_spender_payload(&h.e));
+        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op);
     });
 }
 
@@ -565,7 +627,7 @@ fn on_revoke_spender_allows_policy_denied_spender() {
     let policy = h.e.register(DenyOnePolicy, (op.clone(),));
     h.e.as_contract(&h.host, || {
         set_compliance_config(&h.e, &ComplianceConfig { policy: Some(policy), ..base_config() });
-        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op, &revoke_spender_payload(&h.e));
+        ComplianceHooks::on_revoke_spender(&h.e, &alice, &op);
     });
 }
 
@@ -827,12 +889,298 @@ fn storage_keys_isolated_from_token_keys() {
     });
 }
 
+// ################## CLAWBACK (SMOKE) ##################
+//
+// Contract-layer plumbing only. The verifier is mocked, so nothing here
+// exercises CB1-CB3, the seize bound, or the destination binding -- those are
+// circuit-side (`circuits/clawback/src/tests.nr`). The replay case runs
+// against `ClawbackReplayGuardVerifier`, which binds the first public-input
+// blob it accepts; the redirect case would need the same treatment.
+
+fn clawback_data(e: &Env) -> Bytes {
+    ClawbackData { proof: Bytes::new(e) }.to_xdr(e)
+}
+
+/// Registers `account` with a spendable commitment of `amount * G` and an
+/// empty receiving side, then freezes it.
+fn frozen_account_with(h: &Harness, account: &Address, amount: u128) {
+    h.e.as_contract(&h.host, || {
+        let identity = Grumpkin::identity(&h.e);
+        let acc = ConfidentialAccount {
+            spending_public_key: identity.clone(),
+            viewing_public_key: identity.clone(),
+            spendable_commitment: Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), amount),
+            receiving_commitment: identity,
+            auditor_id: 0,
+        };
+        h.e.storage()
+            .persistent()
+            .set(&ConfidentialTokenStorageKey::Account(account.clone()), &acc);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, account);
+    });
+}
+
+#[test]
+fn clawback_none_folds_commitments_and_moves_no_underlying() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+    h.sac.mint(&h.host, &1_000);
+
+    let client = ConfidentialClawbackClient::new(&h.e, &h.host);
+    client.clawback(&alice, &40i128, &None, &clawback_data(&h.e), &h.admin);
+
+    // C_spend <- C_spend + O - 40*G, C_receive <- O.
+    h.e.as_contract(&h.host, || {
+        let acc = crate::confidential::storage::get_account(&h.e, &alice);
+        let expected = Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 60);
+        assert_eq!(acc.spendable_commitment, expected);
+        assert_eq!(acc.receiving_commitment, Grumpkin::identity(&h.e));
+    });
+    // No underlying moved: the pool is now over-collateralized by 40.
+    assert_eq!(StellarAssetClient::new(&h.e, &h.sac_addr).balance(&h.host), 1_000);
+    // The freeze survives the seizure.
+    h.e.as_contract(&h.host, || assert!(is_frozen(&h.e, &alice)));
+}
+
+#[test]
+fn clawback_some_transfers_exactly_the_seized_amount() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let dest = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+    h.sac.mint(&h.host, &1_000);
+
+    let client = ConfidentialClawbackClient::new(&h.e, &h.host);
+    client.clawback(&alice, &40i128, &Some(dest.clone()), &clawback_data(&h.e), &h.admin);
+
+    let sac = StellarAssetClient::new(&h.e, &h.sac_addr);
+    assert_eq!(sac.balance(&dest), 40);
+    assert_eq!(sac.balance(&h.host), 960);
+}
+
+#[test]
+fn clawback_advances_the_nonce() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+    h.sac.mint(&h.host, &1_000);
+
+    let client = ConfidentialClawbackClient::new(&h.e, &h.host);
+    assert_eq!(client.clawback_nonce(&alice), 0);
+    client.clawback(&alice, &40i128, &None, &clawback_data(&h.e), &h.admin);
+    assert_eq!(client.clawback_nonce(&alice), 1);
+    client.clawback(&alice, &10i128, &None, &clawback_data(&h.e), &h.admin);
+    assert_eq!(client.clawback_nonce(&alice), 2);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3506)")]
+fn clawback_replay_after_restoring_commitments_panics() {
+    // The M-01 scenario: seize 20 from (100G, O), unfreeze, credit 20 with
+    // zero blinding (deposit + merge) so the commitments return to (100G, O),
+    // refreeze, and resubmit the original proof. Every public input except
+    // the nonce is byte-identical to the first submission.
+    let h = setup_with(|e| e.register(ClawbackReplayGuardVerifier, ()));
+    let alice = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+    h.sac.mint(&h.host, &1_000);
+    h.sac.mint(&alice, &20);
+
+    let clawback = ConfidentialClawbackClient::new(&h.e, &h.host);
+    let compliance = ConfidentialComplianceClient::new(&h.e, &h.host);
+    let token = ConfidentialTokenClient::new(&h.e, &h.host);
+    let proof = clawback_data(&h.e);
+
+    clawback.clawback(&alice, &20i128, &None, &proof, &h.admin);
+
+    compliance.unfreeze(&alice, &h.admin);
+    token.deposit(&alice, &alice, &20);
+    token.merge(&alice);
+    compliance.freeze(&alice, &h.admin);
+
+    h.e.as_contract(&h.host, || {
+        let acc = crate::confidential::storage::get_account(&h.e, &alice);
+        assert_eq!(acc.spendable_commitment, Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 100));
+        assert_eq!(acc.receiving_commitment, Grumpkin::identity(&h.e));
+    });
+
+    clawback.clawback(&alice, &20i128, &None, &proof, &h.admin);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3604)")]
+fn clawback_unfrozen_panics() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+    h.e.as_contract(&h.host, || unfreeze(&h.e, &alice));
+
+    ConfidentialClawbackClient::new(&h.e, &h.host).clawback(
+        &alice,
+        &1i128,
+        &None,
+        &clawback_data(&h.e),
+        &h.admin,
+    );
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3604)")]
+fn clawback_freeze_check_precedes_registration_check() {
+    // An address that is neither frozen nor registered yields 3604, not 3501.
+    let h = setup();
+    let nobody = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || set_compliance_config(&h.e, &base_config()));
+
+    ConfidentialClawbackClient::new(&h.e, &h.host).clawback(
+        &nobody,
+        &1i128,
+        &None,
+        &clawback_data(&h.e),
+        &h.admin,
+    );
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3605)")]
+fn clawback_zero_amount_panics() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+
+    ConfidentialClawbackClient::new(&h.e, &h.host).clawback(
+        &alice,
+        &0i128,
+        &None,
+        &clawback_data(&h.e),
+        &h.admin,
+    );
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3605)")]
+fn clawback_negative_amount_panics() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+
+    ConfidentialClawbackClient::new(&h.e, &h.host).clawback(
+        &alice,
+        &-1i128,
+        &None,
+        &clawback_data(&h.e),
+        &h.admin,
+    );
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3606)")]
+fn clawback_to_self_panics() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+
+    ConfidentialClawbackClient::new(&h.e, &h.host).clawback(
+        &alice,
+        &1i128,
+        &Some(h.host.clone()),
+        &clawback_data(&h.e),
+        &h.admin,
+    );
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3301)")]
+fn clawback_unregistered_auditor_panics() {
+    // The public-input blob carries the target's auditor key, so an account
+    // whose `auditor_id` has no registered key cannot be seized.
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        let identity = Grumpkin::identity(&h.e);
+        let acc = ConfidentialAccount {
+            spending_public_key: identity.clone(),
+            viewing_public_key: identity.clone(),
+            spendable_commitment: Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 100),
+            receiving_commitment: identity,
+            auditor_id: 7,
+        };
+        h.e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(alice.clone()), &acc);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &alice);
+    });
+
+    ConfidentialClawbackClient::new(&h.e, &h.host).clawback(
+        &alice,
+        &1i128,
+        &None,
+        &clawback_data(&h.e),
+        &h.admin,
+    );
+}
+
+#[test]
+fn force_revoke_spender_folds_allowance_and_deletes_delegation() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+    h.e.as_contract(&h.host, || {
+        h.e.storage().persistent().set(
+            &ConfidentialTokenStorageKey::Delegation(alice.clone(), spender.clone()),
+            &SpenderDelegation {
+                allowance_commitment: Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 25),
+                a_tilde: fr(&h.e),
+                escrowed_dvk: Grumpkin::identity(&h.e),
+                allowance_salt: fr(&h.e),
+                live_until_ledger: 1_000,
+            },
+        );
+    });
+
+    ConfidentialClawbackClient::new(&h.e, &h.host).force_revoke_spender(&alice, &spender, &h.admin);
+
+    h.e.as_contract(&h.host, || {
+        let acc = crate::confidential::storage::get_account(&h.e, &alice);
+        assert_eq!(acc.spendable_commitment, Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 125));
+        assert!(!h
+            .e
+            .storage()
+            .persistent()
+            .has(&ConfidentialTokenStorageKey::Delegation(alice.clone(), spender.clone())));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3604)")]
+fn force_revoke_spender_unfrozen_panics() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+    h.e.as_contract(&h.host, || unfreeze(&h.e, &alice));
+
+    ConfidentialClawbackClient::new(&h.e, &h.host).force_revoke_spender(&alice, &spender, &h.admin);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3504)")]
+fn force_revoke_unknown_delegation_panics() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+    frozen_account_with(&h, &alice, 100);
+
+    ConfidentialClawbackClient::new(&h.e, &h.host).force_revoke_spender(&alice, &spender, &h.admin);
+}
+
 // ################## HELPERS ##################
 
 fn register_minimal_account(e: &Env, account: &Address) {
     // Bypass proof verification: the unregistered-deposit tests only need
     // `account_exists` to return true for selected addresses.
-    use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
     use crate::confidential::{ConfidentialAccount, ConfidentialTokenStorageKey};
     let identity = Grumpkin::identity(e);

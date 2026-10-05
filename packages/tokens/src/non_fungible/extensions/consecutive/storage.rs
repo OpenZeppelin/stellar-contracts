@@ -6,7 +6,8 @@ use crate::non_fungible::{
     burnable::emit_burn,
     emit_transfer,
     extensions::consecutive::emit_consecutive_mint,
-    overrides::BurnableOverrides,
+    overrides::{BurnableOverrides, MintRangeOverrides},
+    royalties::RoyaltySupport,
     sequential::{self as sequential},
     Base, ContractOverrides, NonFungibleTokenError, OWNERSHIP_EXTEND_AMOUNT,
     OWNERSHIP_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT,
@@ -14,6 +15,16 @@ use crate::non_fungible::{
 };
 
 pub struct Consecutive;
+
+/// Marker for the contract types backing the
+/// [`crate::non_fungible::consecutive::NonFungibleConsecutive`] trait:
+/// [`Consecutive`] itself and the curated combinations that include it.
+/// Contract authors never interact with this trait; it only appears as the
+/// bound enforcing that the selected `ContractType` follows the consecutive
+/// accounting model.
+pub trait ConsecutiveContractType {}
+
+impl ConsecutiveContractType for Consecutive {}
 
 impl ContractOverrides for Consecutive {
     fn owner_of(e: &Env, token_id: u32) -> Address {
@@ -53,6 +64,17 @@ impl BurnableOverrides for Consecutive {
     }
 }
 
+// Implemented for `Consecutive`, so that the royalty existence check routes
+// through `Consecutive`'s `owner_of` (sparse, bucket-based ownership)
+// instead of `Base`'s direct entry lookup.
+impl RoyaltySupport for Consecutive {}
+
+impl MintRangeOverrides for Consecutive {
+    fn mint_range(e: &Env, to: &Address, amount: u32) -> u32 {
+        Consecutive::mint_range(e, to, amount)
+    }
+}
+
 /// For 32,000 total IDs with ITEM of type u32 and 100 items per bucket:
 ///
 /// Bucket 0
@@ -76,7 +98,7 @@ pub const IDS_IN_ITEM: usize = mem::size_of::<u32>() * 8; // 32
 /// Total number of IDs in the whole bucket
 pub const IDS_IN_BUCKET: usize = ITEMS_IN_BUCKET * IDS_IN_ITEM; // 3,200
 /// Max. amount of tokens allowed to be minted at once in
-/// [`Consecutive::batch_mint`]
+/// [`Consecutive::mint_range`]
 pub const MAX_TOKENS_IN_BATCH: usize = 32_000; // 10 buckets * 100 items * 32
 
 /// Storage keys for the data associated with the consecutive extension of
@@ -200,18 +222,18 @@ impl Consecutive {
     /// must be implemented in the calling function. For example:
     ///
     /// ```ignore,rust
-    /// fn mint_batch(e: &Env, to: &Address, amount: u32) {
+    /// fn mint_range(e: &Env, to: &Address, amount: u32) {
     ///     // 1. Verify admin has minting privileges (optional)
     ///     let admin = e.storage().instance().get(&ADMIN_KEY).unwrap();
     ///     admin.require_auth();
     ///
     ///     // 2. Only then call the actual mint function
-    ///     Consecutive::batch_mint(e, &to, amount);
+    ///     Consecutive::mint_range(e, &to, amount);
     /// }
     /// ```
     ///
     /// Failure to add proper authorization could allow anyone to mint tokens.
-    pub fn batch_mint(e: &Env, to: &Address, amount: u32) -> u32 {
+    pub fn mint_range(e: &Env, to: &Address, amount: u32) -> u32 {
         if amount == 0 || amount > MAX_TOKENS_IN_BATCH as u32 {
             panic_with_error!(&e, NonFungibleTokenError::InvalidAmount);
         }
@@ -538,7 +560,7 @@ impl Consecutive {
         let mut item = bucket.get(item_index).expect("token_id out of allowed range");
 
         // return early if the bit was already set in a previous action
-        // (transfer, burn or batch_mint)
+        // (transfer, burn or mint_range)
         if item & mask != 0 {
             return;
         }

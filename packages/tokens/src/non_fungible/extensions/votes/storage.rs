@@ -1,7 +1,11 @@
 use soroban_sdk::{Address, Env};
 use stellar_governance::votes::transfer_voting_units;
 
-use crate::non_fungible::{overrides::BurnableOverrides, Base, ContractOverrides};
+use crate::non_fungible::{
+    overrides::{BurnableOverrides, MintOverrides, MintWithIdOverrides},
+    royalties::RoyaltySupport,
+    Base, ContractOverrides,
+};
 
 pub struct NonFungibleVotes;
 
@@ -22,6 +26,23 @@ impl BurnableOverrides for NonFungibleVotes {
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
         NonFungibleVotes::burn_from(e, spender, from, token_id);
+    }
+}
+
+// Implemented for `NonFungibleVotes`, so that the royalty existence check
+// routes through `NonFungibleVotes`'s `owner_of` (one `Owner` entry per
+// token).
+impl RoyaltySupport for NonFungibleVotes {}
+
+impl MintWithIdOverrides for NonFungibleVotes {
+    fn mint_with_id(e: &Env, to: &Address, token_id: u32) {
+        NonFungibleVotes::mint_with_id(e, to, token_id);
+    }
+}
+
+impl MintOverrides for NonFungibleVotes {
+    fn mint(e: &Env, to: &Address) -> u32 {
+        NonFungibleVotes::mint(e, to)
     }
 }
 
@@ -101,6 +122,37 @@ impl NonFungibleVotes {
     ///
     /// # Errors
     ///
+    /// * refer to [`Base::mint_with_id`] errors.
+    /// * refer to [`transfer_voting_units`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["mint", to: Address]`
+    /// * data - `[token_id: u32]`
+    ///
+    /// * topics - `["delegate_votes_changed", delegate: Address]`
+    /// * data - `[previous_votes: u128, new_votes: u128]`
+    ///
+    /// # Security Warning
+    ///
+    /// This function has NO AUTHORIZATION CONTROLS.
+    /// The caller must ensure proper authorization before calling.
+    pub fn mint_with_id(e: &Env, to: &Address, token_id: u32) {
+        Base::mint_with_id(e, to, token_id);
+        transfer_voting_units(e, None, Some(to), 1);
+    }
+
+    /// Creates a token with the next available `token_id` and assigns it to
+    /// `to`. Returns the `token_id` for the newly minted token.
+    /// Also updates voting units for the recipient's delegate (1 unit per NFT).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to` - The address receiving the new token.
+    ///
+    /// # Errors
+    ///
     /// * refer to [`Base::mint`] errors.
     /// * refer to [`transfer_voting_units`] errors.
     ///
@@ -116,39 +168,8 @@ impl NonFungibleVotes {
     ///
     /// This function has NO AUTHORIZATION CONTROLS.
     /// The caller must ensure proper authorization before calling.
-    pub fn mint(e: &Env, to: &Address, token_id: u32) {
-        Base::mint(e, to, token_id);
-        transfer_voting_units(e, None, Some(to), 1);
-    }
-
-    /// Creates a token with the next available `token_id` and assigns it to
-    /// `to`. Returns the `token_id` for the newly minted token.
-    /// Also updates voting units for the recipient's delegate (1 unit per NFT).
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `to` - The address receiving the new token.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`Base::sequential_mint`] errors.
-    /// * refer to [`transfer_voting_units`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["mint", to: Address]`
-    /// * data - `[token_id: u32]`
-    ///
-    /// * topics - `["delegate_votes_changed", delegate: Address]`
-    /// * data - `[previous_votes: u128, new_votes: u128]`
-    ///
-    /// # Security Warning
-    ///
-    /// This function has NO AUTHORIZATION CONTROLS.
-    /// The caller must ensure proper authorization before calling.
-    pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
-        let token_id = Base::sequential_mint(e, to);
+    pub fn mint(e: &Env, to: &Address) -> u32 {
+        let token_id = Base::mint(e, to);
         transfer_voting_units(e, None, Some(to), 1);
         token_id
     }

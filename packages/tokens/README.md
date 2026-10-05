@@ -18,13 +18,13 @@ Refer to the [OpenZeppelin for Stellar Contracts](https://docs.openzeppelin.com/
 
 ### Fungible
 
-The `fungible` module provides functionalities for fungible tokens: balance management, transfer operations, allowance delegation, total supply tracking.
+The `fungible` module provides functionalities for fungible tokens: balance management, transfer operations and allowance delegation. Total supply tracking is available as an opt-in extension.
 
 #### Usage Examples
 
 ```rust
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, FungibleToken};
+use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, Compose, FungibleToken};
 use stellar_access::ownable::{self as ownable, Ownable};
 use stellar_macros::{only_owner};
 
@@ -56,22 +56,23 @@ impl MyContract {
 
     #[only_owner]
     pub fn mint_tokens(e: &Env, to: Address, amount: i128) {
-        // Mint tokens to the recipient
-        Base::mint(e, &to, amount);
+        // Mint tokens to the recipient, through the selected contract type
+        <Self as FungibleToken>::ContractType::mint(e, &to, amount);
     }
 }
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for MyContract {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 }
 
 #[contractimpl(contracttrait)]
 impl FungibleBurnable for MyContract {}
 ```
 
-Notice the empty trait bodies. Only a `ContractType` has to be picked (here
-`Base`, but it could be `AllowList`, `BlockList`, `RWA`, ...) and the
+Notice the empty trait bodies. Only a `ContractType` has to be picked with
+`Compose` (here `Base`, but it could be `AllowList`, `BlockList`, `RWA`, ...)
+and the
 `#[contractimpl(contracttrait)]` macro fills in every method, routing it to the
 behavior that matches that `ContractType`. The override machinery that makes
 this work (`ContractOverrides`, `BurnableOverrides`) operates in the
@@ -80,7 +81,8 @@ background. There is no need to implement or import it.
 #### Extensions
 
 - **Burnable**: Allow token holders to destroy their tokens
-- **Capped**: Set maximum supply limits
+- **TotalSupply**: Track and expose the total supply (opt-in; `RWA`, `Vault` and `Capped` require it)
+- **Capped**: Set maximum supply limits (requires the TotalSupply extension)
 - **Allowlist**: Restrict transfers to approved addresses
 - **Blocklist**: Prevent transfers from/to blocked addresses
 - **Votes**: Track voting power for governance integration
@@ -101,7 +103,7 @@ The `non_fungible` module implements non-fungible token functionality:
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_tokens::non_fungible::{
     burnable::NonFungibleBurnable,
-    Base, NonFungibleToken,
+    Base, Compose, NonFungibleToken,
 };
 
 #[contract]
@@ -123,13 +125,13 @@ impl MyNFTContract {
 
     pub fn award_item(e: &Env, to: Address) -> u32 {
         // access control might be needed
-        Base::sequential_mint(e, &to)
+        <Self as NonFungibleToken>::ContractType::mint(e, &to)
     }
 }
 
 #[contractimpl(contracttrait)]
 impl NonFungibleToken for MyNFTContract {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 }
 
 #[contractimpl(contracttrait)]

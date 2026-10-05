@@ -2,9 +2,18 @@ use soroban_sdk::{Address, Env};
 
 use crate::fungible::{extensions::burnable::emit_burn, Base};
 
+/// Type-level name of the burnable extension, for use in a
+/// [`crate::fungible::combinations::Compose`] list.
+///
+/// Burnable is additive: it does not override the base behavior, so listing
+/// it is purely declarative and does not affect the resolved contract type.
+/// Burning is enabled by implementing
+/// [`crate::fungible::burnable::FungibleBurnable`], whether or not `Burnable`
+/// is listed.
+pub enum Burnable {}
+
 impl Base {
-    /// Destroys `amount` of tokens from `from`. Updates the total
-    /// supply accordingly.
+    /// Destroys `amount` of tokens from `from`.
     ///
     /// # Arguments
     ///
@@ -32,7 +41,6 @@ impl Base {
 
     /// Destroys `amount` of tokens from `from` using the allowance mechanism.
     /// `amount` is then deducted from `spender` allowance.
-    /// Updates the total supply accordingly.
     ///
     /// # Arguments
     ///

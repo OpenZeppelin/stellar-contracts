@@ -1,12 +1,12 @@
 use stellar_confidential_lib::{
     H, assert_on_curve_non_identity, commit, derive_allow_r, derive_transfer_blind, domain, ecdh,
-    encrypt_allowance, encrypt_amount, scalar_mul, sponge_squeeze_2,
+    encrypt_allowance, encrypt_amount, scalar_mul, sponge_squeeze_2, sponge_squeeze_3,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 mod tests;
 
-// SpenderTransfer circuit -- design doc Section 7.8.
+// SpenderTransfer circuit -- docs/protocol/operations/spender-transfer.md.
 //
 // Constraints
 // -----------
@@ -24,32 +24,35 @@ mod tests;
 //                                                           contract-binding
 //                                                           anchor, see below).
 //   O4  v_a, v_transfer, v_a - v_transfer in [0, 2^127)                 Range validity
-//                                                           (Section 2.6); the
+//                                                           (docs/protocol/primitives.md#integer-embedding-and-range-proofs); the
 //                                                           [0, 2^127) bound is
 //                                                           the SEP-41 i128
 //                                                           non-negative range
-//                                                           (Section 3.4).
-// Recipient ECDH + transfer commitment (Section 5.3, 5.4)
+//                                                           (docs/protocol/system-model.md#underlying-token-assumptions).
+// Recipient ECDH + transfer commitment (docs/protocol/keys-and-commitments.md#ecdh-derived-blinding, docs/protocol/keys-and-commitments.md#anti-poisoning-constraint)
 //   O5  s          = ecdh(r_e, PVK_recipient)               Recipient ECDH
 //                                                           shared-secret
 //                                                           scalar (2.4).
 //   O6  R_e        = r_e * H                                Ephemeral public
 //                                                           key.
 //   O7  r_transfer       = Poseidon2(delta_transfer_blind, s,
-//                              sigma_a)                     Anti-poisoning
+//                              sigma_a')                    Anti-poisoning
 //                                                           binding for the
 //                                                           transfer blinding.
 //   O8  C_transfer       = v_transfer * G + r_transfer * H                    Transfer
 //                                                           commitment.
 //   O9  v_tilde    = v_transfer
 //                       + Poseidon2(delta_transfer_amount, s,
-//                                   sigma_a)                Encrypted amount
+//                                   sigma_a')               Encrypted amount
 //                                                           (emitted).
 // Allowance state (new)
-//   --  sigma_a' != sigma_a                                 Salt rotation
-//                                                           (implementation
-//                                                           hardening; not in
-//                                                           Section 7.8).
+//   O14 sigma_a' != sigma_a                                 Nonce rotation:
+//                                                           rejects keying the
+//                                                           pads to the salt the
+//                                                           previous transfer
+//                                                           already used
+//                                                           (docs/protocol/account-state.md#spender-delegation
+//                                                           *Transfer nonce*).
 //   O10 r_a'       = Poseidon2(delta_allow_r, dvk_i,
 //                              sigma_a')                    New allowance
 //                                                           randomness.
@@ -63,14 +66,18 @@ mod tests;
 // Nonzero ephemeral
 //   O13 r_e != 0                                            Rules out R_e = O
 //                                                           and S, S_{a,r},
-//                                                           S_{a,s} = O.
-// Auditor block (dual-channel visibility, Section 8.1 + Section 8.4)
+//                                                           S_{a,s} = O; every
+//                                                           pad would collapse
+//                                                           to a constant
+//                                                           function of
+//                                                           sigma_a'.
+// Auditor block (dual-channel visibility, docs/protocol/auditing.md#per-transfer-auditor-ciphertexts + docs/protocol/auditing.md#spender-transfer-auditing)
 //   O_a1 s_{a,r}   = ecdh(r_e, K_aud_r)                     Recipient-auditor
 //                                                           ECDH shared scalar
 //                                                           (reuses r_e).
 //   O_a2 (m_v_r, m_r_r)
 //                  = SpongeSqueeze_2(delta_aud_r,
-//                                    s_{a,r}, sigma_a)      Recipient-channel
+//                                    s_{a,r}, sigma_a')     Recipient-channel
 //                                                           sponge: two masks.
 //   O_a3 v_tilde_aud_r = v_transfer + m_v_r                       Recipient-auditor
 //                                                           encrypted amount.
@@ -86,18 +93,22 @@ mod tests;
 //                                                           OWNER, not the
 //                                                           spender (Section
 //                                                           8.4).
-//   O_a6 (m_v_s, m_a_s)
-//                  = SpongeSqueeze_2(delta_aud_s,
-//                                    s_{a,s}, sigma_a)      Owner-channel
-//                                                           sponge: two masks.
+//   O_a6 (m_v_s, m_a_s, m_r_s)
+//                  = SpongeSqueeze_3(delta_aud_s,
+//                                    s_{a,s}, sigma_a')     Owner-channel
+//                                                           sponge: three masks.
 //   O_a7 v_tilde_aud_s = v_transfer + m_v_s                       Owner-auditor
 //                                                           encrypted amount.
 //   O_a8 a_tilde_aud_s = (v_a - v_transfer) + m_a_s               Owner-auditor
 //                                                           encrypted
 //                                                           post-transfer
 //                                                           allowance.
+//   O_a9 r_tilde_aud_s = r_a' + m_r_s                       Owner-auditor
+//                                                           escrow of the new
+//                                                           allowance blinding,
+//                                                           over O10's r_a'.
 //
-// Contract binding (Section 7.8 final paragraph)
+// Contract binding (docs/protocol/operations/spender-transfer.md#contract-binding)
 // ---------------------------------------------
 // Unlike owner-initiated circuits, SpenderTransfer does NOT constrain the vk
 // derivation -- the spender has no access to the owner's sk. Contract binding
@@ -108,31 +119,33 @@ mod tests;
 // input and was constructed with contract-specific randomness, a proof
 // generated against one contract's `C_a` cannot verify against another's.
 //
-// Channel-nonce reuse (Section 6.2 *Dual role*)
-// ---------------------------------------------
-// `sigma_a` serves as the freshness nonce for THREE distinct uses in this
-// circuit: the allowance-randomness Poseidon (O3), the recipient ECDH chain
-// (O7 / O9), and both auditor-channel sponges (O_a2 / O_a6). Soundness derives
-// from ECDH shared-secret unpredictability (s is unknown to anyone but the
-// recipient and the prover); `sigma_a` itself is public and need not be
-// secret. Only the new-allowance constraints O10 and O12 use the fresh
-// `sigma_a'`.
+// Channel nonce (docs/protocol/account-state.md#transfer-nonce)
+// --------------------------------------------
+// The stored `sigma_a` opens the current allowance (O3) and nothing else.
+// Every pad this circuit derives absorbs the prover-chosen replacement
+// `sigma_a'` instead: the recipient ECDH chain (O7 / O9), both auditor-channel
+// sponges (O_a2 / O_a6, hence O_a9's lane[2] pad), and the new-allowance
+// derivations (O10 / O12). docs/protocol/account-state.md#transfer-nonce states why the
+// stored salt cannot key the pads. `sigma_a'` is constrained only against
+// prover-supplied state, so a retry re-samples it freely. O14 rejects the one
+// adjacent collision; global non-repetition of `sigma_a'` over the
+// delegation's lifetime is a client obligation (docs/sdk/wallet.md#salt-freshness).
 //
-// Point-validation doctrine (Section 10.8)
+// Point-validation doctrine (docs/protocol/proof-system.md#on-chain-point-arithmetic)
 // ----------------------------------------
 // Y_op, C_a, C_a', C_transfer, R_e, S, S_{a,r}, and S_{a,s} are bound to in-circuit
 // multi_scalar_mul outputs (O1, O2, O11, O8, O6, O5, O_a1, O_a5) and are
 // therefore on-curve by construction -- no explicit check needed.
 // PVK_recipient was constrained on-curve when the recipient registered (R3,
-// Section 7.2) and is loaded by the contract from trusted storage, so it is
-// path (2) of Section 10.8 and the circuit consumes it without re-checking.
+// docs/protocol/operations/register.md) and is loaded by the contract from trusted storage, so it is
+// path (2) of docs/protocol/proof-system.md#on-chain-point-arithmetic and the circuit consumes it without re-checking.
 // K_aud_r and K_aud_s are public-input keys with no proof constraint at
 // insertion (path (3)) -- the verifier doesn't check curve membership and
 // an off-curve key would break the soundness of O_a1 / O_a5. This file
 // explicitly validates both on-curve AND non-identity before the
 // corresponding ECDH consumes them.
 //
-// Public inputs (24 fields, in design-doc canonical order)
+// Public inputs (25 fields, in design-doc canonical order)
 // --------------------------------------------------------
 //   Idx  Param                Symbol            Source / Note
 //   ---  -----                ------            -------------------------------
@@ -152,7 +165,7 @@ mod tests;
 //   9    k_aud_s_x            K_aud_s.x         Fetched from the auditor
 //   10   k_aud_s_y            K_aud_s.y           contract by the OWNER's
 //                                                 `auditor_id`, not the
-//                                                 spender's (Section 7.8).
+//                                                 spender's (docs/protocol/operations/spender-transfer.md).
 //   11   c_a_new_x            C_a'.x            Prover-supplied; written to
 //   12   c_a_new_y            C_a'.y              the delegation entry's new
 //                                                 allowance_commitment.
@@ -165,6 +178,7 @@ mod tests;
 //   18   a_tilde_new          a_tilde'          Prover-supplied encrypted new
 //                                                 allowance scalar; stored.
 //   19   sigma_a_new          sigma_a'          Prover-supplied fresh salt;
+//                                                 channel nonce for every pad;
 //                                                 written to allowance_salt.
 //   20   v_tilde_aud_r        v_tilde_aud_r     Prover-supplied recipient-
 //                                                 auditor encrypted amount;
@@ -177,6 +191,9 @@ mod tests;
 //   23   a_tilde_aud_s        a_tilde_aud_s     Prover-supplied owner-auditor
 //                                                 encrypted post-transfer
 //                                                 allowance; emitted.
+//   24   r_tilde_aud_s        r_tilde_aud_s     Prover-supplied owner-auditor
+//                                                 escrow of the new allowance
+//                                                 blinding r_a'; emitted.
 //
 // Private witnesses
 // -----------------
@@ -220,6 +237,7 @@ fn main(
     r_tilde_aud_r: pub Field,
     v_tilde_aud_s: pub Field,
     a_tilde_aud_s: pub Field,
+    r_tilde_aud_s: pub Field,
 ) {
     // O13 -- runs first so the r_e = 0 attack is rejected before any
     // scalar mul against it could quietly produce the identity.
@@ -241,7 +259,7 @@ fn main(
     assert(c_a_derived.x == c_a_x);
     assert(c_a_derived.y == c_a_y);
 
-    // O4 -- Section 2.6 spells out the 127-bit decomposition / recomposition
+    // O4 -- docs/protocol/primitives.md#integer-embedding-and-range-proofs spells out the 127-bit decomposition / recomposition
     // pattern; `assert_max_bit_size` is the Noir stdlib primitive that
     // implements it directly.
     v_a.assert_max_bit_size::<127>();
@@ -254,14 +272,14 @@ fn main(
     assert(r_e_derived.x == r_e_x);
     assert(r_e_derived.y == r_e_y);
 
-    // O5 -- PVK_recipient is path (2) of Section 10.8 (proof-constrained at
+    // O5 -- PVK_recipient is path (2) of docs/protocol/proof-system.md#on-chain-point-arithmetic (proof-constrained at
     // the recipient's registration via R3, trusted on read).
     let pvk_recipient =
         EmbeddedCurvePoint { x: pvk_recipient_x, y: pvk_recipient_y, is_infinite: false };
     let s = ecdh(r_e, pvk_recipient);
 
-    // O7 (anti-poisoning, Section 5.4)
-    let r_transfer = derive_transfer_blind(s, sigma_a);
+    // O7 (anti-poisoning, docs/protocol/keys-and-commitments.md#anti-poisoning-constraint)
+    let r_transfer = derive_transfer_blind(s, sigma_a_new);
 
     // O8
     let c_transfer_derived = commit(v_transfer, r_transfer);
@@ -269,10 +287,10 @@ fn main(
     assert(c_transfer_derived.y == c_transfer_y);
 
     // O9
-    let v_tilde_derived = encrypt_amount(v_transfer, s, sigma_a);
+    let v_tilde_derived = encrypt_amount(v_transfer, s, sigma_a_new);
     assert(v_tilde_derived == v_tilde);
 
-    // Salt rotation (implementation hardening).
+    // O14
     assert(sigma_a_new != sigma_a);
 
     // O10
@@ -287,7 +305,7 @@ fn main(
     let a_tilde_new_derived = encrypt_allowance(v_a_new, dvk_i, sigma_a_new);
     assert(a_tilde_new_derived == a_tilde_new);
 
-    // K_aud_r / K_aud_s point validation (Section 10.8: public-input keys).
+    // K_aud_r / K_aud_s point validation (docs/protocol/proof-system.md#on-chain-point-arithmetic: public-input keys).
     let k_aud_r = EmbeddedCurvePoint { x: k_aud_r_x, y: k_aud_r_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_r);
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };
@@ -297,7 +315,7 @@ fn main(
     let s_a_r = ecdh(r_e, k_aud_r);
 
     // O_a2 (recipient-channel masks: amount, then r_transfer)
-    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, sigma_a);
+    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_a_r, sigma_a_new);
 
     // O_a3
     assert(v_transfer + m_r[0] == v_tilde_aud_r);
@@ -308,12 +326,16 @@ fn main(
     // O_a5 (owner-auditor shared-secret scalar)
     let s_a_s = ecdh(r_e, k_aud_s);
 
-    // O_a6 (owner-channel masks: amount, then post-transfer allowance)
-    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_a_s, sigma_a);
+    // O_a6 (owner-channel masks: amount, post-transfer allowance, then the
+    // blinding-escrow slot)
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, sigma_a_new);
 
     // O_a7
     assert(v_transfer + m_s[0] == v_tilde_aud_s);
 
     // O_a8
     assert(v_a_new + m_s[1] == a_tilde_aud_s);
+
+    // O_a9
+    assert(r_a_new + m_s[2] == r_tilde_aud_s);
 }

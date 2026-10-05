@@ -3,7 +3,7 @@
 //! Implements utilities for handling fungible tokens in a Soroban contract.
 //!
 //! This module provides essential storage functionalities required for managing
-//! balances, allowances, and total supply of fungible tokens.
+//! balances and allowances of fungible tokens.
 //!
 //! ## Design Overview
 //!
@@ -27,16 +27,16 @@
 //!
 //! The base module includes:
 //!
-//! - Total supply management
 //! - Transfers and allowances
 //!
 //! The following optional extensions are available:
 //!
 //! - Metadata: Provides additional information about the token, such as name,
 //!   symbol, and decimals.
-//! - Burnable: Enables token holders to destroy their tokens, reducing the
-//!   total supply.
-//! - Capped: Enables the contract to set a maximum limit on the total supply.
+//! - Burnable: Enables token holders to destroy their tokens.
+//! - TotalSupply: Tracks and exposes the total amount of tokens in circulation.
+//! - Capped: Enables the contract to set a maximum limit on the total supply
+//!   (requires the TotalSupply extension).
 //!
 //! ## Compatibility and Compliance
 //!
@@ -74,8 +74,11 @@ mod utils;
 #[cfg(test)]
 mod test;
 
-pub use extensions::{allowlist, blocklist, burnable, capped, votes};
-pub use overrides::{Base, ContractOverrides};
+pub use extensions::{
+    allowlist, blocklist, burnable, capped, combinations, combinations::Compose, total_supply,
+    votes,
+};
+pub use overrides::{Base, ContractOverrides, MintOverrides};
 use soroban_sdk::{
     contracterror, contractevent, contracttrait, Address, Env, MuxedAddress, String,
 };
@@ -87,8 +90,10 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// The `FungibleToken` trait defines the core functionality for fungible
 /// tokens, adhering to SEP-41. It provides a standard interface for managing
 /// balances, allowances, and metadata associated with fungible tokens.
-/// Additionally, this trait includes the `total_supply()` function, which is
-/// not part of SEP-41 but is commonly used in token contracts.
+///
+/// Tracking the total supply is not part of SEP-41 and is not provided by
+/// this trait; it is available as the opt-in
+/// [`crate::fungible::total_supply::FungibleTotalSupply`] extension.
 ///
 /// To fully comply with the SEP-41 specification one has to implement the
 /// `FungibleBurnable` trait in addition to this one. SEP-41 mandates support
@@ -98,28 +103,78 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// as a method in this trait because it is not a part of the SEP-41 standard,
 /// the function signature may change depending on the implementation.
 ///
-/// A function, [`crate::fungible::Base::mint`], is provided for minting to
-/// cover the general use case.
+/// The contract's own mint function mints through `Self::ContractType::mint`,
+/// which reaches the mint of the selected contract type (no import needed,
+/// refer to [`MintOverrides`]), e.g. increasing the supply counter for
+/// [`crate::fungible::total_supply::TotalSupply`].
 ///
-/// This trait is implemented for the following Contract Types:
+/// `FungibleToken` can be implemented with any of the following contract
+/// types, each one defining how the token behaves:
 /// * [`crate::fungible::Base`] (covering the vanilla case, and compatible with
-///   [`crate::fungible::burnable::FungibleBurnable`]) trait
+///   the [`crate::fungible::burnable::FungibleBurnable`] trait)
 /// * [`crate::fungible::allowlist::AllowList`] (enabling the compatibility and
-///   overrides for [`crate::fungible::allowlist::FungibleAllowList`]) trait,
-///   incompatible with [`crate::fungible::blocklist::BlockList`] trait and
-///   [`crate::rwa::RWA`] trait.
+///   overrides for the [`crate::fungible::allowlist::FungibleAllowList`]
+///   trait).
 /// * [`crate::fungible::blocklist::BlockList`] (enabling the compatibility and
-///   overrides for [`crate::fungible::blocklist::FungibleBlockList`]) trait,
-///   incompatible with [`crate::fungible::allowlist::AllowList`] trait and
-///   [`crate::rwa::RWA`] trait.
-/// * [`crate::rwa::RWA`] (enabling the compatibility and overrides for
-///   [`crate::rwa::RWAToken`]) trait, incompatible with
-///   [`crate::fungible::allowlist::AllowList`] trait and
-///   [`crate::fungible::blocklist::BlockList`] trait.
+///   overrides for the [`crate::fungible::blocklist::FungibleBlockList`]
+///   trait).
+/// * [`crate::rwa::RWA`] (enabling the compatibility and overrides for the
+///   [`crate::rwa::RWAToken`] and
+///   [`crate::fungible::total_supply::FungibleTotalSupply`] traits).
+/// * [`crate::fungible::total_supply::TotalSupply`] (additionally tracking the
+///   total supply, enabling the compatibility and overrides for the
+///   [`crate::fungible::total_supply::FungibleTotalSupply`] trait).
+/// * [`crate::vault::Vault`] (enabling the compatibility and overrides for the
+///   [`crate::vault::FungibleVault`] and
+///   [`crate::fungible::total_supply::FungibleTotalSupply`] traits).
+/// * [`crate::fungible::votes::FungibleVotes`] (enabling the compatibility and
+///   overrides for the [`stellar_governance::votes::Votes`] trait).
 ///
-/// The default implementations of this trait for `Base`, `Allowlist`,
-/// `Blocklist` and `RWA` can be found by navigating to:
-/// `ContractType::{method_name}`.
+/// The chosen contract type is declared through the `ContractType`
+/// associated type, wrapped in [`crate::fungible::combinations::Compose`].
+/// For example, a token whose transfers are gated by an allowlist:
+///
+/// ```ignore
+/// #[contractimpl(contracttrait)]
+/// impl FungibleToken for MyToken {
+///     type ContractType = Compose<(AllowList,)>;
+/// }
+///
+/// // Enabled by the contract type above; `allow_user` and `disallow_user`
+/// // are implemented with the desired access control.
+/// #[contractimpl(contracttrait)]
+/// impl FungibleAllowList for MyToken {
+///     // ...
+/// }
+/// ```
+///
+/// `Compose` takes a tuple, so contract types that are compatible with each
+/// other can be listed together. `AllowList` and `FungibleVotes` are such a
+/// pair: listing both (in any order) yields a governance token whose
+/// transfers are gated by the allowlist and whose balances count as voting
+/// units, so both `FungibleAllowList` and `Votes` can be implemented:
+///
+/// ```ignore
+/// #[contractimpl(contracttrait)]
+/// impl FungibleToken for MyToken {
+///     type ContractType = Compose<(AllowList, FungibleVotes)>;
+/// }
+///
+/// #[contractimpl(contracttrait)]
+/// impl FungibleAllowList for MyToken {
+///     // ...
+/// }
+///
+/// #[contractimpl(contracttrait)]
+/// impl Votes for MyToken {}
+/// ```
+///
+/// Not every contract type can be combined with every other one. A
+/// `Compose<(...)>` list that is not supported is rejected at compile time,
+/// and the error names the offending list.
+///
+/// The default implementations of this trait for each contract type can be
+/// found by navigating to: `ContractType::{method_name}`.
 ///
 /// For example, the implementation of [`FungibleToken::transfer`] for the
 /// `Allowlist` contract type can be found at
@@ -128,20 +183,13 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 pub trait FungibleToken {
     /// Helper type that allows some of the functionality of the base trait to
     /// be overridden based on the extensions implemented.
-    /// [`crate::fungible::Base`] should be used as the type when
-    /// not using
-    /// [`crate::fungible::allowlist::AllowList`] or
-    /// [`crate::fungible::blocklist::BlockList`] extensions.
+    /// The contract type is selected with
+    /// [`crate::fungible::combinations::Compose`], by listing the extensions
+    /// the token is made of: `Compose<(Base,)>` for the vanilla case,
+    /// `Compose<(AllowList,)>` for an allowlist token,
+    /// `Compose<(AllowList, TotalSupply)>` for a curated combination, and so
+    /// on. Invalid lists are rejected at compile time.
     type ContractType: ContractOverrides;
-
-    /// Returns the total amount of tokens in circulation.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    fn total_supply(e: &Env) -> i128 {
-        Self::ContractType::total_supply(e)
-    }
 
     /// Returns the amount of tokens held by `account`.
     ///
@@ -290,7 +338,7 @@ pub enum FungibleTokenError {
     InvalidLiveUntilLedger = 102,
     /// Indicates an error when an input that must be >= 0
     LessThanZero = 103,
-    /// Indicates overflow when adding two values
+    /// Indicates an overflow or underflow in an arithmetic operation
     MathOverflow = 104,
     /// Indicates access to uninitialized metadata
     UnsetMetadata = 105,
@@ -322,6 +370,8 @@ pub const BALANCE_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const BALANCE_TTL_THRESHOLD: u32 = BALANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 pub const ALLOW_BLOCK_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const ALLOW_BLOCK_TTL_THRESHOLD: u32 = ALLOW_BLOCK_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+pub const TOTAL_SUPPLY_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const TOTAL_SUPPLY_TTL_THRESHOLD: u32 = TOTAL_SUPPLY_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 pub const INSTANCE_EXTEND_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
 pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 

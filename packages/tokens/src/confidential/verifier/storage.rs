@@ -1,4 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, Bytes, Env};
+use ultrahonk_soroban_verifier::UltraHonkVerifier;
 
 use crate::confidential::verifier::{
     emit_verification_key_registered, emit_verification_key_updated, CircuitType, VerifierError,
@@ -29,6 +30,42 @@ pub fn get_verification_key(e: &Env, circuit_type: CircuitType) -> Bytes {
         .instance()
         .get(&VerifierStorageKey::VerificationKey(circuit_type))
         .unwrap_or_else(|| panic_with_error!(e, VerifierError::VerificationKeyNotRegistered))
+}
+
+/// Verifies an UltraHonk `proof` for `public_inputs` against the verification
+/// key registered under `circuit_type`, returning `true` iff the proof is
+/// valid.
+///
+/// The UltraHonk backend lives in the external
+/// [`ultrahonk_soroban_verifier`](https://github.com/NethermindEth/rs-soroban-ultrahonk)
+/// crate. A malformed proof or mismatched public inputs is not an error here:
+/// the function simply returns `false` and lets the caller decide how to react
+/// (the confidential token reverts with its own `InvalidProof` error).
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `circuit_type` - The circuit the proof was produced against.
+/// * `public_inputs` - The serialized public inputs the prover committed to.
+/// * `proof` - The serialized UltraHonk proof.
+///
+/// # Errors
+///
+/// * [`VerifierError::VerificationKeyNotRegistered`] - When `circuit_type` has
+///   no registered key.
+/// * [`VerifierError::InvalidVerificationKey`] - When the registered key cannot
+///   be parsed as a valid UltraHonk verification key.
+pub fn verify_proof(
+    e: &Env,
+    circuit_type: CircuitType,
+    public_inputs: &Bytes,
+    proof: &Bytes,
+) -> bool {
+    let vk = get_verification_key(e, circuit_type);
+    let verifier = UltraHonkVerifier::new(e, &vk)
+        .unwrap_or_else(|_| panic_with_error!(e, VerifierError::InvalidVerificationKey));
+
+    verifier.verify(proof, public_inputs).is_ok()
 }
 
 // ################## CHANGE STATE ##################
@@ -89,7 +126,7 @@ pub fn register_verification_key(e: &Env, circuit_type: CircuitType, verificatio
 ///   full immutability. If an update path is exposed at all, it should be gated
 ///   by multisig + timelock, and the new VK must be independently reproducible
 ///   from the audited circuit source, pinned toolchain, and SRS transcript
-///   (DESIGN §10.6).
+///   (`docs/protocol/proof-system.md#structured-reference-string`).
 ///
 /// Use only in response to a discovered soundness bug in a circuit or
 /// verifier that cannot be fixed by a fresh deployment.

@@ -45,8 +45,10 @@
 //!
 //! 6. **Contract executes atomically**:
 //!    - Validates both user and relayer authorizations
-//!    - User approves contract to spend up to `max_fee_amount` tokens
-//!    - Contract transfers exactly `fee_amount` tokens from user to itself
+//!    - User approves contract to spend `max_fee_amount` tokens
+//!    - Contract pulls `max_fee_amount` tokens from the user, pays `fee_amount`
+//!      to the relayer and returns the remainder to the user, leaving no
+//!      allowance behind
 //!    - Contract forwards call to `target_contract.target_fn(target_args)`
 //!    - If any step fails, entire transaction reverts (including token
 //!      transfer)

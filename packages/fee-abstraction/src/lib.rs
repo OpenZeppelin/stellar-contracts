@@ -13,7 +13,8 @@
 //! - **Approval strategies**: utilities for collecting fee from users support
 //!   two approval semantics:
 //!   - [`FeeAbstractionApproval::Eager`]: always approve `max_fee_amount`
-//!     (overwriting any existing allowance)
+//!     (overwriting any existing allowance) and consume the whole approval
+//!     within the collection, leaving no residual allowance
 //!   - [`FeeAbstractionApproval::Lazy`]: only approve if the current allowance
 //!     is less than `max_fee_amount`
 //!
