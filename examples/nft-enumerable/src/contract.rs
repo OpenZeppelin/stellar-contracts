@@ -30,7 +30,9 @@ impl ExampleContract {
         let owner: Address =
             e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
         owner.require_auth();
-        Enumerable::sequential_mint(e, &to)
+        // Resolves to the `Enumerable` mint, which records the token in the
+        // enumeration lists.
+        <Self as NonFungibleToken>::ContractType::mint(e, &to)
     }
 }
 

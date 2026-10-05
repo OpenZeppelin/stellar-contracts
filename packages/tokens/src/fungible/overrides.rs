@@ -93,6 +93,73 @@ pub trait BurnableOverrides {
 
 impl BurnableOverrides for Base {}
 
+/// Internal override hook for minting.
+///
+/// # Why this trait exists
+///
+/// Minting is not part of any public trait, because no single `mint`
+/// signature fits every contract type. The underlying business logic depends on
+/// the contract type: `Base` only updates the balance, `TotalSupply` also
+/// increases the supply counter, `FungibleVotes` also moves voting units, `RWA`
+/// also runs its compliance checks.
+///
+/// This trait gives that primitive a single dispatch point. The author's
+/// entry point calls `Self::ContractType::mint`, which reaches the mint of
+/// whatever contract type `Compose` resolved to:
+///
+/// ```ignore
+/// #[only_owner]
+/// pub fn mint(e: &Env, to: Address, amount: i128) {
+///     <Self as FungibleToken>::ContractType::mint(e, &to, amount);
+/// }
+/// ```
+///
+/// Calling a specific primitive such as `Base::mint` instead is the mistake
+/// this protects against: on a supply-tracking contract type it would skip
+/// the supply counter (and a later burn would panic on underflow).
+///
+/// # Note
+///
+/// Like [`ContractOverrides`], this trait is internal plumbing of the
+/// library. As a contract author there is no need to implement it, name it,
+/// or import it. Every fungible contract type that can mint freely keeps an
+/// inherent `mint`, and in the contract `Self::ContractType` is already the
+/// concrete type `Compose` resolved to, so the call above reaches that
+/// inherent function directly. (Importing this trait there would even be
+/// flagged as an unused import.)
+///
+/// # What the trait adds
+///
+/// Choosing the right mint is done by the `ContractType` associated type, not
+/// by this trait. The trait is the checked promise behind that call: every
+/// implementing contract type has a mint with this exact signature, and code
+/// that is generic over the contract type (where inherent functions are not
+/// reachable) can mint through it. Each implementation delegates to the
+/// type's inherent `mint`, so both paths run the same code.
+///
+/// The method is required, with no default body, on purpose: a default
+/// falling back to `Base::mint` would let a new supply-tracking contract type
+/// compile while silently skipping its own bookkeeping.
+///
+/// [`crate::vault::Vault`] does not implement this trait. Vault shares are
+/// only created against deposited assets (`deposit` and `mint` of
+/// [`crate::vault::FungibleVault`]), and a free share mint would dilute every
+/// depositor.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` has no free mint",
+    note = "vault shares are only created against deposited assets, through the `deposit` and \
+            `mint` entry points of `FungibleVault`"
+)]
+pub trait MintOverrides {
+    fn mint(e: &Env, to: &Address, amount: i128);
+}
+
+impl MintOverrides for Base {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        Base::mint(e, to, amount);
+    }
+}
+
 /// Internal override hook for
 /// [`crate::fungible::total_supply::FungibleTotalSupply`].
 ///
@@ -105,8 +172,7 @@ impl BurnableOverrides for Base {}
 /// `ContractType`. The library ships implementations for its supply-aware
 /// contract types ([`crate::fungible::total_supply::TotalSupply`], the
 /// combined contract types resolved by
-/// [`crate::fungible::combinations::Compose`], `RWA`, `Vault`,
-/// `FungibleVotes`).
+/// [`crate::fungible::combinations::Compose`], `RWA`, `Vault`).
 ///
 /// Unlike `BurnableOverrides`, there is deliberately no implementation for
 /// [`Base`]: exposing the total supply requires a supply-tracking contract

@@ -8,7 +8,7 @@ use crate::fungible::{
         total_supply::{decrease_total_supply, mint, total_supply, TotalSupplyOverrides},
         votes::FungibleVotes,
     },
-    overrides::{BurnableOverrides, ContractOverrides},
+    overrides::{Base, BurnableOverrides, ContractOverrides, MintOverrides},
     FungibleTokenError,
 };
 
@@ -48,6 +48,12 @@ impl BurnableOverrides for AllowBlockList {
     }
 }
 
+impl MintOverrides for AllowBlockList {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        AllowBlockList::mint(e, to, amount);
+    }
+}
+
 impl AllowBlockList {
     pub fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         if BlockList::blocked(e, from) || BlockList::blocked(e, &to.address()) {
@@ -74,6 +80,12 @@ impl AllowBlockList {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
         AllowList::approve(e, owner, spender, amount, live_until_ledger);
+    }
+
+    // The list policies are not checked on mint, as for `AllowList` and
+    // `BlockList`.
+    pub fn mint(e: &Env, to: &Address, amount: i128) {
+        Base::mint(e, to, amount);
     }
 
     pub fn burn(e: &Env, from: &Address, amount: i128) {
@@ -118,6 +130,12 @@ impl BurnableOverrides for AllowListVotes {
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         AllowListVotes::burn_from(e, spender, from, amount);
+    }
+}
+
+impl MintOverrides for AllowListVotes {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        AllowListVotes::mint(e, to, amount);
     }
 }
 
@@ -177,6 +195,12 @@ impl BurnableOverrides for BlockListVotes {
     }
 }
 
+impl MintOverrides for BlockListVotes {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        BlockListVotes::mint(e, to, amount);
+    }
+}
+
 impl BlockListVotes {
     pub fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         BlockList::transfer(e, from, to, amount);
@@ -230,6 +254,12 @@ impl BurnableOverrides for AllowBlockListVotes {
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         AllowBlockListVotes::burn_from(e, spender, from, amount);
+    }
+}
+
+impl MintOverrides for AllowBlockListVotes {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        AllowBlockListVotes::mint(e, to, amount);
     }
 }
 
@@ -328,6 +358,12 @@ impl BurnableOverrides for TotalSupplyAllowList {
     }
 }
 
+impl MintOverrides for TotalSupplyAllowList {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        TotalSupplyAllowList::mint(e, to, amount);
+    }
+}
+
 impl BurnableOverrides for TotalSupplyBlockList {
     fn burn(e: &Env, from: &Address, amount: i128) {
         TotalSupplyBlockList::burn(e, from, amount);
@@ -335,6 +371,12 @@ impl BurnableOverrides for TotalSupplyBlockList {
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         TotalSupplyBlockList::burn_from(e, spender, from, amount);
+    }
+}
+
+impl MintOverrides for TotalSupplyBlockList {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        TotalSupplyBlockList::mint(e, to, amount);
     }
 }
 
@@ -411,6 +453,12 @@ impl BurnableOverrides for TotalSupplyAllowBlockList {
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         TotalSupplyAllowBlockList::burn_from(e, spender, from, amount);
+    }
+}
+
+impl MintOverrides for TotalSupplyAllowBlockList {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        TotalSupplyAllowBlockList::mint(e, to, amount);
     }
 }
 

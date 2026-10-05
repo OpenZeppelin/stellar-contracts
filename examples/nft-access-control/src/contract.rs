@@ -25,10 +25,10 @@ impl ExampleContract {
     }
 
     // we want `require_auth()` provided by the macro, since there is no
-    // `require_auth()` in `Base::mint`.
+    // `require_auth()` in the contract type's mint.
     #[only_role(caller, "minter")]
     pub fn mint(e: &Env, to: Address, token_id: u32, caller: Address) {
-        Base::mint(e, &to, token_id)
+        <Self as NonFungibleToken>::ContractType::mint_with_id(e, &to, token_id)
     }
 
     // allows either minter or burner role, does not enforce `require_auth` in

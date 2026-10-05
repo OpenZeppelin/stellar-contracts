@@ -56,8 +56,8 @@ impl MyContract {
 
     #[only_owner]
     pub fn mint_tokens(e: &Env, to: Address, amount: i128) {
-        // Mint tokens to the recipient
-        Base::mint(e, &to, amount);
+        // Mint tokens to the recipient, through the selected contract type
+        <Self as FungibleToken>::ContractType::mint(e, &to, amount);
     }
 }
 
@@ -125,7 +125,7 @@ impl MyNFTContract {
 
     pub fn award_item(e: &Env, to: Address) -> u32 {
         // access control might be needed
-        Base::sequential_mint(e, &to)
+        <Self as NonFungibleToken>::ContractType::mint(e, &to)
     }
 }
 

@@ -132,6 +132,49 @@ impl ContractOverrides for Consecutive {
 }
 ```
 
+#### Minting Through the Contract Type
+
+Minting is not part of any public trait, because no single `mint` signature
+fits every contract type. The contract type decides what the underlying primitive
+does: `TotalSupply` also increases the supply counter, `FungibleVotes` also moves
+voting units, `Enumerable` also records the token in its enumeration lists, and so on.
+
+The contract's own mint function reaches that primitive through the contract
+type:
+
+```rust
+#[only_owner]
+pub fn mint(e: &Env, to: Address, amount: i128) {
+    <Self as FungibleToken>::ContractType::mint(e, &to, amount);
+}
+```
+
+In the contract, `Self::ContractType` is the concrete type `Compose` resolved
+to (e.g. `TotalSupplyAllowList`), so this call is that type's own `mint`. Nothing
+has to be imported for it. Calling a specific primitive such as `Base::mint`
+instead would compile and skip the bookkeeping of the selected contract type
+(the supply counter, the voting units, the enumeration).
+
+The mint primitives each contract type provides follow its storage model:
+
+- fungible: `mint(to, amount)`, on every contract type except `Vault`, which
+  has no free mint (its shares are only created against deposited assets);
+- non-fungible, one owner stored per token (`Base`, `Enumerable`, and their
+  votes variants): `mint(to) -> u32` mints the next id of the sequential
+  counter; `mint_with_id(to, token_id)` is also provided for ids chosen by the
+  caller;
+- non-fungible, ownership stored per batch (`Consecutive` and its votes
+  variant): `mint_range(to, amount) -> u32` mints `amount` consecutive ids.
+
+The non-fungible primitives have distinct names on purpose: switching a
+contract between the two storage models breaks the build at the mint call,
+instead of silently turning "mint one token" into "mint a range". Internally,
+the `MintOverrides` traits (`MintOverrides`, `MintWithIdOverrides` and
+`MintRangeOverrides` on the non-fungible side) are
+the checked promise that each contract type has these primitives with these
+exact signatures, and the path for library code that is generic over the
+contract type. Like `ContractOverrides`, contract authors never name them.
+
 #### Benefits of This Approach
 
 1. **Compile-Time Safety**: Incompatible extensions cannot be combined
