@@ -560,7 +560,7 @@ impl Consecutive {
         let mut item = bucket.get(item_index).expect("token_id out of allowed range");
 
         // return early if the bit was already set in a previous action
-        // (transfer, burn or mint)
+        // (transfer, burn or mint_range)
         if item & mask != 0 {
             return;
         }
