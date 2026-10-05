@@ -286,14 +286,24 @@ pub fn set_allowed_fee_token(e: &Env, token: &Address, allowed: bool) {
             let last_token: Address =
                 e.storage().persistent().get(&last_key).expect("last token to be present");
 
-            e.storage()
-                .persistent()
-                .set(&FeeAbstractionStorageKey::Token(remove_index), &last_token);
+            let slot_key = FeeAbstractionStorageKey::Token(remove_index);
+            e.storage().persistent().set(&slot_key, &last_token);
 
             // Update moved token's index mapping.
-            e.storage()
-                .persistent()
-                .set(&FeeAbstractionStorageKey::TokenIndex(last_token.clone()), &remove_index);
+            let moved_index_key = FeeAbstractionStorageKey::TokenIndex(last_token);
+            e.storage().persistent().set(&moved_index_key, &remove_index);
+
+            // Overwrites keep the previous expiry, so re-align both entries.
+            e.storage().persistent().extend_ttl(
+                &slot_key,
+                FEE_ABSTRACTION_TTL_THRESHOLD,
+                FEE_ABSTRACTION_EXTEND_AMOUNT,
+            );
+            e.storage().persistent().extend_ttl(
+                &moved_index_key,
+                FEE_ABSTRACTION_TTL_THRESHOLD,
+                FEE_ABSTRACTION_EXTEND_AMOUNT,
+            );
         }
 
         // Remove last index entry.
