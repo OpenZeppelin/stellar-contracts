@@ -3,20 +3,22 @@ extern crate std;
 use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short,
     testutils::{Address as _, Events, MuxedAddress as _},
-    vec, Address, Env, Event, MuxedAddress, String, Vec,
+    vec, Address, Env, Error, Event, MuxedAddress, String, Vec,
 };
-use stellar_contract_utils::pausable;
+use stellar_contract_utils::pausable::{self, Pausable};
 
 use crate::{
     fungible::{
-        capped::Capped, total_supply::TotalSupplyOverrides, ContractOverrides, MintOverrides,
+        capped::{Capped, FungibleCapped},
+        total_supply::{FungibleTotalSupply, TotalSupply, TotalSupplyOverrides},
+        Compose, ContractOverrides, FungibleToken, FungibleTokenError, MintOverrides,
         MuxedTransfer, Transfer,
     },
     rwa::{
         compliance::{AccountSnapshot, TransferKind},
         storage::RWAStorageKey,
-        AddressFrozen, Burn, CappedRWA, IdentityVerifier, Mint, RWAError, RecoverySuccess,
-        TokensFrozen, TokensUnfrozen, RWA,
+        AddressFrozen, Burn, CappedRWA, IdentityVerifier, Mint, RWAError, RWAToken,
+        RecoverySuccess, TokensFrozen, TokensUnfrozen, RWA,
     },
 };
 
@@ -1937,4 +1939,166 @@ fn capped_rwa_transfer_from_moves_tokens_through_rwa() {
         assert_eq!(RWA::balance(&e, &to), 30);
         assert_eq!(RWA::allowance(&e, &owner, &spender), 20);
     });
+}
+
+// A contract composing the capped RWA: `RWAToken` and `FungibleCapped` both
+// accept `CappedRWA`, and the contract's `mint` and `batch_mint` reach the
+// capped entry points through `Self::ContractType`. Access control is left out,
+// since this contract only exercises the dispatch.
+#[contract]
+struct CappedRWAContract;
+
+#[contractimpl]
+impl CappedRWAContract {
+    pub fn __constructor(e: &Env, identity_verifier: Address, compliance: Address, cap: i128) {
+        RWA::set_identity_verifier(e, &identity_verifier);
+        RWA::set_compliance(e, &compliance);
+        Capped::set_cap(e, cap);
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl Pausable for CappedRWAContract {
+    fn pause(e: &Env, _caller: Address) {
+        pausable::pause(e);
+    }
+
+    fn unpause(e: &Env, _caller: Address) {
+        pausable::unpause(e);
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl FungibleToken for CappedRWAContract {
+    type ContractType = Compose<(RWA, Capped, TotalSupply)>;
+}
+
+#[contractimpl(contracttrait)]
+impl FungibleTotalSupply for CappedRWAContract {}
+
+#[contractimpl(contracttrait)]
+impl FungibleCapped for CappedRWAContract {}
+
+#[contractimpl(contracttrait)]
+impl RWAToken for CappedRWAContract {
+    fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128, _operator: Address) {
+        RWA::forced_transfer(e, &from, &to, amount);
+    }
+
+    fn mint(e: &Env, to: Address, amount: i128, _operator: Address) {
+        <Self as FungibleToken>::ContractType::mint(e, &to, amount);
+    }
+
+    fn burn(e: &Env, user_address: Address, amount: i128, _operator: Address) {
+        RWA::burn(e, &user_address, amount);
+    }
+
+    fn recover_balance(
+        e: &Env,
+        old_account: Address,
+        new_account: Address,
+        _operator: Address,
+    ) -> bool {
+        RWA::recover_balance(e, &old_account, &new_account)
+    }
+
+    fn set_address_frozen(e: &Env, user_address: Address, freeze: bool, _operator: Address) {
+        RWA::set_address_frozen(e, &user_address, freeze);
+    }
+
+    fn freeze_partial_tokens(e: &Env, user_address: Address, amount: i128, _operator: Address) {
+        RWA::freeze_partial_tokens(e, &user_address, amount);
+    }
+
+    fn unfreeze_partial_tokens(e: &Env, user_address: Address, amount: i128, _operator: Address) {
+        RWA::unfreeze_partial_tokens(e, &user_address, amount);
+    }
+
+    fn batch_forced_transfer(
+        e: &Env,
+        from_list: Vec<Address>,
+        to_list: Vec<Address>,
+        amounts: Vec<i128>,
+        _operator: Address,
+    ) {
+        RWA::batch_forced_transfer(e, &from_list, &to_list, &amounts);
+    }
+
+    fn batch_mint(e: &Env, to_list: Vec<Address>, amounts: Vec<i128>, _operator: Address) {
+        <Self as FungibleToken>::ContractType::batch_mint(e, &to_list, &amounts);
+    }
+
+    fn batch_burn(e: &Env, user_addresses: Vec<Address>, amounts: Vec<i128>, _operator: Address) {
+        RWA::batch_burn(e, &user_addresses, &amounts);
+    }
+
+    fn batch_set_address_frozen(
+        e: &Env,
+        user_addresses: Vec<Address>,
+        freeze_list: Vec<bool>,
+        _operator: Address,
+    ) {
+        RWA::batch_set_address_frozen(e, &user_addresses, &freeze_list);
+    }
+
+    fn batch_freeze_partial_tokens(
+        e: &Env,
+        user_addresses: Vec<Address>,
+        amounts: Vec<i128>,
+        _operator: Address,
+    ) {
+        RWA::batch_freeze_partial_tokens(e, &user_addresses, &amounts);
+    }
+
+    fn batch_unfreeze_partial_tokens(
+        e: &Env,
+        user_addresses: Vec<Address>,
+        amounts: Vec<i128>,
+        _operator: Address,
+    ) {
+        RWA::batch_unfreeze_partial_tokens(e, &user_addresses, &amounts);
+    }
+
+    fn set_compliance(e: &Env, compliance: Address, _operator: Address) {
+        RWA::set_compliance(e, &compliance);
+    }
+
+    fn set_identity_verifier(e: &Env, identity_verifier: Address, _operator: Address) {
+        RWA::set_identity_verifier(e, &identity_verifier);
+    }
+}
+
+#[test]
+fn capped_rwa_contract_enforces_the_cap_through_the_trait() {
+    let e = Env::default();
+    let identity_verifier = e.register(MockIdentityVerifier, ());
+    let compliance = e.register(MockCompliance, ());
+    let address = e.register(CappedRWAContract, (identity_verifier, compliance, 300_i128));
+    let client = CappedRWAContractClient::new(&e, &address);
+    let operator = Address::generate(&e);
+    let first = Address::generate(&e);
+    let second = Address::generate(&e);
+    let exceeded_cap = Error::from_contract_error(FungibleTokenError::ExceededCap as u32);
+
+    assert_eq!(client.cap(), 300);
+
+    client.mint(&first, &100, &operator);
+    assert_eq!(client.total_supply(), 100);
+
+    // past the cap, through both mint entry points
+    assert_eq!(client.try_mint(&first, &201, &operator), Err(Ok(exceeded_cap)));
+    assert_eq!(
+        client.try_batch_mint(
+            &vec![&e, first.clone(), second.clone()],
+            &vec![&e, 100, 101],
+            &operator
+        ),
+        Err(Ok(exceeded_cap))
+    );
+    assert_eq!(client.total_supply(), 100);
+
+    client.batch_mint(&vec![&e, first.clone(), second.clone()], &vec![&e, 100, 100], &operator);
+    assert_eq!(client.balance(&first), 200);
+    assert_eq!(client.balance(&second), 100);
+    assert_eq!(client.total_supply(), 300);
 }

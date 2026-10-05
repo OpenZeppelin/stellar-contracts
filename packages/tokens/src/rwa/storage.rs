@@ -151,7 +151,7 @@ impl CappedRWA {
     ///
     /// # Errors
     ///
-    /// * refer to [`RWA::batch_mint`] errors.
+    /// * refer to [`RWA::mint`] errors.
     /// * refer to [`check_cap`] errors.
     ///
     /// # Security Warning
