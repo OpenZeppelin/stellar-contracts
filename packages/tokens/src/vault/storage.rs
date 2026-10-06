@@ -2,7 +2,10 @@ use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
 use stellar_contract_utils::math::{i128_fixed_point::mul_div_with_rounding, Rounding};
 
 use crate::{
-    fungible::{Base, ContractOverrides},
+    fungible::{
+        total_supply::{decrease_total_supply, increase_total_supply, TotalSupplyOverrides},
+        Base, ContractOverrides,
+    },
     vault::{emit_deposit, emit_withdraw, VaultTokenError, MAX_DECIMALS_OFFSET},
 };
 
@@ -13,6 +16,10 @@ impl ContractOverrides for Vault {
         Vault::decimals(e)
     }
 }
+
+// The vault's share math requires the total supply of shares, so the vault
+// contract type is inherently supply-aware.
+impl TotalSupplyOverrides for Vault {}
 
 /// Storage keys for the data associated with the vault extension
 #[contracttype]
@@ -58,18 +65,35 @@ pub enum VaultStorageKey {
 /// representation between the underlying asset's decimals and the vault
 /// decimals.
 ///
-/// While not fully preventing the attack, analysis shows that the default
-/// offset (0) makes it non-profitable even if an attacker is able to capture
-/// value from multiple user deposits, as a result of the value being captured
-/// by the virtual shares (out of the attacker's donation) matching the
-/// attacker's expected gains. With a larger offset, the attack becomes orders
-/// of magnitude more expensive than it is profitable.
+/// The virtual shares and assets do not fully prevent the attack. With the
+/// default offset (0), diluting a single deposit costs the attacker at least
+/// as much as that deposit, so a single victim is never profitable. The
+/// rounding loss of each deposit, however, accrues to the existing
+/// shareholders, and an attacker holding most of the real shares profits once
+/// enough deposits land on the inflated price. With a larger offset, the
+/// attack becomes orders of magnitude more expensive than it is profitable.
 ///
 /// The drawback of this approach is that the virtual shares do capture (a very
 /// small) part of the value being accrued to the vault. Also, if the vault
 /// experiences losses, the users try to exit the vault, the virtual shares and
 /// assets will cause the first user to exit to experience reduced losses in
 /// detriment to the last users that will experience bigger losses.
+///
+/// The virtual shares also lower the ceiling of the share supply cap. Every
+/// conversion computes `total_supply + 10^offset`, so the real supply has to
+/// stay at least `10^offset` below `i128::MAX` for the vault to keep working.
+/// [`Vault::deposit_internal()`] enforces this bound before minting. Contracts
+/// that mint shares through any other path are expected to preserve it
+/// themselves.
+///
+/// ### 3. Zero-Share Deposit Rejection
+///
+/// [`Vault::deposit()`] rejects a positive deposit that would mint zero
+/// shares, so no depositor can lose their entire deposit to an inflated
+/// price. Each deposit still loses up to one share's worth of assets to
+/// rounding. Integrators that need a tighter bound should compare
+/// [`Vault::preview_deposit()`] against a caller-supplied minimum before
+/// depositing.
 ///
 /// If this is not the preferred solution, implementers can still use the
 /// default offset of 0 and implement their own safeguards.
@@ -318,7 +342,10 @@ impl Vault {
     ///
     /// * [`VaultTokenError::VaultExceededMaxDeposit`] - When attempting to
     ///   deposit more assets than the maximum allowed for the receiver.
+    /// * [`VaultTokenError::VaultZeroShares`] - When a positive amount of
+    ///   assets would mint zero shares.
     /// * also refer to [`Self::preview_deposit()`] errors.
+    /// * also refer to [`Self::deposit_internal()`] errors.
     ///
     /// # Events
     ///
@@ -343,6 +370,9 @@ impl Vault {
             panic_with_error!(e, VaultTokenError::VaultExceededMaxDeposit);
         }
         let shares: i128 = Self::preview_deposit(e, assets);
+        if shares == 0 && assets > 0 {
+            panic_with_error!(e, VaultTokenError::VaultZeroShares);
+        }
         Self::deposit_internal(e, &receiver, assets, shares, &from, &operator);
         emit_deposit(e, &operator, &from, &receiver, assets, shares);
 
@@ -366,6 +396,7 @@ impl Vault {
     /// * [`VaultTokenError::VaultExceededMaxMint`] - When attempting to mint
     ///   more shares than the maximum allowed for the receiver.
     /// * also refer to [`Self::preview_mint()`] errors.
+    /// * also refer to [`Self::deposit_internal()`] errors.
     ///
     /// # Events
     ///
@@ -708,6 +739,15 @@ impl Vault {
     /// * `from` - The address that will provide the underlying assets.
     /// * `operator` - The address performing the deposit operation.
     ///
+    /// # Errors
+    ///
+    /// * [`VaultTokenError::MathOverflow`] - When minting `shares` would push
+    ///   the share supply plus the virtual shares (`10^offset`) past
+    ///   `i128::MAX`.
+    /// * refer to [`Self::query_asset()`] errors.
+    /// * refer to [`increase_total_supply`] errors.
+    /// * refer to [`Base::update`] errors.
+    ///
     /// # Events
     ///
     /// * topics - `["deposit", operator: Address, from: Address, receiver:
@@ -731,6 +771,21 @@ impl Vault {
     ) {
         // This function assumes prior authorization of the operator and
         // validation of amounts.
+
+        // Every conversion computes `total_supply + 10^offset`, so the real
+        // share supply has to stay at least `10^offset` below `i128::MAX`.
+        // `increase_total_supply` only guards `total_supply + shares`; a mint
+        // that passes that check but breaks this stricter bound would leave
+        // every later conversion, and therefore every exit, failing with
+        // `MathOverflow`, locking the assets in the vault.
+        let pow = 10_i128
+            .checked_pow(Self::get_decimals_offset(e))
+            .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
+        Self::total_supply(e)
+            .checked_add(shares)
+            .and_then(|new_supply| new_supply.checked_add(pow))
+            .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
+
         let token_client = token::Client::new(e, &Self::query_asset(e));
         // `safeTransfer` mechanism is not present in the base module, (will be
         // provided as an extension)
@@ -745,6 +800,7 @@ impl Vault {
             token_client.transfer_from(operator, from, &e.current_contract_address(), &assets);
         }
 
+        increase_total_supply(e, shares);
         Base::update(e, None, Some(receiver), shares);
     }
 
@@ -788,6 +844,7 @@ impl Vault {
             Base::spend_allowance(e, owner, operator, shares);
         }
         Base::update(e, Some(owner), None, shares);
+        decrease_total_supply(e, shares);
         let token_client = token::Client::new(e, &Self::query_asset(e));
         // `safeTransfer` mechanism is not present in the base module, (will be
         // provided as an extension)

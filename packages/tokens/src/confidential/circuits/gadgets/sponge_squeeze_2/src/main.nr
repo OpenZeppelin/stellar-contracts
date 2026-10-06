@@ -2,7 +2,7 @@ use stellar_confidential_lib::sponge_squeeze_2;
 
 // Minimal circuit wrapping `sponge_squeeze_2(d, s, sigma) -> [Field; 2]`.
 // Used by `nargo info` to report the per-call constraint cost of the
-// two-squeeze auditor channel sponge (Section 2.5). The one-squeeze case
+// two-squeeze auditor channel sponge (docs/protocol/primitives.md#poseidon2-hash). The one-squeeze case
 // shares the `poseidon_with_domain` gadget already in this directory.
 fn main(d: pub Field, s: pub Field, sigma: pub Field, m0: pub Field, m1: pub Field) {
     let out = sponge_squeeze_2(d, s, sigma);

@@ -60,6 +60,30 @@ impl IdentityRegistryStorage for IdentityRegistryContract {
     }
 
     #[only_role(operator, "manager")]
+    fn batch_add_identity(
+        e: &Env,
+        accounts: Vec<Address>,
+        identities: Vec<Address>,
+        initial_profiles: Vec<Vec<Val>>,
+        operator: Address,
+    ) {
+        let country_data_lists = Vec::from_iter(
+            e,
+            initial_profiles.iter().map(|profiles| {
+                Vec::from_iter(e, profiles.iter().map(|p| CountryData::from_val(e, &p)))
+            }),
+        );
+
+        identity_storage::batch_add_identity(
+            e,
+            &accounts,
+            &identities,
+            IdentityType::Individual,
+            &country_data_lists,
+        );
+    }
+
+    #[only_role(operator, "manager")]
     fn remove_identity(e: &Env, account: Address, operator: Address) {
         identity_storage::remove_identity(e, &account);
     }

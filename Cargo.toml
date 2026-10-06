@@ -39,6 +39,7 @@ members = [
 exclude = [
     "examples/upgradeable/testdata",
     "examples/rwa/sign-claim",       # native CLI tool, not a WASM contract
+    "bench/rwa-batch",               # cost benchmark, run on demand only
 ]
 
 [workspace.package]
@@ -65,6 +66,11 @@ k256 = "0.13.4"
 p256 = "0.13.2"
 serde = { version = "1", default-features = false }
 serde-json-core = { version = "0.6.0", default-features = false }
+
+# UltraHonk proof-verification backend for the confidential token. Pinned to a
+# specific commit because the upstream crate has no tagged release. The pinned
+# commit carries the remediation of the OpenZeppelin audit performed at 661db07.
+ultrahonk-soroban-verifier = { git = "https://github.com/NethermindEth/rs-soroban-ultrahonk", rev = "097da17df8b0b971d71885566034958a8caebab4", package = "ultrahonk_soroban_verifier", default-features = false }
 
 # members
 stellar-access = { path = "packages/access", version = "0.7.1" }

@@ -1,12 +1,12 @@
 use stellar_confidential_lib::{
-    H, assert_on_curve_non_identity, commit, derive_spend_r, ecdh, encrypt_auditor_sender_balance,
-    encrypt_balance, scalar_mul, vk_from_sk,
+    H, assert_on_curve_non_identity, commit, derive_spend_r, domain, ecdh, encrypt_balance,
+    scalar_mul, sponge_squeeze_3, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 mod tests;
 
-// Withdraw circuit -- design doc Section 7.5.
+// Withdraw circuit -- docs/protocol/operations/withdraw.md.
 //
 // Constraints
 // -----------
@@ -17,11 +17,11 @@ mod tests;
 //   W3 C_spend   = v * G + r * H                       Opening of current
 //                                                      spendable balance.
 //   W4 v, a, v - a in [0, 2^127)                       Range validity
-//                                                      (Section 2.6); the
+//                                                      (docs/protocol/primitives.md#integer-embedding-and-range-proofs); the
 //                                                      [0, 2^127) bound is
 //                                                      the SEP-41 i128
 //                                                      non-negative range
-//                                                      (Section 3.4)
+//                                                      (docs/protocol/system-model.md#underlying-token-assumptions)
 //   W5 r'        = Poseidon2(delta_spend_r, vk, sigma) Deterministic
 //                                                      randomness for the
 //                                                      new balance.
@@ -36,27 +36,28 @@ mod tests;
 //                                                      would collapse m_b to
 //                                                      a constant function
 //                                                      of sigma.
-// Auditor block (sender-auditor visibility, Section 8.1)
+// Auditor block (sender-auditor visibility, docs/protocol/auditing.md#per-transfer-auditor-ciphertexts)
 //   W_a1 R_e         = r_e * H                         Ephemeral key for
 //                                                      auditor ECDH.
 //   W_a2 s_{a,s}     = ecdh(r_e, K_{aud,s})            Sender-auditor ECDH
 //                                                      shared scalar (2.4).
-//   W_a3 m_b         = SpongeSqueeze_2(delta_aud_s,
+//   W_a3 (m_b, m_r)  = SpongeSqueeze_3(delta_aud_s,
 //                                     s_{a,s},
-//                                     sigma)[1]         Sender-channel sponge,
-//                                                      second squeeze (the
-//                                                      balance slot; the
-//                                                      first-squeeze amount
+//                                     sigma)[1], [2]    Sender-channel sponge,
+//                                                      lane[1] and lane[2].
+//                                                      The lane[0] amount
 //                                                      slot is unused -- the
 //                                                      withdrawal amount is
-//                                                      public).
+//                                                      public.
 //   W_a4 b_tilde_aud_s = (v - a) + m_b                  Sender-auditor
 //                                                      encrypted balance
 //                                                      checkpoint (emitted).
+//   W_a5 r_tilde_aud_s = r' + m_r                       Sender-auditor escrow
+//                                                      of the new spendable
+//                                                      blinding, over W5's r'
+//                                                      (emitted).
 //
-// W_a3 + W_a4 are encapsulated by `encrypt_auditor_sender_balance` in the lib.
-//
-// Point-validation doctrine (Section 10.8)
+// Point-validation doctrine (docs/protocol/proof-system.md#on-chain-point-arithmetic)
 // ----------------------------------------
 // Y, C_spend, C_spend', and R_e are each bound to in-circuit multi_scalar_mul
 // outputs (W1, W3, W6, W_a1) and are therefore on-curve by construction --
@@ -65,7 +66,7 @@ mod tests;
 // off-curve K_aud_s would break the soundness of W_a2. This file explicitly
 // validates K_aud_s on-curve AND non-identity before W_a2.
 //
-// Public inputs (15 fields, in design-doc canonical order)
+// Public inputs (16 fields, in design-doc canonical order)
 // --------------------------------------------------------
 //   Idx  Param          Symbol        Source / Note
 //   ---  -----          ------        -------------------------------------
@@ -78,7 +79,7 @@ mod tests;
 //   6    k_aud_s_y     K_aud_s.y       `from.auditor_id`.
 //   7    a              a             Public withdrawal amount; the contract
 //                                     pre-checks a >= 0 at the entrypoint
-//                                     (Section 3.4), W4 then closes
+//                                     (docs/protocol/system-model.md#underlying-token-assumptions), W4 then closes
 //                                     a < 2^127 in-circuit.
 //   8    c_spend_new_x  C_spend'.x    Prover-supplied; written to
 //   9    c_spend_new_y  C_spend'.y      `from.spendable_commitment` on success.
@@ -89,6 +90,8 @@ mod tests;
 //   13   r_e_y          R_e.y           auditor ECDH; emitted.
 //   14   b_tilde_aud_s  b_tilde_aud_s Prover-supplied sender-auditor
 //                                     encrypted balance checkpoint; emitted.
+//   15   r_tilde_aud_s  r_tilde_aud_s Prover-supplied sender-auditor escrow
+//                                     of the new spendable blinding; emitted.
 //
 // Private witnesses
 // -----------------
@@ -118,6 +121,7 @@ fn main(
     r_e_x: pub Field,
     r_e_y: pub Field,
     b_tilde_aud_s: pub Field,
+    r_tilde_aud_s: pub Field,
 ) {
     // W8 -- runs first so the r_e = 0 attack is rejected before any
     // scalar mul against it could quietly produce the identity.
@@ -136,7 +140,7 @@ fn main(
     assert(c_spend_derived.x == c_spend_x);
     assert(c_spend_derived.y == c_spend_y);
 
-    // W4 -- Section 2.6 spells out the 127-bit decomposition / recomposition
+    // W4 -- docs/protocol/primitives.md#integer-embedding-and-range-proofs spells out the 127-bit decomposition / recomposition
     // pattern; `assert_max_bit_size` is the Noir stdlib primitive that
     // implements it directly.
     v.assert_max_bit_size::<127>();
@@ -161,14 +165,20 @@ fn main(
     assert(r_e_derived.x == r_e_x);
     assert(r_e_derived.y == r_e_y);
 
-    // K_aud_s point validation (Section 10.8: public-input key).
+    // K_aud_s point validation (docs/protocol/proof-system.md#on-chain-point-arithmetic: public-input key).
     let k_aud_s = EmbeddedCurvePoint { x: k_aud_s_x, y: k_aud_s_y, is_infinite: false };
     assert_on_curve_non_identity(k_aud_s);
 
     // W_a2 (shared-secret scalar)
     let s_a_s = ecdh(r_e, k_aud_s);
 
-    // W_a3 + W_a4
-    let b_tilde_aud_s_derived = encrypt_auditor_sender_balance(v_new, s_a_s, sigma);
-    assert(b_tilde_aud_s_derived == b_tilde_aud_s);
+    // W_a3 (sender-channel masks: lane[0] unused, then balance, then the
+    // secret-escrow slot)
+    let m_s = sponge_squeeze_3(domain::AUDITOR_SENDER, s_a_s, sigma);
+
+    // W_a4
+    assert(v_new + m_s[1] == b_tilde_aud_s);
+
+    // W_a5
+    assert(r_new + m_s[2] == r_tilde_aud_s);
 }

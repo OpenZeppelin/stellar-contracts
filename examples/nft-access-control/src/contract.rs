@@ -5,7 +5,9 @@
 use soroban_sdk::{contract, contractimpl, vec, Address, Env, String, Symbol, Vec};
 use stellar_access::access_control::{set_admin, AccessControl};
 use stellar_macros::{has_any_role, has_role, only_admin, only_any_role, only_role};
-use stellar_tokens::non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
+use stellar_tokens::non_fungible::{
+    burnable::NonFungibleBurnable, Base, Compose, NonFungibleToken,
+};
 
 #[contract]
 pub struct ExampleContract;
@@ -23,10 +25,10 @@ impl ExampleContract {
     }
 
     // we want `require_auth()` provided by the macro, since there is no
-    // `require_auth()` in `Base::mint`.
+    // `require_auth()` in the contract type's mint.
     #[only_role(caller, "minter")]
     pub fn mint(e: &Env, to: Address, token_id: u32, caller: Address) {
-        Base::mint(e, &to, token_id)
+        <Self as NonFungibleToken>::ContractType::mint_with_id(e, &to, token_id)
     }
 
     // allows either minter or burner role, does not enforce `require_auth` in
@@ -47,7 +49,7 @@ impl ExampleContract {
 
 #[contractimpl(contracttrait)]
 impl NonFungibleToken for ExampleContract {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 }
 
 // for this contract, the `burn*` functions are only meant to be called by

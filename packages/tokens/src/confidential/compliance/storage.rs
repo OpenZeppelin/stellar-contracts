@@ -1,11 +1,19 @@
-use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
+use soroban_sdk::{contracttype, panic_with_error, token, Address, Bytes, BytesN, Env};
+use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
 use crate::confidential::{
+    auditor::ConfidentialAuditorClient,
     compliance::{
-        emit_compliance_config_changed, emit_frozen, emit_unfrozen, ComplianceError, PolicyClient,
+        emit_clawback, emit_compliance_config_changed, emit_frozen, emit_unfrozen, ComplianceError,
+        PolicyClient, CLAWBACK_NONCE_EXTEND_AMOUNT, CLAWBACK_NONCE_TTL_THRESHOLD,
         FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
-    storage::get_underlying_asset,
+    storage::{
+        address_to_field, append_amount, append_field, append_point, get_account,
+        get_address_as_field_element, get_auditor, get_underlying_asset, revoke_spender,
+        set_commitments, verify,
+    },
+    verifier::CircuitType,
 };
 
 // ################## TYPES ##################
@@ -27,6 +35,16 @@ pub struct ComplianceConfig {
     pub sac_passthrough: bool,
 }
 
+/// Envelope decoded from the `data: Bytes` argument of
+/// [`crate::confidential::compliance::ConfidentialClawback::clawback`].
+/// Carries the proof alone: the clawback circuit has no prover-supplied
+/// public inputs, so there is no payload to accompany it.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClawbackData {
+    pub proof: Bytes,
+}
+
 /// Storage keys for the confidential token compliance extension.
 #[contracttype]
 pub enum ComplianceStorageKey {
@@ -35,6 +53,9 @@ pub enum ComplianceStorageKey {
     /// Per-account frozen flag. Persistent storage; only set when an account
     /// is frozen and removed on unfreeze.
     Frozen(Address),
+    /// Number of seizures executed against the account. Persistent storage;
+    /// absent until the first seizure.
+    ClawbackNonce(Address),
 }
 
 // ################## QUERY STATE ##################
@@ -68,6 +89,28 @@ pub fn is_frozen(e: &Env, account: &Address) -> bool {
         true
     } else {
         false
+    }
+}
+
+/// Returns the number of seizures executed against `account`, or `0` when it
+/// has never been seized from. The value is a public input of the next
+/// clawback proof (`docs/compliance.md#circuit`).
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `account` - The address to query.
+pub fn clawback_nonce(e: &Env, account: &Address) -> u32 {
+    let key = ComplianceStorageKey::ClawbackNonce(account.clone());
+    if let Some(nonce) = e.storage().persistent().get::<_, u32>(&key) {
+        e.storage().persistent().extend_ttl(
+            &key,
+            CLAWBACK_NONCE_TTL_THRESHOLD,
+            CLAWBACK_NONCE_EXTEND_AMOUNT,
+        );
+        nonce
+    } else {
+        0
     }
 }
 
@@ -170,6 +213,178 @@ pub fn unfreeze(e: &Env, account: &Address) {
     emit_unfrozen(e, account);
 }
 
+/// Reduces `account`'s confidential claim by `amount` and settles the
+/// corresponding underlying according to `destination`.
+///
+/// The proof establishes what the contract cannot check against committed
+/// balances: that the prover holds the secret key of the auditor `account` is
+/// bound to (CB1), that it knows the Pedersen openings of `C_spend` and
+/// `C_receive` (CB2, CB3), and that `amount <= v_spend + v_receive` (CB4).
+/// The openings alone are not a secret — registration, deposits, and merges
+/// leave them public — so the witness is producible only by the auditor.
+///
+/// The post-verification update is the [`crate::confidential::storage::merge`]
+/// rule plus a public debit — `C_spend <- C_spend + C_receive - amount * G`
+/// and `C_receive <- O` — with no fresh randomness. The new opening is
+/// `(v_s + v_r - amount, r_s + r_r)`, which both the owner and the auditor
+/// recompute, so the seized account stays spendable.
+///
+/// The account's clawback nonce is a public input and advances on every
+/// seizure, so a proof executes at most once even if the commitments are
+/// later restored to the values it was built against
+/// (`docs/compliance.md#anti-replay-and-the-freeze`).
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `account` - The confidential account being seized from.
+/// * `amount` - The strictly positive seize amount.
+/// * `destination` - Where the underlying settles, or `None`.
+/// * `proof` - The raw UltraHonk proof bytes, from the decoded
+///   [`ClawbackData`].
+///
+/// # Errors
+///
+/// * [`ComplianceError::AccountNotFrozen`] - When `account` is not frozen.
+/// * [`ComplianceError::InvalidClawbackAmount`] - When `amount <= 0`.
+/// * [`ComplianceError::InvalidClawbackDestination`] - When `destination` is
+///   `Some` naming this contract's own address.
+/// * refer to [`crate::confidential::storage::get_account`] errors.
+/// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
+///   errors.
+/// * [`crate::confidential::ConfidentialTokenError::NonCanonicalEncoding`] -
+///   When a stored commitment or auditor key coordinate is not a canonical
+///   `Bn254Fr` value.
+/// * [`crate::confidential::ConfidentialTokenError::InvalidProof`] - When the
+///   proof fails verification.
+///
+/// # Events
+///
+/// * topics - `["clawback", account: Address]`
+/// * data - `[amount: i128, destination: Option<Address>]`
+///
+/// # Notes
+///
+/// Under `None` no underlying moves: the pool is left over-collateralized by
+/// `amount`, extractable only by the underlying's own issuer through a SAC
+/// `clawback` against this contract's address. That extraction must follow
+/// this call.
+///
+/// Under `Some(d)`, exactly `amount` is transferred to `d` in this invocation,
+/// so the pool and the sum of claims move together. `d` passes no compliance
+/// gate (`docs/compliance.md#contract-flow`).
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks. The trait entry
+/// point [`crate::confidential::compliance::ConfidentialClawback::clawback`]
+/// is responsible for authorizing `operator`.
+pub fn clawback(
+    e: &Env,
+    account: &Address,
+    amount: i128,
+    destination: &Option<Address>,
+    proof: &Bytes,
+) {
+    if !is_frozen(e, account) {
+        panic_with_error!(e, ComplianceError::AccountNotFrozen);
+    }
+    if amount <= 0 {
+        panic_with_error!(e, ComplianceError::InvalidClawbackAmount);
+    }
+    if destination.as_ref() == Some(&e.current_contract_address()) {
+        panic_with_error!(e, ComplianceError::InvalidClawbackDestination);
+    }
+
+    let data = get_account(e, account);
+    let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
+    let k_aud = auditor.get_key(&data.auditor_id);
+    let addr_f = get_address_as_field_element(e);
+    // Zero is an unambiguous `None` sentinel: `address_to_field` is a
+    // Poseidon2 output.
+    let dest_f = match destination {
+        Some(d) => address_to_field(e, d),
+        None => BytesN::from_array(e, &[0u8; 32]),
+    };
+    let nonce = clawback_nonce(e, account);
+
+    // PI order (docs/compliance.md#circuit):
+    //   C_spend, C_receive, K_aud, alpha, addr_f, acct_f, dest_f, nonce
+    //
+    // `addr_f`, `acct_f`, `dest_f` and `nonce` are referenced by no
+    // constraint; their membership in the public-input set binds the proof to
+    // one contract, one account, one settlement destination, and one
+    // execution, on the `register` precedent.
+    let mut pi = Bytes::new(e);
+    append_point(&mut pi, &data.spendable_commitment);
+    append_point(&mut pi, &data.receiving_commitment);
+    append_point(&mut pi, &k_aud);
+    append_amount(&mut pi, e, amount);
+    append_field(&mut pi, &addr_f);
+    append_field(&mut pi, &address_to_field(e, account));
+    append_field(&mut pi, &dest_f);
+    append_amount(&mut pi, e, i128::from(nonce));
+
+    verify(e, CircuitType::Clawback, &pi, proof);
+
+    let seized = Grumpkin::mul(e, &Grumpkin::generator(e), amount as u128);
+    let c_spend_new = Grumpkin::sub(
+        e,
+        &Grumpkin::add(e, &data.spendable_commitment, &data.receiving_commitment),
+        &seized,
+    );
+    set_commitments(e, account, &c_spend_new, &Grumpkin::identity(e));
+    e.storage()
+        .persistent()
+        .set(&ComplianceStorageKey::ClawbackNonce(account.clone()), &(nonce + 1));
+
+    if let Some(d) = destination {
+        let token = token::TokenClient::new(e, &get_underlying_asset(e));
+        token.transfer(&e.current_contract_address(), d, &amount);
+    }
+
+    emit_clawback(e, account, amount, destination);
+}
+
+/// Folds the `(account, spender)` delegation's escrowed allowance back into
+/// `account`'s spendable balance and deletes the delegation, without the
+/// owner's participation.
+///
+/// Escrowed value is invisible to [`clawback`], which sees only `C_spend` and
+/// `C_receive`; this moves it into reach. The fold itself is the same
+/// proofless primitive the owner's
+/// [`revoke_spender`](crate::confidential::ConfidentialToken::revoke_spender)
+/// uses — only the authorization gate differs.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `account` - The delegating owner.
+/// * `spender` - The delegated spender.
+///
+/// # Errors
+///
+/// * [`ComplianceError::AccountNotFrozen`] - When `account` is not frozen.
+/// * refer to [`crate::confidential::storage::revoke_spender`] errors.
+///
+/// # Events
+///
+/// * topics - `["revoke_spender", account: Address, spender: Address]`
+/// * data - `[a_tilde: BytesN<32>, allowance_salt: BytesN<32>]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks. The trait entry
+/// point
+/// [`crate::confidential::compliance::ConfidentialClawback::force_revoke_spender`]
+/// is responsible for authorizing `operator`.
+pub fn force_revoke_spender(e: &Env, account: &Address, spender: &Address) {
+    if !is_frozen(e, account) {
+        panic_with_error!(e, ComplianceError::AccountNotFrozen);
+    }
+    revoke_spender(e, account, spender);
+}
+
 // ################## LOW-LEVEL HELPERS ##################
 
 /// Asserts that `account` passes every configured compliance gate against the
@@ -221,7 +436,8 @@ pub fn check_policy(e: &Env, account: &Address, config: &ComplianceConfig) {
 /// for `account`. A no-op when `config.sac_passthrough` is `false`.
 ///
 /// The `authorized` view belongs to the Stellar Asset Contract admin
-/// interface, not to generic SEP-41 (DESIGN §3.4). Enabling
+/// interface, not to generic SEP-41
+/// (`docs/protocol/system-model.md#underlying-token-assumptions`). Enabling
 /// `sac_passthrough` over a non-SAC underlying (e.g. a plain SEP-41 token)
 /// makes this call — and with it every gated operation — trap on the
 /// missing function.
