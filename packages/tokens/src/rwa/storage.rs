@@ -3,8 +3,11 @@ use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{
     fungible::{
+        capped::{check_cap, CappedContractType},
         emit_transfer,
-        total_supply::{decrease_total_supply, increase_total_supply, TotalSupplyOverrides},
+        total_supply::{
+            decrease_total_supply, increase_total_supply, total_supply, TotalSupplyOverrides,
+        },
         Base, ContractOverrides, MintOverrides,
     },
     rwa::{
@@ -69,6 +72,99 @@ impl TotalSupplyOverrides for RWA {}
 impl MintOverrides for RWA {
     fn mint(e: &Env, to: &Address, amount: i128) {
         RWA::mint(e, to, amount);
+    }
+}
+
+/// Marker for the contract types backing [`crate::rwa::RWAToken`]: [`RWA`]
+/// itself and [`CappedRWA`].
+///
+/// # Why this trait exists
+///
+/// `RWAToken`'s default bodies call the [`RWA`] functions directly (batch
+/// transfers, forced transfers, freezing, recovery, ...), so the trait used to
+/// require `ContractType = RWA` exactly. A capped RWA token needs a different
+/// contract type, [`CappedRWA`], whose mint also checks the cap, while every
+/// other RWA operation stays the same. This marker lets `RWAToken` accept both
+/// contract types, and nothing else.
+///
+/// Contract authors never interact with this trait; it only appears as that
+/// bound.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not an RWA contract type, so `RWAToken` cannot be implemented",
+    note = "list `RWA` in the `Compose` list, e.g. `Compose<(RWA, TotalSupply)>`"
+)]
+pub trait RWAContractType {}
+
+impl RWAContractType for RWA {}
+
+/// Contract type enforcing a maximum total supply on top of [`RWA`], resolved
+/// by `Compose<(RWA, Capped, TotalSupply)>`.
+///
+/// Its `mint` and `batch_mint` check the cap (refer to
+/// [`crate::fungible::capped::Capped`]) before running RWA's own mint path.
+/// Every other operation is RWA's, unchanged.
+pub struct CappedRWA;
+
+impl RWAContractType for CappedRWA {}
+impl CappedContractType for CappedRWA {}
+
+// RWA tracks the supply itself, and the capped variant reads the same counter.
+impl TotalSupplyOverrides for CappedRWA {}
+
+// Transfers keep RWA's identity, freezing and compliance checks.
+impl ContractOverrides for CappedRWA {
+    fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
+        RWA::transfer(e, from, to, amount);
+    }
+
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        RWA::transfer_from(e, spender, from, to, amount);
+    }
+}
+
+impl MintOverrides for CappedRWA {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        CappedRWA::mint(e, to, amount);
+    }
+}
+
+impl CappedRWA {
+    /// Mints `amount` tokens to `to` if the cap allows it.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`check_cap`] errors.
+    /// * refer to [`RWA::mint`] errors.
+    ///
+    /// # Security Warning
+    ///
+    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+    ///
+    /// Refer to the security warning on [`RWA::mint`].
+    pub fn mint(e: &Env, to: &Address, amount: i128) {
+        check_cap(e, amount, total_supply(e));
+        RWA::mint(e, to, amount);
+    }
+
+    /// Mints `amounts[i]` tokens to `to_list[i]`, checking the cap for every
+    /// item.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`RWA::mint`] errors.
+    /// * refer to [`check_cap`] errors.
+    ///
+    /// # Security Warning
+    ///
+    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+    ///
+    /// Refer to the security warning on [`RWA::mint`].
+    pub fn batch_mint(e: &Env, to_list: &Vec<Address>, amounts: &Vec<i128>) {
+        RWA::require_equal_lengths(e, to_list.len(), amounts.len());
+
+        for (to, amount) in to_list.iter().zip(amounts.iter()) {
+            CappedRWA::mint(e, &to, amount);
+        }
     }
 }
 

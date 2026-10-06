@@ -100,8 +100,8 @@ impl BurnableOverrides for Base {}
 /// Minting is not part of any public trait, because no single `mint`
 /// signature fits every contract type. The underlying business logic depends on
 /// the contract type: `Base` only updates the balance, `TotalSupply` also
-/// increases the supply counter, `FungibleVotes` also moves voting units, `RWA`
-/// also runs its compliance checks.
+/// increases the supply counter, `FungibleVotes` also moves voting units,
+/// `Capped` also checks the cap, `RWA` also runs its compliance checks.
 ///
 /// This trait gives that primitive a single dispatch point. The author's
 /// entry point calls `Self::ContractType::mint`, which reaches the mint of
@@ -116,7 +116,8 @@ impl BurnableOverrides for Base {}
 ///
 /// Calling a specific primitive such as `Base::mint` instead is the mistake
 /// this protects against: on a supply-tracking contract type it would skip
-/// the supply counter (and a later burn would panic on underflow).
+/// the supply counter (and a later burn would panic on underflow), and on a
+/// capped contract type it would skip the cap.
 ///
 /// # Note
 ///
@@ -172,7 +173,8 @@ impl MintOverrides for Base {
 /// `ContractType`. The library ships implementations for its supply-aware
 /// contract types ([`crate::fungible::total_supply::TotalSupply`], the
 /// combined contract types resolved by
-/// [`crate::fungible::combinations::Compose`], `RWA`, `Vault`).
+/// [`crate::fungible::combinations::Compose`], `RWA`, `Vault`, `Capped` and
+/// the capped combinations).
 ///
 /// Unlike `BurnableOverrides`, there is deliberately no implementation for
 /// [`Base`]: exposing the total supply requires a supply-tracking contract

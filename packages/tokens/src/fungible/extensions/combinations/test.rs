@@ -5,13 +5,16 @@ use core::any::TypeId;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env, MuxedAddress};
 use stellar_governance::votes::get_voting_units;
 
+// The capped combinations are named directly (not through `Compose`), so the
+// resolution tests below compare against the real types.
+use super::{CappedAllowBlockList, CappedAllowList, CappedBlockList};
 use crate::{
     fungible::{
         extensions::{
             allowlist::{AllowList, AllowListContractType},
             blocklist::{BlockList, BlockListContractType},
             burnable::Burnable,
-            capped::Capped,
+            capped::{Capped, CappedContractType},
             combinations::{Composable, Compose},
             total_supply::{mint, total_supply, TotalSupply},
             votes::FungibleVotes,
@@ -19,8 +22,8 @@ use crate::{
         overrides::{BurnableOverrides, MintOverrides, TotalSupplyOverrides},
         Base, ContractOverrides,
     },
-    rwa::RWA,
-    vault::Vault,
+    rwa::{CappedRWA, RWAContractType, RWA},
+    vault::{CappedVault, Vault},
 };
 
 // deliberately the swapped orders, asserting that the lists are
@@ -87,22 +90,98 @@ fn additive_only_lists_resolve_to_base() {
     assert_composes_to::<(Burnable, Burnable), Base>();
 }
 
-// `Capped` is additive but requires `TotalSupply` in the list, like `RWA` and
-// `Vault`. Lists missing it are rejected at compile time and cannot be covered
-// here.
+// `Capped` is a contract type of its own and, like `RWA` and `Vault`, requires
+// `TotalSupply` in the list. Every capped list resolves to its capped contract
+// type in every order. Lists missing `TotalSupply` are rejected at compile
+// time and cannot be covered here.
 #[test]
-fn capped_requires_total_supply_in_the_list() {
-    assert_composes_to::<(Capped, TotalSupply), TotalSupply>();
-    assert_composes_to::<(TotalSupply, Capped), TotalSupply>();
-    assert_composes_to::<(Burnable, Capped, TotalSupply), TotalSupply>();
-    assert_composes_to::<(AllowList, Capped, TotalSupply), TotalSupplyAllowList>();
-    assert_composes_to::<(Capped, AllowList, TotalSupply), TotalSupplyAllowList>();
-    assert_composes_to::<(TotalSupply, Capped, AllowList), TotalSupplyAllowList>();
-    assert_composes_to::<(AllowList, TotalSupply, Capped), TotalSupplyAllowList>();
-    assert_composes_to::<(BlockList, Capped, AllowList, TotalSupply), TotalSupplyAllowBlockList>();
-    assert_composes_to::<(RWA, Capped, TotalSupply), RWA>();
-    assert_composes_to::<(Capped, RWA, TotalSupply), RWA>();
-    assert_composes_to::<(Vault, TotalSupply, Capped), Vault>();
+fn capped_lists_resolve_to_the_capped_contract_types() {
+    assert_composes_to::<(Capped, TotalSupply), Capped>();
+    assert_composes_to::<(TotalSupply, Capped), Capped>();
+    assert_composes_to::<(Burnable, Capped, TotalSupply), Capped>();
+    assert_composes_to::<(Capped, Burnable, TotalSupply, Burnable), Capped>();
+    assert_composes_to::<(AllowList, Capped, TotalSupply), CappedAllowList>();
+    assert_composes_to::<(AllowList, TotalSupply, Capped), CappedAllowList>();
+    assert_composes_to::<(Capped, AllowList, TotalSupply), CappedAllowList>();
+    assert_composes_to::<(Capped, TotalSupply, AllowList), CappedAllowList>();
+    assert_composes_to::<(TotalSupply, AllowList, Capped), CappedAllowList>();
+    assert_composes_to::<(TotalSupply, Capped, AllowList), CappedAllowList>();
+    assert_composes_to::<(BlockList, Capped, TotalSupply), CappedBlockList>();
+    assert_composes_to::<(BlockList, TotalSupply, Capped), CappedBlockList>();
+    assert_composes_to::<(Capped, BlockList, TotalSupply), CappedBlockList>();
+    assert_composes_to::<(Capped, TotalSupply, BlockList), CappedBlockList>();
+    assert_composes_to::<(TotalSupply, BlockList, Capped), CappedBlockList>();
+    assert_composes_to::<(TotalSupply, Capped, BlockList), CappedBlockList>();
+    assert_composes_to::<(AllowList, BlockList, Capped, TotalSupply), CappedAllowBlockList>();
+    assert_composes_to::<(AllowList, BlockList, TotalSupply, Capped), CappedAllowBlockList>();
+    assert_composes_to::<(AllowList, Capped, BlockList, TotalSupply), CappedAllowBlockList>();
+    assert_composes_to::<(AllowList, Capped, TotalSupply, BlockList), CappedAllowBlockList>();
+    assert_composes_to::<(AllowList, TotalSupply, BlockList, Capped), CappedAllowBlockList>();
+    assert_composes_to::<(AllowList, TotalSupply, Capped, BlockList), CappedAllowBlockList>();
+    assert_composes_to::<(BlockList, AllowList, Capped, TotalSupply), CappedAllowBlockList>();
+    assert_composes_to::<(BlockList, AllowList, TotalSupply, Capped), CappedAllowBlockList>();
+    assert_composes_to::<(BlockList, Capped, AllowList, TotalSupply), CappedAllowBlockList>();
+    assert_composes_to::<(BlockList, Capped, TotalSupply, AllowList), CappedAllowBlockList>();
+    assert_composes_to::<(BlockList, TotalSupply, AllowList, Capped), CappedAllowBlockList>();
+    assert_composes_to::<(BlockList, TotalSupply, Capped, AllowList), CappedAllowBlockList>();
+    assert_composes_to::<(Capped, AllowList, BlockList, TotalSupply), CappedAllowBlockList>();
+    assert_composes_to::<(Capped, AllowList, TotalSupply, BlockList), CappedAllowBlockList>();
+    assert_composes_to::<(Capped, BlockList, AllowList, TotalSupply), CappedAllowBlockList>();
+    assert_composes_to::<(Capped, BlockList, TotalSupply, AllowList), CappedAllowBlockList>();
+    assert_composes_to::<(Capped, TotalSupply, AllowList, BlockList), CappedAllowBlockList>();
+    assert_composes_to::<(Capped, TotalSupply, BlockList, AllowList), CappedAllowBlockList>();
+    assert_composes_to::<(TotalSupply, AllowList, BlockList, Capped), CappedAllowBlockList>();
+    assert_composes_to::<(TotalSupply, AllowList, Capped, BlockList), CappedAllowBlockList>();
+    assert_composes_to::<(TotalSupply, BlockList, AllowList, Capped), CappedAllowBlockList>();
+    assert_composes_to::<(TotalSupply, BlockList, Capped, AllowList), CappedAllowBlockList>();
+    assert_composes_to::<(TotalSupply, Capped, AllowList, BlockList), CappedAllowBlockList>();
+    assert_composes_to::<(TotalSupply, Capped, BlockList, AllowList), CappedAllowBlockList>();
+    assert_composes_to::<(RWA, Capped, TotalSupply), CappedRWA>();
+    assert_composes_to::<(RWA, TotalSupply, Capped), CappedRWA>();
+    assert_composes_to::<(Capped, RWA, TotalSupply), CappedRWA>();
+    assert_composes_to::<(Capped, TotalSupply, RWA), CappedRWA>();
+    assert_composes_to::<(TotalSupply, RWA, Capped), CappedRWA>();
+    assert_composes_to::<(TotalSupply, Capped, RWA), CappedRWA>();
+    assert_composes_to::<(Vault, Capped, TotalSupply), CappedVault>();
+    assert_composes_to::<(Vault, TotalSupply, Capped), CappedVault>();
+    assert_composes_to::<(Capped, Vault, TotalSupply), CappedVault>();
+    assert_composes_to::<(Capped, TotalSupply, Vault), CappedVault>();
+    assert_composes_to::<(TotalSupply, Vault, Capped), CappedVault>();
+    assert_composes_to::<(TotalSupply, Capped, Vault), CappedVault>();
+    assert_composes_to::<(Vault, Burnable, Capped, TotalSupply), CappedVault>();
+}
+
+#[test]
+fn capped_contract_types_are_distinct() {
+    assert_ne!(TypeId::of::<Capped>(), TypeId::of::<TotalSupply>());
+    assert_ne!(TypeId::of::<CappedAllowList>(), TypeId::of::<TotalSupplyAllowList>());
+    assert_ne!(TypeId::of::<CappedBlockList>(), TypeId::of::<TotalSupplyBlockList>());
+    assert_ne!(TypeId::of::<CappedAllowBlockList>(), TypeId::of::<TotalSupplyAllowBlockList>());
+    assert_ne!(TypeId::of::<CappedRWA>(), TypeId::of::<RWA>());
+    assert_ne!(TypeId::of::<CappedVault>(), TypeId::of::<Vault>());
+}
+
+// The capped contract types have to back every extension their members back:
+// `FungibleCapped`, `FungibleTotalSupply`, and the list extensions. A missing
+// impl fails here at compile time instead of at some downstream contract's
+// build.
+#[test]
+fn capped_contract_types_back_their_extensions() {
+    fn assert_capped<T: CappedContractType + TotalSupplyOverrides>() {}
+    fn assert_allowlist<T: AllowListContractType>() {}
+    fn assert_blocklist<T: BlockListContractType>() {}
+    fn assert_rwa<T: RWAContractType>() {}
+    assert_capped::<Capped>();
+    assert_capped::<CappedAllowList>();
+    assert_capped::<CappedBlockList>();
+    assert_capped::<CappedAllowBlockList>();
+    assert_capped::<CappedRWA>();
+    assert_capped::<CappedVault>();
+    assert_allowlist::<CappedAllowList>();
+    assert_allowlist::<CappedAllowBlockList>();
+    assert_blocklist::<CappedBlockList>();
+    assert_blocklist::<CappedAllowBlockList>();
+    assert_rwa::<CappedRWA>();
 }
 
 // Every contract type that can mint freely has to implement `MintOverrides`,
@@ -124,6 +203,11 @@ fn free_minting_contract_types_implement_mint_overrides() {
     assert_mint::<BlockListVotes>();
     assert_mint::<AllowBlockListVotes>();
     assert_mint::<RWA>();
+    assert_mint::<Capped>();
+    assert_mint::<CappedAllowList>();
+    assert_mint::<CappedBlockList>();
+    assert_mint::<CappedAllowBlockList>();
+    assert_mint::<CappedRWA>();
 }
 
 #[test]
@@ -240,6 +324,12 @@ fn supply_aware_contract_types_back_total_supply() {
     assert_supply::<TotalSupplyAllowBlockList>();
     assert_supply::<RWA>();
     assert_supply::<Vault>();
+    assert_supply::<Capped>();
+    assert_supply::<CappedAllowList>();
+    assert_supply::<CappedBlockList>();
+    assert_supply::<CappedAllowBlockList>();
+    assert_supply::<CappedRWA>();
+    assert_supply::<CappedVault>();
 }
 
 #[contract]
@@ -908,13 +998,376 @@ fn total_supply_allow_block_list_transfer_rejects_not_allowed_receiver() {
     });
 }
 
-// ################## MINT OVERRIDES ##################
+// ################## CAPPED COMBINATIONS ##################
 
-// Mints through `MintOverrides`, the path code that is generic over the
-// contract type takes, so each impl is exercised and not only its existence.
+// Mints through `MintOverrides`, the path `Self::ContractType::mint` takes on
+// a contract, so the cap check of the capped contract type is exercised.
 fn mint_through<T: MintOverrides>(e: &Env, to: &Address, amount: i128) {
     T::mint(e, to, amount);
 }
+
+#[test]
+fn capped_combinations_mint_up_to_the_cap() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 100);
+        mint_through::<Capped>(&e, &alice, 25);
+        mint_through::<CappedAllowList>(&e, &alice, 25);
+        mint_through::<CappedBlockList>(&e, &alice, 25);
+        mint_through::<CappedAllowBlockList>(&e, &alice, 25);
+        // every capped contract type reads the same supply counter and cap
+        assert_eq!(total_supply(&e), 100);
+        assert_eq!(<CappedAllowList as TotalSupplyOverrides>::total_supply(&e), 100);
+        assert_eq!(Base::balance(&e, &alice), 100);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #106)")]
+fn capped_allow_list_mint_rejects_exceeding_cap() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 100);
+        mint_through::<CappedAllowList>(&e, &alice, 60);
+        mint_through::<CappedAllowList>(&e, &alice, 41);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #106)")]
+fn capped_block_list_mint_rejects_exceeding_cap() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 100);
+        mint_through::<CappedBlockList>(&e, &alice, 101);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #106)")]
+fn capped_allow_block_list_mint_rejects_exceeding_cap() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 100);
+        // supply minted outside the capped type still counts against the cap
+        mint(&e, &alice, 90);
+        mint_through::<CappedAllowBlockList>(&e, &alice, 11);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #108)")]
+fn capped_combination_mint_requires_a_cap() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint_through::<CappedAllowList>(&e, &alice, 1);
+    });
+}
+
+#[test]
+fn capped_allow_list_applies_policy_and_tracks_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        AllowList::allow_user(&e, &alice);
+        AllowList::allow_user(&e, &bob);
+        mint_through::<CappedAllowList>(&e, &alice, 100);
+    });
+    e.as_contract(&address, || {
+        <CappedAllowList as ContractOverrides>::approve(&e, &alice, &spender, 50, 1000);
+    });
+    e.as_contract(&address, || {
+        <CappedAllowList as ContractOverrides>::transfer(
+            &e,
+            &alice,
+            &MuxedAddress::from(bob.clone()),
+            30,
+        );
+    });
+    e.as_contract(&address, || {
+        <CappedAllowList as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 20);
+    });
+    e.as_contract(&address, || {
+        <CappedAllowList as BurnableOverrides>::burn(&e, &alice, 10);
+    });
+    e.as_contract(&address, || {
+        <CappedAllowList as BurnableOverrides>::burn_from(&e, &spender, &alice, 10);
+    });
+
+    e.as_contract(&address, || {
+        assert_eq!(Base::balance(&e, &alice), 30);
+        assert_eq!(Base::balance(&e, &bob), 50);
+        assert_eq!(total_supply(&e), 80);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #113)")]
+fn capped_allow_list_transfer_rejects_not_allowed_receiver() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        AllowList::allow_user(&e, &alice);
+        mint_through::<CappedAllowList>(&e, &alice, 100);
+        <CappedAllowList as ContractOverrides>::transfer(&e, &alice, &MuxedAddress::from(bob), 30);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #113)")]
+fn capped_allow_list_burn_respects_policy() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        mint_through::<CappedAllowList>(&e, &alice, 100);
+        // `alice` is not allowed
+        <CappedAllowList as BurnableOverrides>::burn(&e, &alice, 10);
+    });
+}
+
+#[test]
+fn capped_block_list_applies_policy_and_tracks_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        mint_through::<CappedBlockList>(&e, &alice, 100);
+    });
+    e.as_contract(&address, || {
+        <CappedBlockList as ContractOverrides>::transfer(
+            &e,
+            &alice,
+            &MuxedAddress::from(bob.clone()),
+            30,
+        );
+    });
+    e.as_contract(&address, || {
+        <CappedBlockList as BurnableOverrides>::burn(&e, &alice, 20);
+    });
+
+    e.as_contract(&address, || {
+        assert_eq!(Base::balance(&e, &alice), 50);
+        assert_eq!(Base::balance(&e, &bob), 30);
+        assert_eq!(total_supply(&e), 80);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn capped_block_list_transfer_rejects_blocked_receiver() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        mint_through::<CappedBlockList>(&e, &alice, 100);
+        BlockList::block_user(&e, &bob);
+        <CappedBlockList as ContractOverrides>::transfer(&e, &alice, &MuxedAddress::from(bob), 30);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn capped_block_list_approve_rejects_blocked_owner() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        BlockList::block_user(&e, &alice);
+        <CappedBlockList as ContractOverrides>::approve(&e, &alice, &spender, 50, 1000);
+    });
+}
+
+#[test]
+fn capped_allow_block_list_applies_both_policies_and_tracks_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        AllowList::allow_user(&e, &alice);
+        AllowList::allow_user(&e, &bob);
+        mint_through::<CappedAllowBlockList>(&e, &alice, 100);
+    });
+    e.as_contract(&address, || {
+        <CappedAllowBlockList as ContractOverrides>::approve(&e, &alice, &spender, 50, 1000);
+    });
+    e.as_contract(&address, || {
+        <CappedAllowBlockList as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 20);
+    });
+    e.as_contract(&address, || {
+        <CappedAllowBlockList as BurnableOverrides>::burn_from(&e, &spender, &alice, 10);
+    });
+
+    e.as_contract(&address, || {
+        assert_eq!(Base::balance(&e, &alice), 70);
+        assert_eq!(Base::balance(&e, &bob), 20);
+        assert_eq!(total_supply(&e), 90);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn capped_allow_block_list_transfer_rejects_blocked_sender() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        AllowList::allow_user(&e, &alice);
+        AllowList::allow_user(&e, &bob);
+        mint_through::<CappedAllowBlockList>(&e, &alice, 100);
+        BlockList::block_user(&e, &alice);
+        <CappedAllowBlockList as ContractOverrides>::transfer(
+            &e,
+            &alice,
+            &MuxedAddress::from(bob),
+            30,
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #113)")]
+fn capped_allow_block_list_burn_rejects_not_allowed_account() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        mint_through::<CappedAllowBlockList>(&e, &alice, 100);
+        <CappedAllowBlockList as BurnableOverrides>::burn(&e, &alice, 10);
+    });
+}
+
+// A cap lowered below the current supply blocks further minting until the
+// supply is burned back under it (refer to `set_cap`).
+#[test]
+#[should_panic(expected = "Error(Contract, #106)")]
+fn capped_mint_rejected_after_cap_lowered_below_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 100);
+        mint_through::<Capped>(&e, &alice, 80);
+        Capped::set_cap(&e, 50);
+        mint_through::<Capped>(&e, &alice, 1);
+    });
+}
+
+// Burning under a cap is plain supply-tracked burning, and frees room under
+// the cap again.
+#[test]
+fn capped_burn_decreases_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 100);
+        mint_through::<Capped>(&e, &alice, 100);
+        <Capped as ContractOverrides>::approve(&e, &alice, &spender, 50, 1000);
+    });
+    e.as_contract(&address, || {
+        <Capped as BurnableOverrides>::burn(&e, &alice, 30);
+    });
+    e.as_contract(&address, || {
+        <Capped as BurnableOverrides>::burn_from(&e, &spender, &alice, 20);
+        assert_eq!(Capped::total_supply(&e), 50);
+        assert_eq!(Base::balance(&e, &alice), 50);
+        // the burned amount can be minted again
+        mint_through::<Capped>(&e, &alice, 50);
+        assert_eq!(Capped::total_supply(&e), 100);
+    });
+}
+
+// Every capped contract type reads the same supply counter.
+#[test]
+fn capped_combinations_report_the_tracked_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 100);
+        mint_through::<Capped>(&e, &alice, 40);
+        assert_eq!(Capped::total_supply(&e), 40);
+        assert_eq!(CappedAllowList::total_supply(&e), 40);
+        assert_eq!(CappedBlockList::total_supply(&e), 40);
+        assert_eq!(CappedAllowBlockList::total_supply(&e), 40);
+    });
+}
+
+#[test]
+fn capped_block_list_transfer_from_and_burn_from_apply_policy_and_track_supply() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        mint_through::<CappedBlockList>(&e, &alice, 100);
+        <CappedBlockList as ContractOverrides>::approve(&e, &alice, &spender, 60, 1000);
+    });
+    e.as_contract(&address, || {
+        <CappedBlockList as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 30);
+    });
+    e.as_contract(&address, || {
+        <CappedBlockList as BurnableOverrides>::burn_from(&e, &spender, &alice, 20);
+        assert_eq!(Base::balance(&e, &alice), 50);
+        assert_eq!(Base::balance(&e, &bob), 30);
+        assert_eq!(Base::allowance(&e, &alice, &spender), 10);
+        assert_eq!(total_supply(&e), 80);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn capped_block_list_transfer_from_rejects_blocked_receiver() {
+    let (e, address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Capped::set_cap(&e, 1000);
+        mint_through::<CappedBlockList>(&e, &alice, 100);
+        <CappedBlockList as ContractOverrides>::approve(&e, &alice, &spender, 60, 1000);
+        BlockList::block_user(&e, &bob);
+    });
+    e.as_contract(&address, || {
+        <CappedBlockList as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 30);
+    });
+}
+
+// ################## MINT OVERRIDES ##################
 
 // Contract types without supply tracking or voting units only credit the
 // balance; the list policies are not checked on mint.

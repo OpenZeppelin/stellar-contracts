@@ -129,7 +129,7 @@ mod test;
 
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, String, Vec};
 use stellar_contract_utils::pausable::Pausable;
-pub use storage::{FromVerification, RWAStorageKey, RWA};
+pub use storage::{CappedRWA, FromVerification, RWAContractType, RWAStorageKey, RWA};
 
 use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 
@@ -154,8 +154,16 @@ use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 /// alongside it (an empty `impl` block is enough), so that the supply is
 /// exposed by the contract. `TotalSupply` has to be listed in the contract
 /// type as well, e.g. `Compose<(RWA, TotalSupply)>`.
+///
+/// For a maximum total supply, `Capped` is listed too:
+/// `Compose<(RWA, Capped, TotalSupply)>` resolves to [`CappedRWA`], whose
+/// mints check the cap. The `mint` and `batch_mint` bodies then mint through
+/// `Self::ContractType::mint` and `Self::ContractType::batch_mint`, which
+/// reach [`RWA`] or [`CappedRWA`] depending on the list.
 #[contracttrait]
-pub trait RWAToken: Pausable + FungibleTotalSupply + FungibleToken<ContractType = RWA> {
+pub trait RWAToken:
+    Pausable + FungibleTotalSupply + FungibleToken<ContractType: RWAContractType>
+{
     // ################## CORE TOKEN FUNCTIONS ##################
 
     /// Transfers tokens to several recipients in a single call, moving
@@ -299,9 +307,10 @@ pub trait RWAToken: Pausable + FungibleTotalSupply + FungibleToken<ContractType 
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced on `operator` before calling [`RWA::mint`] for the
-    /// implementation (which handles identity verification and compliance
-    /// checks).
+    /// enforced on `operator` before calling `Self::ContractType::mint` for
+    /// the implementation, which reaches [`RWA::mint`] (identity verification
+    /// and compliance checks) or, when `Capped` is listed, [`CappedRWA::mint`]
+    /// (the same, after checking the cap).
     fn mint(e: &Env, to: Address, amount: i128, operator: Address);
 
     /// Mints `amounts[i]` tokens to `to_list[i]` in a single call. The batched
@@ -329,8 +338,9 @@ pub trait RWAToken: Pausable + FungibleTotalSupply + FungibleToken<ContractType 
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced on `operator` before calling [`RWA::batch_mint`] for the
-    /// implementation.
+    /// enforced on `operator` before calling `Self::ContractType::batch_mint`
+    /// for the implementation, which reaches [`RWA::batch_mint`] or, when
+    /// `Capped` is listed, [`CappedRWA::batch_mint`].
     ///
     /// Refer to the batch operations section of the
     /// [module documentation](crate::rwa) for how to size a batch.
