@@ -29,7 +29,9 @@ pub enum FeeAbstractionApproval {
     Lazy,
     /// Always approve `max_fee_amount`, overwriting previous allowances, and
     /// consume the whole approval within the same collection so that no
-    /// allowance remains afterwards.
+    /// allowance remains afterwards. Requires a fee token whose transfers
+    /// credit the receiver exactly the amount debited from the sender; use
+    /// `Lazy` for fee-on-transfer and other non-conserving tokens.
     Eager,
 }
 
@@ -131,6 +133,17 @@ pub fn collect_fee_and_invoke(
 /// no allowance survives the collection. The user therefore needs a spendable
 /// balance of at least `max_fee_amount` for an eager collection; the token
 /// rejects it otherwise.
+///
+/// Because `Eager` pays out exactly `max_fee_amount` from the current contract
+/// regardless of the amount it received, it requires a fee token whose
+/// transfers credit the receiver exactly the amount debited from the sender.
+/// With fee-on-transfer or otherwise non-conserving tokens, the shortfall is
+/// drawn from the current contract's own balance, or the collection reverts
+/// when that balance is insufficient. `Lazy` transfers directly from the user
+/// to `fee_recipient` without touching the current contract's balance and is
+/// the strategy to use for such tokens. In both cases, the emitted
+/// `fee_collected` event reports the requested `fee_amount`, which can exceed
+/// the amount `fee_recipient` receives from a non-conserving token.
 ///
 /// # Arguments
 ///

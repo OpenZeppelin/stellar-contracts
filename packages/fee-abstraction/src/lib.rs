@@ -14,7 +14,9 @@
 //!   two approval semantics:
 //!   - [`FeeAbstractionApproval::Eager`]: always approve `max_fee_amount`
 //!     (overwriting any existing allowance) and consume the whole approval
-//!     within the collection, leaving no residual allowance
+//!     within the collection, leaving no residual allowance; requires a fee
+//!     token whose transfers credit the receiver exactly the amount debited
+//!     from the sender
 //!   - [`FeeAbstractionApproval::Lazy`]: only approve if the current allowance
 //!     is less than `max_fee_amount`
 //!
