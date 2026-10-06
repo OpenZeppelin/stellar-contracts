@@ -1,7 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, Bytes, Env};
 use ultrahonk_soroban_verifier::UltraHonkVerifier;
 
-use crate::confidential::verifier::{
+use crate::verifier::{
     emit_verification_key_registered, emit_verification_key_updated, CircuitType, VerifierError,
 };
 

@@ -31,6 +31,7 @@ Refer to the [OpenZeppelin for Stellar Contracts](https://docs.openzeppelin.com/
 - `packages/`: Source code
   - [`access/`](packages/access): Role-based access controls and ownable
   - [`accounts/`](packages/accounts): Smart accounts with custom authentication and authorization
+  - [`confidential/`](packages/confidential): Confidential token with encrypted balances and zero-knowledge proofs
   - [`contract-utils/`](packages/contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
   - [`fee-abstraction/`](packages/fee-abstraction): Utilities for covering transaction fees with fungible tokens instead of XLM
   - [`governance/`](packages/governance): Governance utilities (governor, votes, timelock)

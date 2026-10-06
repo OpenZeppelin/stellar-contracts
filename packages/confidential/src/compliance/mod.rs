@@ -34,7 +34,7 @@ use soroban_sdk::{
 };
 pub use storage::{ClawbackData, ComplianceConfig, ComplianceStorageKey};
 
-use crate::confidential::{
+use crate::{
     ConfidentialToken, Hooks, RegisterPayload, SetSpenderPayload, SpenderTransferPayload,
     TransferPayload, WithdrawPayload,
 };
@@ -185,7 +185,7 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 /// require such an impl.** `ConfidentialClawback: ConfidentialCompliance`
 /// obliges the deployment to implement `freeze` / `unfreeze` but places no
 /// constraint on `<Self as ConfidentialToken>::Hooks`. A contract that wires
-/// [`NoHooks`](crate::confidential::NoHooks) alongside this trait gets a
+/// [`NoHooks`](crate::NoHooks) alongside this trait gets a
 /// `freeze` that writes the flag and an `is_frozen` that returns `true`, so
 /// the precondition passes while every token operation remains unrestricted
 /// and the target can move its balance before the seizure executes. The only
@@ -233,7 +233,7 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     ///
     /// # Errors
     ///
-    /// * refer to [`crate::confidential::storage::decode_data`] errors.
+    /// * refer to [`crate::storage::decode_data`] errors.
     /// * refer to [`storage::clawback`] errors.
     ///
     /// # Events
@@ -261,7 +261,7 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// [`ConfidentialClawback::clawback`].
     ///
     /// The fold is the same as the owner's
-    /// [`revoke_spender`](crate::confidential::ConfidentialToken::revoke_spender);
+    /// [`revoke_spender`](crate::ConfidentialToken::revoke_spender);
     /// only the authorizing party differs.
     ///
     /// `account` MUST be frozen.

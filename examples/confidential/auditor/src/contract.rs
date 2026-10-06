@@ -2,8 +2,8 @@
 
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
+use stellar_confidential::auditor::{storage as auditor, ConfidentialAuditor};
 use stellar_macros::only_role;
-use stellar_tokens::confidential::auditor::{storage as auditor, ConfidentialAuditor};
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
 
