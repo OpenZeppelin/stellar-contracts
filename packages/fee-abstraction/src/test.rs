@@ -1,6 +1,6 @@
 use soroban_sdk::{
     contract, contractimpl,
-    testutils::{Address as _, Events, Ledger},
+    testutils::{storage::Persistent as _, Address as _, Events, Ledger},
     token::TokenClient,
     vec, Address, Env, Event, FromVal, MuxedAddress, String, Symbol, Val, Vec,
 };
@@ -9,7 +9,7 @@ use stellar_tokens::fungible::{Approve, Base, Compose, FungibleToken, Transfer};
 use crate::{
     collect_fee, collect_fee_and_invoke, is_allowed_fee_token, is_fee_token_allowlist_enabled,
     set_allowed_fee_token, sweep_token, validate_expiration_ledger, validate_fee_bounds,
-    FeeAbstractionApproval, FeeAbstractionStorageKey, FeeCollected,
+    FeeAbstractionApproval, FeeAbstractionStorageKey, FeeCollected, FEE_ABSTRACTION_EXTEND_AMOUNT,
 };
 
 #[contract]
@@ -544,6 +544,32 @@ fn swap_and_pop_removal_updates_mappings() {
             .get(&FeeAbstractionStorageKey::TokenIndex(token3.clone()))
             .unwrap();
         assert_eq!(i, 1);
+    });
+}
+
+#[test]
+fn swap_and_pop_removal_extends_moved_token_entries() {
+    let e = Env::default();
+    let contract_address = e.register(MockContract, ());
+    let token1 = Address::generate(&e);
+    let token2 = Address::generate(&e);
+    let token3 = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        set_allowed_fee_token(&e, &token1, true);
+        set_allowed_fee_token(&e, &token2, true);
+        set_allowed_fee_token(&e, &token3, true);
+
+        // token3's entries are extended, token1's keep their creation TTL.
+        assert!(is_allowed_fee_token(&e, &token3));
+
+        // token3 moves from index 2 into token1's slot at index 0.
+        set_allowed_fee_token(&e, &token1, false);
+
+        let slot_key = FeeAbstractionStorageKey::Token(0);
+        let index_key = FeeAbstractionStorageKey::TokenIndex(token3.clone());
+        assert_eq!(e.storage().persistent().get_ttl(&slot_key), FEE_ABSTRACTION_EXTEND_AMOUNT);
+        assert_eq!(e.storage().persistent().get_ttl(&index_key), FEE_ABSTRACTION_EXTEND_AMOUNT);
     });
 }
 
