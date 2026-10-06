@@ -151,7 +151,7 @@ impl CappedRWA {
     ///
     /// # Errors
     ///
-    /// * refer to [`RWA::batch_mint`] errors.
+    /// * refer to [`RWA::mint`] errors.
     /// * refer to [`check_cap`] errors.
     ///
     /// # Security Warning
@@ -507,7 +507,7 @@ impl RWA {
     /// Recovery function used to force transfer tokens from a old account to a
     /// new account. This function transfers all tokens and preserves the frozen
     /// status from the old account to the new account. Returns `true` if
-    /// recovery was successful, `false` if no tokens to recover.
+    /// tokens were moved, `false` if the old account held no tokens.
     ///
     /// # Arguments
     ///
@@ -524,6 +524,11 @@ impl RWA {
     ///
     /// # Events
     ///
+    /// Emitted when the old account is fully frozen:
+    /// * topics - `["address_frozen", new_account: Address, is_frozen: bool]`
+    /// * data - `[]`
+    ///
+    /// Emitted only when tokens are moved:
     /// * topics - `["transfer", old_account: Address, new_account: Address]`
     /// * data - `[amount: i128]`
     /// * topics - `["recovery_success", old_account: Address, new_account:
@@ -534,7 +539,11 @@ impl RWA {
     ///
     /// This function preserves the frozen status (both partial and full) from
     /// the old account and applies it to the new account, maintaining
-    /// regulatory compliance.
+    /// regulatory compliance. The full-address freeze is a wallet-level
+    /// restriction, so it follows the investor to the new account even when the
+    /// old account holds no tokens. The partially frozen amount is bounded by
+    /// the balance, so there is nothing to migrate in that case.
+    ///
     ///
     /// State owned by this contract (the frozen status) is migrated directly
     /// by this function. State held by compliance modules is handled through
@@ -570,6 +579,10 @@ impl RWA {
             panic_with_error!(e, RWAError::IdentityMismatch);
         }
 
+        if Self::is_frozen(e, old_account) {
+            Self::set_address_frozen(e, new_account, true);
+        }
+
         // Get the balance of the old account, if there is nothing to transfer,
         // return false
         let lost_balance = Base::balance(e, old_account);
@@ -577,9 +590,8 @@ impl RWA {
             return false;
         }
 
-        // Store frozen status before transfer
+        // Store the partially frozen amount before the transfer unfreezes it
         let frozen_tokens = Self::get_frozen_tokens(e, old_account);
-        let is_address_frozen = Self::is_frozen(e, old_account);
 
         // Move all tokens with the shared privileged mechanics (handles
         // unfreezing as needed), reporting the movement as a recovery so
@@ -596,11 +608,6 @@ impl RWA {
         // Preserve frozen tokens on the new account if there were any
         if frozen_tokens > 0 {
             Self::freeze_partial_tokens(e, new_account, frozen_tokens);
-        }
-
-        // Preserve address frozen status on the new account if it was frozen
-        if is_address_frozen {
-            Self::set_address_frozen(e, new_account, true);
         }
 
         emit_recovery_success(e, old_account, new_account);

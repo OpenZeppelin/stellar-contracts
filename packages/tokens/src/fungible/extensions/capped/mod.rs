@@ -11,10 +11,12 @@
 //!
 //! - The [`Capped`] contract type, selected by listing `Capped` in the
 //!   [`crate::fungible::combinations::Compose`] list. Its mint checks the cap
-//!   and then mints through the supply counter. [`Capped::set_cap`] is called
-//!   in the constructor, and the contract's own `mint` function mints through
-//!   `Self::ContractType::mint`, which resolves to the capped mint, so the cap
-//!   is enforced without being called explicitly.
+//!   and then mints through the supply counter. [`Capped::set_cap`] is best
+//!   called once, in the constructor, so holders can rely on a fixed cap. If
+//!   the token owner or governance needs to adjust the cap later, it can also
+//!   be called from an access-controlled function. The contract's own `mint`
+//!   function mints through `Self::ContractType::mint`, which resolves to the
+//!   capped mint, so the cap is enforced without being called explicitly.
 //! - [`FungibleCapped`]: exposes the `cap()` function on the contract. It can
 //!   only be implemented when the resolved contract type enforces the cap
 //!   (refer to [`CappedContractType`]), so a contract cannot report a cap it

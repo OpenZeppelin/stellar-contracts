@@ -92,9 +92,10 @@ pub use utils::sequential;
 /// as a method in this trait because it is not a part of the standard,
 /// the function signature may change depending on the implementation.
 ///
-/// The contract's own mint function mints through `Self::ContractType::mint`,
-/// which reaches the mint of the selected contract type (no import needed,
-/// refer to [`MintOverrides`]).
+/// The contract's own mint function calls the mint of the selected contract
+/// type: `Self::ContractType::mint` (or `mint_with_id`) for the contract types
+/// that store one owner per token, and `Self::ContractType::mint_range` for the
+/// consecutive ones. No import is needed (refer to [`MintOverrides`]).
 ///
 /// This trait is implemented for the following Contract Types:
 /// * [`crate::non_fungible::Base`] (covering the vanilla case, and compatible

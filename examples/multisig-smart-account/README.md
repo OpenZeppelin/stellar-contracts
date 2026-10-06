@@ -217,6 +217,12 @@ For off-chain clients (e.g., JS SDK):
 3. External signers sign the resulting 32-byte digest
 4. Delegated signers authorize `__check_auth` on the smart account with the same `ScVal::Map` as the only argument. Simulation does not return this entry, so the client adds it as a second root-level authorization entry for the delegated address
 
+## Deploying Accounts Through a Factory
+
+If you want to deploy accounts to deterministic addresses bound to their
+initial configuration, or predict an account's address before deploying it, see
+the [factory example](factory/README.md).
+
 ## Next Steps
 
 1. Review the [Smart Accounts documentation](https://docs.openzeppelin.com/stellar-contracts/accounts/smart-account) to learn more about:

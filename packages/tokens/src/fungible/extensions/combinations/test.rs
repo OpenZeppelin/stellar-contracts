@@ -22,7 +22,7 @@ use crate::{
         overrides::{BurnableOverrides, MintOverrides, TotalSupplyOverrides},
         Base, ContractOverrides,
     },
-    rwa::{CappedRWA, RWA},
+    rwa::{CappedRWA, RWAContractType, RWA},
     vault::{CappedVault, Vault},
 };
 
@@ -170,6 +170,7 @@ fn capped_contract_types_back_their_extensions() {
     fn assert_capped<T: CappedContractType + TotalSupplyOverrides>() {}
     fn assert_allowlist<T: AllowListContractType>() {}
     fn assert_blocklist<T: BlockListContractType>() {}
+    fn assert_rwa<T: RWAContractType>() {}
     assert_capped::<Capped>();
     assert_capped::<CappedAllowList>();
     assert_capped::<CappedBlockList>();
@@ -180,6 +181,7 @@ fn capped_contract_types_back_their_extensions() {
     assert_allowlist::<CappedAllowBlockList>();
     assert_blocklist::<CappedBlockList>();
     assert_blocklist::<CappedAllowBlockList>();
+    assert_rwa::<CappedRWA>();
 }
 
 // Every contract type that can mint freely has to implement `MintOverrides`,

@@ -154,12 +154,13 @@ In the contract, `Self::ContractType` is the concrete type `Compose` resolved
 to (e.g. `CappedAllowList`), so this call is that type's own `mint`. Nothing
 has to be imported for it. Calling a specific primitive such as `Base::mint`
 instead would compile and skip the bookkeeping of the selected contract type
-(the supply counter, the cap, the enumeration).
+(the supply counter, the cap, the voting units, the enumeration).
 
 The mint primitives each contract type provides follow its storage model:
 
-- fungible: `mint(to, amount)`, on every contract type except `Vault`, which
-  has no free mint (its shares are only created against deposited assets);
+- fungible: `mint(to, amount)`, on every contract type except `Vault` and
+  `CappedVault`, which have no free mint (their shares are only created
+  against deposited assets);
 - non-fungible, one owner stored per token (`Base`, `Enumerable`, and their
   votes variants): `mint(to) -> u32` mints the next id of the sequential
   counter; `mint_with_id(to, token_id)` is also provided for ids chosen by the

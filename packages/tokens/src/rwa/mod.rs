@@ -415,6 +415,12 @@ pub trait RWAToken:
     /// privileges. RBAC checks are expected to be enforced on the
     /// `operator`.
     ///
+    /// Balances and address freezes are stored per token, so after the
+    /// identity is recovered in the registry, this function should be called on
+    /// each token separately. A token where the old account holds nothing
+    /// still needs the call when the account is frozen there, otherwise the
+    /// freeze status is not carried over to the new account.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
@@ -429,6 +435,11 @@ pub trait RWAToken:
     ///
     /// # Events
     ///
+    /// Emitted when the old account is fully frozen:
+    /// * topics - `["address_frozen", new_account: Address, is_frozen: bool]`
+    /// * data - `[]`
+    ///
+    /// Emitted only when tokens are moved:
     /// * topics - `["transfer", old_account: Address, new_account: Address]`
     /// * data - `[amount: i128]`
     /// * topics - `["recovery_success", old_account: Address, new_account:

@@ -710,7 +710,6 @@ fn enforce_negative_amount_errors() {
 #[should_panic(expected = "Error(Contract, #3224)")]
 fn enforce_history_capacity_exceeded() {
     let e = Env::default();
-    e.cost_estimate().disable_resource_limits();
     let address = e.register(MockContract, ());
     let smart_account = Address::generate(&e);
     let context_rule = create_context_rule(&e);
@@ -904,5 +903,32 @@ fn enforce_create_contract_context_with_signers_errors() {
         });
 
         enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Budget, ExceededLimit)")]
+fn spending_history_past_the_cap_exceeds_the_ledger_entry_limit() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    // Bypass `enforce` and its capacity guard, writing a history one entry past
+    // the cap straight to storage. The write exceeds
+    // `contractDataEntrySizeBytes` and the host rejects it, which is why
+    // MAX_HISTORY_ENTRIES cannot be raised on its own.
+    e.as_contract(&address, || {
+        let mut spending_history = Vec::new(&e);
+        for i in 0..=MAX_HISTORY_ENTRIES {
+            spending_history.push_back(SpendingEntry { amount: 1, ledger_sequence: 1000 + i });
+        }
+        let data = SpendingLimitData {
+            spending_limit: i128::MAX,
+            period_ledgers: 1_000_000,
+            spending_history,
+            cached_total_spent: i128::from(MAX_HISTORY_ENTRIES) + 1,
+        };
+        let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), 1);
+        e.storage().persistent().set(&key, &data);
     });
 }

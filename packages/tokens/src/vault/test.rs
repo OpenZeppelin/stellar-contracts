@@ -1,14 +1,14 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, testutils::Address as _, Address, Env, MuxedAddress, String,
+    contract, contractimpl, testutils::Address as _, Address, Env, Error, MuxedAddress, String,
 };
 
 use crate::{
     fungible::{
         capped::{Capped, FungibleCapped},
         total_supply::{total_supply, FungibleTotalSupply, TotalSupply},
-        Base, Compose, ContractOverrides, FungibleToken,
+        Base, Compose, ContractOverrides, FungibleToken, FungibleTokenError,
     },
     vault::{
         storage::VaultStorageKey, CappedVault, FungibleVault, Vault, VaultOverrides,
@@ -1220,8 +1220,9 @@ fn capped_vault_contract_enforces_the_cap_through_the_trait() {
     assert_eq!(client.max_mint(&admin), 40);
 
     // past the cap, through both share-creating entry points
-    assert!(client.try_deposit(&41, &admin, &admin, &admin).is_err());
-    assert!(client.try_mint(&41, &admin, &admin, &admin).is_err());
+    let exceeded_cap = Error::from_contract_error(FungibleTokenError::ExceededCap as u32);
+    assert_eq!(client.try_deposit(&41, &admin, &admin, &admin), Err(Ok(exceeded_cap)));
+    assert_eq!(client.try_mint(&41, &admin, &admin, &admin), Err(Ok(exceeded_cap)));
 
     client.mint(&40, &admin, &admin, &admin);
     assert_eq!(client.total_supply(), 100);

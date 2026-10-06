@@ -10,8 +10,8 @@
 //!
 //! ## Implementation Notes
 //!
-//! - **Minting**: `mint` stores the owner only for the last token ID in the
-//!   batch.
+//! - **Minting**: `mint_range` stores the owner only for the last token ID in
+//!   the batch.
 //!
 //!   Mint first 10 tokens to A
 //!   -------------------A
@@ -48,10 +48,10 @@
 //! - Requires extra logic to preserve ownership inference when transferring or
 //!   burning tokens.
 //! - To avoid exceeding resource read limits per transaction (especially during
-//!   `owner_of` calls), a maximum number of tokens is enforced per `mint`. The
-//!   rationale is that the gaps between set bits within buckets can only shrink
-//!   over time, ensuring that future lookups remain within the bounds defined
-//!   by `mint`.
+//!   `owner_of` calls), a maximum number of tokens is enforced per
+//!   `mint_range`. The rationale is that the gaps between set bits within
+//!   buckets can only shrink over time, ensuring that future lookups remain
+//!   within the bounds defined by `mint_range`.
 //!
 //! ## Usage
 //!
@@ -59,8 +59,8 @@
 //!   minted separately. It is rather best suited for NFTs where minting happens
 //!   in large batches.
 //! - **IMPORTANT**: For minting tokens ONLY [`Consecutive::mint_range`]
-//!   (reached through `Self::ContractType::mint`) must be used. Using other
-//!   minting functions will break the logic of tracking ownership.
+//!   (reached through `Self::ContractType::mint_range`) must be used. Using
+//!   other minting functions will break the logic of tracking ownership.
 pub mod storage;
 use soroban_sdk::{contractevent, Address, Env};
 pub use storage::{Consecutive, ConsecutiveContractType};
