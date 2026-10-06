@@ -78,7 +78,7 @@ pub use extensions::{
     allowlist, blocklist, burnable, capped, combinations, combinations::Compose, total_supply,
     votes,
 };
-pub use overrides::{Base, ContractOverrides};
+pub use overrides::{Base, ContractOverrides, MintOverrides};
 use soroban_sdk::{
     contracterror, contractevent, contracttrait, Address, Env, MuxedAddress, String,
 };
@@ -103,8 +103,11 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// as a method in this trait because it is not a part of the SEP-41 standard,
 /// the function signature may change depending on the implementation.
 ///
-/// A function, [`crate::fungible::Base::mint`], is provided for minting to
-/// cover the general use case.
+/// The contract's own mint function mints through `Self::ContractType::mint`,
+/// which reaches the mint of the selected contract type (no import needed,
+/// refer to [`MintOverrides`]), e.g. increasing the supply counter for
+/// [`crate::fungible::total_supply::TotalSupply`] or checking the cap for
+/// [`crate::fungible::capped::Capped`].
 ///
 /// `FungibleToken` can be implemented with any of the following contract
 /// types, each one defining how the token behaves:
@@ -127,6 +130,10 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 ///   [`crate::fungible::total_supply::FungibleTotalSupply`] traits).
 /// * [`crate::fungible::votes::FungibleVotes`] (enabling the compatibility and
 ///   overrides for the [`stellar_governance::votes::Votes`] trait).
+/// * [`crate::fungible::capped::Capped`] (additionally enforcing a maximum
+///   total supply on mint, enabling the compatibility for the
+///   [`crate::fungible::capped::FungibleCapped`] and
+///   [`crate::fungible::total_supply::FungibleTotalSupply`] traits).
 ///
 /// The chosen contract type is declared through the `ContractType`
 /// associated type, wrapped in [`crate::fungible::combinations::Compose`].

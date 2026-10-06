@@ -102,7 +102,7 @@ impl RWAToken for RWATokenContract {
 
     #[only_role(operator, "manager")]
     fn mint(e: &Env, to: Address, amount: i128, operator: Address) {
-        RWA::mint(e, &to, amount);
+        <Self as FungibleToken>::ContractType::mint(e, &to, amount);
     }
 
     #[only_role(operator, "manager")]
@@ -148,7 +148,7 @@ impl RWAToken for RWATokenContract {
 
     #[only_role(operator, "manager")]
     fn batch_mint(e: &Env, to_list: Vec<Address>, amounts: Vec<i128>, operator: Address) {
-        RWA::batch_mint(e, &to_list, &amounts);
+        <Self as FungibleToken>::ContractType::batch_mint(e, &to_list, &amounts);
     }
 
     #[only_role(operator, "manager")]

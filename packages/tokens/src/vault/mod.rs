@@ -4,7 +4,7 @@ pub mod storage;
 mod test;
 
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env};
-pub use storage::Vault;
+pub use storage::{CappedVault, Vault, VaultOverrides};
 
 use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 
@@ -23,6 +23,12 @@ use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 /// alongside it (an empty `impl` block is enough), so that the supply of
 /// shares is exposed by the contract. `TotalSupply` has to be listed in the
 /// contract type as well, e.g. `Compose<(Vault, TotalSupply)>`.
+///
+/// For a maximum supply of shares, `Capped` is listed too:
+/// `Compose<(Vault, Capped, TotalSupply)>` resolves to [`CappedVault`], which
+/// enforces the cap on `deposit` and `mint` and reports it through
+/// `max_deposit` and `max_mint`. Each method delegates to the contract type
+/// through [`VaultOverrides`].
 ///
 /// # Design Overview
 ///
@@ -46,7 +52,7 @@ use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 /// providing familiar interfaces for Ethereum developers while leveraging
 /// Stellar's unique capabilities.
 #[contracttrait]
-pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType = Vault> {
+pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: VaultOverrides> {
     /// Returns the address of the underlying asset that the vault manages.
     ///
     /// # Arguments

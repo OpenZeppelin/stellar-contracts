@@ -19,8 +19,7 @@ fn test_set_default_royalty() {
     let address = e.register(MockContract, ());
     let receiver = Address::generate(&e);
 
-    let token_id =
-        e.as_contract(&address, || Enumerable::sequential_mint(&e, &Address::generate(&e)));
+    let token_id = e.as_contract(&address, || Enumerable::mint(&e, &Address::generate(&e)));
 
     e.as_contract(&address, || {
         // Set default royalty
@@ -42,7 +41,7 @@ fn test_set_token_royalty() {
 
     e.as_contract(&address, || {
         // Mint a token
-        let token_id = Enumerable::sequential_mint(&e, &owner);
+        let token_id = Enumerable::mint(&e, &owner);
 
         // Set token-specific royalty
         let receiver = Address::generate(&e);
@@ -70,7 +69,7 @@ fn test_token_royalty_overrides_default() {
         Base::set_default_royalty(&e, &default_receiver, 1000); // 10%
 
         // Mint a token
-        let token_id = Enumerable::sequential_mint(&e, &owner);
+        let token_id = Enumerable::mint(&e, &owner);
 
         // Set token-specific royalty
         Base::set_token_royalty(&e, token_id, &token_receiver, 500); // 5%
@@ -81,7 +80,7 @@ fn test_token_royalty_overrides_default() {
         assert_eq!(royalty_amount, 100); // 5% of 2000
 
         // Mint another token without specific royalty
-        let token_id2 = Enumerable::sequential_mint(&e, &owner);
+        let token_id2 = Enumerable::mint(&e, &owner);
 
         // Check that default royalty applies
         let (royalty_receiver, royalty_amount) = Base::royalty_info(&e, token_id2, 2000);
@@ -100,7 +99,7 @@ fn test_zero_royalty() {
 
     e.as_contract(&address, || {
         // Mint a token
-        let token_id = Enumerable::sequential_mint(&e, &owner);
+        let token_id = Enumerable::mint(&e, &owner);
 
         // Set zero royalty
         Base::set_token_royalty(&e, token_id, &receiver, 0);
@@ -134,7 +133,7 @@ fn test_no_royalty_set() {
 
     e.as_contract(&address, || {
         // Mint a token
-        let token_id = Enumerable::sequential_mint(&e, &owner);
+        let token_id = Enumerable::mint(&e, &owner);
 
         // Check royalty info
         let (royalty_receiver, royalty_amount) = Base::royalty_info(&e, token_id, 1000);
@@ -153,7 +152,7 @@ fn test_invalid_royalty_amount() {
 
     e.as_contract(&address, || {
         // Mint a token
-        let token_id = Enumerable::sequential_mint(&e, &owner);
+        let token_id = Enumerable::mint(&e, &owner);
 
         // Set invalid royalty amount
         Base::set_token_royalty(&e, token_id, &Address::generate(&e), 10001);
@@ -174,7 +173,7 @@ fn test_remove_token_royalty() {
         Base::set_default_royalty(&e, &default_receiver, 1000); // 10%
 
         // Mint a token
-        let token_id = Enumerable::sequential_mint(&e, &owner);
+        let token_id = Enumerable::mint(&e, &owner);
 
         // Set token-specific royalty
         Base::set_token_royalty(&e, token_id, &token_receiver, 500); // 5%
@@ -204,7 +203,7 @@ fn test_remove_token_royalty_no_default() {
 
     e.as_contract(&address, || {
         // Mint a token
-        let token_id = Enumerable::sequential_mint(&e, &owner);
+        let token_id = Enumerable::mint(&e, &owner);
 
         // Set token-specific royalty
         Base::set_token_royalty(&e, token_id, &token_receiver, 500); // 5%
@@ -270,7 +269,7 @@ fn test_consecutive_royalty_info_resolves_every_token() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Consecutive::batch_mint(&e, &owner, 10);
+        Consecutive::mint_range(&e, &owner, 10);
     });
     client.set_default_royalty(&receiver, &500, &operator); // 5%
 
@@ -298,7 +297,7 @@ fn test_consecutive_set_and_remove_token_royalty_on_non_boundary_token() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Consecutive::batch_mint(&e, &owner, 10);
+        Consecutive::mint_range(&e, &owner, 10);
     });
     client.set_default_royalty(&default_receiver, &1000, &operator); // 10%
 
@@ -326,7 +325,7 @@ fn test_consecutive_royalty_info_non_existent_token() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Consecutive::batch_mint(&e, &owner, 10);
+        Consecutive::mint_range(&e, &owner, 10);
     });
 
     // The batch covers ids 0..=9; id 10 does not exist.
@@ -345,7 +344,7 @@ fn test_consecutive_set_token_royalty_non_existent_token() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Consecutive::batch_mint(&e, &owner, 10);
+        Consecutive::mint_range(&e, &owner, 10);
     });
 
     // The batch covers ids 0..=9; id 10 does not exist.

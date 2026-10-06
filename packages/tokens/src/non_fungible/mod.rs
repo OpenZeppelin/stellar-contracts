@@ -74,7 +74,9 @@ mod test;
 pub use extensions::{
     burnable, combinations, combinations::Compose, consecutive, enumerable, royalties, votes,
 };
-pub use overrides::{Base, ContractOverrides};
+pub use overrides::{
+    Base, ContractOverrides, MintOverrides, MintRangeOverrides, MintWithIdOverrides,
+};
 // ################## TRAIT ##################
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, String};
 pub use storage::{ApprovalData, NFTStorageKey};
@@ -90,9 +92,10 @@ pub use utils::sequential;
 /// as a method in this trait because it is not a part of the standard,
 /// the function signature may change depending on the implementation.
 ///
-/// Functions are provided for both sequential minting
-/// ([`crate::non_fungible::Base::sequential_mint`]) and non-sequential
-/// minting strategies ([`crate::non_fungible::Base::mint`]).
+/// The contract's own mint function calls the mint of the selected contract
+/// type: `Self::ContractType::mint` (or `mint_with_id`) for the contract types
+/// that store one owner per token, and `Self::ContractType::mint_range` for the
+/// consecutive ones. No import is needed (refer to [`MintOverrides`]).
 ///
 /// This trait is implemented for the following Contract Types:
 /// * [`crate::non_fungible::Base`] (covering the vanilla case, and compatible

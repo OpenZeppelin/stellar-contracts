@@ -19,7 +19,7 @@ fn burn_works() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         Base::burn(&e, &owner, token_id);
 
@@ -47,7 +47,7 @@ fn burn_from_with_approve_works() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         Base::approve(&e, &owner, &spender, token_id, 1000);
         Base::burn_from(&e, &spender, &owner, token_id);
@@ -86,7 +86,7 @@ fn burn_from_with_operator_works() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         Base::approve_for_all(&e, &owner, &operator, 1000);
 
@@ -124,7 +124,7 @@ fn burn_from_with_owner_works() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         Base::burn_from(&e, &owner, &owner, token_id);
 
@@ -153,7 +153,7 @@ fn burn_with_not_owner_panics() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         Base::burn(&e, &spender, token_id);
     });
@@ -169,7 +169,7 @@ fn burn_from_with_insufficient_approval_panics() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = Base::mint(&e, &owner);
 
         Base::burn_from(&e, &spender, &owner, token_id);
     });
@@ -185,7 +185,7 @@ fn burn_with_non_existent_token_panics() {
     let non_existent_token_id = 2;
 
     e.as_contract(&address, || {
-        let _token_id = Base::sequential_mint(&e, &owner);
+        let _token_id = Base::mint(&e, &owner);
 
         Base::burn(&e, &owner, non_existent_token_id);
     });

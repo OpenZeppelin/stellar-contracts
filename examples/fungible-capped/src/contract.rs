@@ -1,8 +1,10 @@
 //! Capped Example Contract.
 //!
 //! Demonstrates an example usage of the `capped` extension: the maximum
-//! supply is set in the constructor, exposed through `FungibleCapped`, and
-//! enforced in the contract's own `mint` function.
+//! supply is set in the constructor and exposed through `FungibleCapped`.
+//! Listing `Capped` in the `Compose` list selects the `Capped` contract type,
+//! whose mint enforces the cap, so the contract's own `mint` function only
+//! has to mint through the contract type.
 //!
 //! **IMPORTANT**: this example is for demonstration purposes, and authorization
 //! is not taken into consideration
@@ -24,8 +26,9 @@ impl ExampleContract {
     }
 
     pub fn mint(e: &Env, to: Address, amount: i128) {
-        // Checks the cap, then mints through the supply counter.
-        Capped::mint(e, &to, amount);
+        // Resolves to the `Capped` mint: checks the cap, then mints through the
+        // supply counter.
+        <Self as FungibleToken>::ContractType::mint(e, &to, amount);
     }
 }
 

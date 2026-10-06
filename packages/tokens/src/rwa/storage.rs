@@ -3,9 +3,12 @@ use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{
     fungible::{
+        capped::{check_cap, CappedContractType},
         emit_transfer,
-        total_supply::{decrease_total_supply, increase_total_supply, TotalSupplyOverrides},
-        Base, ContractOverrides,
+        total_supply::{
+            decrease_total_supply, increase_total_supply, total_supply, TotalSupplyOverrides,
+        },
+        Base, ContractOverrides, MintOverrides,
     },
     rwa::{
         compliance::{AccountSnapshot, ComplianceClient, TransferKind},
@@ -63,6 +66,107 @@ impl ContractOverrides for RWA {
 // T-REX (ERC-3643) tokens expose the total supply, so the RWA contract type
 // is inherently supply-aware.
 impl TotalSupplyOverrides for RWA {}
+
+// Minting through the contract type runs RWA's full mint path: identity
+// verification, freezing checks, supply accounting and the compliance hook.
+impl MintOverrides for RWA {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        RWA::mint(e, to, amount);
+    }
+}
+
+/// Marker for the contract types backing [`crate::rwa::RWAToken`]: [`RWA`]
+/// itself and [`CappedRWA`].
+///
+/// # Why this trait exists
+///
+/// `RWAToken`'s default bodies call the [`RWA`] functions directly (batch
+/// transfers, forced transfers, freezing, recovery, ...), so the trait used to
+/// require `ContractType = RWA` exactly. A capped RWA token needs a different
+/// contract type, [`CappedRWA`], whose mint also checks the cap, while every
+/// other RWA operation stays the same. This marker lets `RWAToken` accept both
+/// contract types, and nothing else.
+///
+/// Contract authors never interact with this trait; it only appears as that
+/// bound.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not an RWA contract type, so `RWAToken` cannot be implemented",
+    note = "list `RWA` in the `Compose` list, e.g. `Compose<(RWA, TotalSupply)>`"
+)]
+pub trait RWAContractType {}
+
+impl RWAContractType for RWA {}
+
+/// Contract type enforcing a maximum total supply on top of [`RWA`], resolved
+/// by `Compose<(RWA, Capped, TotalSupply)>`.
+///
+/// Its `mint` and `batch_mint` check the cap (refer to
+/// [`crate::fungible::capped::Capped`]) before running RWA's own mint path.
+/// Every other operation is RWA's, unchanged.
+pub struct CappedRWA;
+
+impl RWAContractType for CappedRWA {}
+impl CappedContractType for CappedRWA {}
+
+// RWA tracks the supply itself, and the capped variant reads the same counter.
+impl TotalSupplyOverrides for CappedRWA {}
+
+// Transfers keep RWA's identity, freezing and compliance checks.
+impl ContractOverrides for CappedRWA {
+    fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
+        RWA::transfer(e, from, to, amount);
+    }
+
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        RWA::transfer_from(e, spender, from, to, amount);
+    }
+}
+
+impl MintOverrides for CappedRWA {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        CappedRWA::mint(e, to, amount);
+    }
+}
+
+impl CappedRWA {
+    /// Mints `amount` tokens to `to` if the cap allows it.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`check_cap`] errors.
+    /// * refer to [`RWA::mint`] errors.
+    ///
+    /// # Security Warning
+    ///
+    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+    ///
+    /// Refer to the security warning on [`RWA::mint`].
+    pub fn mint(e: &Env, to: &Address, amount: i128) {
+        check_cap(e, amount, total_supply(e));
+        RWA::mint(e, to, amount);
+    }
+
+    /// Mints `amounts[i]` tokens to `to_list[i]`, checking the cap for every
+    /// item.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`RWA::mint`] errors.
+    /// * refer to [`check_cap`] errors.
+    ///
+    /// # Security Warning
+    ///
+    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+    ///
+    /// Refer to the security warning on [`RWA::mint`].
+    pub fn batch_mint(e: &Env, to_list: &Vec<Address>, amounts: &Vec<i128>) {
+        RWA::require_equal_lengths(e, to_list.len(), amounts.len());
+
+        for (to, amount) in to_list.iter().zip(amounts.iter()) {
+            CappedRWA::mint(e, &to, amount);
+        }
+    }
+}
 
 impl RWA {
     // ################## QUERY STATE ##################
@@ -403,7 +507,7 @@ impl RWA {
     /// Recovery function used to force transfer tokens from a old account to a
     /// new account. This function transfers all tokens and preserves the frozen
     /// status from the old account to the new account. Returns `true` if
-    /// recovery was successful, `false` if no tokens to recover.
+    /// tokens were moved, `false` if the old account held no tokens.
     ///
     /// # Arguments
     ///
@@ -420,6 +524,11 @@ impl RWA {
     ///
     /// # Events
     ///
+    /// Emitted when the old account is fully frozen:
+    /// * topics - `["address_frozen", new_account: Address, is_frozen: bool]`
+    /// * data - `[]`
+    ///
+    /// Emitted only when tokens are moved:
     /// * topics - `["transfer", old_account: Address, new_account: Address]`
     /// * data - `[amount: i128]`
     /// * topics - `["recovery_success", old_account: Address, new_account:
@@ -430,7 +539,11 @@ impl RWA {
     ///
     /// This function preserves the frozen status (both partial and full) from
     /// the old account and applies it to the new account, maintaining
-    /// regulatory compliance.
+    /// regulatory compliance. The full-address freeze is a wallet-level
+    /// restriction, so it follows the investor to the new account even when the
+    /// old account holds no tokens. The partially frozen amount is bounded by
+    /// the balance, so there is nothing to migrate in that case.
+    ///
     ///
     /// State owned by this contract (the frozen status) is migrated directly
     /// by this function. State held by compliance modules is handled through
@@ -466,6 +579,10 @@ impl RWA {
             panic_with_error!(e, RWAError::IdentityMismatch);
         }
 
+        if Self::is_frozen(e, old_account) {
+            Self::set_address_frozen(e, new_account, true);
+        }
+
         // Get the balance of the old account, if there is nothing to transfer,
         // return false
         let lost_balance = Base::balance(e, old_account);
@@ -473,9 +590,8 @@ impl RWA {
             return false;
         }
 
-        // Store frozen status before transfer
+        // Store the partially frozen amount before the transfer unfreezes it
         let frozen_tokens = Self::get_frozen_tokens(e, old_account);
-        let is_address_frozen = Self::is_frozen(e, old_account);
 
         // Move all tokens with the shared privileged mechanics (handles
         // unfreezing as needed), reporting the movement as a recovery so
@@ -492,11 +608,6 @@ impl RWA {
         // Preserve frozen tokens on the new account if there were any
         if frozen_tokens > 0 {
             Self::freeze_partial_tokens(e, new_account, frozen_tokens);
-        }
-
-        // Preserve address frozen status on the new account if it was frozen
-        if is_address_frozen {
-            Self::set_address_frozen(e, new_account, true);
         }
 
         emit_recovery_success(e, old_account, new_account);
