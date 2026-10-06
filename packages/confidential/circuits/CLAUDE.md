@@ -1,6 +1,6 @@
 # Confidential Circuits — Agent Guide
 
-Scoped to `packages/tokens/src/confidential/circuits/`. Read alongside the root `CLAUDE.md` and `../CLAUDE.md`.
+Scoped to `packages/confidential/circuits/`. Read alongside the root `CLAUDE.md` and `../CLAUDE.md`.
 
 This tree is Noir, built by `nargo` — **not** part of the Cargo workspace. Nothing in `Cargo.toml` references it and nothing here references `Cargo.toml`. `Architecture.md` §"Noir Circuits" explains the package model (`lib` vs measurement-only `bin` gadgets vs operation circuits); it is not repeated here.
 

@@ -14,11 +14,12 @@ recipient addresses remain visible on-chain; amounts and balances do not.
 
 ```text
 confidential/
-├── mod.rs          # ConfidentialToken trait + Hooks + events
-├── storage.rs      # operation-level orchestration, public-input assembly
-├── auditor/        # Grumpkin auditor-key registry (separate contract)
-├── verifier/       # UltraHonk VK registry (separate contract)
-├── compliance/     # turnkey ComplianceHooks: freeze, SAC passthrough, external policy
+├── src/
+│   ├── lib.rs      # ConfidentialToken trait + Hooks + events
+│   ├── storage.rs  # operation-level orchestration, public-input assembly
+│   ├── auditor/    # Grumpkin auditor-key registry (separate contract)
+│   ├── verifier/   # UltraHonk VK registry (separate contract)
+│   └── compliance/ # turnkey ComplianceHooks: freeze, SAC passthrough, external policy
 ├── circuits/       # Noir/UltraHonk circuits + pinned VKs
 └── docs/
     ├── README.md                  # documentation index: where to start, map, citation rules
@@ -57,7 +58,7 @@ entry points that drive them. Every state-changing entry point:
    state mutation, and emits the event.
 
 The `Hooks` associated type is the extension point — wire `NoHooks` for a
-plain deployment, or [`ComplianceHooks`](./compliance/) for a gated one.
+plain deployment, or [`ComplianceHooks`](./src/compliance/) for a gated one.
 
 ### `auditor`
 
@@ -97,3 +98,33 @@ mathematics, then read the protocol specification from
 links to the next. [`docs/README.md`](./docs/README.md) maps the whole set:
 reading paths per role, the compliance, selective-disclosure, indexer, and
 SDK companions, and the citation rules that CI enforces with lychee.
+
+## Packaging
+
+The crate's packaging follows from its UltraHonk verifier backend
+(`ultrahonk-soroban-verifier`), which links Rust's `alloc` crate and has no
+crates.io release.
+
+- **Separate from `stellar-tokens`.** As a module of `stellar-tokens`, the
+  verifier would put `alloc` in the dependency graph of every contract that
+  uses a fungible, non-fungible, RWA, or vault token, and each of them would
+  need a global allocator it never uses. A `confidential` cargo feature on
+  `stellar-tokens` would remove that coupling but would leave
+  `stellar-tokens` unpublishable, because `cargo publish` rejects git
+  dependencies even when they are optional.
+- **Contracts provide the allocator.** A wasm binary whose dependency graph
+  includes `alloc` needs exactly one `#[global_allocator]`. Enabling the
+  `alloc` feature of `soroban-sdk` registers the SDK's bump allocator as
+  that allocator, and Cargo features are additive, so a library that enables
+  it prevents every dependent contract from registering its own
+  (`the #[global_allocator] in this crate conflicts with global allocator
+  in: soroban_sdk`). This crate leaves the feature off, and each contract
+  either enables it or registers its own allocator. The verifier's
+  repository splits its library and contracts the same way.
+- **`lib` only.** Without an allocator, a standalone `cdylib` build of this
+  crate fails with `no global memory allocator found but one is required`.
+  The crate is compiled to wasm as a dependency of the contracts under
+  `examples/confidential/`, which provide one.
+- **`publish = false`.** The verifier is a git dependency, which
+  `cargo publish` rejects. The crate can be published once the verifier has
+  a crates.io release.

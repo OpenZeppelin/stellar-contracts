@@ -21,6 +21,15 @@
 //!   none.
 //! - Storage helpers and operation-level orchestration under [`storage`].
 //!
+//! ## Global Allocator
+//!
+//! The UltraHonk verifier backend links Rust's `alloc` crate, so every
+//! contract that depends on this crate must provide a global allocator,
+//! either by enabling the `alloc` feature of `soroban-sdk` or by registering
+//! its own `#[global_allocator]`. This crate enables neither and leaves the
+//! choice to the contract; the "Packaging" section of `README.md` gives the
+//! reasons.
+//!
 //! ## Public-Input Encoding
 //!
 //! The contract assembles the public-input blob handed to the verifier by
@@ -96,7 +105,7 @@
 //! Tokens that are SEP-41 compliant are supported, for example:
 //!
 //! - the Stellar Asset Contract (SAC), or
-//! - OpenZeppelin's [`fungible`](crate::fungible) token.
+//! - OpenZeppelin's fungible token (`stellar_tokens::fungible`).
 //!
 //! Deploying this contract over any other token implementation is the
 //! deployer's responsibility — verify that `transfer` does not skim a fee
@@ -135,6 +144,8 @@
 //! first passes through a deficit borne by every other holder. An issuer
 //! extracting more than the accumulated surplus creates the shortfall
 //! described above.
+
+#![no_std]
 
 pub mod auditor;
 pub mod compliance;

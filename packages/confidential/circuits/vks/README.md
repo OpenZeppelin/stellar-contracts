@@ -55,7 +55,7 @@ including the zero-knowledge setting.
 ## Regenerating
 
 ```bash
-cd packages/tokens/src/confidential/circuits
+cd packages/confidential/circuits
 ./scripts/extract_vks.sh     # regenerates the *.vk.json (CI-diffed)
 ./scripts/build_vk_bins.sh   # regenerates the *.vk.bin (the on-chain form)
 ```

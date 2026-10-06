@@ -9,7 +9,7 @@ use soroban_sdk::{
 };
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
-use crate::confidential::{
+use crate::{
     compliance::{
         storage::{
             clawback, compliance_config, force_revoke_spender, freeze, is_frozen,
@@ -129,10 +129,10 @@ impl Policy for DenyOnePolicy {
 struct MockVerifier;
 
 #[contractimpl(contracttrait)]
-impl crate::confidential::verifier::ConfidentialVerifier for MockVerifier {
+impl crate::verifier::ConfidentialVerifier for MockVerifier {
     fn register_verification_key(
         _e: &Env,
-        _ct: crate::confidential::verifier::CircuitType,
+        _ct: crate::verifier::CircuitType,
         _verification_key: Bytes,
         _op: Address,
     ) {
@@ -140,7 +140,7 @@ impl crate::confidential::verifier::ConfidentialVerifier for MockVerifier {
 
     fn update_verification_key(
         _e: &Env,
-        _ct: crate::confidential::verifier::CircuitType,
+        _ct: crate::verifier::CircuitType,
         _verification_key: Bytes,
         _op: Address,
     ) {
@@ -148,7 +148,7 @@ impl crate::confidential::verifier::ConfidentialVerifier for MockVerifier {
 
     fn verify_proof(
         _e: &Env,
-        _ct: crate::confidential::verifier::CircuitType,
+        _ct: crate::verifier::CircuitType,
         _pi: Bytes,
         _proof: Bytes,
     ) -> bool {
@@ -166,7 +166,7 @@ impl crate::confidential::verifier::ConfidentialVerifier for MockVerifier {
 struct ClawbackReplayGuardVerifier;
 
 #[contractimpl(contracttrait)]
-impl crate::confidential::verifier::ConfidentialVerifier for ClawbackReplayGuardVerifier {
+impl crate::verifier::ConfidentialVerifier for ClawbackReplayGuardVerifier {
     fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
 
     fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
@@ -187,9 +187,9 @@ impl crate::confidential::verifier::ConfidentialVerifier for ClawbackReplayGuard
 struct MockAuditor;
 
 #[contractimpl(contracttrait)]
-impl crate::confidential::auditor::ConfidentialAuditor for MockAuditor {
+impl crate::auditor::ConfidentialAuditor for MockAuditor {
     fn register_key(e: &Env, auditor_id: u32, point: BytesN<64>, _operator: Address) {
-        crate::confidential::auditor::storage::register_key(e, auditor_id, &point);
+        crate::auditor::storage::register_key(e, auditor_id, &point);
     }
 
     fn rotate_key(_e: &Env, _auditor_id: u32, _new_point: BytesN<64>, _operator: Address) {}
@@ -226,7 +226,7 @@ fn setup_with<'a>(register_verifier: impl FnOnce(&Env) -> Address) -> Harness<'a
     let admin = Address::generate(&e);
     // Auditor 0 is the `auditor_id` every account in this suite binds to;
     // `clawback` fetches its key for the public-input blob.
-    crate::confidential::auditor::ConfidentialAuditorClient::new(&e, &auditor).register_key(
+    crate::auditor::ConfidentialAuditorClient::new(&e, &auditor).register_key(
         &0,
         &Grumpkin::generator(&e),
         &admin,
@@ -881,9 +881,9 @@ fn storage_keys_isolated_from_token_keys() {
     // disturb the token's stored SAC address.
     let h = setup();
     h.e.as_contract(&h.host, || {
-        let before = crate::confidential::storage::get_underlying_asset(&h.e);
+        let before = crate::storage::get_underlying_asset(&h.e);
         set_compliance_config(&h.e, &base_config());
-        let after = crate::confidential::storage::get_underlying_asset(&h.e);
+        let after = crate::storage::get_underlying_asset(&h.e);
         assert_eq!(before, after);
         assert_eq!(after, h.sac_addr);
     });
@@ -933,7 +933,7 @@ fn clawback_none_folds_commitments_and_moves_no_underlying() {
 
     // C_spend <- C_spend + O - 40*G, C_receive <- O.
     h.e.as_contract(&h.host, || {
-        let acc = crate::confidential::storage::get_account(&h.e, &alice);
+        let acc = crate::storage::get_account(&h.e, &alice);
         let expected = Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 60);
         assert_eq!(acc.spendable_commitment, expected);
         assert_eq!(acc.receiving_commitment, Grumpkin::identity(&h.e));
@@ -1001,7 +1001,7 @@ fn clawback_replay_after_restoring_commitments_panics() {
     compliance.freeze(&alice, &h.admin);
 
     h.e.as_contract(&h.host, || {
-        let acc = crate::confidential::storage::get_account(&h.e, &alice);
+        let acc = crate::storage::get_account(&h.e, &alice);
         assert_eq!(acc.spendable_commitment, Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 100));
         assert_eq!(acc.receiving_commitment, Grumpkin::identity(&h.e));
     });
@@ -1143,7 +1143,7 @@ fn force_revoke_spender_folds_allowance_and_deletes_delegation() {
     ConfidentialClawbackClient::new(&h.e, &h.host).force_revoke_spender(&alice, &spender, &h.admin);
 
     h.e.as_contract(&h.host, || {
-        let acc = crate::confidential::storage::get_account(&h.e, &alice);
+        let acc = crate::storage::get_account(&h.e, &alice);
         assert_eq!(acc.spendable_commitment, Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 125));
         assert!(!h
             .e
@@ -1182,7 +1182,7 @@ fn register_minimal_account(e: &Env, account: &Address) {
     // Bypass proof verification: the unregistered-deposit tests only need
     // `account_exists` to return true for selected addresses.
 
-    use crate::confidential::{ConfidentialAccount, ConfidentialTokenStorageKey};
+    use crate::{ConfidentialAccount, ConfidentialTokenStorageKey};
     let identity = Grumpkin::identity(e);
     let acc = ConfidentialAccount {
         spending_public_key: identity.clone(),

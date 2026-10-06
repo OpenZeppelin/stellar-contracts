@@ -15,10 +15,10 @@ crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
-soroban-sdk = { workspace = true }
+soroban-sdk = { workspace = true, features = ["alloc"] }
 stellar-access = { workspace = true }
+stellar-confidential = { workspace = true }
 stellar-macros = { workspace = true }
-stellar-tokens = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

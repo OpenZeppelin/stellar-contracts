@@ -9,7 +9,7 @@ use soroban_sdk::{
 };
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
-use crate::confidential::{
+use crate::{
     auditor::{storage as auditor_storage, ConfidentialAuditor},
     storage as token_storage,
     verifier::{CircuitType, ConfidentialVerifier},
@@ -239,8 +239,7 @@ fn setup_with_verifier_addr<'a>(e: Env, verifier_addr: Address) -> Harness<'a> {
 
     // Register an auditor key (id = 1) using the on-curve fixture so it
     // passes the validator inside `register_key`.
-    let auditor_client =
-        crate::confidential::auditor::ConfidentialAuditorClient::new(&e, &auditor_addr);
+    let auditor_client = crate::auditor::ConfidentialAuditorClient::new(&e, &auditor_addr);
     auditor_client.register_key(&1u32, &fixture_point(&e), &Address::generate(&e));
 
     let token_addr =
@@ -855,8 +854,7 @@ fn auditor_key_rotation_rescopes_the_escrowed_allowance_opening() {
     // Step 2 -- rotate the owner's auditor key. Nothing about the live
     // delegation changes: no event, no new ciphertext, and the on-chain C_a is
     // untouched. K2 holds no opening for it yet.
-    let auditor =
-        crate::confidential::auditor::ConfidentialAuditorClient::new(&h.e, &h.auditor_addr);
+    let auditor = crate::auditor::ConfidentialAuditorClient::new(&h.e, &h.auditor_addr);
     auditor.rotate_key(&1u32, &k2, &Address::generate(&h.e));
     let before = h.token.get_spender_delegation(&alice, &spender);
 

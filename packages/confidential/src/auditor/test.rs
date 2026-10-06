@@ -3,7 +3,7 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Events, BytesN, Env};
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
-use crate::confidential::auditor::storage::{
+use crate::auditor::storage::{
     get_key, register_key, rotate_key, validate_point, AuditorStorageKey,
 };
 

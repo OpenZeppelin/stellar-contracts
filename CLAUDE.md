@@ -9,6 +9,7 @@ network. Contracts target `wasm32v1-none`; library crates are `no_std`.
 packages/
 ├── access/          # access_control, ownable, role_transfer
 ├── accounts/        # smart-account policies (multisig, thresholds)
+├── confidential/    # confidential token (encrypted balances, ZK proofs)
 ├── contract-utils/  # pausable, upgradeable, math, crypto, merkle_distributor
 ├── fee-abstraction/ # fee forwarder
 ├── governance/      # governor, timelock, votes
@@ -156,6 +157,8 @@ Reversing the two is a common mistake.
 - All packages have `[package.metadata.stellar] cargo_inherit = true`.
 - Workspace fields use `field.workspace = true` shorthand; library crates
   set `crate-type = ["lib", "cdylib"]`, examples set `["cdylib"]` only.
+  `stellar-confidential` is the exception (`["lib"]`, unpublished, no
+  `alloc` feature); see `packages/confidential/README.md#packaging`.
 - Two-step transfer pattern (initiate + accept with `live_until_ledger`)
   for any owner/admin handover. Reuse `role_transfer` rather than rolling
   a new one.
