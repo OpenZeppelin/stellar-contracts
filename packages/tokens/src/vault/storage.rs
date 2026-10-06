@@ -307,7 +307,7 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * refer to [`Self::convert_to_assets_with_rounding()`] errors.
+    /// * refer to [`Self::convert_to_assets()`] errors.
     pub fn max_redeem(e: &Env, owner: Address) -> i128 {
         let shares = Self::balance(e, &owner);
         // `redeem` rejects burning shares for zero assets, so a balance
@@ -502,7 +502,10 @@ impl Vault {
     /// * [`VaultTokenError::VaultExceededMaxRedeem`] - When attempting to
     ///   redeem more shares than the maximum allowed for the owner.
     /// * [`VaultTokenError::VaultZeroAssets`] - When a positive amount of
-    ///   shares would redeem zero assets.
+    ///   shares would redeem zero assets while the owner's balance is worth at
+    ///   least one unit of the asset. When the whole balance is worth zero
+    ///   assets, [`Self::max_redeem`] is `0` and the redemption fails with
+    ///   [`VaultTokenError::VaultExceededMaxRedeem`] instead.
     /// * also refer to [`Self::max_redeem()`] errors.
     /// * also refer to [`Self::preview_redeem()`] errors.
     ///

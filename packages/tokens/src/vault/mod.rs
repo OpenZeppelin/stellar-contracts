@@ -377,7 +377,10 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType = Vaul
     ///   attempting to redeem more shares than the maximum allowed for the
     ///   owner.
     /// * [`crate::vault::VaultTokenError::VaultZeroAssets`] - When a positive
-    ///   amount of shares would redeem zero assets.
+    ///   amount of shares would redeem zero assets while the owner's balance is
+    ///   worth at least one unit of the asset. When the whole balance is worth
+    ///   zero assets, `max_redeem` is `0` and the redemption fails with
+    ///   [`crate::vault::VaultTokenError::VaultExceededMaxRedeem`] instead.
     /// * [`crate::vault::VaultTokenError::VaultInvalidSharesAmount`] - When
     ///   `shares < 0`.
     /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical

@@ -484,6 +484,35 @@ fn redeem_after_clawback_is_rejected() {
 }
 
 #[test]
+fn redeem_max_redeem_after_clawback_is_a_no_op() {
+    let e = Env::default();
+    let issuer = Address::generate(&e);
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &user);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.mock_all_auths();
+
+    let shares = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 1_000, user.clone(), user.clone(), user.clone())
+    });
+    asset_client.transfer(&vault_address, &issuer, &1_000);
+
+    e.as_contract(&vault_address, || {
+        // `redeem(max_redeem(owner))` must not revert (ERC-4626), even when
+        // `max_redeem` is 0 because the balance is worth zero assets.
+        let max_shares = Vault::max_redeem(&e, user.clone());
+        assert_eq!(max_shares, 0);
+        let assets = Vault::redeem(&e, max_shares, user.clone(), user.clone(), user.clone());
+
+        assert_eq!(assets, 0);
+        assert_eq!(Base::balance(&e, &user), shares);
+        assert_eq!(total_supply(&e), shares);
+    });
+}
+
+#[test]
 fn max_redeem_matches_redeem_for_dust_balance() {
     let e = Env::default();
     let user = Address::generate(&e);
