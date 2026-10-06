@@ -270,7 +270,7 @@ fn cancel_proposal() {
 }
 
 #[test]
-#[should_panic(expected = "#5006")]
+#[should_panic(expected = "#4206")]
 fn execute_fails_when_defeated() {
     let s = setup();
     let proposer = Address::generate(&s.e);
@@ -291,7 +291,7 @@ fn execute_fails_when_defeated() {
 }
 
 #[test]
-#[should_panic(expected = "#5002")]
+#[should_panic(expected = "#4202")]
 fn propose_fails_with_insufficient_voting_power() {
     let s = setup();
     let proposer = Address::generate(&s.e);
@@ -462,7 +462,7 @@ fn voting_power_snapshot_at_proposal_creation() {
 }
 
 #[test]
-#[should_panic(expected = "#5005")]
+#[should_panic(expected = "#4205")]
 fn cannot_vote_before_voting_starts() {
     let s = setup();
     let proposer = Address::generate(&s.e);
@@ -482,7 +482,7 @@ fn cannot_vote_before_voting_starts() {
 }
 
 #[test]
-#[should_panic(expected = "#5005")]
+#[should_panic(expected = "#4205")]
 fn cannot_vote_after_voting_ends() {
     let s = setup();
     let proposer = Address::generate(&s.e);

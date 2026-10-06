@@ -230,7 +230,7 @@ fn execute_fails_before_timelock_delay() {
 
 /// Executing without queuing first should fail (proposal not in Queued state).
 #[test]
-#[should_panic(expected = "Error(Contract, #5007)")]
+#[should_panic(expected = "Error(Contract, #4207)")]
 fn execute_fails_without_queue() {
     let s = setup();
 
@@ -261,7 +261,7 @@ fn execute_fails_when_caller_is_not_timelock() {
 
 /// Queueing a non-Succeeded proposal should fail.
 #[test]
-#[should_panic(expected = "Error(Contract, #5006)")]
+#[should_panic(expected = "Error(Contract, #4206)")]
 fn queue_fails_when_not_succeeded() {
     let s = setup();
 

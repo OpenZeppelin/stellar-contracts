@@ -234,6 +234,64 @@ pub enum StorageKey {
 This library handles extension of storage entries to prevent expiration, except from `instance` storage entry.
 Extending the `instance` storage entries is the responsibility of the contract developer.
 
+## Error Codes
+
+A failed invocation reports `Error(Contract, #N)`, and the code alone does not say which contract in the call tree raised it. Every `#[contracterror]` code in `packages/` is therefore unique across the workspace, and each package owns a disjoint range:
+
+| Range     | Owner                              |
+| :-------- | :--------------------------------- |
+| 100–499   | `stellar-tokens`                   |
+| 1000–1999 | `stellar-contract-utils`           |
+| 2000–2999 | `stellar-access`                   |
+| 3000–3299 | `stellar-accounts`                 |
+| 3300–3699 | `stellar-confidential`             |
+| 3900–3999 | Third-party smart-account policies |
+| 4000–4999 | `stellar-governance`               |
+| 5000–5999 | `stellar-fee-abstraction`          |
+| 6000–6999 | `stellar-zk-email`                 |
+
+The library never allocates codes in 3900–3999; that block is reserved for smart-account policies built outside this repository. Codes below 100 are left to contract-specific errors, as in `examples/`.
+
+Within its package's range, each enum owns a block:
+
+| Block     | Enum                         | Module                                                                  |
+| :-------- | :--------------------------- | :---------------------------------------------------------------------- |
+| 100–199   | `FungibleTokenError`         | `stellar_tokens::fungible`                                              |
+| 200–299   | `NonFungibleTokenError`      | `stellar_tokens::non_fungible`                                          |
+| 300–319   | `RWAError`                   | `stellar_tokens::rwa`                                                   |
+| 320–329   | `IRSError`                   | `stellar_tokens::rwa::identity_verification::identity_registry_storage` |
+| 330–339   | `TokenBinderError`           | `stellar_tokens::rwa::utils::token_binder`                              |
+| 340–349   | `ClaimsError`                | `stellar_tokens::rwa::identity_verification::identity_claims`           |
+| 350–359   | `ClaimIssuerError`           | `stellar_tokens::rwa::identity_verification::claim_issuer`              |
+| 360–369   | `ComplianceError`            | `stellar_tokens::rwa::compliance`                                       |
+| 370–379   | `ClaimTopicsAndIssuersError` | `stellar_tokens::rwa::identity_verification::claim_topics_and_issuers`  |
+| 380–382   | `DocumentError`              | `stellar_tokens::rwa::extensions::doc_manager`                          |
+| 383–399   | `ComplianceModuleError`      | `stellar_tokens::rwa::compliance::modules`                              |
+| 400–499   | `VaultTokenError`            | `stellar_tokens::vault`                                                 |
+| 1000–1099 | `PausableError`              | `stellar_contract_utils::pausable`                                      |
+| 1300–1399 | `MerkleDistributorError`     | `stellar_contract_utils::merkle_distributor`                            |
+| 1400–1499 | `CryptoError`                | `stellar_contract_utils::crypto::error`                                 |
+| 1500–1599 | `SorobanFixedPointError`     | `stellar_contract_utils::math`                                          |
+| 2000–2099 | `AccessControlError`         | `stellar_access::access_control`                                        |
+| 2100–2199 | `OwnableError`               | `stellar_access::ownable`                                               |
+| 2200–2299 | `RoleTransferError`          | `stellar_access::role_transfer`                                         |
+| 3000–3099 | `SmartAccountError`          | `stellar_accounts::smart_account`                                       |
+| 3110–3119 | `WebAuthnError`              | `stellar_accounts::verifiers::webauthn`                                 |
+| 3200–3209 | `SimpleThresholdError`       | `stellar_accounts::policies::simple_threshold`                          |
+| 3210–3219 | `WeightedThresholdError`     | `stellar_accounts::policies::weighted_threshold`                        |
+| 3220–3229 | `SpendingLimitError`         | `stellar_accounts::policies::spending_limit`                            |
+| 3300–3399 | `AuditorError`               | `stellar_confidential::auditor`                                         |
+| 3400–3499 | `VerifierError`              | `stellar_confidential::verifier`                                        |
+| 3500–3599 | `ConfidentialTokenError`     | `stellar_confidential`                                                  |
+| 3600–3699 | `ComplianceError`            | `stellar_confidential::compliance`                                      |
+| 4000–4099 | `TimelockError`              | `stellar_governance::timelock`                                          |
+| 4100–4199 | `VotesError`                 | `stellar_governance::votes`                                             |
+| 4200–4299 | `GovernorError`              | `stellar_governance::governor`                                          |
+| 5000–5099 | `FeeAbstractionError`        | `stellar_fee_abstraction`                                               |
+| 6000–6099 | `DKIMRegistryError`          | `stellar_zk_email::dkim_registry`                                       |
+
+A new variant takes the next free code in its enum's block, and a new enum takes the next free block in its package's range. `.github/scripts/check_error_codes.py` runs in CI and fails when two enums share a code.
+
 ## Contract Implementation Patterns
 
 ### 1. Base Implementation Pattern
