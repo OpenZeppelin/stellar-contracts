@@ -874,6 +874,86 @@ fn limits_report_no_room_when_virtual_shares_overflow() {
     });
 }
 
+// Once a share is worth more than one asset base unit, minting all the shares
+// the virtual bound allows would cost more than `i128::MAX` assets. `max_mint`
+// reports only the shares `i128::MAX` assets can pay for, so `preview_mint` of
+// it fits.
+fn vault_with_share_worth_two_assets(e: &Env, user: &Address) -> Address {
+    let asset_address = create_asset_contract(e, 100, user);
+    let vault_address = create_vault_contract(e, &asset_address, 0);
+    e.mock_all_auths();
+    e.as_contract(&vault_address, || {
+        Vault::deposit(e, 100, user.clone(), user.clone(), user.clone());
+    });
+    // donation: 200 assets back 100 shares
+    MockAssetContractClient::new(e, &asset_address).mint(&vault_address, &100);
+    vault_address
+}
+
+#[test]
+fn max_mint_is_limited_by_what_i128_max_assets_can_pay() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let vault_address = vault_with_share_worth_two_assets(&e, &user);
+
+    e.as_contract(&vault_address, || {
+        let max_shares = Vault::max_mint(&e, user.clone());
+        // fewer than the virtual bound allows, `i128::MAX - 1 - 100`
+        assert!(max_shares < i128::MAX - 1 - 100);
+        // paying for the reported shares fits in an `i128`
+        assert!(Vault::preview_mint(&e, max_shares) > i128::MAX - 201);
+        // and `max_deposit` converts back to at most what they cost
+        assert!(Vault::max_deposit(&e, user.clone()) <= Vault::preview_mint(&e, max_shares));
+    });
+}
+
+// Pins that the limit above is tight: one more share costs more than
+// `i128::MAX` assets.
+#[test]
+#[should_panic(expected = "Error(Contract, #1500)")]
+fn preview_mint_overflows_one_share_above_max_mint() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let vault_address = vault_with_share_worth_two_assets(&e, &user);
+
+    e.as_contract(&vault_address, || {
+        Vault::preview_mint(&e, Vault::max_mint(&e, user.clone()) + 1);
+    });
+}
+
+// When the vault holds `i128::MAX` assets, every conversion overflows on
+// `total_assets + 1`, so both limits are `0`.
+#[test]
+fn limits_are_zero_when_total_assets_is_i128_max() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 0, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    MockAssetContractClient::new(&e, &asset_address).mint(&vault_address, &i128::MAX);
+
+    e.as_contract(&vault_address, || {
+        assert_eq!(Vault::max_mint(&e, user.clone()), 0);
+        assert_eq!(Vault::max_deposit(&e, user.clone()), 0);
+    });
+}
+
+// Pins the claim above: `mint` is now rejected by its limit check
+// (`VaultExceededMaxMint`) instead of overflowing in `preview_mint`.
+#[test]
+#[should_panic(expected = "Error(Contract, #406)")]
+fn mint_is_rejected_when_total_assets_is_i128_max() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    MockAssetContractClient::new(&e, &asset_address).mint(&vault_address, &i128::MAX);
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Vault::mint(&e, 1, user.clone(), user.clone(), user.clone());
+    });
+}
+
 // ################## CAPPED VAULT ##################
 
 // The finding that motivated `CappedVault`: a vault listing `Capped` must not
@@ -1033,8 +1113,8 @@ fn capped_vault_limits_are_zero_above_the_cap() {
 }
 
 // A cap far above anything the vault can reach, with a share price high
-// enough that converting the remaining shares overflows an `i128`: the view
-// must not panic, and reports that the cap does not bind.
+// enough that the remaining shares cost more than `i128::MAX` assets: the
+// views must not panic, and report the shares `i128::MAX` assets can pay for.
 #[test]
 fn capped_vault_max_deposit_does_not_overflow() {
     let e = Env::default();
@@ -1042,19 +1122,24 @@ fn capped_vault_max_deposit_does_not_overflow() {
     let asset_address = create_asset_contract(&e, 0, &admin);
     let asset_client = MockAssetContractClient::new(&e, &asset_address);
     let vault_address = create_vault_contract(&e, &asset_address, 0);
-    asset_client.mint(&vault_address, &10i128.pow(30));
+    let assets = 10i128.pow(30);
+    asset_client.mint(&vault_address, &assets);
 
     e.as_contract(&vault_address, || {
         Capped::set_cap(&e, i128::MAX);
-        // offset 0: one virtual share below `i128::MAX`
-        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), i128::MAX - 1);
-        assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), i128::MAX);
+        // offset 0, empty supply: floor(i128::MAX * 1 / (10^30 + 1))
+        let max_shares = i128::MAX / (assets + 1);
+        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), max_shares);
+        assert_eq!(
+            <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()),
+            max_shares * (assets + 1)
+        );
     });
 }
 
-// When the vault's asset balance is `i128::MAX`, `deposit` overflows on
-// `total_assets + 1` and cannot succeed, so the reported limit must be `0`
-// rather than `i128::MAX`.
+// When the vault's asset balance is `i128::MAX`, `deposit` and `mint` overflow
+// on `total_assets + 1` and cannot succeed, so the reported limits must be `0`
+// even when the cap still allows more shares.
 #[test]
 fn capped_vault_max_deposit_is_zero_when_deposits_cannot_succeed() {
     let e = Env::default();
@@ -1067,8 +1152,7 @@ fn capped_vault_max_deposit_is_zero_when_deposits_cannot_succeed() {
 
     e.as_contract(&vault_address, || {
         Capped::set_cap(&e, 100);
-        // room remains under the cap, but no deposit can go through
-        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), 100);
+        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), 0);
         assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), 0);
     });
 }
