@@ -1322,3 +1322,168 @@ fn batch_add_identity_accepts_an_empty_batch() {
         assert_eq!(e.events().all().events().len(), 0);
     });
 }
+
+// ################## PENDING RECOVERY ##################
+
+#[test]
+#[should_panic(expected = "Error(Contract, #328)")] // AccountHasBalance
+fn remove_identity_of_pending_recovery_target_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token = e.register(MockToken, ());
+
+    let old_account = Address::generate(&e);
+    let new_account = Address::generate(&e);
+    let identity = Address::generate(&e);
+    // The tokens are still on the old account: recover_balance has not run.
+    MockTokenClient::new(&e, &token).set_balance(&old_account, &100);
+
+    e.as_contract(&contract_id, || {
+        let countries = vec![&e, CountryData { country: residence(840), metadata: None }];
+        bind_token(&e, &token);
+        add_identity(&e, &old_account, &identity, IdentityType::Individual, &countries);
+        recover_identity(&e, &old_account, &new_account);
+
+        // The new account itself is empty, but it is still owed the old
+        // account's tokens, so it cannot be released for re-registration.
+        remove_identity(&e, &new_account);
+    });
+}
+
+#[test]
+fn remove_identity_of_recovery_target_after_balance_moved_succeeds() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token = e.register(MockToken, ());
+    let token_client = MockTokenClient::new(&e, &token);
+
+    let old_account = Address::generate(&e);
+    let new_account = Address::generate(&e);
+    let other_old_account = Address::generate(&e);
+    let identity = Address::generate(&e);
+    let other_identity = Address::generate(&e);
+    token_client.set_balance(&old_account, &100);
+
+    e.as_contract(&contract_id, || {
+        let countries = vec![&e, CountryData { country: residence(840), metadata: None }];
+        bind_token(&e, &token);
+        add_identity(&e, &old_account, &identity, IdentityType::Individual, &countries);
+        add_identity(&e, &other_old_account, &other_identity, IdentityType::Individual, &countries);
+        recover_identity(&e, &old_account, &new_account);
+    });
+
+    // recover_balance moved the old account's tokens away, and the new
+    // account was emptied afterwards.
+    token_client.set_balance(&old_account, &0);
+
+    e.as_contract(&contract_id, || {
+        remove_identity(&e, &new_account);
+
+        // The released account can serve as the target of a later recovery.
+        recover_identity(&e, &other_old_account, &new_account);
+        assert_eq!(stored_identity(&e, &new_account), other_identity);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #328)")] // AccountHasBalance
+fn recover_identity_onward_from_pending_recovery_target_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token = e.register(MockToken, ());
+
+    let account1 = Address::generate(&e);
+    let account2 = Address::generate(&e);
+    let account3 = Address::generate(&e);
+    let identity = Address::generate(&e);
+    MockTokenClient::new(&e, &token).set_balance(&account1, &100);
+
+    e.as_contract(&contract_id, || {
+        let countries = vec![&e, CountryData { country: residence(840), metadata: None }];
+        bind_token(&e, &token);
+        add_identity(&e, &account1, &identity, IdentityType::Individual, &countries);
+        recover_identity(&e, &account1, &account2);
+
+        // account1's tokens could no longer reach account2 once it loses its
+        // identity, and recover_balance(account1, account3) fails the
+        // recovery target check, so the onward recovery is rejected.
+        recover_identity(&e, &account2, &account3);
+    });
+}
+
+#[test]
+fn recover_identity_onward_after_balance_moved_succeeds() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token = e.register(MockToken, ());
+    let token_client = MockTokenClient::new(&e, &token);
+
+    let account1 = Address::generate(&e);
+    let account2 = Address::generate(&e);
+    let account3 = Address::generate(&e);
+    let identity = Address::generate(&e);
+    token_client.set_balance(&account1, &100);
+
+    e.as_contract(&contract_id, || {
+        let countries = vec![&e, CountryData { country: residence(840), metadata: None }];
+        bind_token(&e, &token);
+        add_identity(&e, &account1, &identity, IdentityType::Individual, &countries);
+        recover_identity(&e, &account1, &account2);
+    });
+
+    // recover_balance(account1, account2) ran; account2 now holds the tokens,
+    // which a later recover_balance(account2, account3) moves on.
+    token_client.set_balance(&account1, &0);
+    token_client.set_balance(&account2, &100);
+
+    e.as_contract(&contract_id, || {
+        recover_identity(&e, &account2, &account3);
+        assert_eq!(get_recovered_to(&e, &account2), Some(account3.clone()));
+        assert_eq!(stored_identity(&e, &account3), identity);
+    });
+}
+
+#[test]
+fn remove_identity_of_recovery_target_deletes_recovered_from_link() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token = e.register(MockToken, ());
+    let token_client = MockTokenClient::new(&e, &token);
+
+    let old_account = Address::generate(&e);
+    let new_account = Address::generate(&e);
+    let identity = Address::generate(&e);
+    let other_identity = Address::generate(&e);
+
+    e.as_contract(&contract_id, || {
+        let country = CountryData { country: residence(840), metadata: None };
+
+        bind_token(&e, &token);
+        add_identity(&e, &old_account, &identity, IdentityType::Individual, &vec![&e, country]);
+        recover_identity(&e, &old_account, &new_account);
+
+        remove_identity(&e, &new_account);
+        assert_eq!(get_recovered_to(&e, &old_account), Some(new_account.clone()));
+    });
+
+    // Removing `new_account` deleted its `RecoveredFrom` link, so it is an
+    // ordinary wallet again: a balance showing up on the old account later
+    // no longer blocks removing `new_account`. If the link were kept, the
+    // second removal below would panic with `AccountHasBalance`.
+    token_client.set_balance(&old_account, &100);
+
+    e.as_contract(&contract_id, || {
+        let country = CountryData { country: residence(840), metadata: None };
+
+        add_identity(
+            &e,
+            &new_account,
+            &other_identity,
+            IdentityType::Individual,
+            &vec![&e, country],
+        );
+        assert_eq!(stored_identity(&e, &new_account), other_identity);
+
+        remove_identity(&e, &new_account);
+    });
+}
