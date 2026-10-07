@@ -150,6 +150,11 @@ pub trait SmartAccount: CustomAccountInterface {
     /// Retrieves the number of all context rules, including expired rules.
     /// Defaults to 0.
     ///
+    /// A count of 0 means the account cannot authorize anything, including
+    /// adding a rule back. A non-zero count does not rule this out either,
+    /// since the remaining rules may all be expired or scoped to other
+    /// contracts (refer to [`SmartAccount::remove_context_rule`]).
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
@@ -252,6 +257,7 @@ pub trait SmartAccount: CustomAccountInterface {
     /// * topics - `["context_rule_added", context_rule_id: u32]`
     /// * data - `[name: String, context_type: ContextRuleType, valid_until:
     ///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]`
+    ///   (`valid_until` is left out of the data when it is `None`)
     ///
     /// # Notes
     ///
@@ -292,7 +298,8 @@ pub trait SmartAccount: CustomAccountInterface {
     /// # Events
     ///
     /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
-    /// * data - `[name: String, valid_until: Option<u32>]`
+    /// * data - `[name: String, valid_until: Option<u32>]` (`valid_until` is
+    ///   left out of the data when it is `None`)
     ///
     /// # Notes
     ///
@@ -324,13 +331,22 @@ pub trait SmartAccount: CustomAccountInterface {
     /// # Events
     ///
     /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
-    /// * data - `[name: String, valid_until: Option<u32>]`
+    /// * data - `[name: String, valid_until: Option<u32>]` (`valid_until` is
+    ///   left out of the data when it is `None`)
     ///
     /// # Notes
     ///
     /// Defaults to requiring authorization from the smart account itself
     /// (`e.current_contract_address().require_auth()`) and then delegating to
     /// [`storage::update_context_rule_valid_until`].
+    ///
+    /// The library does not stop the account from giving an expiry to the last
+    /// context rule that can authorize calls to the account itself (a
+    /// `Default` rule, or a `CallContract` rule for the account's own
+    /// address). Every management function, including
+    /// [`SmartAccount::add_context_rule`], needs such a rule, so once none
+    /// is valid the account is locked permanently. Refer to the caveats in
+    /// the package README.
     fn update_context_rule_valid_until(
         e: &Env,
         context_rule_id: u32,
@@ -364,6 +380,13 @@ pub trait SmartAccount: CustomAccountInterface {
     /// Defaults to requiring authorization from the smart account itself
     /// (`e.current_contract_address().require_auth()`) and then delegating to
     /// [`storage::remove_context_rule`].
+    ///
+    /// The library does not stop the account from removing the last context
+    /// rule that can authorize calls to the account itself (a `Default` rule,
+    /// or a `CallContract` rule for the account's own address). Every
+    /// management function, including [`SmartAccount::add_context_rule`],
+    /// needs such a rule, so once none is valid the account is locked
+    /// permanently. Refer to the caveats in the package README.
     fn remove_context_rule(e: &Env, context_rule_id: u32) {
         e.current_contract_address().require_auth();
         storage::remove_context_rule(e, context_rule_id);
@@ -628,7 +651,8 @@ pub struct ContextRuleAdded {
 ///
 /// * topics - `["context_rule_added", context_rule_id: u32]`
 /// * data - `[name: String, context_type: ContextRuleType, valid_until:
-///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]`
+///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]` (`valid_until`
+///   is left out of the data when it is `None`)
 pub fn emit_context_rule_added(
     e: &Env,
     context_rule_id: u32,
@@ -672,7 +696,8 @@ pub struct ContextRuleMetaUpdated {
 /// # Events
 ///
 /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
-/// * data - `[name: String, valid_until: Option<u32>]`
+/// * data - `[name: String, valid_until: Option<u32>]` (`valid_until` is left
+///   out of the data when it is `None`)
 pub fn emit_context_rule_meta_updated(
     e: &Env,
     context_rule_id: u32,

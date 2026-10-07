@@ -158,7 +158,9 @@ pub(super) fn ln_wad(e: &Env, x: i128) -> Option<i128> {
 ///
 /// Returns `Some(0)` for `x <= EXP_INPUT_MIN` (underflow to 0, matching
 /// Solmate). Returns `None` for `x >= EXP_INPUT_MAX` (would overflow even
-/// in i256-with-2^96-scale).
+/// in i256-with-2^96-scale), and for any `x` whose result does not fit in
+/// `i128`, which is the tighter bound: `x > 46_583_160_257_220_231_983`
+/// (`≈ 46.583 * 10^18`).
 pub(super) fn exp_wad(e: &Env, x: i128) -> Option<i128> {
     if x <= EXP_INPUT_MIN {
         return Some(0);

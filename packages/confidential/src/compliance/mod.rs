@@ -136,7 +136,8 @@ pub trait ConfidentialCompliance: ConfidentialToken {
     /// # Events
     ///
     /// * topics - `["compliance_config_changed"]`
-    /// * data - `[policy: Option<Address>, sac_passthrough: bool]`
+    /// * data - `[policy: Option<Address>, sac_passthrough: bool]` (`policy` is
+    ///   left out of the data when it is `None`)
     ///
     /// # Security Warning
     ///
@@ -239,7 +240,8 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// # Events
     ///
     /// * topics - `["clawback", account: Address]`
-    /// * data - `[amount: i128, destination: Option<Address>]`
+    /// * data - `[amount: i128, destination: Option<Address>]` (`destination`
+    ///   is left out of the data when it is `None`)
     ///
     /// # Security Warning
     ///

@@ -171,14 +171,16 @@ impl MintOverrides for Base {
 /// [`crate::fungible::total_supply::FungibleTotalSupply`] with an empty body
 /// is enough, and the right behavior is picked based on the contract's
 /// `ContractType`. The library ships implementations for its supply-aware
-/// contract types ([`crate::fungible::total_supply::TotalSupply`], the
-/// combined contract types resolved by
-/// [`crate::fungible::combinations::Compose`], `RWA`, `Vault`, `Capped` and
-/// the capped combinations).
+/// contract types: [`crate::fungible::total_supply::TotalSupply`], its
+/// combinations with the list policies (`TotalSupplyAllowList`,
+/// `TotalSupplyBlockList`, `TotalSupplyAllowBlockList`), `RWA`, `Vault`,
+/// `Capped` and the capped combinations.
 ///
 /// Unlike `BurnableOverrides`, there is deliberately no implementation for
 /// [`Base`]: exposing the total supply requires a supply-tracking contract
-/// type.
+/// type. The same holds for the contract types that do not track the supply:
+/// `AllowList`, `BlockList`, `AllowBlockList`, `FungibleVotes` and the votes
+/// combinations.
 pub trait TotalSupplyOverrides {
     fn total_supply(e: &Env) -> i128 {
         total_supply(e)

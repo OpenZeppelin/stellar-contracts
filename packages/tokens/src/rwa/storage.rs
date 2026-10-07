@@ -340,6 +340,11 @@ impl RWA {
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
     ///
+    /// Emitted before the transfer when `amount` exceeds the free (unfrozen)
+    /// balance of `from`, for the part of the frozen tokens that is unfrozen:
+    /// * topics - `["tokens_unfrozen", from: Address]`
+    /// * data - `[amount: i128]`
+    ///
     /// # Notes
     ///
     /// This function bypasses freezing restrictions and can unfreeze tokens
@@ -449,6 +454,12 @@ impl RWA {
     /// * topics - `["burn", user_address: Address]`
     /// * data - `[amount: i128]`
     ///
+    /// Emitted before the burn when `amount` exceeds the free (unfrozen)
+    /// balance of `user_address`, for the part of the frozen tokens that is
+    /// unfrozen:
+    /// * topics - `["tokens_unfrozen", user_address: Address]`
+    /// * data - `[amount: i128]`
+    ///
     /// # Notes
     ///
     /// This function bypasses freezing restrictions and can unfreeze tokens
@@ -535,6 +546,14 @@ impl RWA {
     ///   Address]`
     /// * data - `[]`
     ///
+    /// Emitted only when tokens are moved and the old account has partially
+    /// frozen tokens, which are unfrozen there before the transfer and frozen
+    /// again on the new account after it:
+    /// * topics - `["tokens_unfrozen", old_account: Address]`
+    /// * data - `[amount: i128]`
+    /// * topics - `["tokens_frozen", new_account: Address]`
+    /// * data - `[amount: i128]`
+    ///
     /// # Notes
     ///
     /// This function preserves the frozen status (both partial and full) from
@@ -557,6 +576,11 @@ impl RWA {
     /// This function does not concern itself with the Identity Management.
     /// If the old account's identity should be removed, it should be done on
     /// the Identity Stack.
+    ///
+    /// Allowances are not migrated or revoked: allowances the old account
+    /// granted stay in place (with an empty balance there is nothing to spend
+    /// until the old account receives tokens again), and allowances granted to
+    /// the old account as a spender remain usable by whoever controls it.
     ///
     /// # Security Warning
     ///
@@ -615,8 +639,11 @@ impl RWA {
         true
     }
 
-    /// Sets the frozen status for an address. Frozen wallets cannot send or
-    /// receive funds.
+    /// Sets the frozen status for an address. A frozen wallet cannot send
+    /// tokens from its own balance or receive tokens. The freeze applies to
+    /// the wallet's own balance only: a frozen wallet can still act as the
+    /// spender in [`Self::transfer_from`], moving tokens out of another
+    /// (unfrozen) account within the allowance it was granted.
     ///
     /// # Arguments
     ///
@@ -1037,6 +1064,11 @@ impl RWA {
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
     ///
+    /// For each triple whose `amount` exceeds the free (unfrozen) balance of
+    /// `from`, emitted before its transfer:
+    /// * topics - `["tokens_unfrozen", from: Address]`
+    /// * data - `[amount: i128]`
+    ///
     /// # Notes
     ///
     /// The caller is responsible for sizing the batch to fit the
@@ -1122,6 +1154,11 @@ impl RWA {
     ///
     /// For each address:
     /// * topics - `["burn", user_address: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// For each address whose `amount` exceeds its free (unfrozen) balance,
+    /// emitted before its burn:
+    /// * topics - `["tokens_unfrozen", user_address: Address]`
     /// * data - `[amount: i128]`
     ///
     /// # Notes

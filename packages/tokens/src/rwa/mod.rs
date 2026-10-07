@@ -230,6 +230,11 @@ pub trait RWAToken:
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
     ///
+    /// Emitted before the transfer when `amount` exceeds the free (unfrozen)
+    /// balance of `from`, for the part of the frozen tokens that is unfrozen:
+    /// * topics - `["tokens_unfrozen", from: Address]`
+    /// * data - `[amount: i128]`
+    ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
@@ -259,6 +264,11 @@ pub trait RWAToken:
     ///
     /// For each triple:
     /// * topics - `["transfer", from: Address, to: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// For each triple whose `amount` exceeds the free (unfrozen) balance of
+    /// `from`, emitted before its transfer:
+    /// * topics - `["tokens_unfrozen", from: Address]`
     /// * data - `[amount: i128]`
     ///
     /// # Notes
@@ -370,6 +380,12 @@ pub trait RWAToken:
     /// * topics - `["burn", user_address: Address]`
     /// * data - `[amount: i128]`
     ///
+    /// Emitted before the burn when `amount` exceeds the free (unfrozen)
+    /// balance of `user_address`, for the part of the frozen tokens that is
+    /// unfrozen:
+    /// * topics - `["tokens_unfrozen", user_address: Address]`
+    /// * data - `[amount: i128]`
+    ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
@@ -396,6 +412,11 @@ pub trait RWAToken:
     ///
     /// For each address:
     /// * topics - `["burn", user_address: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// For each address whose `amount` exceeds its free (unfrozen) balance,
+    /// emitted before its burn:
+    /// * topics - `["tokens_unfrozen", user_address: Address]`
     /// * data - `[amount: i128]`
     ///
     /// # Notes
@@ -446,6 +467,14 @@ pub trait RWAToken:
     ///   Address]`
     /// * data - `[]`
     ///
+    /// Emitted only when tokens are moved and the old account has partially
+    /// frozen tokens, which are unfrozen there before the transfer and frozen
+    /// again on the new account after it:
+    /// * topics - `["tokens_unfrozen", old_account: Address]`
+    /// * data - `[amount: i128]`
+    /// * topics - `["tokens_frozen", new_account: Address]`
+    /// * data - `[amount: i128]`
+    ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
@@ -460,10 +489,12 @@ pub trait RWAToken:
         operator: Address,
     ) -> bool;
 
-    /// Sets the frozen status for an address. Frozen addresses cannot send or
-    /// receive tokens. This function can only be called by the operator
-    /// with necessary privileges. RBAC checks are expected to be enforced
-    /// on the `operator`.
+    /// Sets the frozen status for an address. A frozen address cannot send
+    /// tokens from its own balance or receive tokens, but can still act as
+    /// the spender in `transfer_from` within the allowance it was granted
+    /// (refer to [`RWA::set_address_frozen`]). This function can only be
+    /// called by the operator with necessary privileges. RBAC checks are
+    /// expected to be enforced on the `operator`.
     ///
     /// # Arguments
     ///

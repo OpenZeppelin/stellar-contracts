@@ -172,6 +172,7 @@ pub trait Votes {
     ///
     /// * topics - `["delegate_changed", delegator: Address]`
     /// * data - `[from_delegate: Option<Address>, to_delegate: Address]`
+    ///   (`from_delegate` is left out of the data when it is `None`)
     ///
     /// * topics - `["delegate_votes_changed", delegate: Address]`
     /// * data - `[previous_votes: u128, new_votes: u128]`
