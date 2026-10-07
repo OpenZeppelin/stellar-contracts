@@ -3,17 +3,22 @@ extern crate std;
 use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short,
     testutils::{Address as _, Events, MuxedAddress as _},
-    vec, Address, Env, Event, MuxedAddress, String, Vec,
+    vec, Address, Env, Error, Event, MuxedAddress, String, Vec,
 };
-use stellar_contract_utils::pausable;
+use stellar_contract_utils::pausable::{self, Pausable};
 
 use crate::{
-    fungible::{total_supply::TotalSupplyOverrides, ContractOverrides, MuxedTransfer, Transfer},
+    fungible::{
+        capped::{Capped, FungibleCapped},
+        total_supply::{FungibleTotalSupply, TotalSupply, TotalSupplyOverrides},
+        Compose, ContractOverrides, FungibleToken, FungibleTokenError, MintOverrides,
+        MuxedTransfer, Transfer,
+    },
     rwa::{
         compliance::{AccountSnapshot, TransferKind},
         storage::RWAStorageKey,
-        AddressFrozen, Burn, IdentityVerifier, Mint, RWAError, RecoverySuccess, TokensFrozen,
-        TokensUnfrozen, RWA,
+        AddressFrozen, Burn, CappedRWA, IdentityVerifier, Mint, RWAError, RWAToken,
+        RecoverySuccess, TokensFrozen, TokensUnfrozen, RWA,
     },
 };
 
@@ -215,6 +220,45 @@ fn mint_tokens() {
         assert_eq!(RWA::total_supply(&e), 100);
         // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted
         assert_eq!(e.events().all().events().len(), 3);
+    });
+}
+
+// Minting through `MintOverrides` runs RWA's full mint path, the same as the
+// inherent `RWA::mint`: supply accounting and the `Mint` event.
+#[test]
+fn mint_through_mint_overrides_runs_the_rwa_mint() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        <RWA as MintOverrides>::mint(&e, &to, 100);
+        assert_eq!(RWA::balance(&e, &to), 100);
+        assert_eq!(RWA::total_supply(&e), 100);
+        let events = e.events().all();
+        assert_eq!(
+            events.events().last().unwrap(),
+            &Mint { to: to.clone(), amount: 100 }.to_xdr(&e, &address)
+        );
+    });
+}
+
+// Minting through `MintOverrides` keeps RWA's checks: a frozen recipient is
+// rejected.
+#[test]
+#[should_panic(expected = "Error(Contract, #302)")]
+fn mint_through_mint_overrides_keeps_rwa_checks() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        RWA::set_address_frozen(&e, &to, true);
+
+        <RWA as MintOverrides>::mint(&e, &to, 100);
     });
 }
 
@@ -585,6 +629,7 @@ fn recovery_with_zero_balance_returns_false() {
         // No tokens in old account
         let success = RWA::recover_balance(&e, &old_account, &new_account);
         assert!(!success); // Should return false for zero balance
+        assert!(!RWA::is_frozen(&e, &new_account));
     });
 }
 
@@ -1095,6 +1140,35 @@ fn recover_balance_with_both_frozen_tokens_and_address() {
         assert_eq!(RWA::balance(&e, &old_account), 0);
         assert_eq!(RWA::balance(&e, &new_account), 100);
         assert_eq!(RWA::get_frozen_tokens(&e, &new_account), 80);
+        assert!(RWA::is_frozen(&e, &new_account));
+    });
+}
+
+#[test]
+fn recover_balance_with_zero_balance_preserves_frozen_address() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let old_account = Address::generate(&e);
+    let new_account = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        // Set recovery target in the identity verifier contract's storage
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("recovery"), &new_account);
+        });
+
+        // Freeze the address while it holds no tokens
+        RWA::set_address_frozen(&e, &old_account, true);
+        assert!(RWA::is_frozen(&e, &old_account));
+
+        // Nothing to move, but the address freeze must still follow
+        let success = RWA::recover_balance(&e, &old_account, &new_account);
+        assert!(!success);
+
+        assert_eq!(RWA::balance(&e, &new_account), 0);
         assert!(RWA::is_frozen(&e, &new_account));
     });
 }
@@ -1739,4 +1813,322 @@ fn batch_transfer_rejects_an_empty_batch_when_paused() {
 
         RWA::batch_transfer(&e, &from, &Vec::new(&e), &Vec::new(&e));
     });
+}
+
+// ################## CAPPED RWA ##################
+
+#[test]
+fn capped_rwa_mint_runs_the_rwa_mint_path() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        Capped::set_cap(&e, 100);
+
+        <CappedRWA as MintOverrides>::mint(&e, &to, 100);
+
+        assert_eq!(RWA::balance(&e, &to), 100);
+        assert_eq!(<CappedRWA as TotalSupplyOverrides>::total_supply(&e), 100);
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Mint, as for `RWA::mint`
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 3);
+        assert_eq!(
+            events.events().get(2).unwrap(),
+            &Mint { to: to.clone(), amount: 100 }.to_xdr(&e, &address)
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #106)")]
+fn capped_rwa_mint_rejects_exceeding_cap() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        Capped::set_cap(&e, 100);
+
+        CappedRWA::mint(&e, &to, 60);
+        CappedRWA::mint(&e, &to, 41);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #302)")]
+fn capped_rwa_mint_keeps_rwa_checks() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        Capped::set_cap(&e, 100);
+        RWA::set_address_frozen(&e, &to, true);
+
+        CappedRWA::mint(&e, &to, 10);
+    });
+}
+
+#[test]
+fn capped_rwa_batch_mint_up_to_the_cap() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let first = Address::generate(&e);
+    let second = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        Capped::set_cap(&e, 350);
+
+        CappedRWA::batch_mint(&e, &vec![&e, first.clone(), second.clone()], &vec![&e, 100, 250]);
+
+        assert_eq!(RWA::balance(&e, &first), 100);
+        assert_eq!(RWA::balance(&e, &second), 250);
+        assert_eq!(RWA::total_supply(&e), 350);
+    });
+}
+
+// The cap is checked per item against the supply the earlier items produced,
+// so a batch cannot exceed it even when every single item fits.
+#[test]
+#[should_panic(expected = "Error(Contract, #106)")]
+fn capped_rwa_batch_mint_rejects_exceeding_cap() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let first = Address::generate(&e);
+    let second = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        Capped::set_cap(&e, 300);
+
+        CappedRWA::batch_mint(&e, &vec![&e, first, second], &vec![&e, 100, 250]);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #314)")]
+fn capped_rwa_batch_mint_rejects_length_mismatch() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        Capped::set_cap(&e, 1000);
+
+        CappedRWA::batch_mint(&e, &vec![&e, recipient], &vec![&e, 100, 250]);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #302)")]
+fn capped_rwa_transfer_keeps_rwa_checks() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        Capped::set_cap(&e, 1000);
+
+        CappedRWA::mint(&e, &from, 100);
+        RWA::set_address_frozen(&e, &from, true);
+
+        <CappedRWA as ContractOverrides>::transfer(&e, &from, &MuxedAddress::from(to), 10);
+    });
+}
+
+#[test]
+fn capped_rwa_transfer_from_moves_tokens_through_rwa() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+        Capped::set_cap(&e, 1000);
+
+        CappedRWA::mint(&e, &owner, 100);
+        RWA::approve(&e, &owner, &spender, 50, 1000);
+    });
+
+    e.as_contract(&address, || {
+        <CappedRWA as ContractOverrides>::transfer_from(&e, &spender, &owner, &to, 30);
+
+        assert_eq!(RWA::balance(&e, &owner), 70);
+        assert_eq!(RWA::balance(&e, &to), 30);
+        assert_eq!(RWA::allowance(&e, &owner, &spender), 20);
+    });
+}
+
+// A contract composing the capped RWA: `RWAToken` and `FungibleCapped` both
+// accept `CappedRWA`, and the contract's `mint` and `batch_mint` reach the
+// capped entry points through `Self::ContractType`. Access control is left out,
+// since this contract only exercises the dispatch.
+#[contract]
+struct CappedRWAContract;
+
+#[contractimpl]
+impl CappedRWAContract {
+    pub fn __constructor(e: &Env, identity_verifier: Address, compliance: Address, cap: i128) {
+        RWA::set_identity_verifier(e, &identity_verifier);
+        RWA::set_compliance(e, &compliance);
+        Capped::set_cap(e, cap);
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl Pausable for CappedRWAContract {
+    fn pause(e: &Env, _caller: Address) {
+        pausable::pause(e);
+    }
+
+    fn unpause(e: &Env, _caller: Address) {
+        pausable::unpause(e);
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl FungibleToken for CappedRWAContract {
+    type ContractType = Compose<(RWA, Capped, TotalSupply)>;
+}
+
+#[contractimpl(contracttrait)]
+impl FungibleTotalSupply for CappedRWAContract {}
+
+#[contractimpl(contracttrait)]
+impl FungibleCapped for CappedRWAContract {}
+
+#[contractimpl(contracttrait)]
+impl RWAToken for CappedRWAContract {
+    fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128, _operator: Address) {
+        RWA::forced_transfer(e, &from, &to, amount);
+    }
+
+    fn mint(e: &Env, to: Address, amount: i128, _operator: Address) {
+        <Self as FungibleToken>::ContractType::mint(e, &to, amount);
+    }
+
+    fn burn(e: &Env, user_address: Address, amount: i128, _operator: Address) {
+        RWA::burn(e, &user_address, amount);
+    }
+
+    fn recover_balance(
+        e: &Env,
+        old_account: Address,
+        new_account: Address,
+        _operator: Address,
+    ) -> bool {
+        RWA::recover_balance(e, &old_account, &new_account)
+    }
+
+    fn set_address_frozen(e: &Env, user_address: Address, freeze: bool, _operator: Address) {
+        RWA::set_address_frozen(e, &user_address, freeze);
+    }
+
+    fn freeze_partial_tokens(e: &Env, user_address: Address, amount: i128, _operator: Address) {
+        RWA::freeze_partial_tokens(e, &user_address, amount);
+    }
+
+    fn unfreeze_partial_tokens(e: &Env, user_address: Address, amount: i128, _operator: Address) {
+        RWA::unfreeze_partial_tokens(e, &user_address, amount);
+    }
+
+    fn batch_forced_transfer(
+        e: &Env,
+        from_list: Vec<Address>,
+        to_list: Vec<Address>,
+        amounts: Vec<i128>,
+        _operator: Address,
+    ) {
+        RWA::batch_forced_transfer(e, &from_list, &to_list, &amounts);
+    }
+
+    fn batch_mint(e: &Env, to_list: Vec<Address>, amounts: Vec<i128>, _operator: Address) {
+        <Self as FungibleToken>::ContractType::batch_mint(e, &to_list, &amounts);
+    }
+
+    fn batch_burn(e: &Env, user_addresses: Vec<Address>, amounts: Vec<i128>, _operator: Address) {
+        RWA::batch_burn(e, &user_addresses, &amounts);
+    }
+
+    fn batch_set_address_frozen(
+        e: &Env,
+        user_addresses: Vec<Address>,
+        freeze_list: Vec<bool>,
+        _operator: Address,
+    ) {
+        RWA::batch_set_address_frozen(e, &user_addresses, &freeze_list);
+    }
+
+    fn batch_freeze_partial_tokens(
+        e: &Env,
+        user_addresses: Vec<Address>,
+        amounts: Vec<i128>,
+        _operator: Address,
+    ) {
+        RWA::batch_freeze_partial_tokens(e, &user_addresses, &amounts);
+    }
+
+    fn batch_unfreeze_partial_tokens(
+        e: &Env,
+        user_addresses: Vec<Address>,
+        amounts: Vec<i128>,
+        _operator: Address,
+    ) {
+        RWA::batch_unfreeze_partial_tokens(e, &user_addresses, &amounts);
+    }
+
+    fn set_compliance(e: &Env, compliance: Address, _operator: Address) {
+        RWA::set_compliance(e, &compliance);
+    }
+
+    fn set_identity_verifier(e: &Env, identity_verifier: Address, _operator: Address) {
+        RWA::set_identity_verifier(e, &identity_verifier);
+    }
+}
+
+#[test]
+fn capped_rwa_contract_enforces_the_cap_through_the_trait() {
+    let e = Env::default();
+    let identity_verifier = e.register(MockIdentityVerifier, ());
+    let compliance = e.register(MockCompliance, ());
+    let address = e.register(CappedRWAContract, (identity_verifier, compliance, 300_i128));
+    let client = CappedRWAContractClient::new(&e, &address);
+    let operator = Address::generate(&e);
+    let first = Address::generate(&e);
+    let second = Address::generate(&e);
+    let exceeded_cap = Error::from_contract_error(FungibleTokenError::ExceededCap as u32);
+
+    assert_eq!(client.cap(), 300);
+
+    client.mint(&first, &100, &operator);
+    assert_eq!(client.total_supply(), 100);
+
+    // past the cap, through both mint entry points
+    assert_eq!(client.try_mint(&first, &201, &operator), Err(Ok(exceeded_cap)));
+    assert_eq!(
+        client.try_batch_mint(
+            &vec![&e, first.clone(), second.clone()],
+            &vec![&e, 100, 101],
+            &operator
+        ),
+        Err(Ok(exceeded_cap))
+    );
+    assert_eq!(client.total_supply(), 100);
+
+    client.batch_mint(&vec![&e, first.clone(), second.clone()], &vec![&e, 100, 100], &operator);
+    assert_eq!(client.balance(&first), 200);
+    assert_eq!(client.balance(&second), 100);
+    assert_eq!(client.total_supply(), 300);
 }

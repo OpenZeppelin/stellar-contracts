@@ -39,13 +39,13 @@ impl ExampleContract {
     #[only_admin]
     pub fn mint(e: &Env, to: Address) -> u32 {
         // Mint token with sequential ID
-        Base::sequential_mint(e, &to)
+        <Self as NonFungibleToken>::ContractType::mint(e, &to)
     }
 
     #[only_admin]
     pub fn mint_with_royalty(e: &Env, to: Address, receiver: Address, basis_points: u32) -> u32 {
         // Mint token with sequential ID
-        let token_id = Base::sequential_mint(e, &to);
+        let token_id = <Self as NonFungibleToken>::ContractType::mint(e, &to);
 
         // Set token-specific royalty, routed through the contract type so
         // the token existence check matches its ownership model.

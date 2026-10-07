@@ -1,21 +1,25 @@
 # Confidential Token — Agent Guide
 
-Scoped to `packages/tokens/src/confidential/`. The root `CLAUDE.md` still applies in full; this file only covers what is specific to this subtree. The Noir workspace has its own guide at `circuits/CLAUDE.md`.
+Scoped to `packages/confidential/`. The root `CLAUDE.md` still applies in full; this file only covers what is specific to this subtree. The Noir workspace has its own guide at `circuits/CLAUDE.md`.
 
 ## Orientation
 
-The module ships one token contract plus three satellites, each with the standard `mod.rs` / `storage.rs` / `test.rs` shape:
+The crate ships one token contract at its root (`src/lib.rs` / `src/storage.rs` / `src/test.rs`) plus three satellites, each with the standard `mod.rs` / `storage.rs` / `test.rs` shape:
 
 | Path | Role |
 |:---|:---|
-| `mod.rs`, `storage.rs` | The `ConfidentialToken` trait — eleven entry points, of which `revoke_spender` is proofless — and the storage/orchestration layer |
-| `verifier/` | Separate contract holding per-circuit UltraHonk verification keys |
-| `auditor/` | Separate contract holding the auditor key registry |
-| `compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract — plus the opt-in `ConfidentialClawback` trait (`clawback`, `force_revoke_spender`) |
+| `src/lib.rs`, `src/storage.rs` | The `ConfidentialToken` trait — eleven entry points, of which `revoke_spender` is proofless — and the storage/orchestration layer |
+| `src/verifier/` | Separate contract holding per-circuit UltraHonk verification keys |
+| `src/auditor/` | Separate contract holding the auditor key registry |
+| `src/compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract — plus the opt-in `ConfidentialClawback` trait (`clawback`, `force_revoke_spender`) |
 | `circuits/` | Noir workspace, compiled by `nargo`, not `cargo` |
 | `docs/` | The specification set; `docs/README.md` is its map (see below) |
 
 Balances are Pedersen commitments on Grumpkin. Every operation that opens or re-randomizes a commitment carries a proof the contract forwards to the verifier contract; `deposit`, `merge`, and `revoke_spender` are proofless homomorphic folds.
+
+## Packaging
+
+The crate is `lib` only, `publish = false`, and depends on `soroban-sdk` without its `alloc` feature, so contracts built on it supply the global allocator. These depart from the root guide's library conventions for reasons recorded in `README.md#packaging`; keep all three when editing `Cargo.toml`.
 
 ## Errors
 
@@ -35,9 +39,9 @@ Rust and Noir comments cite the docs as `docs/<file>.md#<heading-slug>` paths, a
 
 Beyond the root guide's conventions:
 
-- Proof verification is mocked. `MockVerifier` / `MockAuditor` in `test.rs` stand in for the real contracts, and proofs are empty `Bytes::new(e)`. Do not attempt to generate real proofs in Rust tests.
+- Proof verification is mocked. `MockVerifier` / `MockAuditor` in `src/test.rs` stand in for the real contracts, and proofs are empty `Bytes::new(e)`. Do not attempt to generate real proofs in Rust tests.
 - Use `fixture_point` / `fixture_field`, not arbitrary bytes. The fixtures are canonical and on-curve; random values fail the canonicality guards before reaching any logic under test.
-- Two mocks model proof semantics on purpose: the register mock in `test.rs` binds the first `acct_f` it sees, and `ClawbackReplayGuardVerifier` in `compliance/test.rs` binds the first whole blob, both standing in for UltraHonk's absorption of public inputs, so replay tests are meaningful. Keep that behaviour if either flow changes.
+- Two mocks model proof semantics on purpose: the register mock in `src/test.rs` binds the first `acct_f` it sees, and `ClawbackReplayGuardVerifier` in `src/compliance/test.rs` binds the first whole blob, both standing in for UltraHonk's absorption of public inputs, so replay tests are meaningful. Keep that behaviour if either flow changes.
 
 ## The documentation set
 

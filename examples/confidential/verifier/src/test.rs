@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{testutils::Address as _, Address, Bytes, Env};
-use stellar_tokens::confidential::verifier::CircuitType;
+use stellar_confidential::verifier::CircuitType;
 
 use crate::contract::{ConfidentialVerifierContract, ConfidentialVerifierContractClient};
 
@@ -11,11 +11,7 @@ use crate::contract::{ConfidentialVerifierContract, ConfidentialVerifierContract
 // key would be rejected by `UltraHonkVerifier::new` with `#3403`.
 macro_rules! vk_bin {
     ($name:literal) => {
-        include_bytes!(concat!(
-            "../../../../packages/tokens/src/confidential/circuits/vks/",
-            $name,
-            ".vk.bin"
-        ))
+        include_bytes!(concat!("../../../../packages/confidential/circuits/vks/", $name, ".vk.bin"))
     };
 }
 

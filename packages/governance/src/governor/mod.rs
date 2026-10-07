@@ -861,54 +861,54 @@ pub enum ProposalState {
 #[repr(u32)]
 pub enum GovernorError {
     /// The proposal was not found.
-    ProposalNotFound = 5000,
+    ProposalNotFound = 4200,
     /// The proposal already exists.
-    ProposalAlreadyExists = 5001,
+    ProposalAlreadyExists = 4201,
     /// The proposer does not have enough voting power.
-    InsufficientProposerVotes = 5002,
+    InsufficientProposerVotes = 4202,
     /// The proposal contains no actions.
-    EmptyProposal = 5003,
+    EmptyProposal = 4203,
     /// The targets, functions, and args vectors have different lengths.
-    InvalidProposalLength = 5004,
+    InvalidProposalLength = 4204,
     /// The proposal is not in the active state.
-    ProposalNotActive = 5005,
+    ProposalNotActive = 4205,
     /// The proposal has not succeeded.
-    ProposalNotSuccessful = 5006,
+    ProposalNotSuccessful = 4206,
     /// The proposal has not been queued.
-    ProposalNotQueued = 5007,
+    ProposalNotQueued = 4207,
     /// The proposal has already been executed.
-    ProposalAlreadyExecuted = 5008,
+    ProposalAlreadyExecuted = 4208,
     /// The proposal is in a non-cancellable state (`Canceled`, `Expired`, or
     /// `Executed`).
-    ProposalNotCancellable = 5009,
+    ProposalNotCancellable = 4209,
     /// The voting delay has not been set.
-    VotingDelayNotSet = 5010,
+    VotingDelayNotSet = 4210,
     /// The voting period has not been set.
-    VotingPeriodNotSet = 5011,
+    VotingPeriodNotSet = 4211,
     /// The proposal threshold has not been set.
-    ProposalThresholdNotSet = 5012,
+    ProposalThresholdNotSet = 4212,
     /// The name has not been set.
-    NameNotSet = 5013,
+    NameNotSet = 4213,
     /// The version has not been set.
-    VersionNotSet = 5014,
+    VersionNotSet = 4214,
     /// Arithmetic overflow occurred.
-    MathOverflow = 5015,
+    MathOverflow = 4215,
     /// The account has already voted on this proposal.
-    AlreadyVoted = 5016,
+    AlreadyVoted = 4216,
     /// The vote type is invalid (must be 0, 1, or 2).
-    InvalidVoteType = 5017,
+    InvalidVoteType = 4217,
     /// The quorum has not been set.
-    QuorumNotSet = 5018,
+    QuorumNotSet = 4218,
     /// The token contract has already been set (can only be initialized once).
-    TokenContractAlreadySet = 5019,
+    TokenContractAlreadySet = 4219,
     /// The token contract has not been set.
-    TokenContractNotSet = 5020,
+    TokenContractNotSet = 4220,
     /// The proposal description exceeds the maximum allowed length.
-    DescriptionTooLong = 5021,
+    DescriptionTooLong = 4221,
     /// Queuing is not enabled for this governor.
-    QueueNotEnabled = 5022,
+    QueueNotEnabled = 4222,
     /// The voting period is zero, which would leave every proposal unvotable.
-    InvalidVotingPeriod = 5023,
+    InvalidVotingPeriod = 4223,
 }
 
 // ################## CONSTANTS ##################

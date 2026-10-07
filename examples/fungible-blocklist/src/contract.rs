@@ -46,7 +46,7 @@ impl ExampleContract {
         access_control::grant_role_no_auth(e, &manager, &symbol_short!("manager"), &admin);
 
         // Mint initial supply to the admin
-        Base::mint(e, &admin, initial_supply);
+        <Self as FungibleToken>::ContractType::mint(e, &admin, initial_supply);
     }
 }
 

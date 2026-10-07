@@ -142,7 +142,7 @@ rule).
 
 ```bash
 # WASM release build — catches no_std and target-specific issues
-cargo build --target wasm32v1-none --release --package <name>
+stellar contract build --package <name>
 
 # Unit + integration tests
 cargo test --package <name>
@@ -221,9 +221,10 @@ followed by `mod contract;` and `#[cfg(test)] mod test;`.
   `<Module>Error` (`FungibleTokenError`, `AccessControlError`,
   `OwnableError`, `PausableError`). The enum is `#[derive(Copy, Clone,
   Debug, Eq, PartialEq, PartialOrd, Ord)] #[repr(u32)]`. Numeric codes are
-  sequential within the package's existing range (pausable 1000s, fungible
-  100s, access-control 2000s, ownable 2100s). New errors should stay in
-  the same range as their enum's siblings — do not invent new ranges.
+  unique across `packages/` and sequential within the enum's block from the
+  allocation table in `Architecture.md` (Error Codes). New errors should
+  stay in the same block as their enum's siblings — do not invent new
+  ranges.
 - **Constants**: `UPPER_SNAKE_CASE`. TTL extension constants follow the
   pattern:
   ```rust

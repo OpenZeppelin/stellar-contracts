@@ -155,7 +155,18 @@ pub const SPENDING_LIMIT_TTL_THRESHOLD: u32 = SPENDING_LIMIT_EXTEND_AMOUNT - DAY
 
 /// Maximum number of spending entries to keep in history.
 /// This prevents storage DoS by capping the vector size.
-pub const MAX_HISTORY_ENTRIES: u32 = 1000;
+///
+/// # Notes
+///
+/// The cap is the largest history that still fits in a single ledger entry. A
+/// `SpendingLimitData` holding 816 entries serializes to 65,592 bytes, past the
+/// mainnet `contractDataEntrySizeBytes` limit of 65,536, so a higher cap could
+/// never be enforced: [`enforce`] would fail with an untyped host budget error
+/// before [`SpendingLimitError::HistoryCapacityExceeded`] could be returned.
+/// Raising this value therefore requires a smaller entry or a larger network
+/// limit, which
+/// `spending_history_past_the_cap_exceeds_the_ledger_entry_limit` pins.
+pub const MAX_HISTORY_ENTRIES: u32 = 815;
 
 // ################## QUERY STATE ##################
 

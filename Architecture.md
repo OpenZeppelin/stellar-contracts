@@ -132,6 +132,51 @@ impl ContractOverrides for Consecutive {
 }
 ```
 
+#### Minting Through the Contract Type
+
+Minting is not part of any public trait, because no single `mint` signature
+fits every contract type. The contract type decides what the underlying primitive
+does: `TotalSupply` also increases the supply counter, `Capped` also checks the
+cap, `FungibleVotes` also moves voting units, `Enumerable` also records the token
+in its enumeration lists, and so on.
+
+The contract's own mint function reaches that primitive through the contract
+type:
+
+```rust
+#[only_owner]
+pub fn mint(e: &Env, to: Address, amount: i128) {
+    <Self as FungibleToken>::ContractType::mint(e, &to, amount);
+}
+```
+
+In the contract, `Self::ContractType` is the concrete type `Compose` resolved
+to (e.g. `CappedAllowList`), so this call is that type's own `mint`. Nothing
+has to be imported for it. Calling a specific primitive such as `Base::mint`
+instead would compile and skip the bookkeeping of the selected contract type
+(the supply counter, the cap, the voting units, the enumeration).
+
+The mint primitives each contract type provides follow its storage model:
+
+- fungible: `mint(to, amount)`, on every contract type except `Vault` and
+  `CappedVault`, which have no free mint (their shares are only created
+  against deposited assets);
+- non-fungible, one owner stored per token (`Base`, `Enumerable`, and their
+  votes variants): `mint(to) -> u32` mints the next id of the sequential
+  counter; `mint_with_id(to, token_id)` is also provided for ids chosen by the
+  caller;
+- non-fungible, ownership stored per batch (`Consecutive` and its votes
+  variant): `mint_range(to, amount) -> u32` mints `amount` consecutive ids.
+
+The non-fungible primitives have distinct names on purpose: switching a
+contract between the two storage models breaks the build at the mint call,
+instead of silently turning "mint one token" into "mint a range". Internally,
+the `MintOverrides` traits (`MintOverrides`, `MintWithIdOverrides` and
+`MintRangeOverrides` on the non-fungible side) are
+the checked promise that each contract type has these primitives with these
+exact signatures, and the path for library code that is generic over the
+contract type. Like `ContractOverrides`, contract authors never name them.
+
 #### Benefits of This Approach
 
 1. **Compile-Time Safety**: Incompatible extensions cannot be combined
@@ -188,6 +233,64 @@ pub enum StorageKey {
 
 This library handles extension of storage entries to prevent expiration, except from `instance` storage entry.
 Extending the `instance` storage entries is the responsibility of the contract developer.
+
+## Error Codes
+
+A failed invocation reports `Error(Contract, #N)`, and the code alone does not say which contract in the call tree raised it. Every `#[contracterror]` code in `packages/` is therefore unique across the workspace, and each package owns a disjoint range:
+
+| Range     | Owner                              |
+| :-------- | :--------------------------------- |
+| 100–999   | `stellar-tokens`                   |
+| 1000–1999 | `stellar-contract-utils`           |
+| 2000–2999 | `stellar-access`                   |
+| 3000–3299 | `stellar-accounts`                 |
+| 3300–3699 | `stellar-confidential`             |
+| 3900–3999 | Third-party smart-account policies |
+| 4000–4999 | `stellar-governance`               |
+| 5000–5999 | `stellar-fee-abstraction`          |
+| 6000–6999 | `stellar-zk-email`                 |
+
+The library never allocates codes in 3900–3999; that block is reserved for smart-account policies built outside this repository. Codes below 100 are left to contract-specific errors, as in `examples/`.
+
+Within its package's range, each enum owns a block:
+
+| Block     | Enum                         | Module                                                                  |
+| :-------- | :--------------------------- | :---------------------------------------------------------------------- |
+| 100–199   | `FungibleTokenError`         | `stellar_tokens::fungible`                                              |
+| 200–299   | `NonFungibleTokenError`      | `stellar_tokens::non_fungible`                                          |
+| 300–319   | `RWAError`                   | `stellar_tokens::rwa`                                                   |
+| 320–329   | `IRSError`                   | `stellar_tokens::rwa::identity_verification::identity_registry_storage` |
+| 330–339   | `TokenBinderError`           | `stellar_tokens::rwa::utils::token_binder`                              |
+| 340–349   | `ClaimsError`                | `stellar_tokens::rwa::identity_verification::identity_claims`           |
+| 350–359   | `ClaimIssuerError`           | `stellar_tokens::rwa::identity_verification::claim_issuer`              |
+| 360–369   | `ComplianceError`            | `stellar_tokens::rwa::compliance`                                       |
+| 370–379   | `ClaimTopicsAndIssuersError` | `stellar_tokens::rwa::identity_verification::claim_topics_and_issuers`  |
+| 380–382   | `DocumentError`              | `stellar_tokens::rwa::extensions::doc_manager`                          |
+| 383–399   | `ComplianceModuleError`      | `stellar_tokens::rwa::compliance::modules`                              |
+| 400–499   | `VaultTokenError`            | `stellar_tokens::vault`                                                 |
+| 1000–1099 | `PausableError`              | `stellar_contract_utils::pausable`                                      |
+| 1300–1399 | `MerkleDistributorError`     | `stellar_contract_utils::merkle_distributor`                            |
+| 1400–1499 | `CryptoError`                | `stellar_contract_utils::crypto::error`                                 |
+| 1500–1599 | `SorobanFixedPointError`     | `stellar_contract_utils::math`                                          |
+| 2000–2099 | `AccessControlError`         | `stellar_access::access_control`                                        |
+| 2100–2199 | `OwnableError`               | `stellar_access::ownable`                                               |
+| 2200–2299 | `RoleTransferError`          | `stellar_access::role_transfer`                                         |
+| 3000–3099 | `SmartAccountError`          | `stellar_accounts::smart_account`                                       |
+| 3110–3119 | `WebAuthnError`              | `stellar_accounts::verifiers::webauthn`                                 |
+| 3200–3209 | `SimpleThresholdError`       | `stellar_accounts::policies::simple_threshold`                          |
+| 3210–3219 | `WeightedThresholdError`     | `stellar_accounts::policies::weighted_threshold`                        |
+| 3220–3229 | `SpendingLimitError`         | `stellar_accounts::policies::spending_limit`                            |
+| 3300–3399 | `AuditorError`               | `stellar_confidential::auditor`                                         |
+| 3400–3499 | `VerifierError`              | `stellar_confidential::verifier`                                        |
+| 3500–3599 | `ConfidentialTokenError`     | `stellar_confidential`                                                  |
+| 3600–3699 | `ComplianceError`            | `stellar_confidential::compliance`                                      |
+| 4000–4099 | `TimelockError`              | `stellar_governance::timelock`                                          |
+| 4100–4199 | `VotesError`                 | `stellar_governance::votes`                                             |
+| 4200–4299 | `GovernorError`              | `stellar_governance::governor`                                          |
+| 5000–5099 | `FeeAbstractionError`        | `stellar_fee_abstraction`                                               |
+| 6000–6099 | `DKIMRegistryError`          | `stellar_zk_email::dkim_registry`                                       |
+
+A new variant takes the next free code in its enum's block, and a new enum takes the next free block in its package's range. An enum whose block is full continues in the next free block of its package's range, and that block is added to the enum's row above. `.github/scripts/check_error_codes.py` runs in CI and fails when two enums share a code.
 
 ## Contract Implementation Patterns
 
@@ -296,7 +399,7 @@ The non-fungible token implementation is designed to be compatible with existing
 
 ## Noir Circuits
 
-Token kinds that require zero-knowledge proofs (currently `confidential/`) ship Noir circuits alongside the Soroban contract. Noir is compiled by `nargo`, not `cargo`, and its packages are described by `Nargo.toml`, so the Noir tree forms its own workspace independent of the Cargo workspace — nothing in `Cargo.toml` references it and nothing inside the Noir tree references `Cargo.toml`.
+Packages that require zero-knowledge proofs (currently `confidential/`) ship Noir circuits alongside the Soroban contract. Noir is compiled by `nargo`, not `cargo`, and its packages are described by `Nargo.toml`, so the Noir tree forms its own workspace independent of the Cargo workspace — nothing in `Cargo.toml` references it and nothing inside the Noir tree references `Cargo.toml`.
 
 ### Noir package model
 
@@ -307,10 +410,10 @@ Noir has two package types, declared by `type =` in each `Nargo.toml`:
 
 ### Layout
 
-Noir artifacts for a token kind live under `packages/tokens/src/<kind>/circuits/`:
+Noir artifacts for a package live under `packages/<package>/circuits/`:
 
 ```text
-packages/tokens/src/<kind>/circuits/
+packages/<package>/circuits/
 ├── Nargo.toml               # Nargo workspace manifest
 ├── lib/                     # Shared primitives (type = "lib", no `main`)
 │   ├── src/lib.nr
@@ -328,12 +431,12 @@ The `main.nr` files in `gadgets/` and `<operation>/` are both Noir circuit entry
 
 ### Commands
 
-| Task                            | Command (run from `packages/tokens/src/<kind>/circuits/`) |
-| :------------------------------ | :-------------------------------------------------------- |
-| Type-check the workspace        | `nargo check`                                             |
-| Run all tests                   | `nargo test`                                              |
-| Per-primitive constraint counts | `nargo info`                                              |
-| Compile a single circuit        | `nargo compile --package <name>`                          |
+| Task                            | Command (run from `packages/<package>/circuits/`) |
+| :------------------------------ | :------------------------------------------------ |
+| Type-check the workspace        | `nargo check`                                     |
+| Run all tests                   | `nargo test`                                      |
+| Per-primitive constraint counts | `nargo info`                                      |
+| Compile a single circuit        | `nargo compile --package <name>`                  |
 
 Compiled ACIR and proving artifacts are gitignored; `testdata/*.json` is the only Noir-side artifact committed to the repo.
 

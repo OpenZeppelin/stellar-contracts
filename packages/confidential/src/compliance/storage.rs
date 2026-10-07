@@ -1,7 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, token, Address, Bytes, BytesN, Env};
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
-use crate::confidential::{
+use crate::{
     auditor::ConfidentialAuditorClient,
     compliance::{
         emit_clawback, emit_compliance_config_changed, emit_frozen, emit_unfrozen, ComplianceError,
@@ -24,7 +24,7 @@ use crate::confidential::{
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ComplianceConfig {
     /// Optional external authorization policy (see
-    /// [`crate::confidential::compliance::Policy`]). `None` disables the
+    /// [`crate::compliance::Policy`]). `None` disables the
     /// policy gate.
     pub policy: Option<Address>,
     /// When `true`, the gates additionally consult the underlying SAC's
@@ -36,7 +36,7 @@ pub struct ComplianceConfig {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`crate::confidential::compliance::ConfidentialClawback::clawback`].
+/// [`crate::compliance::ConfidentialClawback::clawback`].
 /// Carries the proof alone: the clawback circuit has no prover-supplied
 /// public inputs, so there is no payload to accompany it.
 #[contracttype]
@@ -223,7 +223,7 @@ pub fn unfreeze(e: &Env, account: &Address) {
 /// The openings alone are not a secret — registration, deposits, and merges
 /// leave them public — so the witness is producible only by the auditor.
 ///
-/// The post-verification update is the [`crate::confidential::storage::merge`]
+/// The post-verification update is the [`crate::storage::merge`]
 /// rule plus a public debit — `C_spend <- C_spend + C_receive - amount * G`
 /// and `C_receive <- O` — with no fresh randomness. The new opening is
 /// `(v_s + v_r - amount, r_s + r_r)`, which both the owner and the auditor
@@ -249,14 +249,12 @@ pub fn unfreeze(e: &Env, account: &Address) {
 /// * [`ComplianceError::InvalidClawbackAmount`] - When `amount <= 0`.
 /// * [`ComplianceError::InvalidClawbackDestination`] - When `destination` is
 ///   `Some` naming this contract's own address.
-/// * refer to [`crate::confidential::storage::get_account`] errors.
-/// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
-///   errors.
-/// * [`crate::confidential::ConfidentialTokenError::NonCanonicalEncoding`] -
-///   When a stored commitment or auditor key coordinate is not a canonical
-///   `Bn254Fr` value.
-/// * [`crate::confidential::ConfidentialTokenError::InvalidProof`] - When the
-///   proof fails verification.
+/// * refer to [`crate::storage::get_account`] errors.
+/// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors.
+/// * [`crate::ConfidentialTokenError::NonCanonicalEncoding`] - When a stored
+///   commitment or auditor key coordinate is not a canonical `Bn254Fr` value.
+/// * [`crate::ConfidentialTokenError::InvalidProof`] - When the proof fails
+///   verification.
 ///
 /// # Events
 ///
@@ -277,7 +275,7 @@ pub fn unfreeze(e: &Env, account: &Address) {
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait entry
-/// point [`crate::confidential::compliance::ConfidentialClawback::clawback`]
+/// point [`crate::compliance::ConfidentialClawback::clawback`]
 /// is responsible for authorizing `operator`.
 pub fn clawback(
     e: &Env,
@@ -353,7 +351,7 @@ pub fn clawback(
 /// Escrowed value is invisible to [`clawback`], which sees only `C_spend` and
 /// `C_receive`; this moves it into reach. The fold itself is the same
 /// proofless primitive the owner's
-/// [`revoke_spender`](crate::confidential::ConfidentialToken::revoke_spender)
+/// [`revoke_spender`](crate::ConfidentialToken::revoke_spender)
 /// uses — only the authorization gate differs.
 ///
 /// # Arguments
@@ -365,7 +363,7 @@ pub fn clawback(
 /// # Errors
 ///
 /// * [`ComplianceError::AccountNotFrozen`] - When `account` is not frozen.
-/// * refer to [`crate::confidential::storage::revoke_spender`] errors.
+/// * refer to [`crate::storage::revoke_spender`] errors.
 ///
 /// # Events
 ///
@@ -376,7 +374,7 @@ pub fn clawback(
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait entry
 /// point
-/// [`crate::confidential::compliance::ConfidentialClawback::force_revoke_spender`]
+/// [`crate::compliance::ConfidentialClawback::force_revoke_spender`]
 /// is responsible for authorizing `operator`.
 pub fn force_revoke_spender(e: &Env, account: &Address, spender: &Address) {
     if !is_frozen(e, account) {

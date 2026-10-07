@@ -55,6 +55,7 @@ jobs:
 
       # Skipped: stellar-fee-abstraction (dev-deps on stellar-tokens, stellar-macros)
       # Skipped: stellar-tokens (depends on stellar-contract-utils, stellar-governance)
+      # Skipped: stellar-confidential (not published to crates.io yet)
       # Skipped: stellar-zk-email (not published to crates.io yet)
 
   publish:

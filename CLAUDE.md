@@ -9,6 +9,7 @@ network. Contracts target `wasm32v1-none`; library crates are `no_std`.
 packages/
 ├── access/          # access_control, ownable, role_transfer
 ├── accounts/        # smart-account policies (multisig, thresholds)
+├── confidential/    # confidential token (encrypted balances, ZK proofs)
 ├── contract-utils/  # pausable, upgradeable, math, crypto, merkle_distributor
 ├── fee-abstraction/ # fee forwarder
 ├── governance/      # governor, timelock, votes
@@ -42,11 +43,15 @@ cargo clippy --release --locked --all-targets -- -D warnings
 # Test the workspace
 cargo test
 
-# WASM release build (per-package; see CI note in .github/workflows/generic.yml)
-cargo build --target wasm32v1-none --release --package <name>
+# WASM release build (per-package; plain `cargo build --target wasm32v1-none`
+# fails since soroban-sdk 28 — spec shaking needs stellar-cli >= 25.2.0)
+stellar contract build --package <name>
 
 # Coverage (CI threshold: 90% line coverage)
 cargo llvm-cov --workspace --fail-under-lines 90
+
+# Error codes (CI fails on a code shared by two #[contracterror] enums)
+python3 .github/scripts/check_error_codes.py
 ```
 
 When iterating, prefer `--package <name>` to avoid rebuilding the whole
@@ -136,9 +141,9 @@ Reversing the two is a common mistake.
 ### Errors, events, sections
 
 - Errors: `#[contracterror] #[derive(Copy, Clone, Debug, Eq, PartialEq,
-  PartialOrd, Ord)] #[repr(u32)]`, PascalCase variants. Stay within the
-  package's existing numeric range (pausable 1000s, fungible 100s,
-  access-control 2000s, ownable 2100s, …) — don't invent new ranges.
+  PartialOrd, Ord)] #[repr(u32)]`, PascalCase variants. Codes are unique
+  across `packages/`: stay within the enum's block from the allocation
+  table in `Architecture.md` (Error Codes) — don't invent new ranges.
 - Events: `#[contractevent]` struct (PascalCase, past-tense or noun) +
   snake_case `pub fn emit_<event>(e: &Env, ...)` helper that
   `.publish(e)`s. Don't call `.publish(e)` directly from `storage.rs` —
@@ -155,6 +160,8 @@ Reversing the two is a common mistake.
 - All packages have `[package.metadata.stellar] cargo_inherit = true`.
 - Workspace fields use `field.workspace = true` shorthand; library crates
   set `crate-type = ["lib", "cdylib"]`, examples set `["cdylib"]` only.
+  `stellar-confidential` is the exception (`["lib"]`, unpublished, no
+  `alloc` feature); see `packages/confidential/README.md#packaging`.
 - Two-step transfer pattern (initiate + accept with `live_until_ledger`)
   for any owner/admin handover. Reuse `role_transfer` rather than rolling
   a new one.

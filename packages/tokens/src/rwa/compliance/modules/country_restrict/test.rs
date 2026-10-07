@@ -254,7 +254,7 @@ fn on_transfer_and_on_created_pass_for_unrestricted_recipient() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #405)")]
+#[should_panic(expected = "Error(Contract, #387)")]
 fn on_transfer_panics_for_restricted_recipient() {
     let e = Env::default();
     let module_id = e.register(TestCountryRestrictContract, ());
@@ -274,7 +274,7 @@ fn on_transfer_panics_for_restricted_recipient() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #405)")]
+#[should_panic(expected = "Error(Contract, #387)")]
 fn on_created_panics_for_restricted_recipient() {
     let e = Env::default();
     let module_id = e.register(TestCountryRestrictContract, ());

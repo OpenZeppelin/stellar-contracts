@@ -270,7 +270,7 @@ fn cancel_proposal() {
 }
 
 #[test]
-#[should_panic(expected = "#5006")]
+#[should_panic(expected = "#4206")]
 fn execute_fails_when_defeated() {
     let s = setup();
     let proposer = Address::generate(&s.e);
@@ -286,12 +286,12 @@ fn execute_fails_when_defeated() {
     // Advance past voting with no votes -> Defeated
     s.e.ledger().set_sequence_number(311);
 
-    // Should panic with ProposalNotSuccessful = 5006
+    // Should panic with ProposalNotSuccessful = 4206
     s.governor.execute(&targets, &functions, &args, &desc_hash, &proposer);
 }
 
 #[test]
-#[should_panic(expected = "#5002")]
+#[should_panic(expected = "#4202")]
 fn propose_fails_with_insufficient_voting_power() {
     let s = setup();
     let proposer = Address::generate(&s.e);
@@ -302,7 +302,7 @@ fn propose_fails_with_insufficient_voting_power() {
     s.e.ledger().set_sequence_number(200);
 
     let (targets, functions, args, description) = build_proposal(&s.e, &s.target.address, 42);
-    // Should panic with InsufficientProposerVotes = 5002
+    // Should panic with InsufficientProposerVotes = 4202
     s.governor.propose(&targets, &functions, &args, &description, &proposer);
 }
 
@@ -462,7 +462,7 @@ fn voting_power_snapshot_at_proposal_creation() {
 }
 
 #[test]
-#[should_panic(expected = "#5005")]
+#[should_panic(expected = "#4205")]
 fn cannot_vote_before_voting_starts() {
     let s = setup();
     let proposer = Address::generate(&s.e);
@@ -477,12 +477,12 @@ fn cannot_vote_before_voting_starts() {
     let proposal_id = s.governor.propose(&targets, &functions, &args, &description, &proposer);
 
     // Try to vote while still Pending (ledger 200 <= vote_snapshot 210)
-    // Should panic with ProposalNotActive = 5005
+    // Should panic with ProposalNotActive = 4205
     s.governor.cast_vote(&proposal_id, &1, &String::from_str(&s.e, ""), &voter);
 }
 
 #[test]
-#[should_panic(expected = "#5005")]
+#[should_panic(expected = "#4205")]
 fn cannot_vote_after_voting_ends() {
     let s = setup();
     let proposer = Address::generate(&s.e);
@@ -499,6 +499,6 @@ fn cannot_vote_after_voting_ends() {
     // Advance past voting end
     s.e.ledger().set_sequence_number(311);
 
-    // Should panic with ProposalNotActive = 5005
+    // Should panic with ProposalNotActive = 4205
     s.governor.cast_vote(&proposal_id, &1, &String::from_str(&s.e, ""), &voter);
 }

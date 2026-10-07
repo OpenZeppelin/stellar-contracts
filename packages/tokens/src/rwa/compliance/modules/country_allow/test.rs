@@ -251,7 +251,7 @@ fn on_transfer_and_on_created_pass_for_allowed_recipient() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #404)")]
+#[should_panic(expected = "Error(Contract, #386)")]
 fn on_transfer_panics_for_disallowed_recipient() {
     let e = Env::default();
     let module_id = e.register(TestCountryAllowContract, ());
@@ -268,7 +268,7 @@ fn on_transfer_panics_for_disallowed_recipient() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #404)")]
+#[should_panic(expected = "Error(Contract, #386)")]
 fn on_created_panics_for_disallowed_recipient() {
     let e = Env::default();
     let module_id = e.register(TestCountryAllowContract, ());

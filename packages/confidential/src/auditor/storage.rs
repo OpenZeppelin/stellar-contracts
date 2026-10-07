@@ -1,7 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, BytesN, Env, TryFromVal, Val};
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
-use crate::confidential::auditor::{
+use crate::auditor::{
     emit_auditor_registered, emit_auditor_rotated, AuditorError, AUDITOR_KEY_EXTEND_AMOUNT,
     AUDITOR_KEY_TTL_THRESHOLD,
 };

@@ -29,6 +29,7 @@ members = [
     "examples/upgradeable/*",
     "packages/accounts",
     "packages/access",
+    "packages/confidential",
     "packages/contract-utils",
     "packages/fee-abstraction",
     "packages/governance",
@@ -53,10 +54,8 @@ categories = ["no-std", "wasm"]
 version = "0.7.1"
 
 [workspace.dependencies]
-soroban-sdk = { version = "27.0.2", features = [
-    "experimental_spec_shaking_v2",
-] }
-soroban-poseidon = "27.0.0"
+soroban-sdk = "28.0.0"
+soroban-poseidon = "28.0.0"
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
@@ -72,11 +71,12 @@ serde-json-core = { version = "0.6.0", default-features = false }
 # UltraHonk proof-verification backend for the confidential token. Pinned to a
 # specific commit because the upstream crate has no tagged release. The pinned
 # commit carries the remediation of the OpenZeppelin audit performed at 661db07.
-ultrahonk-soroban-verifier = { git = "https://github.com/NethermindEth/rs-soroban-ultrahonk", rev = "c2160987260284c656ffbdad8344210fc162b177", package = "ultrahonk_soroban_verifier", default-features = false }
+ultrahonk-soroban-verifier = { git = "https://github.com/NethermindEth/rs-soroban-ultrahonk", rev = "097da17df8b0b971d71885566034958a8caebab4", package = "ultrahonk_soroban_verifier", default-features = false }
 
 # members
 stellar-access = { path = "packages/access", version = "0.7.1" }
 stellar-accounts = { path = "packages/accounts", version = "0.7.1" }
+stellar-confidential = { path = "packages/confidential", version = "0.7.1" }
 stellar-contract-utils = { path = "packages/contract-utils", version = "0.7.1" }
 stellar-fee-abstraction = { path = "packages/fee-abstraction", version = "0.7.1" }
 stellar-governance = { path = "packages/governance", version = "0.7.1" }

@@ -5,11 +5,11 @@ on:
     branches:
       - main
     paths:
-      - "packages/tokens/src/confidential/circuits/**"
+      - "packages/confidential/circuits/**"
       - ".github/workflows/noir.yml"
   pull_request:
     paths:
-      - "packages/tokens/src/confidential/circuits/**"
+      - "packages/confidential/circuits/**"
       - ".github/workflows/noir.yml"
   workflow_dispatch:
 
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: packages/tokens/src/confidential/circuits
+        working-directory: packages/confidential/circuits
 
     steps:
       - name: git checkout
@@ -105,7 +105,7 @@ jobs:
               echo "If this is intentional, regenerate VKs in this PR:"
               echo ""
               echo '```'
-              echo "cd packages/tokens/src/confidential/circuits"
+              echo "cd packages/confidential/circuits"
               echo "./scripts/extract_vks.sh"
               echo "./scripts/build_vk_bins.sh"
               echo '```'
@@ -145,7 +145,7 @@ jobs:
               echo "If this is intentional, regenerate the baseline in this PR:"
               echo ""
               echo '```'
-              echo "cd packages/tokens/src/confidential/circuits"
+              echo "cd packages/confidential/circuits"
               echo "LC_ALL=C nargo info | grep '^|' | LC_ALL=C sort > constraints.baseline"
               echo '```'
               echo ""

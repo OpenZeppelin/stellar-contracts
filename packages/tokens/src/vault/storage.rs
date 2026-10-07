@@ -1,9 +1,15 @@
 use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
-use stellar_contract_utils::math::{i128_fixed_point::mul_div_with_rounding, Rounding};
+use stellar_contract_utils::math::{
+    i128_fixed_point::{checked_mul_div_with_rounding, mul_div_with_rounding},
+    Rounding,
+};
 
 use crate::{
     fungible::{
-        total_supply::{decrease_total_supply, increase_total_supply, TotalSupplyOverrides},
+        capped::{check_cap, query_cap, CappedContractType},
+        total_supply::{
+            decrease_total_supply, increase_total_supply, total_supply, TotalSupplyOverrides,
+        },
         Base, ContractOverrides,
     },
     vault::{emit_deposit, emit_withdraw, VaultTokenError, MAX_DECIMALS_OFFSET},
@@ -20,6 +26,297 @@ impl ContractOverrides for Vault {
 // The vault's share math requires the total supply of shares, so the vault
 // contract type is inherently supply-aware.
 impl TotalSupplyOverrides for Vault {}
+
+/// Internal override hook for [`crate::vault::FungibleVault`].
+///
+/// # Why this trait exists
+///
+/// `FungibleVault` used to require `ContractType = Vault` exactly, so there
+/// was only one possible vault behavior, and a contract type built on the
+/// vault (such as [`CappedVault`]) could not change any of it. Every
+/// `FungibleVault` method delegates to `Self::ContractType::{function_name}`,
+/// the same routing `ContractOverrides` gives `FungibleToken`, and this trait
+/// is what that call reaches. `FungibleVault` now requires it on the
+/// contract's `ContractType`.
+///
+/// Every method defaults to the [`Vault`] function of the same name, so
+/// [`Vault`] implements it with an empty body and behaves exactly as before.
+/// A contract type built on the vault overrides only the methods it changes:
+/// [`CappedVault`] overrides `max_deposit`, `deposit`, `max_mint` and `mint`,
+/// and keeps the defaults for the rest.
+///
+/// # Note
+///
+/// Like `ContractOverrides`, this trait is internal plumbing of the library.
+/// There is no need to implement or import it: implementing
+/// [`crate::vault::FungibleVault`] with an empty body is enough, and the
+/// behavior is picked based on the contract's `ContractType`.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not a vault contract type, so `FungibleVault` cannot be implemented",
+    note = "list `Vault` in the `Compose` list, e.g. `Compose<(Vault, TotalSupply)>`"
+)]
+pub trait VaultOverrides {
+    fn query_asset(e: &Env) -> Address {
+        Vault::query_asset(e)
+    }
+
+    fn total_assets(e: &Env) -> i128 {
+        Vault::total_assets(e)
+    }
+
+    fn convert_to_shares(e: &Env, assets: i128) -> i128 {
+        Vault::convert_to_shares(e, assets)
+    }
+
+    fn convert_to_assets(e: &Env, shares: i128) -> i128 {
+        Vault::convert_to_assets(e, shares)
+    }
+
+    fn max_deposit(e: &Env, receiver: Address) -> i128 {
+        Vault::max_deposit(e, receiver)
+    }
+
+    fn preview_deposit(e: &Env, assets: i128) -> i128 {
+        Vault::preview_deposit(e, assets)
+    }
+
+    fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128 {
+        Vault::deposit(e, assets, receiver, from, operator)
+    }
+
+    fn max_mint(e: &Env, receiver: Address) -> i128 {
+        Vault::max_mint(e, receiver)
+    }
+
+    fn preview_mint(e: &Env, shares: i128) -> i128 {
+        Vault::preview_mint(e, shares)
+    }
+
+    fn mint(e: &Env, shares: i128, receiver: Address, from: Address, operator: Address) -> i128 {
+        Vault::mint(e, shares, receiver, from, operator)
+    }
+
+    fn max_withdraw(e: &Env, owner: Address) -> i128 {
+        Vault::max_withdraw(e, owner)
+    }
+
+    fn preview_withdraw(e: &Env, assets: i128) -> i128 {
+        Vault::preview_withdraw(e, assets)
+    }
+
+    fn withdraw(
+        e: &Env,
+        assets: i128,
+        receiver: Address,
+        owner: Address,
+        operator: Address,
+    ) -> i128 {
+        Vault::withdraw(e, assets, receiver, owner, operator)
+    }
+
+    fn max_redeem(e: &Env, owner: Address) -> i128 {
+        Vault::max_redeem(e, owner)
+    }
+
+    fn preview_redeem(e: &Env, shares: i128) -> i128 {
+        Vault::preview_redeem(e, shares)
+    }
+
+    fn redeem(e: &Env, shares: i128, receiver: Address, owner: Address, operator: Address) -> i128 {
+        Vault::redeem(e, shares, receiver, owner, operator)
+    }
+}
+
+impl VaultOverrides for Vault {}
+
+/// Contract type enforcing a maximum supply of shares on top of [`Vault`],
+/// resolved by `Compose<(Vault, Capped, TotalSupply)>`.
+///
+/// The cap (refer to [`crate::fungible::capped::Capped`]) bounds the number of
+/// shares in circulation. It is enforced on both share-creating entry points,
+/// `deposit` and `mint`, and reflected in `max_deposit` and `max_mint`, so the
+/// limits the vault reports are the limits it enforces, as ERC-4626 requires.
+/// Withdrawals, redemptions, conversions and previews are the [`Vault`] ones.
+///
+/// A deposit or mint that would exceed the cap fails with
+/// [`crate::fungible::FungibleTokenError::ExceededCap`], as on every other
+/// capped contract type.
+pub struct CappedVault;
+
+impl CappedContractType for CappedVault {}
+
+// The share math of the vault requires the total supply of shares, and the
+// capped variant reads the same counter.
+impl TotalSupplyOverrides for CappedVault {}
+
+impl ContractOverrides for CappedVault {
+    fn decimals(e: &Env) -> u32 {
+        Vault::decimals(e)
+    }
+}
+
+// Only the four entry points the cap touches are overridden.
+impl VaultOverrides for CappedVault {
+    fn max_deposit(e: &Env, receiver: Address) -> i128 {
+        CappedVault::max_deposit(e, receiver)
+    }
+
+    fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128 {
+        CappedVault::deposit(e, assets, receiver, from, operator)
+    }
+
+    fn max_mint(e: &Env, receiver: Address) -> i128 {
+        CappedVault::max_mint(e, receiver)
+    }
+
+    fn mint(e: &Env, shares: i128, receiver: Address, from: Address, operator: Address) -> i128 {
+        CappedVault::mint(e, shares, receiver, from, operator)
+    }
+}
+
+impl CappedVault {
+    /// Returns the amount of shares that can still be minted before the cap
+    /// is reached, and never more than [`Vault::max_mint`]. Returns `0` when
+    /// the supply is at or above the cap (the cap may have been lowered below
+    /// the current supply, refer to [`crate::fungible::capped::set_cap`]).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `receiver` - The address that would receive the vault shares.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`query_cap`] errors.
+    pub fn max_mint(e: &Env, receiver: Address) -> i128 {
+        let remaining = query_cap(e).saturating_sub(total_supply(e)).max(0);
+        remaining.min(Vault::max_mint(e, receiver))
+    }
+
+    /// Returns the amount of underlying assets that can still be deposited
+    /// before the cap is reached, and never more than [`Vault::max_deposit`].
+    ///
+    /// The remaining shares are converted to assets rounding down, so
+    /// depositing this amount never mints more shares than
+    /// [`CappedVault::max_mint`] allows.
+    ///
+    /// Two edge cases, both far outside normal operation:
+    ///
+    /// * Returns `0` when the vault's totals are too large for any deposit to
+    ///   succeed: `deposit` computes `total_assets + 1` and `total_supply +
+    ///   10^offset`, and panics when either overflows.
+    /// * Returns `i128::MAX` when the remaining room under the cap, in assets,
+    ///   is larger than any `i128` amount (a very high share price with a large
+    ///   cap): every deposit amount then fits under the cap.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `receiver` - The address that would receive the vault shares.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`query_cap`] errors.
+    pub fn max_deposit(e: &Env, receiver: Address) -> i128 {
+        let remaining_shares = CappedVault::max_mint(e, receiver.clone());
+        if remaining_shares == 0 {
+            return 0;
+        }
+
+        // Same formula as `Vault::convert_to_assets_with_rounding`, with every
+        // step checked instead of panicking, since this is a view.
+        let (Some(y), Some(denominator)) = (
+            Vault::total_assets(e).checked_add(1),
+            10_i128
+                .checked_pow(Vault::get_decimals_offset(e))
+                .and_then(|pow| total_supply(e).checked_add(pow)),
+        ) else {
+            // `deposit` computes these same two sums and panics when they
+            // overflow, so no deposit is possible in this state.
+            return 0;
+        };
+        // Past this point, overflow only means the remaining room under the
+        // cap, in assets, is larger than any `i128` amount: every deposit fits.
+        let remaining_assets =
+            checked_mul_div_with_rounding(e, remaining_shares, y, denominator, Rounding::Floor)
+                .unwrap_or(i128::MAX);
+        remaining_assets.min(Vault::max_deposit(e, receiver))
+    }
+
+    /// Deposits `assets` if the shares it mints fit under the cap.
+    ///
+    /// The shares are computed with [`Vault::preview_deposit`], the same
+    /// computation [`Vault::deposit`] performs against the same state, so the
+    /// cap is checked against the exact amount that is minted.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `assets` - The amount of underlying assets to deposit.
+    /// * `receiver` - The address that will receive the minted vault shares.
+    /// * `from` - The address that will provide the underlying assets.
+    /// * `operator` - The address performing the deposit operation.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`check_cap`] errors.
+    /// * refer to [`Vault::deposit`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["deposit", operator: Address, from: Address, receiver:
+    ///   Address]`
+    /// * data - `[assets: i128, shares: i128]`
+    ///
+    /// # Notes
+    ///
+    /// Authorization from `operator` is required.
+    pub fn deposit(
+        e: &Env,
+        assets: i128,
+        receiver: Address,
+        from: Address,
+        operator: Address,
+    ) -> i128 {
+        check_cap(e, Vault::preview_deposit(e, assets), total_supply(e));
+        Vault::deposit(e, assets, receiver, from, operator)
+    }
+
+    /// Mints `shares` if they fit under the cap.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `shares` - The amount of vault shares to mint.
+    /// * `receiver` - The address that will receive the minted vault shares.
+    /// * `from` - The address that will provide the underlying assets.
+    /// * `operator` - The address performing the mint operation.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`check_cap`] errors.
+    /// * refer to [`Vault::mint`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["deposit", operator: Address, from: Address, receiver:
+    ///   Address]`
+    /// * data - `[assets: i128, shares: i128]`
+    ///
+    /// # Notes
+    ///
+    /// Authorization from `operator` is required.
+    pub fn mint(
+        e: &Env,
+        shares: i128,
+        receiver: Address,
+        from: Address,
+        operator: Address,
+    ) -> i128 {
+        check_cap(e, shares, total_supply(e));
+        Vault::mint(e, shares, receiver, from, operator)
+    }
+}
 
 /// Storage keys for the data associated with the vault extension
 #[contracttype]
@@ -295,14 +592,27 @@ impl Vault {
     }
 
     /// Returns the maximum amount of vault shares that can be redeemed
-    /// by the given owner (equal to their vault share balance).
+    /// by the given owner.
+    ///
+    /// This is the owner's vault share balance, or `0` when that balance is
+    /// worth zero assets (see [`VaultTokenError::VaultZeroAssets`]).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - The address that owns the vault shares.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`Self::convert_to_assets()`] errors.
     pub fn max_redeem(e: &Env, owner: Address) -> i128 {
-        Self::balance(e, &owner)
+        let shares = Self::balance(e, &owner);
+        // `redeem` rejects burning shares for zero assets, so a balance
+        // worth less than one unit of the asset cannot be redeemed at all.
+        if Self::convert_to_assets(e, shares) == 0 {
+            return 0;
+        }
+        shares
     }
 
     /// Simulates and returns the amount of underlying assets that would be
@@ -488,6 +798,12 @@ impl Vault {
     ///
     /// * [`VaultTokenError::VaultExceededMaxRedeem`] - When attempting to
     ///   redeem more shares than the maximum allowed for the owner.
+    /// * [`VaultTokenError::VaultZeroAssets`] - When a positive amount of
+    ///   shares would redeem zero assets while the owner's balance is worth at
+    ///   least one unit of the asset. When the whole balance is worth zero
+    ///   assets, [`Self::max_redeem`] is `0` and the redemption fails with
+    ///   [`VaultTokenError::VaultExceededMaxRedeem`] instead.
+    /// * also refer to [`Self::max_redeem()`] errors.
     /// * also refer to [`Self::preview_redeem()`] errors.
     ///
     /// # Events
@@ -513,6 +829,9 @@ impl Vault {
             panic_with_error!(e, VaultTokenError::VaultExceededMaxRedeem);
         }
         let assets = Self::preview_redeem(e, shares);
+        if assets == 0 && shares > 0 {
+            panic_with_error!(e, VaultTokenError::VaultZeroAssets);
+        }
         Self::withdraw_internal(e, &receiver, &owner, assets, shares, &operator);
         emit_withdraw(e, &operator, &receiver, &owner, assets, shares);
 
