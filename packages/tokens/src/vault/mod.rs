@@ -121,12 +121,22 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: Vault
     }
 
     /// Returns the maximum amount of underlying assets that can be deposited
-    /// for the given receiver address (currently `i128::MAX`).
+    /// for the given receiver address.
+    ///
+    /// This is `max_mint` converted to assets rounding down, so
+    /// depositing this amount never mints more shares than the vault accepts.
+    /// Returns `0` when the vault's totals are too large for any deposit to
+    /// succeed.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that would receive the vault shares.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::vault::VaultTokenError::VaultAssetAddressNotSet`] - When the
+    ///   vault's underlying asset address has not been initialized.
     fn max_deposit(e: &Env, receiver: Address) -> i128 {
         Self::ContractType::max_deposit(e, receiver)
     }
@@ -188,12 +198,30 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: Vault
     }
 
     /// Returns the maximum amount of vault shares that can be minted
-    /// for the given receiver address (currently `i128::MAX`).
+    /// for the given receiver address.
+    ///
+    /// Two limits apply, and the smaller one is returned:
+    ///
+    /// * The share supply must stay below `i128::MAX - 10^offset`, because
+    ///   every conversion computes `total_supply + 10^offset`. So at most
+    ///   `i128::MAX - 10^offset - total_supply` more shares can be minted.
+    /// * Minting has to be paid for in assets, and the payment cannot exceed
+    ///   `i128::MAX`. Once a share is worth more than one asset base unit, this
+    ///   caps the shares at what `i128::MAX` assets buy at the current price.
+    ///
+    /// Returns `0` when the share supply has reached its limit, or when the
+    /// vault holds `i128::MAX` assets (no mint can succeed then, because
+    /// `total_assets + 1` overflows).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that would receive the vault shares.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::vault::VaultTokenError::VaultAssetAddressNotSet`] - When the
+    ///   vault's underlying asset address has not been initialized.
     fn max_mint(e: &Env, receiver: Address) -> i128 {
         Self::ContractType::max_mint(e, receiver)
     }
