@@ -55,6 +55,12 @@
 //!
 //! The supply is stored in its own `persistent` entry, ensuring that mints
 //! and burns only conflict with each other and never with plain transfers.
+//!
+//! Up to `stellar-tokens` v0.7.x, the supply was tracked by
+//! [`crate::fungible::Base`] in `instance` storage. A token upgraded in place
+//! from such a version has to move it with [`migrate_total_supply`] right
+//! after the upgrade, otherwise its supply reads as `0` and burns panic. The
+//! `examples/upgradeable` `v1` / `v2` contracts show the full upgrade.
 
 pub mod storage;
 
@@ -63,8 +69,8 @@ mod test;
 
 use soroban_sdk::{contracttrait, Env};
 pub use storage::{
-    decrease_total_supply, increase_total_supply, mint, total_supply, TotalSupply,
-    TotalSupplyStorageKey,
+    decrease_total_supply, increase_total_supply, migrate_total_supply, mint, total_supply,
+    TotalSupply, TotalSupplyStorageKey,
 };
 
 // The trait is defined alongside its siblings (`ContractOverrides`,

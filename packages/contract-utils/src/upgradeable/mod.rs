@@ -233,9 +233,11 @@
 //! where the rollback-specific logic is defined and performed as a migration.
 //!
 //! See the `examples/upgradeable/` directory for full examples:
-//! - `v1` / `v2` — eager migration of bounded instance storage, with an
+//! - `v1` / `v2`: eager migration of a single entry, upgrading a fungible token
+//!   built with `stellar-tokens` v0.7.x (total supply in `instance` storage) to
+//!   the current library (total supply in a `persistent` entry), with an
 //!   `Upgrader` helper that atomically combines upgrade+migrate.
-//! - `lazy-v1` / `lazy-v2` — lazy per-entry migration of unbounded persistent
+//! - `lazy-v1` / `lazy-v2`: lazy per-entry migration of unbounded persistent
 //!   storage, where entries are converted on first read after the upgrade.
 
 mod storage;
