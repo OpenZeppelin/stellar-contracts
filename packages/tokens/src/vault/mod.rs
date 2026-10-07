@@ -193,10 +193,7 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: Vault
     ///
     /// # Notes
     ///
-    /// Authorization from `operator` is required, and the contract type
-    /// requests it (refer to [`Vault::deposit`]). An override must not call
-    /// `operator.require_auth()` again: a second authorization request for the
-    /// same address in one invocation fails.
+    /// Authorization from `operator` is required.
     fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128 {
         Self::ContractType::deposit(e, assets, receiver, from, operator)
     }
@@ -278,10 +275,7 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: Vault
     ///
     /// # Notes
     ///
-    /// Authorization from `operator` is required, and the contract type
-    /// requests it (refer to [`Vault::mint`]). An override must not call
-    /// `operator.require_auth()` again: a second authorization request for the
-    /// same address in one invocation fails.
+    /// Authorization from `operator` is required.
     fn mint(e: &Env, shares: i128, receiver: Address, from: Address, operator: Address) -> i128 {
         Self::ContractType::mint(e, shares, receiver, from, operator)
     }
@@ -348,10 +342,7 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: Vault
     ///
     /// # Notes
     ///
-    /// Authorization from `operator` is required, and the contract type
-    /// requests it (refer to [`Vault::withdraw`]). An override must not call
-    /// `operator.require_auth()` again: a second authorization request for the
-    /// same address in one invocation fails.
+    /// Authorization from `operator` is required.
     fn withdraw(
         e: &Env,
         assets: i128,
@@ -434,10 +425,7 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: Vault
     ///
     /// # Notes
     ///
-    /// Authorization from `operator` is required, and the contract type
-    /// requests it (refer to [`Vault::redeem`]). An override must not call
-    /// `operator.require_auth()` again: a second authorization request for the
-    /// same address in one invocation fails.
+    /// Authorization from `operator` is required.
     fn redeem(e: &Env, shares: i128, receiver: Address, owner: Address, operator: Address) -> i128 {
         Self::ContractType::redeem(e, shares, receiver, owner, operator)
     }
