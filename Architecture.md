@@ -341,7 +341,7 @@ The non-fungible token implementation is designed to be compatible with existing
 
 ## Noir Circuits
 
-Token kinds that require zero-knowledge proofs (currently `confidential/`) ship Noir circuits alongside the Soroban contract. Noir is compiled by `nargo`, not `cargo`, and its packages are described by `Nargo.toml`, so the Noir tree forms its own workspace independent of the Cargo workspace — nothing in `Cargo.toml` references it and nothing inside the Noir tree references `Cargo.toml`.
+Packages that require zero-knowledge proofs (currently `confidential/`) ship Noir circuits alongside the Soroban contract. Noir is compiled by `nargo`, not `cargo`, and its packages are described by `Nargo.toml`, so the Noir tree forms its own workspace independent of the Cargo workspace — nothing in `Cargo.toml` references it and nothing inside the Noir tree references `Cargo.toml`.
 
 ### Noir package model
 
@@ -352,10 +352,10 @@ Noir has two package types, declared by `type =` in each `Nargo.toml`:
 
 ### Layout
 
-Noir artifacts for a token kind live under `packages/tokens/src/<kind>/circuits/`:
+Noir artifacts for a package live under `packages/<package>/circuits/`:
 
 ```text
-packages/tokens/src/<kind>/circuits/
+packages/<package>/circuits/
 ├── Nargo.toml               # Nargo workspace manifest
 ├── lib/                     # Shared primitives (type = "lib", no `main`)
 │   ├── src/lib.nr
@@ -373,12 +373,12 @@ The `main.nr` files in `gadgets/` and `<operation>/` are both Noir circuit entry
 
 ### Commands
 
-| Task                            | Command (run from `packages/tokens/src/<kind>/circuits/`) |
-| :------------------------------ | :-------------------------------------------------------- |
-| Type-check the workspace        | `nargo check`                                             |
-| Run all tests                   | `nargo test`                                              |
-| Per-primitive constraint counts | `nargo info`                                              |
-| Compile a single circuit        | `nargo compile --package <name>`                          |
+| Task                            | Command (run from `packages/<package>/circuits/`) |
+| :------------------------------ | :------------------------------------------------ |
+| Type-check the workspace        | `nargo check`                                     |
+| Run all tests                   | `nargo test`                                      |
+| Per-primitive constraint counts | `nargo info`                                      |
+| Compile a single circuit        | `nargo compile --package <name>`                  |
 
 Compiled ACIR and proving artifacts are gitignored; `testdata/*.json` is the only Noir-side artifact committed to the repo.
 

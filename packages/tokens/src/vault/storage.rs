@@ -622,14 +622,27 @@ impl Vault {
     }
 
     /// Returns the maximum amount of vault shares that can be redeemed
-    /// by the given owner (equal to their vault share balance).
+    /// by the given owner.
+    ///
+    /// This is the owner's vault share balance, or `0` when that balance is
+    /// worth zero assets (see [`VaultTokenError::VaultZeroAssets`]).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - The address that owns the vault shares.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`Self::convert_to_assets()`] errors.
     pub fn max_redeem(e: &Env, owner: Address) -> i128 {
-        Self::balance(e, &owner)
+        let shares = Self::balance(e, &owner);
+        // `redeem` rejects burning shares for zero assets, so a balance
+        // worth less than one unit of the asset cannot be redeemed at all.
+        if Self::convert_to_assets(e, shares) == 0 {
+            return 0;
+        }
+        shares
     }
 
     /// Simulates and returns the amount of underlying assets that would be
@@ -827,6 +840,12 @@ impl Vault {
     ///
     /// * [`VaultTokenError::VaultExceededMaxRedeem`] - When attempting to
     ///   redeem more shares than the maximum allowed for the owner.
+    /// * [`VaultTokenError::VaultZeroAssets`] - When a positive amount of
+    ///   shares would redeem zero assets while the owner's balance is worth at
+    ///   least one unit of the asset. When the whole balance is worth zero
+    ///   assets, [`Self::max_redeem`] is `0` and the redemption fails with
+    ///   [`VaultTokenError::VaultExceededMaxRedeem`] instead.
+    /// * also refer to [`Self::max_redeem()`] errors.
     /// * also refer to [`Self::preview_redeem()`] errors.
     ///
     /// # Events
@@ -852,6 +871,9 @@ impl Vault {
             panic_with_error!(e, VaultTokenError::VaultExceededMaxRedeem);
         }
         let assets = Self::preview_redeem(e, shares);
+        if assets == 0 && shares > 0 {
+            panic_with_error!(e, VaultTokenError::VaultZeroAssets);
+        }
         Self::withdraw_internal(e, &receiver, &owner, assets, shares, &operator);
         emit_withdraw(e, &operator, &receiver, &owner, assets, shares);
 

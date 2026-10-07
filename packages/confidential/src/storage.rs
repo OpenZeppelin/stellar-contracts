@@ -5,7 +5,7 @@ use soroban_sdk::{
 };
 use stellar_contract_utils::crypto::grumpkin::{Grumpkin, Point};
 
-use crate::confidential::{
+use crate::{
     auditor::ConfidentialAuditorClient,
     emit_address_as_field_set, emit_auditor_set, emit_deposit, emit_merge, emit_register,
     emit_revoke_spender, emit_set_spender, emit_spender_transfer, emit_transfer,
@@ -90,7 +90,7 @@ pub struct SpenderDelegation {
 // while keeping a single `data: Bytes` wire-format parameter at the trait
 // surface.
 
-/// Payload for [`crate::confidential::ConfidentialToken::register`].
+/// Payload for [`crate::ConfidentialToken::register`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegisterPayload {
@@ -99,7 +99,7 @@ pub struct RegisterPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`crate::confidential::ConfidentialToken::register`].
+/// [`crate::ConfidentialToken::register`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegisterData {
@@ -107,7 +107,7 @@ pub struct RegisterData {
     pub proof: Bytes,
 }
 
-/// Payload for [`crate::confidential::ConfidentialToken::withdraw`].
+/// Payload for [`crate::ConfidentialToken::withdraw`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WithdrawPayload {
@@ -120,7 +120,7 @@ pub struct WithdrawPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`crate::confidential::ConfidentialToken::withdraw`].
+/// [`crate::ConfidentialToken::withdraw`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WithdrawData {
@@ -129,7 +129,7 @@ pub struct WithdrawData {
 }
 
 /// Payload for
-/// [`crate::confidential::ConfidentialToken::confidential_transfer`].
+/// [`crate::ConfidentialToken::confidential_transfer`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransferPayload {
@@ -147,7 +147,7 @@ pub struct TransferPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`crate::confidential::ConfidentialToken::confidential_transfer`].
+/// [`crate::ConfidentialToken::confidential_transfer`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransferData {
@@ -156,7 +156,7 @@ pub struct TransferData {
 }
 
 /// Payload for
-/// [`crate::confidential::ConfidentialToken::confidential_transfer_from`].
+/// [`crate::ConfidentialToken::confidential_transfer_from`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpenderTransferPayload {
@@ -174,7 +174,7 @@ pub struct SpenderTransferPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`crate::confidential::ConfidentialToken::confidential_transfer_from`].
+/// [`crate::ConfidentialToken::confidential_transfer_from`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpenderTransferData {
@@ -182,7 +182,7 @@ pub struct SpenderTransferData {
     pub proof: Bytes,
 }
 
-/// Payload for [`crate::confidential::ConfidentialToken::set_spender`].
+/// Payload for [`crate::ConfidentialToken::set_spender`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SetSpenderPayload {
@@ -201,7 +201,7 @@ pub struct SetSpenderPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`crate::confidential::ConfidentialToken::set_spender`].
+/// [`crate::ConfidentialToken::set_spender`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SetSpenderData {
@@ -391,8 +391,7 @@ pub fn delegation_exists(e: &Env, owner: &Address, spender: &Address) -> bool {
 ///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
-/// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
-///   errors.
+/// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors.
 ///
 /// # Events
 ///
@@ -553,8 +552,7 @@ pub fn merge(e: &Env, account: &Address) {
 ///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
-/// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
-///   errors.
+/// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors.
 ///
 /// # Events
 ///
@@ -648,8 +646,7 @@ pub fn withdraw(
 ///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
-/// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
-///   errors.
+/// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors.
 ///
 /// # Events
 ///
@@ -744,8 +741,7 @@ pub fn confidential_transfer(
 ///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
-/// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
-///   errors.
+/// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors.
 ///
 /// # Events
 ///
@@ -858,8 +854,7 @@ pub fn confidential_transfer_from(
 ///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
-/// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
-///   errors.
+/// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors.
 ///
 /// # Events
 ///
@@ -1151,7 +1146,7 @@ pub fn set_address_as_field_element(e: &Env) {
 /// preserves balance conservation
 /// (`docs/protocol/security.md#balance-conservation`) is the caller's
 /// obligation. It exists for the compliance module's clawback flow
-/// ([`crate::confidential::compliance::storage::clawback`]), which discharges
+/// ([`crate::compliance::storage::clawback`]), which discharges
 /// that obligation in-circuit before calling.
 pub(crate) fn set_commitments(e: &Env, account: &Address, c_spend: &Point, c_receive: &Point) {
     let mut data = get_account(e, account);

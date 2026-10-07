@@ -429,6 +429,136 @@ fn redeem_exceeds_max() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #412)")]
+fn redeem_zero_assets() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 100, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, 6);
+
+    e.mock_all_auths();
+
+    let shares = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 100, user.clone(), user.clone(), user.clone())
+    });
+
+    e.as_contract(&vault_address, || {
+        assert_eq!(Vault::max_redeem(&e, user.clone()), shares);
+        // 1 share is worth 101 / (100 * 10^6 + 10^6) assets, which rounds to 0.
+        assert_eq!(Vault::preview_redeem(&e, 1), 0);
+
+        Vault::redeem(&e, 1, user.clone(), user.clone(), user.clone());
+    });
+}
+
+#[test]
+fn max_redeem_zero_after_clawback() {
+    let e = Env::default();
+    let issuer = Address::generate(&e);
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &user);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.mock_all_auths();
+
+    let shares = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 1_000, user.clone(), user.clone(), user.clone())
+    });
+    // Asset taken out of the vault without any vault function being called.
+    asset_client.transfer(&vault_address, &issuer, &1_000);
+
+    e.as_contract(&vault_address, || {
+        assert_eq!(Vault::total_assets(&e), 0);
+        assert_eq!(Base::balance(&e, &user), shares);
+        assert_eq!(Vault::preview_redeem(&e, shares), 0);
+        assert_eq!(Vault::max_redeem(&e, user.clone()), 0);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #408)")]
+fn redeem_after_clawback_is_rejected() {
+    let e = Env::default();
+    let issuer = Address::generate(&e);
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &user);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.mock_all_auths();
+
+    let shares = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 1_000, user.clone(), user.clone(), user.clone())
+    });
+    asset_client.transfer(&vault_address, &issuer, &1_000);
+
+    e.as_contract(&vault_address, || {
+        Vault::redeem(&e, shares, user.clone(), user.clone(), user.clone());
+    });
+}
+
+#[test]
+fn redeem_max_redeem_after_clawback_is_a_no_op() {
+    let e = Env::default();
+    let issuer = Address::generate(&e);
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &user);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.mock_all_auths();
+
+    let shares = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 1_000, user.clone(), user.clone(), user.clone())
+    });
+    asset_client.transfer(&vault_address, &issuer, &1_000);
+
+    e.as_contract(&vault_address, || {
+        // `redeem(max_redeem(owner))` must not revert (ERC-4626), even when
+        // `max_redeem` is 0 because the balance is worth zero assets.
+        let max_shares = Vault::max_redeem(&e, user.clone());
+        assert_eq!(max_shares, 0);
+        let assets = Vault::redeem(&e, max_shares, user.clone(), user.clone(), user.clone());
+
+        assert_eq!(assets, 0);
+        assert_eq!(Base::balance(&e, &user), shares);
+        assert_eq!(total_supply(&e), shares);
+    });
+}
+
+#[test]
+fn max_redeem_matches_redeem_for_dust_balance() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let dust_holder = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 100, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, 6);
+
+    e.mock_all_auths();
+
+    let shares = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 100, user.clone(), user.clone(), user.clone())
+    });
+    e.as_contract(&vault_address, || {
+        Base::transfer(&e, &user, &dust_holder.clone().into(), 1);
+    });
+
+    e.as_contract(&vault_address, || {
+        // A balance worth zero assets cannot be redeemed, and says so.
+        assert_eq!(Base::balance(&e, &dust_holder), 1);
+        assert_eq!(Vault::max_redeem(&e, dust_holder.clone()), 0);
+
+        // A balance worth assets can be redeemed in full.
+        let max_shares = Vault::max_redeem(&e, user.clone());
+        assert_eq!(max_shares, shares - 1);
+        let assets = Vault::redeem(&e, max_shares, user.clone(), user.clone(), user.clone());
+        assert!(assets > 0);
+        assert_eq!(Base::balance(&e, &user), 0);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #401)")]
 fn asset_address_already_set() {
     let e = Env::default();

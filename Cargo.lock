@@ -520,9 +520,9 @@ version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
+ "stellar-confidential",
  "stellar-contract-utils",
  "stellar-macros",
- "stellar-tokens",
 ]
 
 [[package]]
@@ -531,8 +531,8 @@ version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
+ "stellar-confidential",
  "stellar-macros",
- "stellar-tokens",
 ]
 
 [[package]]
@@ -2429,6 +2429,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-confidential"
+version = "0.7.1"
+dependencies = [
+ "soroban-poseidon",
+ "soroban-sdk",
+ "stellar-contract-utils",
+ "ultrahonk_soroban_verifier",
+]
+
+[[package]]
 name = "stellar-contract-utils"
 version = "0.7.1"
 dependencies = [
@@ -2494,12 +2504,10 @@ dependencies = [
  "ed25519-dalek",
  "k256",
  "p256",
- "soroban-poseidon",
  "soroban-sdk",
  "soroban-test-helpers",
  "stellar-contract-utils",
  "stellar-governance",
- "ultrahonk_soroban_verifier",
 ]
 
 [[package]]

@@ -2,7 +2,7 @@ extern crate std;
 
 use soroban_sdk::{contract, testutils::Events, Bytes, Env};
 
-use crate::confidential::verifier::{
+use crate::verifier::{
     storage::{
         get_verification_key, register_verification_key, update_verification_key, verify_proof,
         VerifierStorageKey,
