@@ -170,7 +170,7 @@ fn set_time_transfer_limit_adds_and_updates_entries() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #402)")]
+#[should_panic(expected = "Error(Contract, #384)")]
 fn set_time_transfer_limit_panics_at_bound() {
     let e = Env::default();
     let module_id = e.register(TestTimeTransfersLimitsContract, ());
@@ -260,7 +260,7 @@ fn remove_time_transfer_limit_removes_entry() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #403)")]
+#[should_panic(expected = "Error(Contract, #385)")]
 fn remove_time_transfer_limit_panics_when_missing() {
     let e = Env::default();
     let module_id = e.register(TestTimeTransfersLimitsContract, ());
@@ -298,7 +298,7 @@ fn batch_set_and_remove_time_transfer_limits() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #401)")]
+#[should_panic(expected = "Error(Contract, #383)")]
 fn on_transfer_panics_when_amount_alone_exceeds_cap() {
     let e = Env::default();
     let module_id = e.register(TestTimeTransfersLimitsContract, ());
@@ -486,7 +486,7 @@ fn on_transfer_skips_when_no_limits_configured() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #401)")]
+#[should_panic(expected = "Error(Contract, #383)")]
 fn on_transfer_panics_when_limit_exceeded() {
     let e = Env::default();
     let module_id = e.register(TestTimeTransfersLimitsContract, ());

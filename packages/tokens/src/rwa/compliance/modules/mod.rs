@@ -261,6 +261,22 @@ pub trait ComplianceModule {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum ComplianceModuleError {
+    /// A transfer would push the sender identity's cumulative volume above a
+    /// configured time-window limit.
+    TransferLimitExceeded = 383,
+    /// Adding another time-window limit would exceed the per-token bound.
+    LimitBoundExceeded = 384,
+    /// No time-window limit exists for the given window duration.
+    LimitNotFound = 385,
+    /// The transfer recipient's country is not on the allowlist.
+    CountryNotAllowed = 386,
+    /// The transfer recipient's country is on the restriction list.
+    CountryRestricted = 387,
+    /// Neither transfer party is on the allowlist.
+    UserNotAllowed = 388,
+    /// A mint or preset would push a wallet's lock entries above the
+    /// per-wallet bound.
+    LockBoundExceeded = 389,
     /// An amount argument is negative when it must be non-negative.
     InvalidAmount = 390,
     /// Arithmetic overflow in a checked addition.
@@ -285,22 +301,6 @@ pub enum ComplianceModuleError {
     /// A transfer or burn would consume more unlocked tokens than the sender
     /// holds.
     InsufficientUnlockedBalance = 399,
-    /// A transfer would push the sender identity's cumulative volume above a
-    /// configured time-window limit.
-    TransferLimitExceeded = 401,
-    /// Adding another time-window limit would exceed the per-token bound.
-    LimitBoundExceeded = 402,
-    /// No time-window limit exists for the given window duration.
-    LimitNotFound = 403,
-    /// The transfer recipient's country is not on the allowlist.
-    CountryNotAllowed = 404,
-    /// The transfer recipient's country is on the restriction list.
-    CountryRestricted = 405,
-    /// Neither transfer party is on the allowlist.
-    UserNotAllowed = 406,
-    /// A mint or preset would push a wallet's lock entries above the
-    /// per-wallet bound.
-    LockBoundExceeded = 407,
 }
 
 // ################## CONSTANTS ##################

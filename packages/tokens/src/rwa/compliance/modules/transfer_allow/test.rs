@@ -125,7 +125,7 @@ fn on_transfer_refreshes_sender_ttl_when_recipient_allowlisted() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #406)")]
+#[should_panic(expected = "Error(Contract, #388)")]
 fn on_transfer_panics_when_neither_party_allowlisted() {
     let e = Env::default();
     let module_id = e.register(TestTransferAllowContract, ());
@@ -169,7 +169,7 @@ fn on_transfer_recovery_is_exempt_from_policy() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #406)")]
+#[should_panic(expected = "Error(Contract, #388)")]
 fn allowlist_is_tracked_per_token() {
     let e = Env::default();
     let module_id = e.register(TestTransferAllowContract, ());
@@ -224,7 +224,7 @@ fn disallow_user_is_noop_when_not_present() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #406)")]
+#[should_panic(expected = "Error(Contract, #388)")]
 fn disallow_user_revokes_access() {
     let e = Env::default();
     let module_id = e.register(TestTransferAllowContract, ());

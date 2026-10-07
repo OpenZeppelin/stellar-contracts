@@ -142,7 +142,7 @@ fn on_created_pruning_keeps_active_locks() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #407)")]
+#[should_panic(expected = "Error(Contract, #389)")]
 fn on_created_panics_at_lock_bound() {
     let e = Env::default();
     let module_id = e.register(TestInitialLockupPeriodContract, ());
@@ -219,7 +219,7 @@ fn on_created_prunes_expired_zero_amount_locks() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #407)")]
+#[should_panic(expected = "Error(Contract, #389)")]
 fn preset_locks_panics_above_lock_bound() {
     let e = Env::default();
     let module_id = e.register(TestInitialLockupPeriodContract, ());
