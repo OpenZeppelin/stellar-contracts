@@ -1,11 +1,13 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Env, MuxedAddress, String};
+use soroban_sdk::{
+    contract, contracttype, testutils::Address as _, xdr::ToXdr, Address, Env, MuxedAddress, String,
+};
 
 use crate::fungible::{
     extensions::total_supply::{
-        decrease_total_supply, increase_total_supply, mint, total_supply, TotalSupply,
-        TotalSupplyOverrides,
+        decrease_total_supply, increase_total_supply, migrate_total_supply, mint, total_supply,
+        TotalSupply, TotalSupplyOverrides, TotalSupplyStorageKey,
     },
     overrides::BurnableOverrides,
     Base, ContractOverrides,
@@ -151,5 +153,77 @@ fn decrease_total_supply_underflow_panics() {
     let address = e.register(MockContract, ());
     e.as_contract(&address, || {
         decrease_total_supply(&e, 1);
+    });
+}
+
+/// Copy of the storage key enum of `stellar-tokens` v0.7.x, which stored the
+/// total supply in `instance` storage under `TotalSupply`.
+#[contracttype]
+enum LegacyFungibleStorageKey {
+    Meta,
+    TotalSupply,
+    Balance(Address),
+}
+
+#[test]
+fn legacy_key_encodes_as_current_key() {
+    let e = Env::default();
+    assert_eq!(
+        LegacyFungibleStorageKey::TotalSupply.to_xdr(&e),
+        TotalSupplyStorageKey::TotalSupply.to_xdr(&e)
+    );
+}
+
+#[test]
+fn migrate_total_supply_moves_legacy_supply() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    e.as_contract(&address, || {
+        e.storage().instance().set(&LegacyFungibleStorageKey::TotalSupply, &1000i128);
+        assert_eq!(total_supply(&e), 0);
+
+        assert_eq!(migrate_total_supply(&e), 1000);
+        assert_eq!(total_supply(&e), 1000);
+        assert!(!e.storage().instance().has(&LegacyFungibleStorageKey::TotalSupply));
+    });
+}
+
+#[test]
+fn migrate_total_supply_adds_to_post_upgrade_mints() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let account = Address::generate(&e);
+    e.as_contract(&address, || {
+        e.storage().instance().set(&LegacyFungibleStorageKey::TotalSupply, &1000i128);
+        mint(&e, &account, 300);
+
+        assert_eq!(migrate_total_supply(&e), 1000);
+        assert_eq!(total_supply(&e), 1300);
+    });
+}
+
+#[test]
+fn migrate_total_supply_without_legacy_supply_is_noop() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let account = Address::generate(&e);
+    e.as_contract(&address, || {
+        mint(&e, &account, 100);
+
+        assert_eq!(migrate_total_supply(&e), 0);
+        assert_eq!(total_supply(&e), 100);
+    });
+}
+
+#[test]
+fn migrate_total_supply_twice_migrates_once() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    e.as_contract(&address, || {
+        e.storage().instance().set(&LegacyFungibleStorageKey::TotalSupply, &1000i128);
+
+        assert_eq!(migrate_total_supply(&e), 1000);
+        assert_eq!(migrate_total_supply(&e), 0);
+        assert_eq!(total_supply(&e), 1000);
     });
 }

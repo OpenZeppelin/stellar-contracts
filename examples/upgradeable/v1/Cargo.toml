@@ -14,11 +14,15 @@ cargo_inherit = true
 crate-type = ["cdylib"]
 doctest = false
 
+# Pinned to the v0.7.2 release on purpose: this contract stands for a token
+# deployed before the total supply moved out of instance storage. `v2` is
+# built against the current workspace and migrates the stored supply.
 [dependencies]
-soroban-sdk = { workspace = true }
-stellar-contract-utils = { workspace = true }
-stellar-access = { workspace = true }
-stellar-macros = { workspace = true }
+soroban-sdk = { version = "=26.1.0", features = ["experimental_spec_shaking_v2"] }
+stellar-access = "=0.7.2"
+stellar-contract-utils = "=0.7.2"
+stellar-macros = "=0.7.2"
+stellar-tokens = "=0.7.2"
 
 [dev-dependencies]
-soroban-sdk = { workspace = true, features = ["testutils"] }
+soroban-sdk = { version = "=26.1.0", features = ["experimental_spec_shaking_v2", "testutils"] }

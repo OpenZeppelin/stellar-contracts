@@ -143,6 +143,53 @@ pub fn mint(e: &Env, to: &Address, amount: i128) {
     Base::mint(e, to, amount);
 }
 
+/// Moves a total supply recorded by `stellar-tokens` v0.7.x or earlier to the
+/// `persistent` entry used by this extension, and returns the migrated amount
+/// (`0` when there is nothing to migrate).
+///
+/// Up to v0.7.x, [`crate::fungible::Base`] tracked the total supply in
+/// `instance` storage. A token upgraded in place from such a version keeps
+/// that entry, while the current library reads the supply from a `persistent`
+/// entry that does not exist yet. Until this function runs, [`total_supply`]
+/// returns `0` and burns panic, as the burned amount exceeds the recorded
+/// supply.
+///
+/// The old key is `FungibleStorageKey::TotalSupply`. A `#[contracttype]` enum
+/// variant is stored by its name only, so it is the same key as
+/// [`TotalSupplyStorageKey::TotalSupply`], read from `instance` storage.
+///
+/// The old supply is added to the `persistent` entry instead of overwriting
+/// it, so tokens minted between the upgrade and the migration stay accounted
+/// for. The `instance` entry is removed, so calling this function again
+/// migrates nothing.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * refer to [`increase_total_supply`] errors.
+///
+/// # Security Warning
+///
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+///
+/// It is meant to be called once, from an access-controlled migration
+/// function that runs right after the upgrade, ideally in the same
+/// transaction. A schema version guard
+/// (`stellar_contract_utils::upgradeable::get_schema_version`) is
+/// recommended to prevent the migration from running more than once.
+pub fn migrate_total_supply(e: &Env) -> i128 {
+    let key = TotalSupplyStorageKey::TotalSupply;
+    let Some(legacy_supply) = e.storage().instance().get::<_, i128>(&key) else {
+        return 0;
+    };
+    increase_total_supply(e, legacy_supply);
+    e.storage().instance().remove(&key);
+    legacy_supply
+}
+
 // ################## LOW-LEVEL HELPERS ##################
 
 /// Adds `amount` to the total supply.
