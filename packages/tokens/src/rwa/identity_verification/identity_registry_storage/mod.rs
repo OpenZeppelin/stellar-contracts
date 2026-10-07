@@ -499,7 +499,8 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// `account` holds a non-zero balance in any linked token, so that
     /// identity-keyed compliance state is never orphaned. If `account`
     /// is in the process of identity recovery, it also rejects removal
-    /// while the old account of that recovery still holds a balance;
+    /// while the old account of that recovery still holds a balance. Refer to
+    /// its documentation.
     fn remove_identity(e: &Env, account: Address, operator: Address);
 
     /// Recovers an identity by transferring it from an old account to a new

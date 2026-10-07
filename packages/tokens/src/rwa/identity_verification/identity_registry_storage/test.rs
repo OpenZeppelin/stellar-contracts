@@ -1442,3 +1442,48 @@ fn recover_identity_onward_after_balance_moved_succeeds() {
         assert_eq!(stored_identity(&e, &account3), identity);
     });
 }
+
+#[test]
+fn remove_identity_of_recovery_target_deletes_recovered_from_link() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let token = e.register(MockToken, ());
+    let token_client = MockTokenClient::new(&e, &token);
+
+    let old_account = Address::generate(&e);
+    let new_account = Address::generate(&e);
+    let identity = Address::generate(&e);
+    let other_identity = Address::generate(&e);
+
+    e.as_contract(&contract_id, || {
+        let country = CountryData { country: residence(840), metadata: None };
+
+        bind_token(&e, &token);
+        add_identity(&e, &old_account, &identity, IdentityType::Individual, &vec![&e, country]);
+        recover_identity(&e, &old_account, &new_account);
+
+        remove_identity(&e, &new_account);
+        assert_eq!(get_recovered_to(&e, &old_account), Some(new_account.clone()));
+    });
+
+    // Removing `new_account` deleted its `RecoveredFrom` link, so it is an
+    // ordinary wallet again: a balance showing up on the old account later
+    // no longer blocks removing `new_account`. If the link were kept, the
+    // second removal below would panic with `AccountHasBalance`.
+    token_client.set_balance(&old_account, &100);
+
+    e.as_contract(&contract_id, || {
+        let country = CountryData { country: residence(840), metadata: None };
+
+        add_identity(
+            &e,
+            &new_account,
+            &other_identity,
+            IdentityType::Individual,
+            &vec![&e, country],
+        );
+        assert_eq!(stored_identity(&e, &new_account), other_identity);
+
+        remove_identity(&e, &new_account);
+    });
+}

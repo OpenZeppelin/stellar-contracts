@@ -31,11 +31,11 @@ pub use storage::{
 ///
 /// Implementation notes:
 /// - All token addresses live in a single `Vec<Address>` ledger entry. At most
-///   [`MAX_TOKENS`] = 100 tokens can be bound to a single contract: the cap is
-///   deliberately small enough that a sweep making one cross-contract call per
-///   bound token fits in a single transaction, and it keeps the whole list a
-///   few kilobytes, far below the per-entry size limit. Refer to [`MAX_TOKENS`]
-///   for the sizing rationale.
+///   [`MAX_TOKENS`] = 75 tokens can be bound to a single contract: the cap is
+///   deliberately small enough that a sweep making up to two cross-contract
+///   calls per bound token fits in a single transaction, and it keeps the whole
+///   list a few kilobytes, far below the per-entry size limit. Refer to
+///   [`MAX_TOKENS`] for the sizing rationale.
 /// - With Protocol 23, reading live Soroban state is inexpensive. Lookups are
 ///   therefore cheap, and storage remains simple with no reverse mapping;
 ///   membership checks (`is_token_bound()`) linearly scan the list.
@@ -108,19 +108,20 @@ pub const TOKEN_BINDER_TTL_THRESHOLD: u32 = TOKEN_BINDER_EXTEND_AMOUNT - DAY_IN_
 
 /// Max. number of Token addresses.
 ///
-/// The cap is sized so that operations sweeping every bound token with one
-/// cross-contract call each (such as the identity registry's zero-balance
-/// check on `remove_identity`) fit within a single transaction. The binding
-/// constraint on current Mainnet is the 400 footprint entries allowed per
-/// transaction: each swept token touches up to three distinct entries
-/// (contract instance, contract code, one data entry), so 100 tokens consume
-/// at most ~300 entries and leave room for the caller's own footprint. CPU
-/// stays well within budget at this size. Current limits are listed at
-/// <https://lab.stellar.org/network-limits>.
+/// The cap is sized so that operations sweeping every bound token fit within
+/// a single transaction. The binding constraint on current Mainnet is the 400
+/// footprint entries allowed per transaction. The largest sweep is the
+/// identity registry's `remove_identity` on an account that got its identity
+/// from a recovery: it reads the balance of both the account and the old
+/// account of that recovery, so each token touches up to four distinct
+/// entries (contract instance, contract code, two balance entries). 75 tokens
+/// consume at most ~300 entries and leave room for the caller's own
+/// footprint. CPU stays well within budget at this size. Current limits are
+/// listed at <https://lab.stellar.org/network-limits>.
 ///
 /// The cap also keeps the whole token list viable as a single ledger entry:
-/// 100 addresses take a few kilobytes, far below the 64 KB per-entry limit.
-pub const MAX_TOKENS: u32 = 100;
+/// 75 addresses take a few kilobytes, far below the 64 KB per-entry limit.
+pub const MAX_TOKENS: u32 = 75;
 
 // ################## EVENTS ##################
 
