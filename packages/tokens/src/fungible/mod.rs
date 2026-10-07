@@ -236,7 +236,9 @@ pub trait FungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[to_muxed_id: Option<u64>, amount: i128]`
+    /// * data - `amount: i128` (when `to` has no muxed ID)
+    /// * data - `{to_muxed_id: Option<u64>, amount: i128}` (when `to` has a
+    ///   muxed ID)
     fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
         Self::ContractType::transfer(e, &from, &to, amount);
     }

@@ -556,7 +556,8 @@ impl Wad {
     /// base, use [`Wad::powf`]. `Wad::exp` is the inverse of [`Wad::ln`]
     ///
     /// Returns `0` for inputs below `≈ -41.446` (the result truncates to 0 in
-    /// WAD precision). Panics for inputs at or above `≈ 135.305` (overflow).
+    /// WAD precision). Panics for inputs above `≈ 46.583` (exactly, above
+    /// `46.583160257220231983`), where `e^self` no longer fits in `i128`.
     ///
     /// # Arguments
     ///
@@ -581,7 +582,8 @@ impl Wad {
     /// Checked version of [`Wad::exp`]. Computes `e^self` where `e` is
     /// Euler's number; not a power function.
     ///
-    /// Returns `None` if the input is at or above the overflow bound.
+    /// Returns `None` if the result does not fit in `i128`, i.e. for inputs
+    /// above `≈ 46.583` (refer to [`Wad::exp`]).
     pub fn checked_exp(self, e: &Env) -> Option<Self> {
         exp_wad(e, self.0).map(Wad)
     }

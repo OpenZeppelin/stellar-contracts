@@ -15,7 +15,9 @@ use crate::fungible::{
 
 /// Contract type combining the [`AllowList`] and [`BlockList`] transfer
 /// policies: an account has to be allowed and must not be blocked to send,
-/// receive, approve or burn tokens.
+/// receive, approve or burn tokens. Minting does not check either list, as for
+/// [`AllowList`] and [`BlockList`]: the recipient is chosen by the contract's
+/// own (authorized) mint entry point.
 ///
 /// The blocklist is checked first, so an account that is both blocked and not
 /// allowed fails with [`FungibleTokenError::UserBlocked`].
@@ -105,8 +107,10 @@ impl AllowBlockList {
 }
 
 /// Contract type combining the [`AllowList`] transfer policy with vote
-/// checkpoints: every mint, transfer and burn goes through the list policy and
-/// moves the corresponding voting units.
+/// checkpoints: every transfer, approval and burn goes through the list policy,
+/// and every mint, transfer and burn moves the corresponding voting units.
+/// Minting does not check the list policy, as for the list contract types on
+/// their own.
 pub struct AllowListVotes;
 
 impl ContractOverrides for AllowListVotes {
@@ -167,8 +171,10 @@ impl AllowListVotes {
 }
 
 /// Contract type combining the [`BlockList`] transfer policy with vote
-/// checkpoints: every mint, transfer and burn goes through the list policy and
-/// moves the corresponding voting units.
+/// checkpoints: every transfer, approval and burn goes through the list policy,
+/// and every mint, transfer and burn moves the corresponding voting units.
+/// Minting does not check the list policy, as for the list contract types on
+/// their own.
 pub struct BlockListVotes;
 
 impl ContractOverrides for BlockListVotes {
@@ -229,8 +235,10 @@ impl BlockListVotes {
 }
 
 /// Contract type combining both list policies ([`AllowBlockList`]) with vote
-/// checkpoints: every mint, transfer and burn goes through the list policy and
-/// moves the corresponding voting units.
+/// checkpoints: every transfer, approval and burn goes through the list policy,
+/// and every mint, transfer and burn moves the corresponding voting units.
+/// Minting does not check the list policy, as for the list contract types on
+/// their own.
 pub struct AllowBlockListVotes;
 
 impl ContractOverrides for AllowBlockListVotes {

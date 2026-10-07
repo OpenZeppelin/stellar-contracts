@@ -41,10 +41,13 @@ use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 ///
 /// # Security Considerations
 ///
-/// ⚠️ **IMPORTANT**: Most low-level functions for this trait bypass
-/// authorization checks by design. It is the implementer's responsibility to
-/// add appropriate access controls, typically by combining with Ownable or
-/// Access Control patterns.
+/// The trait methods that move assets or shares (`deposit`, `mint`,
+/// `withdraw`, `redeem`) require authorization from `operator` through the
+/// contract type. The low-level functions on [`Vault`] (e.g.
+/// `Vault::deposit_internal`) bypass authorization checks by design. A
+/// contract that calls them directly is responsible for adding the
+/// appropriate access controls, typically by combining with Ownable or Access
+/// Control patterns.
 ///
 /// # Compatibility
 ///
@@ -188,11 +191,12 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: Vault
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
-    /// # Security Warning
+    /// # Notes
     ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// Authorization for the operator must be handled at a higher level.
+    /// Authorization from `operator` is required, and the contract type
+    /// requests it (refer to [`Vault::deposit`]). An override must not call
+    /// `operator.require_auth()` again: a second authorization request for the
+    /// same address in one invocation fails.
     fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128 {
         Self::ContractType::deposit(e, assets, receiver, from, operator)
     }
@@ -272,11 +276,12 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: Vault
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
-    /// # Security Warning
+    /// # Notes
     ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// Authorization for the operator must be handled at a higher level.
+    /// Authorization from `operator` is required, and the contract type
+    /// requests it (refer to [`Vault::mint`]). An override must not call
+    /// `operator.require_auth()` again: a second authorization request for the
+    /// same address in one invocation fails.
     fn mint(e: &Env, shares: i128, receiver: Address, from: Address, operator: Address) -> i128 {
         Self::ContractType::mint(e, shares, receiver, from, operator)
     }
@@ -341,11 +346,12 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: Vault
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
-    /// # Security Warning
+    /// # Notes
     ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// Authorization for the operator must be handled at a higher level.
+    /// Authorization from `operator` is required, and the contract type
+    /// requests it (refer to [`Vault::withdraw`]). An override must not call
+    /// `operator.require_auth()` again: a second authorization request for the
+    /// same address in one invocation fails.
     fn withdraw(
         e: &Env,
         assets: i128,
@@ -426,11 +432,12 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: Vault
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
-    /// # Security Warning
+    /// # Notes
     ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// Authorization for the operator must be handled at a higher level.
+    /// Authorization from `operator` is required, and the contract type
+    /// requests it (refer to [`Vault::redeem`]). An override must not call
+    /// `operator.require_auth()` again: a second authorization request for the
+    /// same address in one invocation fails.
     fn redeem(e: &Env, shares: i128, receiver: Address, owner: Address, operator: Address) -> i128 {
         Self::ContractType::redeem(e, shares, receiver, owner, operator)
     }

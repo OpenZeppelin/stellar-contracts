@@ -1047,9 +1047,22 @@ fn test_exp_near_underflow_crossing_is_nonzero() {
 #[should_panic(expected = "Error(Contract, #1500)")]
 fn test_exp_overflow_panics() {
     let e = Env::default();
-    // Just above the upper bound (135.305...).
-    let too_large = Wad::from_raw(135_305_999_368_893_231_589);
+    // One unit above the largest input whose result fits in i128 (≈ 46.583).
+    let too_large = Wad::from_raw(46_583_160_257_220_231_984);
     let _ = too_large.exp(&e);
+}
+
+#[test]
+fn test_checked_exp_i128_ceiling() {
+    let e = Env::default();
+    // The largest input whose result fits in i128 (`e^x * 10^18 <= i128::MAX`).
+    let last = Wad::from_raw(46_583_160_257_220_231_983);
+    assert!(last.checked_exp(&e).is_some());
+    // One unit above overflows the i128 result, well below the i256 limit
+    // of the algorithm (`EXP_INPUT_MAX` ≈ 135.305).
+    let first = Wad::from_raw(46_583_160_257_220_231_984);
+    assert_eq!(first.checked_exp(&e), None);
+    assert_eq!(Wad::from_integer(&e, 100).checked_exp(&e), None);
 }
 
 #[test]

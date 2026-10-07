@@ -655,7 +655,8 @@ pub fn validate_no_canonical_duplicates(e: &Env, signers: &Vec<Signer>) {
 ///
 /// * topics - `["context_rule_added", context_rule_id: u32]`
 /// * data - `[name: String, context_type: ContextRuleType, valid_until:
-///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]`
+///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]` (`valid_until`
+///   is left out of the data when it is `None`)
 ///
 /// For each signer not previously registered in the global registry:
 /// * topics - `["signer_registered", signer_id: u32]`
@@ -763,7 +764,8 @@ pub fn add_context_rule(
 /// # Events
 ///
 /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
-/// * data - `[name: String, valid_until: Option<u32>]`
+/// * data - `[name: String, valid_until: Option<u32>]` (`valid_until` is left
+///   out of the data when it is `None`)
 ///
 /// # Security Warning
 ///
@@ -813,7 +815,8 @@ pub fn update_context_rule_name(e: &Env, id: u32, name: &String) -> ContextRule 
 /// # Events
 ///
 /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
-/// * data - `[name: String, valid_until: Option<u32>]`
+/// * data - `[name: String, valid_until: Option<u32>]` (`valid_until` is left
+///   out of the data when it is `None`)
 ///
 /// # Security Warning
 ///

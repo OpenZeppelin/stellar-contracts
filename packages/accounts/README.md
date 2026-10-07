@@ -173,6 +173,12 @@ Conversely, if signers are added without updating the threshold, the security gu
 
 Administrators must manually update thresholds and weights when modifying signer sets. Before removing signers, verify that the threshold remains achievable. After adding signers, adjust thresholds or assign weights to maintain the desired security level. Ideally, these updates should occur in the same transaction as the signer modifications.
 
+**Losing the Last Administrative Rule**
+
+Every management function (adding, updating or removing context rules, signers and policies) is authorized by the smart account itself, so it needs a valid context rule that matches a call to the account: a `Default` rule, or a `CallContract` rule for the account's own address. The library does not enforce that such a rule remains. `remove_context_rule` accepts the last one, and `update_context_rule_valid_until` accepts any expiry that is not already in the past, so the last one can also be set to lapse later.
+
+Once no valid rule covers calls to the account, nothing can authorize a management function again, including adding a new rule, and the account is locked permanently. Rules scoped to other contracts keep working, but cannot repair this. Before removing a rule or setting its expiry, verify that another valid rule still covers the account itself.
+
 **`enforce()` Responsibilities**
 
 The `enforce()` function handles both validation and state mutation in a single step. It must reject invalid authorization by panicking (which reverts the transaction), and apply any necessary state changes (for example, decrementing a spending allowance or incrementing a counter). Because it runs after signature authentication and context type matching are already confirmed, the focus inside `enforce()` is on business-logic constraints.
