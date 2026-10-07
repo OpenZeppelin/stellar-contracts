@@ -240,7 +240,7 @@ A failed invocation reports `Error(Contract, #N)`, and the code alone does not s
 
 | Range     | Owner                              |
 | :-------- | :--------------------------------- |
-| 100–499   | `stellar-tokens`                   |
+| 100–999   | `stellar-tokens`                   |
 | 1000–1999 | `stellar-contract-utils`           |
 | 2000–2999 | `stellar-access`                   |
 | 3000–3299 | `stellar-accounts`                 |
@@ -290,7 +290,7 @@ Within its package's range, each enum owns a block:
 | 5000–5099 | `FeeAbstractionError`        | `stellar_fee_abstraction`                                               |
 | 6000–6099 | `DKIMRegistryError`          | `stellar_zk_email::dkim_registry`                                       |
 
-A new variant takes the next free code in its enum's block, and a new enum takes the next free block in its package's range. `.github/scripts/check_error_codes.py` runs in CI and fails when two enums share a code.
+A new variant takes the next free code in its enum's block, and a new enum takes the next free block in its package's range. An enum whose block is full continues in the next free block of its package's range, and that block is added to the enum's row above. `.github/scripts/check_error_codes.py` runs in CI and fails when two enums share a code.
 
 ## Contract Implementation Patterns
 
