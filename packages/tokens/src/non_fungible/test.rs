@@ -6,7 +6,9 @@ use soroban_sdk::{
     Address, Env, Event, String,
 };
 
-use crate::non_fungible::{Approve, ApproveForAll, Base, Mint, NFTStorageKey, Transfer};
+use crate::non_fungible::{
+    Approve, ApproveForAll, Base, ContractOverrides, Mint, NFTStorageKey, Transfer,
+};
 
 #[contract]
 struct MockContract;
@@ -448,6 +450,17 @@ fn owner_of_non_existent_token_fails() {
     e.as_contract(&address, || {
         // Attempt to get the owner of a non-existent token
         Base::owner_of(&e, non_existent_token_id);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #200)")]
+fn get_approved_non_existent_token_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        <Base as ContractOverrides>::get_approved(&e, 1);
     });
 }
 
