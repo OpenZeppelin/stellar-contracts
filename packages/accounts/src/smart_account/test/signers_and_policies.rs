@@ -142,6 +142,19 @@ fn add_signer_oversized_external_key_fails() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3018)")]
+fn add_signer_self_delegated_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    let rule = setup_test_rule(&e, &address);
+
+    e.as_contract(&address, || {
+        add_signer(&e, rule.id, &Signer::Delegated(address.clone()));
+    });
+}
+
+#[test]
 fn remove_signer_success() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -672,6 +685,20 @@ fn batch_add_signer_duplicate_signer_fails() {
     e.as_contract(&address, || {
         let existing_signer = rule.signers.get(0).unwrap();
         let signers = Vec::from_array(&e, [existing_signer]);
+        batch_add_signer(&e, rule.id, &signers);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3018)")]
+fn batch_add_signer_self_delegated_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    let rule = setup_test_rule(&e, &address);
+
+    e.as_contract(&address, || {
+        let signers = Vec::from_array(&e, [Signer::Delegated(address.clone())]);
         batch_add_signer(&e, rule.id, &signers);
     });
 }

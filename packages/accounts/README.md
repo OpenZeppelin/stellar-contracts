@@ -94,6 +94,8 @@ Signer::Delegated(Address)
 - Any Soroban address (contract or account)
 - Verification uses `require_auth_for_args(payload)`
 - This model requires manual authorization entry crafting, because it is not returned in a simulation mode.
+- A `Delegated` signer is rejected with `DelegatedSignerIsContextContract` when its address is the contract of any context being authorized, such as a delegate contract that calls into the account, or the delegate's own `__check_auth` in a mutual delegation. The host would otherwise approve its `require_auth_for_args` without a signature. Two accounts may still delegate to each other; each is authorized through the other's non-cyclic signers.
+- A smart account cannot be its own `Delegated` signer: adding one fails with `SelfDelegatedSigner`.
 
 #### External Signers
 

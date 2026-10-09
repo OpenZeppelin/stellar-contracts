@@ -122,7 +122,8 @@ pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, batch_add_signer, do_check_auth,
     get_context_rule, get_context_rules_count, get_validated_context_by_id, remove_context_rule,
     remove_policy, remove_signer, update_context_rule_name, update_context_rule_valid_until,
-    validate_no_canonical_duplicates, validate_signer_key_size, AuthPayload, ContextRule,
+    validate_no_canonical_duplicates, validate_no_delegated_context_contract,
+    validate_no_self_delegation, validate_signer_key_size, AuthPayload, ContextRule,
     ContextRuleEntry, ContextRuleType, Signer, SmartAccountStorageKey,
 };
 
@@ -569,6 +570,11 @@ pub enum SmartAccountError {
     NameTooLong = 3015,
     /// A signer in `AuthPayload` is not part of any selected context rule.
     UnauthorizedSigner = 3016,
+    /// A delegated signer's address is the contract of a context being
+    /// authorized.
+    DelegatedSignerIsContextContract = 3017,
+    /// A delegated signer's address is the smart account itself.
+    SelfDelegatedSigner = 3018,
 }
 
 // ################## EVENTS ##################
