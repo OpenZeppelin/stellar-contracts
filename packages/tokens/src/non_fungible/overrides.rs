@@ -65,6 +65,9 @@ pub trait ContractOverrides {
     }
 
     fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
+        // Verify token exists, through this contract type's ownership model
+        let _ = Self::owner_of(e, token_id);
+
         Base::get_approved(e, token_id)
     }
 

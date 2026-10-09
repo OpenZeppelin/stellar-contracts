@@ -17,7 +17,7 @@ use crate::non_fungible::{
             Consecutive, ConsecutiveMint,
         },
     },
-    sequential, Approve, Base, Transfer,
+    sequential, Approve, Base, ContractOverrides, Transfer,
 };
 
 #[contract]
@@ -611,5 +611,49 @@ fn consecutive_token_uri_panics_for_burned_id_fails() {
         Consecutive::mint_range(&e, &owner, 1);
         Consecutive::burn(&e, &owner, 0);
         Consecutive::token_uri(&e, 0);
+    });
+}
+
+#[test]
+fn consecutive_get_approved_works_for_unapproved_id_in_batch() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let approved = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Consecutive::mint_range(&e, &owner, 2);
+        assert_eq!(<Consecutive as ContractOverrides>::get_approved(&e, 0), None);
+
+        Consecutive::approve(&e, &owner, &approved, 0, 1000);
+        assert_eq!(<Consecutive as ContractOverrides>::get_approved(&e, 0), Some(approved));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #200)")]
+fn consecutive_get_approved_panics_for_more_than_max_id_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let _ = sequential::increment_token_id(&e, 100);
+        <Consecutive as ContractOverrides>::get_approved(&e, sequential::next_token_id(&e));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #200)")]
+fn consecutive_get_approved_panics_for_burned_id_fails() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Consecutive::mint_range(&e, &owner, 2);
+        Consecutive::burn(&e, &owner, 0);
+        <Consecutive as ContractOverrides>::get_approved(&e, 0);
     });
 }
