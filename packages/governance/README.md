@@ -28,11 +28,17 @@ This package provides governance modules for Soroban smart contracts:
 
 The `governor` module implements on-chain governance for Soroban contracts. It provides the core governance primitives for decentralized decision-making.
 
+It is split into three traits, each building on the previous ones:
+
+- `GovernorSettings`: configuration values (voting delay and period, proposal threshold, quorum, voting token)
+- `GovernorQueries`: read-only information about proposals, including `proposal_state`, which decides the outcome of a vote
+- `Governor`: the proposal lifecycle (propose, vote, queue, execute, cancel)
+
 #### Core Concepts
 
 - **Proposals**: Bundles of on-chain calls (targets, functions, arguments) paired with a description
 - **Voting**: Token holders vote during a voting period using snapshot-based voting power
-- **Counting**: Default simple counting (Against/For/Abstain) with pluggable alternatives
+- **Counting**: Default simple counting (Against/For/Abstain). Whether a proposal passes (the quorum and the share of `for` votes) can be changed by overriding `proposal_succeeded()`
 - **Execution**: Successful proposals can be executed, triggering on-chain calls
 - **Queuing**: Optional queue step for integration with a timelock (disabled by default, enabled with a single override)
 
@@ -40,7 +46,7 @@ The `governor` module implements on-chain governance for Soroban contracts. It p
 
 - Snapshot-based voting power prevents flash loan attacks
 - Proposal threshold prevents governance spam
-- Dynamic quorum support (override `quorum()` for supply-relative quorum)
+- Dynamic configuration: overriding a setting (e.g. `quorum()` or `proposal_threshold()` for supply-relative values) changes what is enforced, not only what is reported
 - Queue logic is built into the base trait but disabled by default — a single `proposals_need_queuing()` override activates the full flow
 - `execute` and `cancel` have no default implementation, requiring explicit access control decisions
 
