@@ -1,5 +1,7 @@
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, String, Symbol, Val, Vec};
-use stellar_governance::governor::{self as governor, Governor, ProposalState};
+use stellar_governance::governor::{
+    self as governor, Governor, GovernorQueries, GovernorSettings, ProposalState,
+};
 
 #[contract]
 pub struct GovernorContract;
@@ -25,9 +27,17 @@ impl GovernorContract {
 }
 
 #[contractimpl(contracttrait)]
+impl GovernorSettings for GovernorContract {
+    // Every setting uses the value stored in the constructor.
+    // To enable queueing, override `proposals_need_queuing` to return `true`.
+}
+
+#[contractimpl(contracttrait)]
+impl GovernorQueries for GovernorContract {}
+
+#[contractimpl(contracttrait)]
 impl Governor for GovernorContract {
     // `queue` uses the default open-queueing implementation.
-    // To enable queueing, override `proposals_need_queuing` to return `true`.
 
     fn execute(
         e: &Env,
@@ -42,8 +52,7 @@ impl Governor for GovernorContract {
         executor.require_auth();
         let proposal_id =
             governor::hash_proposal(e, &targets, &functions, &args, &description_hash);
-        let snapshot = governor::get_proposal_snapshot(e, &proposal_id);
-        let quorum = Self::quorum(e, snapshot);
+        let state = Self::proposal_state(e, proposal_id);
         governor::execute(
             e,
             targets,
@@ -51,7 +60,7 @@ impl Governor for GovernorContract {
             args,
             &description_hash,
             Self::proposals_need_queuing(e),
-            quorum,
+            state,
         )
     }
 

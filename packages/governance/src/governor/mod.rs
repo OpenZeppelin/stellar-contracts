@@ -8,19 +8,45 @@
 //!
 //! ## Structure
 //!
-//! The [`Governor`] trait includes:
+//! The governor is split into three traits, each building on the previous
+//! ones:
 //!
-//! - Proposal lifecycle management (creation, voting, execution, cancellation)
-//! - Vote counting and quorum logic (simple counting by default)
+//! - [`GovernorSettings`]: configuration values (voting delay and period,
+//!   proposal threshold, quorum, voting token, ...).
+//! - [`GovernorQueries`]: read-only information about proposals, including
+//!   [`GovernorQueries::proposal_state`], which decides the outcome of a vote.
+//! - [`Governor`]: the proposal lifecycle (proposing, voting, queueing,
+//!   executing and cancelling).
 //!
-//! The default counting implementation provides **simple counting**:
+//! A governor contract implements all three. Usually only
+//! [`Governor::execute`] and [`Governor::cancel`] need to be written, since
+//! every other method has a default implementation:
+//!
+//! ```ignore
+//! #[contractimpl(contracttrait)]
+//! impl GovernorSettings for MyGovernor {}
+//!
+//! #[contractimpl(contracttrait)]
+//! impl GovernorQueries for MyGovernor {}
+//!
+//! #[contractimpl(contracttrait)]
+//! impl Governor for MyGovernor {
+//!     fn execute(/* ... */) -> BytesN<32> { /* ... */ }
+//!     fn cancel(/* ... */) -> BytesN<32> { /* ... */ }
+//! }
+//! ```
+//!
+//! The default implementation provides **simple counting**:
 //!
 //! - **Vote types**: Against (0), For (1), Abstain (2)
 //! - **Vote success**: `for` votes strictly exceed `against` votes
 //! - **Quorum**: Sum of `for` and `abstain` votes meets or exceeds the quorum
-//!   value in effect at the proposal's `vote_snapshot` ledger. Quorum values
-//!   are stored as checkpoints, so updates do not retroactively affect existing
-//!   proposals
+//!   value in effect at the proposal's `vote_snapshot` ledger (see
+//!   [`GovernorSettings::quorum`]). Quorum values are stored as checkpoints, so
+//!   updates do not retroactively affect existing proposals
+//!
+//! Both criteria are checked by [`GovernorQueries::proposal_succeeded`], which
+//! can be overridden to change them.
 //!
 //! The [`Governor`] trait does not define how to store, manage, and access
 //! votes. But Governor trait needs to be able to access the voting power of
@@ -44,8 +70,8 @@
 //!
 //! 1. **Propose** → 2. **Vote** → 3. **Queue** → 4. **Execute**
 //!
-//! To enable queuing, override [`Governor::proposals_need_queuing`] to return
-//! `true`. This wires up the full queuing flow:
+//! To enable queuing, override [`GovernorSettings::proposals_need_queuing`] to
+//! return `true`. This wires up the full queuing flow:
 //!
 //! - [`Governor::queue`] validates that the  proposal is in the `Succeeded`
 //!   state, transitions it to `Queued`, and emits a [`ProposalQueued`] event
@@ -125,6 +151,8 @@
 //! - **Voting delay** ([`get_voting_delay()`]) gives token holders time to
 //!   acquire more tokens or delegate before voting starts
 
+pub mod queries;
+pub mod settings;
 pub mod storage;
 
 #[cfg(test)]
@@ -135,312 +163,40 @@ use soroban_sdk::{
     Symbol, Val, Vec,
 };
 
-pub use crate::governor::storage::{
-    cancel, cast_vote, check_proposal_state, count_vote, counting_mode, execute, get_name,
-    get_proposal_core, get_proposal_deadline, get_proposal_proposer, get_proposal_snapshot,
-    get_proposal_state, get_proposal_threshold, get_proposal_vote_counts, get_quorum,
-    get_token_contract, get_version, get_voting_delay, get_voting_period, has_voted, hash_proposal,
-    propose, queue, quorum_reached, set_name, set_proposal_threshold, set_quorum,
-    set_token_contract, set_version, set_voting_delay, set_voting_period, tally_succeeded,
-    ProposalSettings, ProposalVoteCounts, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
+pub use crate::governor::{
+    queries::{
+        storage::{
+            get_proposal_core, get_proposal_deadline, get_proposal_proposer, get_proposal_snapshot,
+            get_proposal_state, get_proposal_vote_counts, has_voted, hash_proposal, quorum_reached,
+            tally_succeeded, ProposalCore, ProposalStorageKey, ProposalVoteCounts, VOTE_ABSTAIN,
+            VOTE_AGAINST, VOTE_FOR,
+        },
+        GovernorQueries, GovernorQueriesClient, GovernorQueriesSpec,
+    },
+    settings::{
+        emit_quorum_changed,
+        storage::{
+            counting_mode, get_name, get_proposal_threshold, get_quorum, get_token_contract,
+            get_version, get_voting_delay, get_voting_period, set_name, set_proposal_threshold,
+            set_quorum, set_token_contract, set_version, set_voting_delay, set_voting_period,
+            GovernorSettingsStorageKey, QuorumCheckpoint,
+        },
+        GovernorSettings, GovernorSettingsClient, GovernorSettingsSpec, QuorumChanged,
+    },
+    storage::{cancel, cast_vote, count_vote, execute, propose, queue, ProposalSettings},
 };
 
-/// The `Governor` trait defines the core functionality for on-chain governance.
-/// It provides a standard interface for creating proposals, counting,
-/// and executing approved actions.
+/// The proposal lifecycle: creating proposals, voting, queueing, executing
+/// and cancelling.
 ///
-/// # Default Counting Implementation
-///
-/// The default implementation provides simple counting with three vote
-/// types (Against, For, Abstain), simple majority for success, and
-/// checkpoint-based quorum.
-///
-/// Implementers can override the counting-related trait methods to provide
-/// custom counting strategies (e.g., fractional voting, weighted quorum
-/// based on total supply, etc.).
+/// [`Governor::execute`] and [`Governor::cancel`] have no default
+/// implementation, because who may execute or cancel a proposal is decided
+/// by each contract. Every other method has a default implementation that
+/// reads the configuration from [`GovernorSettings`] and the proposal state
+/// from [`GovernorQueries::proposal_state`], so overrides of either are
+/// respected.
 #[contracttrait]
-pub trait Governor {
-    /// Returns the name of the governor.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::NameNotSet`] - Occurs if the name has not been set.
-    fn name(e: &Env) -> String {
-        storage::get_name(e)
-    }
-
-    /// Returns the version of the governor contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::VersionNotSet`] - Occurs if the version has not been
-    ///   set.
-    fn version(e: &Env) -> String {
-        storage::get_version(e)
-    }
-
-    /// Returns the voting delay in ledgers.
-    ///
-    /// The voting delay is the number of ledgers between proposal creation
-    /// and the start of voting.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::VotingDelayNotSet`] - Occurs if the voting delay has
-    ///   not been set.
-    fn voting_delay(e: &Env) -> u32 {
-        storage::get_voting_delay(e)
-    }
-
-    /// Returns the voting period in ledgers.
-    ///
-    /// The voting period is the number of ledgers during which voting is open.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::VotingPeriodNotSet`] - Occurs if the voting period
-    ///   has not been set.
-    fn voting_period(e: &Env) -> u32 {
-        storage::get_voting_period(e)
-    }
-
-    /// Returns the minimum voting power required to create a proposal.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::ProposalThresholdNotSet`] - Occurs if the proposal
-    ///   threshold has not been set.
-    fn proposal_threshold(e: &Env) -> u128 {
-        storage::get_proposal_threshold(e)
-    }
-
-    /// Returns the address of the token contract that implements the Votes
-    /// trait.
-    ///
-    /// Proposal creation and vote weighting always read the token from
-    /// storage. Overriding this method changes only the address reported to
-    /// callers, not the token used for enforcement. To switch the voting
-    /// token, the stored value itself has to be updated.
-    ///
-    /// By design, the library's [`set_token_contract`] can be called only
-    /// once, and no function for updating the token afterwards is provided.
-    /// Changing the voting token of a live governor is a rare and sensitive
-    /// operation, so keeping the token fixed spares users from unexpected
-    /// changes to how their votes are counted. For the rare deployment that
-    /// does need to switch tokens, a custom setter without the one-time
-    /// check can be added to the contract. Gating it behind the governor's
-    /// own authorization means a switch can only happen through a passed
-    /// proposal:
-    ///
-    /// ```ignore
-    /// use stellar_governance::governor::storage::GovernorStorageKey;
-    ///
-    /// #[contractimpl]
-    /// impl MyGovernor {
-    ///     pub fn update_token_contract(e: &Env, token: Address) {
-    ///         e.current_contract_address().require_auth();
-    ///         e.storage().instance().set(&GovernorStorageKey::TokenContract, &token);
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// Switching the token affects proposals that are still live. Their
-    /// proposers were checked against the old token, while their remaining
-    /// votes are weighed with the new one, at the proposal's original
-    /// snapshot ledger. If the new token has no checkpoints at that ledger,
-    /// those votes weigh 0. A switch is therefore best made while no proposal
-    /// is `Pending` or `Active`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::TokenContractNotSet`] - Occurs if the token contract
-    ///   has not been set.
-    fn get_token_contract(e: &Env) -> Address {
-        storage::get_token_contract(e)
-    }
-
-    /// Returns a symbol identifying the counting strategy.
-    ///
-    /// This function is expected to be used to display human-readable
-    /// information about the counting strategy, for example in UIs.
-    ///
-    /// For simple counting, this returns `"simple"`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    fn counting_mode(e: &Env) -> Symbol {
-        storage::counting_mode(e)
-    }
-
-    /// Returns whether an account has voted on a proposal.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `proposal_id` - The unique identifier of the proposal.
-    /// * `account` - The address to check.
-    fn has_voted(e: &Env, proposal_id: BytesN<32>, account: Address) -> bool {
-        storage::has_voted(e, &proposal_id, &account)
-    }
-
-    /// Returns the quorum required at the given ledger.
-    ///
-    /// The default implementation uses checkpoint-based storage, returning
-    /// the quorum value that was in effect at the requested `ledger`.
-    /// Custom implementations (e.g., fractional quorum based on total
-    /// supply) may override this to compute a dynamic quorum.
-    ///
-    /// # Dynamic Quorum Overrides
-    ///
-    /// Dynamic quorum implementations (e.g., supply-relative) should
-    /// typically **not** use [`set_quorum`] / [`storage::get_quorum`], as
-    /// those are designed for the default checkpoint-based fixed quorum.
-    /// Instead, compute the quorum from on-chain state at the requested
-    /// `ledger`.
-    ///
-    /// If the dynamic quorum depends on configurable parameters (e.g., a
-    /// quorum percentage), those parameters must themselves be queried at
-    /// the historical `ledger` — otherwise, later parameter updates would
-    /// retroactively change the outcome of existing proposals.
-    ///
-    /// This method is called with the proposal's `vote_snapshot` ledger,
-    /// which may be in the future during the `Pending` state. The override
-    /// **must not panic** on future ledger values — if a checkpoint does
-    /// not yet exist, return `u128::MAX` so that quorum is unreachable
-    /// until the real value becomes available. Quorum is only meaningful
-    /// after voting ends; during `Pending` and `Active` states the returned
-    /// value is unused, so the `u128::MAX` fallback has no effect on normal
-    /// operation.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `ledger` - The ledger number at which to query the quorum.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
-    ///   before the requested ledger.
-    fn quorum(e: &Env, ledger: u32) -> u128 {
-        storage::get_quorum(e, ledger)
-    }
-
-    /// Returns the current state of a proposal.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `proposal_id` - The unique identifier of the proposal.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
-    /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
-    ///   before the proposal's `vote_snapshot` ledger.
-    fn proposal_state(e: &Env, proposal_id: BytesN<32>) -> ProposalState {
-        let snapshot = storage::get_proposal_snapshot(e, &proposal_id);
-        let quorum = Self::quorum(e, snapshot);
-        storage::get_proposal_state(e, &proposal_id, quorum)
-    }
-
-    /// Returns the ledger number at which voting power is retrieved for a
-    /// proposal.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `proposal_id` - The unique identifier of the proposal.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
-    fn proposal_snapshot(e: &Env, proposal_id: BytesN<32>) -> u32 {
-        storage::get_proposal_snapshot(e, &proposal_id)
-    }
-
-    /// Returns the ledger number at which voting ends for a proposal.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `proposal_id` - The unique identifier of the proposal.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
-    fn proposal_deadline(e: &Env, proposal_id: BytesN<32>) -> u32 {
-        storage::get_proposal_deadline(e, &proposal_id)
-    }
-
-    /// Returns the address of the proposer for a given proposal.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `proposal_id` - The unique identifier of the proposal.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
-    fn proposal_proposer(e: &Env, proposal_id: BytesN<32>) -> Address {
-        storage::get_proposal_proposer(e, &proposal_id)
-    }
-
-    /// Returns the proposal ID computed from the proposal details.
-    ///
-    /// The proposal ID is a deterministic keccak256 hash of the XDR-serialized
-    /// targets, functions, args, and description hash. This allows anyone to
-    /// compute the ID without storing the full proposal data.
-    ///
-    /// The `description_hash` is computed as
-    /// `keccak256(description.to_bytes())`, i.e., a keccak256 hash of the
-    /// raw UTF-8 bytes of the description string. Off-chain clients can
-    /// reproduce this by hashing the raw string bytes directly — no XDR
-    /// encoding is required.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `targets` - The addresses of contracts to call.
-    /// * `functions` - The function names to invoke on each target.
-    /// * `args` - The arguments for each function call.
-    /// * `description_hash` - The keccak256 hash of the description's raw
-    ///   bytes.
-    fn get_proposal_id(
-        e: &Env,
-        targets: Vec<Address>,
-        functions: Vec<Symbol>,
-        args: Vec<Vec<Val>>,
-        description_hash: BytesN<32>,
-    ) -> BytesN<32> {
-        storage::hash_proposal(e, &targets, &functions, &args, &description_hash)
-    }
-
+pub trait Governor: GovernorSettings + GovernorQueries {
     /// Creates a new proposal and returns its unique identifier (hash).
     ///
     /// # Arguments
@@ -518,8 +274,7 @@ pub trait Governor {
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
     /// * [`GovernorError::ProposalNotActive`] - If voting is not currently
     ///   open.
-    /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
-    ///   before the proposal's `vote_snapshot` ledger.
+    /// * refer to [`GovernorQueries::proposal_state`] errors.
     ///
     /// # Events
     ///
@@ -540,18 +295,17 @@ pub trait Governor {
         voter: Address,
     ) -> u128 {
         voter.require_auth();
-        let snapshot = storage::get_proposal_snapshot(e, &proposal_id);
-        let quorum = Self::quorum(e, snapshot);
-        storage::cast_vote(e, &proposal_id, vote_type, &reason, &voter, quorum)
+        let state = Self::proposal_state(e, proposal_id.clone());
+        storage::cast_vote(e, &proposal_id, vote_type, &reason, &voter, state)
     }
 
     /// Queues a succeeded proposal for execution and returns its unique
     /// identifier.
     ///
     /// This function is only relevant when queuing is enabled, i.e., when
-    /// [`Governor::proposals_need_queuing`] is overridden to return `true`. If
-    /// queuing is not enabled, calling this function will revert with
-    /// [`GovernorError::QueueNotEnabled`].
+    /// [`GovernorSettings::proposals_need_queuing`] is overridden to return
+    /// `true`. If queuing is not enabled, calling this function will revert
+    /// with [`GovernorError::QueueNotEnabled`].
     ///
     /// When queuing is enabled, this function transitions a proposal from
     /// the `Succeeded` state to the `Queued` state. The `execute` function
@@ -565,16 +319,14 @@ pub trait Governor {
     ///
     /// The default implementation uses **open queueing**: any account can
     /// queue a succeeded proposal without authentication. To enable it,
-    /// override [`Governor::proposals_need_queuing`] to return `true`:
+    /// override [`GovernorSettings::proposals_need_queuing`] to return `true`:
     ///
     /// ```ignore
     /// #[contractimpl(contracttrait)]
-    /// impl Governor for MyGovernor {
+    /// impl GovernorSettings for MyGovernor {
     ///     fn proposals_need_queuing(_e: &Env) -> bool {
     ///         true
     ///     }
-    ///
-    ///     // ... other required methods (propose, execute, cancel) ...
     /// }
     /// ```
     ///
@@ -590,11 +342,8 @@ pub trait Governor {
     /// ```ignore
     /// #[contractimpl(contracttrait)]
     /// impl Governor for MyGovernor {
-    ///     fn proposals_need_queuing(_e: &Env) -> bool {
-    ///         true
-    ///     }
-    ///
-    ///     // Restricted — only a timelock contract can queue:
+    ///     // Restricted — only a timelock contract can queue (queueing must also
+    ///     // be enabled in `GovernorSettings`, as shown above):
     ///     fn queue(
     ///         e: &Env,
     ///         targets: Vec<Address>,
@@ -608,8 +357,8 @@ pub trait Governor {
     ///         assert!(operator == timelock);
     ///         operator.require_auth();
     ///         let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
-    ///         let quorum = Self::quorum(e, get_proposal_snapshot(e, &proposal_id));
-    ///         storage::queue(e, targets, functions, args, &description_hash, eta, quorum)
+    ///         let state = Self::proposal_state(e, proposal_id);
+    ///         storage::queue(e, targets, functions, args, &description_hash, eta, state)
     ///     }
     /// }
     /// ```
@@ -632,11 +381,10 @@ pub trait Governor {
     ///
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
     /// * [`GovernorError::QueueNotEnabled`] - If queuing is not enabled (i.e.,
-    ///   [`Governor::proposals_need_queuing`] returns `false`).
+    ///   [`GovernorSettings::proposals_need_queuing`] returns `false`).
     /// * [`GovernorError::ProposalNotSuccessful`] - If the proposal has not
     ///   succeeded.
-    /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
-    ///   before the proposal's `vote_snapshot` ledger.
+    /// * refer to [`GovernorQueries::proposal_state`] errors.
     ///
     /// # Events
     ///
@@ -654,10 +402,9 @@ pub trait Governor {
         if !Self::proposals_need_queuing(e) {
             soroban_sdk::panic_with_error!(e, GovernorError::QueueNotEnabled);
         }
-        let proposal_id = storage::hash_proposal(e, &targets, &functions, &args, &description_hash);
-        let snapshot = storage::get_proposal_snapshot(e, &proposal_id);
-        let quorum = Self::quorum(e, snapshot);
-        storage::queue(e, targets, functions, args, &description_hash, eta, quorum)
+        let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
+        let state = Self::proposal_state(e, proposal_id);
+        storage::queue(e, targets, functions, args, &description_hash, eta, state)
     }
 
     /// Executes a proposal and returns its unique identifier.
@@ -709,8 +456,8 @@ pub trait Governor {
     /// // Open execution — anyone can trigger a succeeded proposal:
     /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
     ///     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
-    ///     let quorum = Self::quorum(e, get_proposal_snapshot(e, &proposal_id));
-    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), quorum)
+    ///     let state = Self::proposal_state(e, proposal_id);
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), state)
     /// }
     ///
     /// // Restricted — only a timelock contract can execute:
@@ -719,16 +466,16 @@ pub trait Governor {
     ///     assert!(executor == timelock);
     ///     executor.require_auth();
     ///     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
-    ///     let quorum = Self::quorum(e, get_proposal_snapshot(e, &proposal_id));
-    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), quorum)
+    ///     let state = Self::proposal_state(e, proposal_id);
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), state)
     /// }
     ///
     /// // Role-based — using the `stellar-macros` access control macro:
     /// #[only_role(executor, "executor")]
     /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
     ///     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
-    ///     let quorum = Self::quorum(e, get_proposal_snapshot(e, &proposal_id));
-    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), quorum)
+    ///     let state = Self::proposal_state(e, proposal_id);
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), state)
     /// }
     /// ```
     fn execute(
@@ -790,7 +537,7 @@ pub trait Governor {
     /// ```ignore
     /// // Only the original proposer can cancel:
     /// fn cancel(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
-    ///     let proposal_id = storage::hash_proposal(e, &targets, &functions, &args, &description_hash);
+    ///     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
     ///     let proposer = storage::get_proposal_proposer(e, &proposal_id);
     ///     assert!(operator == proposer);
     ///     operator.require_auth();
@@ -811,23 +558,6 @@ pub trait Governor {
         description_hash: BytesN<32>,
         operator: Address,
     ) -> BytesN<32>;
-
-    /// Returns whether proposals need to be queued before execution.
-    ///
-    /// When this returns `false` (the default), [`Governor::execute`] expects
-    /// proposals in the `Succeeded` state and [`Governor::queue`] will revert
-    /// with [`GovernorError::QueueNotEnabled`].
-    ///
-    /// When overridden to return `true`, [`Governor::execute`] expects
-    /// proposals in the `Queued` state, meaning [`Governor::queue`] must be
-    /// called first to transition from `Succeeded` to `Queued`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    fn proposals_need_queuing(_e: &Env) -> bool {
-        false
-    }
 }
 
 // ################## TYPES ##################
@@ -1119,23 +849,4 @@ pub struct ProposalCancelled {
 /// * `proposal_id` - The unique identifier of the proposal.
 pub fn emit_proposal_cancelled(e: &Env, proposal_id: &BytesN<32>) {
     ProposalCancelled { proposal_id: proposal_id.clone() }.publish(e);
-}
-
-/// Event emitted when the quorum value is changed.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct QuorumChanged {
-    pub old_quorum: u128,
-    pub new_quorum: u128,
-}
-
-/// Emits an event when the quorum value is changed.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `old_quorum` - The previous quorum value.
-/// * `new_quorum` - The new quorum value.
-pub fn emit_quorum_changed(e: &Env, old_quorum: u128, new_quorum: u128) {
-    QuorumChanged { old_quorum, new_quorum }.publish(e);
 }
