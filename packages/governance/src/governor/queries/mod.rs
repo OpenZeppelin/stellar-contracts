@@ -64,7 +64,7 @@ pub trait GovernorQueries: GovernorSettings {
     ///   [`GovernorSettings::quorum`] at the proposal's `vote_snapshot` ledger.
     /// * **Tally**: the `for` votes strictly exceed the `against` votes.
     ///
-    /// An override can change either criterion, e.g. to count `against` votes
+    /// An override can change either criterion, e.g. to count `absent` votes
     /// toward the quorum, or to require "at least 60% of the `for` and
     /// `against` votes to be `for`". An override replaces both criteria, so it
     /// must check the quorum as well to keep requiring it:
