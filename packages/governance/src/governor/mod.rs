@@ -142,7 +142,7 @@ pub use crate::governor::storage::{
     get_token_contract, get_version, get_voting_delay, get_voting_period, has_voted, hash_proposal,
     propose, queue, quorum_reached, set_name, set_proposal_threshold, set_quorum,
     set_token_contract, set_version, set_voting_delay, set_voting_period, tally_succeeded,
-    ProposalVoteCounts, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
+    ProposalSettings, ProposalVoteCounts, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
 };
 
 /// The `Governor` trait defines the core functionality for on-chain governance.
@@ -236,6 +236,40 @@ pub trait Governor {
 
     /// Returns the address of the token contract that implements the Votes
     /// trait.
+    ///
+    /// Proposal creation and vote weighting always read the token from
+    /// storage. Overriding this method changes only the address reported to
+    /// callers, not the token used for enforcement. To switch the voting
+    /// token, the stored value itself has to be updated.
+    ///
+    /// By design, the library's [`set_token_contract`] can be called only
+    /// once, and no function for updating the token afterwards is provided.
+    /// Changing the voting token of a live governor is a rare and sensitive
+    /// operation, so keeping the token fixed spares users from unexpected
+    /// changes to how their votes are counted. For the rare deployment that
+    /// does need to switch tokens, a custom setter without the one-time
+    /// check can be added to the contract. Gating it behind the governor's
+    /// own authorization means a switch can only happen through a passed
+    /// proposal:
+    ///
+    /// ```ignore
+    /// use stellar_governance::governor::storage::GovernorStorageKey;
+    ///
+    /// #[contractimpl]
+    /// impl MyGovernor {
+    ///     pub fn update_token_contract(e: &Env, token: Address) {
+    ///         e.current_contract_address().require_auth();
+    ///         e.storage().instance().set(&GovernorStorageKey::TokenContract, &token);
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// Switching the token affects proposals that are still live. Their
+    /// proposers were checked against the old token, while their remaining
+    /// votes are weighed with the new one, at the proposal's original
+    /// snapshot ledger. If the new token has no checkpoints at that ledger,
+    /// those votes weigh 0. A switch is therefore best made while no proposal
+    /// is `Pending` or `Active`.
     ///
     /// # Arguments
     ///
@@ -460,7 +494,12 @@ pub trait Governor {
         proposer: Address,
     ) -> BytesN<32> {
         proposer.require_auth();
-        storage::propose(e, targets, functions, args, description, &proposer)
+        let settings = ProposalSettings {
+            threshold: Self::proposal_threshold(e),
+            voting_delay: Self::voting_delay(e),
+            voting_period: Self::voting_period(e),
+        };
+        storage::propose(e, targets, functions, args, description, &proposer, &settings)
     }
 
     /// Casts a vote on a proposal and returns the voter's voting power.

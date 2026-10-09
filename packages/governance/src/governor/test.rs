@@ -9,8 +9,9 @@ use crate::governor::{
         self, cancel, cast_vote, count_vote, counting_mode, execute, get_proposal_vote_counts,
         get_quorum, get_token_contract, has_voted, hash_proposal, propose, queue, quorum_reached,
         set_quorum, set_token_contract, tally_succeeded, GovernorStorageKey, ProposalCore,
+        ProposalSettings,
     },
-    ProposalState, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
+    Governor, ProposalState, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
 };
 
 #[contract]
@@ -49,6 +50,16 @@ fn setup_env_with_token() -> (Env, Address, Address) {
         set_token_contract(&e, &token_address);
     });
     (e, contract_address, token_address)
+}
+
+/// Builds the [`ProposalSettings`] from the stored configuration, the same
+/// values the default `Governor::propose` passes when no getter is overridden.
+fn stored_settings(e: &Env) -> ProposalSettings {
+    ProposalSettings {
+        threshold: storage::get_proposal_threshold(e),
+        voting_delay: storage::get_voting_delay(e),
+        voting_period: storage::get_voting_period(e),
+    }
 }
 
 /// Sets the voting power the mock token contract will return.
@@ -268,7 +279,7 @@ fn quorum_change_does_not_affect_past_proposals() {
 
     // Quorum is 100 (set by setup_governor_config at ledger 100).
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     // Advance to voting window and cast 150 votes (passes quorum of 100).
@@ -1158,7 +1169,8 @@ fn propose_creates_proposal_successfully() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     e.as_contract(&contract_address, || {
-        let pid = propose(&e, targets, functions, args, description, &proposer);
+        let pid =
+            propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e));
 
         // Proposal should exist and be in Pending state
         let state = storage::get_proposal_state(&e, &pid, get_quorum(&e, e.ledger().sequence()));
@@ -1180,7 +1192,8 @@ fn propose_sets_correct_voting_schedule() {
     let current_ledger = e.ledger().sequence();
 
     e.as_contract(&contract_address, || {
-        let pid = propose(&e, targets, functions, args, description, &proposer);
+        let pid =
+            propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e));
 
         // voting_delay = 10, voting_period = 100
         let snapshot = storage::get_proposal_snapshot(&e, &pid);
@@ -1200,7 +1213,7 @@ fn propose_emits_proposal_created_event() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer);
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e));
     });
 
     // At least one event should be emitted (ProposalCreated)
@@ -1221,7 +1234,7 @@ fn propose_fails_with_empty_proposal() {
     let description = String::from_str(&e, "Empty");
 
     e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer);
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e));
     });
 }
 
@@ -1239,7 +1252,7 @@ fn propose_fails_with_mismatched_lengths() {
     let description = String::from_str(&e, "Mismatch");
 
     e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer);
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e));
     });
 }
 
@@ -1256,7 +1269,7 @@ fn propose_fails_with_description_too_long() {
     let long_desc = String::from_str(&e, &"a".repeat(8193));
 
     e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, long_desc, &proposer);
+        propose(&e, targets, functions, args, long_desc, &proposer, &stored_settings(&e));
     });
 }
 
@@ -1272,7 +1285,7 @@ fn propose_fails_with_insufficient_voting_power() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer);
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e));
     });
 }
 
@@ -1294,8 +1307,9 @@ fn propose_fails_with_duplicate_proposal() {
             args.clone(),
             description.clone(),
             &proposer,
+            &stored_settings(&e),
         );
-        propose(&e, targets, functions, args, description, &proposer);
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e));
     });
 }
 
@@ -1310,7 +1324,8 @@ fn propose_with_exact_threshold() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     e.as_contract(&contract_address, || {
-        let pid = propose(&e, targets, functions, args, description, &proposer);
+        let pid =
+            propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e));
         assert_eq!(
             storage::get_proposal_state(&e, &pid, get_quorum(&e, e.ledger().sequence())),
             ProposalState::Pending
@@ -1336,7 +1351,7 @@ fn propose_fails_on_voting_schedule_overflow() {
         storage::set_voting_delay(&e, u32::MAX);
         storage::set_voting_period(&e, 100);
 
-        propose(&e, targets, functions, args, description, &proposer);
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e));
     });
 }
 
@@ -1398,7 +1413,7 @@ fn proposal_transitions_to_active() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     // Advance past voting delay (vote_snapshot). Voting opens after snapshot.
@@ -1423,7 +1438,7 @@ fn proposal_transitions_to_defeated_after_voting_period() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     // Advance past deadline
@@ -1448,7 +1463,7 @@ fn proposal_pending_before_voting_starts() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     // Still within voting delay
@@ -1470,7 +1485,7 @@ fn check_proposal_state_returns_snapshot_when_active() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     let snapshot = e.as_contract(&contract_address, || storage::get_proposal_snapshot(&e, &pid));
@@ -1494,7 +1509,7 @@ fn check_proposal_state_fails_when_pending() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     e.as_contract(&contract_address, || {
@@ -1513,7 +1528,7 @@ fn check_proposal_state_fails_when_defeated() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     let deadline = e.as_contract(&contract_address, || storage::get_proposal_deadline(&e, &pid));
@@ -1539,7 +1554,7 @@ fn zero_voting_delay_opens_voting_on_the_next_ledger() {
 
     let pid = e.as_contract(&contract_address, || {
         storage::set_voting_delay(&e, 0);
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     e.as_contract(&contract_address, || {
@@ -1576,7 +1591,7 @@ fn zero_voting_period_leaves_proposal_unvotable() {
 
     let pid = e.as_contract(&contract_address, || {
         e.storage().instance().set(&GovernorStorageKey::VotingPeriod, &0u32);
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     e.as_contract(&contract_address, || {
@@ -1607,7 +1622,7 @@ fn cast_vote_records_vote_and_returns_weight() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     // Advance to active
@@ -1638,7 +1653,7 @@ fn cast_vote_emits_event() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     let snapshot = e.as_contract(&contract_address, || storage::get_proposal_snapshot(&e, &pid));
@@ -1667,7 +1682,7 @@ fn cast_vote_fails_when_proposal_not_active() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     // Don't advance — still Pending
@@ -1689,7 +1704,7 @@ fn cast_vote_fails_on_double_vote() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     let snapshot = e.as_contract(&contract_address, || storage::get_proposal_snapshot(&e, &pid));
@@ -1714,7 +1729,7 @@ fn cast_vote_multiple_voters() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     let snapshot = e.as_contract(&contract_address, || storage::get_proposal_snapshot(&e, &pid));
@@ -1746,8 +1761,15 @@ fn cancel_pending_proposal() {
     let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     e.as_contract(&contract_address, || {
-        let pid =
-            propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer);
+        let pid = propose(
+            &e,
+            targets.clone(),
+            functions.clone(),
+            args.clone(),
+            description,
+            &proposer,
+            &stored_settings(&e),
+        );
         assert_eq!(
             storage::get_proposal_state(&e, &pid, get_quorum(&e, e.ledger().sequence())),
             ProposalState::Pending
@@ -1773,7 +1795,15 @@ fn cancel_active_proposal() {
     let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer)
+        propose(
+            &e,
+            targets.clone(),
+            functions.clone(),
+            args.clone(),
+            description,
+            &proposer,
+            &stored_settings(&e),
+        )
     });
 
     // Advance to active
@@ -1804,7 +1834,15 @@ fn cancel_defeated_proposal() {
     let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer)
+        propose(
+            &e,
+            targets.clone(),
+            functions.clone(),
+            args.clone(),
+            description,
+            &proposer,
+            &stored_settings(&e),
+        )
     });
 
     // Advance past deadline to get Defeated
@@ -1836,7 +1874,15 @@ fn cancel_fails_when_already_canceled() {
     let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     e.as_contract(&contract_address, || {
-        propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer);
+        propose(
+            &e,
+            targets.clone(),
+            functions.clone(),
+            args.clone(),
+            description,
+            &proposer,
+            &stored_settings(&e),
+        );
         cancel(&e, targets.clone(), functions.clone(), args.clone(), &desc_hash);
         // Second cancel should fail
         cancel(&e, targets, functions, args, &desc_hash);
@@ -1868,7 +1914,15 @@ fn cancel_emits_event() {
     let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     e.as_contract(&contract_address, || {
-        propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer);
+        propose(
+            &e,
+            targets.clone(),
+            functions.clone(),
+            args.clone(),
+            description,
+            &proposer,
+            &stored_settings(&e),
+        );
         cancel(&e, targets, functions, args, &desc_hash);
     });
 
@@ -1909,7 +1963,15 @@ fn create_executable_proposal(
 
     // Propose (at ledger 100 → vote_start=110, vote_end=210)
     let pid = e.as_contract(contract_address, || {
-        propose(e, targets.clone(), functions.clone(), args.clone(), description, &proposer)
+        propose(
+            e,
+            targets.clone(),
+            functions.clone(),
+            args.clone(),
+            description,
+            &proposer,
+            &stored_settings(e),
+        )
     });
 
     // Advance into the voting window and cast a passing vote
@@ -1970,7 +2032,15 @@ fn execute_fails_when_not_succeeded() {
     let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     e.as_contract(&contract_address, || {
-        propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer);
+        propose(
+            &e,
+            targets.clone(),
+            functions.clone(),
+            args.clone(),
+            description,
+            &proposer,
+            &stored_settings(&e),
+        );
         // Proposal is Pending, not Succeeded
         execute(
             &e,
@@ -2102,7 +2172,7 @@ fn full_proposal_lifecycle_pending_to_active_to_defeated() {
     let (targets, functions, args, description) = simple_proposal(&e);
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer)
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
     });
 
     // Phase 1: Pending
@@ -2180,7 +2250,15 @@ fn full_proposal_lifecycle_to_canceled() {
     let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer)
+        propose(
+            &e,
+            targets.clone(),
+            functions.clone(),
+            args.clone(),
+            description,
+            &proposer,
+            &stored_settings(&e),
+        )
     });
 
     // Cancel while pending
@@ -2248,7 +2326,15 @@ fn queue_fails_when_not_succeeded() {
 
     // Create proposal (stays Pending)
     e.as_contract(&contract_address, || {
-        propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer);
+        propose(
+            &e,
+            targets.clone(),
+            functions.clone(),
+            args.clone(),
+            description,
+            &proposer,
+            &stored_settings(&e),
+        );
     });
 
     // Trying to queue a Pending proposal should fail with ProposalNotSuccessful
@@ -2335,4 +2421,112 @@ fn cancel_queued_proposal() {
             ProposalState::Canceled
         );
     });
+}
+
+// ################## CONFIGURATION OVERRIDE TESTS ##################
+
+const OVERRIDDEN_THRESHOLD: u128 = 500;
+const OVERRIDDEN_VOTING_DELAY: u32 = 50;
+const OVERRIDDEN_VOTING_PERIOD: u32 = 300;
+
+/// A governor that overrides the proposal threshold, voting delay and voting
+/// period with values different from the stored ones.
+#[contract]
+struct OverrideGovernor;
+
+#[contractimpl(contracttrait)]
+impl Governor for OverrideGovernor {
+    fn proposal_threshold(_e: &Env) -> u128 {
+        OVERRIDDEN_THRESHOLD
+    }
+
+    fn voting_delay(_e: &Env) -> u32 {
+        OVERRIDDEN_VOTING_DELAY
+    }
+
+    fn voting_period(_e: &Env) -> u32 {
+        OVERRIDDEN_VOTING_PERIOD
+    }
+
+    fn execute(
+        _e: &Env,
+        _targets: Vec<Address>,
+        _functions: Vec<Symbol>,
+        _args: Vec<Vec<Val>>,
+        _description_hash: BytesN<32>,
+        _executor: Address,
+    ) -> BytesN<32> {
+        unimplemented!("not used in these tests")
+    }
+
+    fn cancel(
+        _e: &Env,
+        _targets: Vec<Address>,
+        _functions: Vec<Symbol>,
+        _args: Vec<Vec<Val>>,
+        _description_hash: BytesN<32>,
+        _operator: Address,
+    ) -> BytesN<32> {
+        unimplemented!("not used in these tests")
+    }
+}
+
+/// Registers an `OverrideGovernor` wired to a mock token that reports
+/// `voting_power` for every account. When `store_config` is true, the stored
+/// configuration (threshold 100, delay 10, period 100) differs from the
+/// overrides.
+fn setup_override_governor(
+    voting_power: u128,
+    store_config: bool,
+) -> (Env, OverrideGovernorClient<'static>) {
+    let e = Env::default();
+    e.mock_all_auths();
+    e.ledger().set_sequence_number(100);
+    let governor_address = e.register(OverrideGovernor, ());
+    let token_address = e.register(MockTokenContract, ());
+    e.as_contract(&governor_address, || {
+        set_token_contract(&e, &token_address);
+    });
+    if store_config {
+        setup_governor_config(&e, &governor_address);
+    }
+    set_mock_voting_power(&e, &token_address, voting_power);
+    let client = OverrideGovernorClient::new(&e, &governor_address);
+    (e, client)
+}
+
+#[test]
+fn propose_enforces_overridden_voting_schedule() {
+    let (e, governor) = setup_override_governor(1000, true);
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, description) = simple_proposal(&e);
+
+    let pid = governor.propose(&targets, &functions, &args, &description, &proposer);
+
+    let snapshot = governor.proposal_snapshot(&pid);
+    assert_eq!(snapshot, 100 + OVERRIDDEN_VOTING_DELAY);
+    assert_eq!(governor.proposal_deadline(&pid), snapshot + OVERRIDDEN_VOTING_PERIOD);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4202)")]
+fn propose_enforces_overridden_threshold() {
+    // 200 clears the stored threshold (100) but not the overridden one (500).
+    let (e, governor) = setup_override_governor(200, true);
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, description) = simple_proposal(&e);
+
+    governor.propose(&targets, &functions, &args, &description, &proposer);
+}
+
+#[test]
+fn propose_with_overrides_needs_no_stored_config() {
+    let (e, governor) = setup_override_governor(OVERRIDDEN_THRESHOLD, false);
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, description) = simple_proposal(&e);
+
+    let pid = governor.propose(&targets, &functions, &args, &description, &proposer);
+
+    assert_eq!(governor.proposal_proposer(&pid), proposer);
+    assert_eq!(governor.proposal_snapshot(&pid), 100 + OVERRIDDEN_VOTING_DELAY);
 }

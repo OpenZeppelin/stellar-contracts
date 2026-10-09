@@ -87,6 +87,26 @@ pub struct ProposalVoteCounts {
     pub abstain_votes: u128,
 }
 
+/// Configuration values that [`propose`] enforces when creating a proposal.
+///
+/// The default [`Governor::propose`](crate::governor::Governor::propose)
+/// fills these from the trait methods
+/// ([`Governor::proposal_threshold`](crate::governor::Governor::proposal_threshold),
+/// [`Governor::voting_delay`](crate::governor::Governor::voting_delay) and
+/// [`Governor::voting_period`](crate::governor::Governor::voting_period)),
+/// so overrides of those methods are what gets enforced.
+///
+/// This type is only passed between functions; it is never stored.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProposalSettings {
+    /// Minimum voting power the proposer must hold at the previous ledger.
+    pub threshold: u128,
+    /// Number of ledgers between proposal creation and the vote snapshot.
+    pub voting_delay: u32,
+    /// Number of ledgers during which voting is open.
+    pub voting_period: u32,
+}
+
 // ################## CONSTANTS ##################
 
 /// Vote type: Against the proposal.
@@ -462,6 +482,8 @@ pub fn set_token_contract(e: &Env, token_contract: &Address) {
 /// * `args` - The arguments for each function call.
 /// * `description` - A description of the proposal.
 /// * `proposer` - The address creating the proposal.
+/// * `settings` - The proposal threshold, voting delay and voting period to
+///   enforce. See [`ProposalSettings`].
 ///
 /// # Errors
 ///
@@ -475,9 +497,6 @@ pub fn set_token_contract(e: &Env, token_contract: &Address) {
 ///   lacks sufficient voting power.
 /// * [`GovernorError::MathOverflow`] - Occurs if voting schedule calculation
 ///   overflows.
-/// * refer to [`get_proposal_threshold()`] errors.
-/// * refer to [`get_voting_delay()`] errors.
-/// * refer to [`get_voting_period()`] errors.
 /// * refer to [`get_token_contract()`] errors.
 ///
 /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
@@ -492,6 +511,7 @@ pub fn propose(
     args: Vec<Vec<Val>>,
     description: String,
     proposer: &Address,
+    settings: &ProposalSettings,
 ) -> BytesN<32> {
     // Validate proposal length
     let targets_len = targets.len();
@@ -512,8 +532,7 @@ pub fn propose(
     let proposer_votes = get_voting_power(e, proposer, snapshot);
 
     // Check proposer has sufficient voting power
-    let threshold = get_proposal_threshold(e);
-    if proposer_votes < threshold {
+    if proposer_votes < settings.threshold {
         panic_with_error!(e, GovernorError::InsufficientProposerVotes);
     }
 
@@ -529,12 +548,10 @@ pub fn propose(
     }
 
     // Calculate voting schedule
-    let voting_delay = get_voting_delay(e);
-    let voting_period = get_voting_period(e);
-    let Some(vote_snapshot) = current_ledger.checked_add(voting_delay) else {
+    let Some(vote_snapshot) = current_ledger.checked_add(settings.voting_delay) else {
         panic_with_error!(e, GovernorError::MathOverflow);
     };
-    let Some(vote_end) = vote_snapshot.checked_add(voting_period) else {
+    let Some(vote_end) = vote_snapshot.checked_add(settings.voting_period) else {
         panic_with_error!(e, GovernorError::MathOverflow);
     };
 
