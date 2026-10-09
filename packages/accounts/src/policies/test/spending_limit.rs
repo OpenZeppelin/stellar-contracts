@@ -4,11 +4,13 @@ use soroban_sdk::{
     auth::{Context, ContractContext, ContractExecutable, CreateContractHostFnContext},
     contract, symbol_short,
     testutils::{Address as _, Events, Ledger},
-    Address, BytesN, Env, IntoVal, Vec,
+    xdr::{Limits, WriteXdr},
+    Address, Bytes, BytesN, Env, Event, IntoVal, Vec,
 };
 
+use super::ENFORCED_EVENT_SIZE_CEILING_BYTES;
 use crate::{
-    policies::spending_limit::*,
+    policies::{spending_limit::*, EnforcedContext},
     smart_account::{ContextRule, ContextRuleType, Signer},
 };
 
@@ -930,5 +932,57 @@ fn spending_history_past_the_cap_exceeds_the_ledger_entry_limit() {
         };
         let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), 1);
         e.storage().persistent().set(&key, &data);
+    });
+}
+
+#[test]
+fn enforce_with_large_trailing_argument_succeeds() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        let mut args = Vec::new(&e);
+        args.push_back(Address::generate(&e).into_val(&e));
+        args.push_back(Address::generate(&e).into_val(&e));
+        args.push_back(100_i128.into_val(&e));
+        args.push_back(Bytes::from_slice(&e, &std::vec![0; 20_000]).into_val(&e));
+        let contract = Address::generate(&e);
+        let fn_name = symbol_short!("transfer");
+        let context = Context::Contract(ContractContext {
+            contract: contract.clone(),
+            fn_name: fn_name.clone(),
+            args,
+        });
+
+        enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
+
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 1);
+        let event = events.events().first().unwrap();
+        assert_eq!(
+            event,
+            &SpendingLimitEnforced {
+                smart_account: smart_account.clone(),
+                context_rule_id: context_rule.id,
+                context: EnforcedContext::CallContract(contract, fn_name),
+                amount: 100,
+                total_spent_in_period: 100,
+            }
+            .to_xdr(&e, &address),
+        );
+        let event_size = WriteXdr::to_xdr(event, Limits::none()).unwrap().len();
+        assert!(
+            event_size < ENFORCED_EVENT_SIZE_CEILING_BYTES,
+            "enforcement event is {event_size} bytes"
+        );
     });
 }

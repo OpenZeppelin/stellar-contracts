@@ -89,17 +89,21 @@ use soroban_sdk::{
 };
 
 // re-export
-use crate::smart_account::{ContextRule, Signer};
+use crate::{
+    policies::{authenticated_signer_ids, EnforcedContext},
+    smart_account::{ContextRule, Signer},
+};
 
 /// Event emitted when a weighted threshold policy is enforced.
 #[contractevent]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct WeightedEnforced {
     #[topic]
     pub smart_account: Address,
-    pub context: Context,
+    #[topic]
     pub context_rule_id: u32,
-    pub authenticated_signers: Vec<Signer>,
+    pub context: EnforcedContext,
+    pub signer_ids: Vec<u32>,
 }
 
 /// Event emitted when a weighted threshold policy is installed.
@@ -297,7 +301,8 @@ pub fn calculate_weight(
 /// * `e` - Access to the Soroban environment.
 /// * `context` - The authorization context.
 /// * `authenticated_signers` - The list of authenticated signers.
-/// * `context_rule` - The context rule for this policy.
+/// * `context_rule` - The context rule for this policy. Its positionally
+///   aligned `signer_ids` are included in the enforcement event.
 /// * `smart_account` - The address of the smart account.
 ///
 /// # Errors
@@ -309,9 +314,9 @@ pub fn calculate_weight(
 ///
 /// # Events
 ///
-/// * topics - `["weighted_enforced", smart_account: Address]`
-/// * data - `[context: Context, context_rule_id: u32, authenticated_signers:
-///   Vec<Signer>]`
+/// * topics - `["weighted_enforced", smart_account: Address, context_rule_id:
+///   u32]`
+/// * data - `[context: EnforcedContext, signer_ids: Vec<u32>]`
 pub fn enforce(
     e: &Env,
     context: &Context,
@@ -334,9 +339,9 @@ pub fn enforce(
         // emit event
         WeightedEnforced {
             smart_account: smart_account.clone(),
-            context: context.clone(),
             context_rule_id: context_rule.id,
-            authenticated_signers: authenticated_signers.clone(),
+            context: context.into(),
+            signer_ids: authenticated_signer_ids(e, authenticated_signers, context_rule),
         }
         .publish(e);
     } else {
