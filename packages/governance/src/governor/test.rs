@@ -1560,7 +1560,8 @@ fn propose_with_overrides_needs_no_stored_config() {
 
 // ################## OUTCOME OVERRIDE TESTS ##################
 
-/// At least two thirds of the `for` and `against` votes must be `for`.
+/// At least two thirds of the `for` and `against` votes must be `for`, i.e.
+/// `for / (for + against) >= 2 / 3`, multiplied out to avoid integer division.
 fn two_thirds_in_favor(e: &Env, proposal_id: &BytesN<32>) -> bool {
     let counts = get_proposal_vote_counts(e, proposal_id);
     counts.for_votes * 3 >= (counts.for_votes + counts.against_votes) * 2

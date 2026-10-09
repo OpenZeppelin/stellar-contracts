@@ -74,7 +74,7 @@ pub trait GovernorQueries: GovernorSettings {
     ///     let quorum = Self::quorum(e, governor::get_proposal_snapshot(e, &proposal_id));
     ///     let counts = governor::get_proposal_vote_counts(e, &proposal_id);
     ///     governor::quorum_reached(e, &proposal_id, quorum)
-    ///         && counts.for_votes * 5 >= (counts.for_votes + counts.against_votes) * 3
+    ///         && counts.for_votes * 100 >= (counts.for_votes + counts.against_votes) * 60
     /// }
     /// ```
     ///
