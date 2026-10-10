@@ -94,7 +94,10 @@ Signer::Delegated(Address)
 - Any Soroban address (contract or account)
 - Verification uses `require_auth_for_args(payload)`
 - This model requires manual authorization entry crafting, because it is not returned in a simulation mode.
-- A `Delegated` signer is rejected with `DelegatedSignerIsContextContract` when its address is the contract of any context being authorized, such as a delegate contract that calls into the account, or the delegate's own `__check_auth` in a mutual delegation. The host would otherwise approve its `require_auth_for_args` without a signature. Two accounts may still delegate to each other; each is authorized through the other's non-cyclic signers.
+- A `Delegated` signer is rejected with `DelegatedSignerIsContextContract` when its address is the contract of any context being authorized, such as a delegate contract that calls into the account, or the delegate's own `__check_auth` in a mutual delegation. The host would otherwise approve its `require_auth_for_args` without a signature. Two smart accounts built on this library may still delegate to each other; each is authorized through the other's non-cyclic signers.
+- A `Delegated` signer must not be an account that delegates its authentication back to the smart account, unless it is another smart account built on this library. The check above does not cover the following cases, in which the host approves the delegation back without a signature:
+  - The account delegates to the smart account through CAP-71 (`CustomAccount::delegate_auth`). The host runs the smart account's `__check_auth` from that account's `__check_auth` and with that account's contexts, so the account is the invoker without being the contract of any context. It can then be authorized without any key, along with any account relying on its authorization.
+  - The account calls `require_auth` on the smart account from its own `__check_auth` without an equivalent check. The smart account can then be authorized without any key.
 - A smart account cannot be its own `Delegated` signer: adding one fails with `SelfDelegatedSigner`.
 
 #### External Signers

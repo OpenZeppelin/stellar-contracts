@@ -95,6 +95,11 @@ pub struct PolicyEntry {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Signer {
     /// A delegated signer that uses built-in signature verification.
+    ///
+    /// The address must not be an account that delegates its authentication
+    /// back to this smart account, unless it is an account that authenticates
+    /// through [`do_check_auth`]; this signer can otherwise be authorized
+    /// without any signature. See [`validate_no_delegated_context_contract`].
     Delegated(Address),
     /// An external signer with custom verification logic.
     /// Contains the verifier contract address and the public key data.
@@ -343,9 +348,10 @@ pub fn get_validated_context_by_id(
 ///
 /// A [`Signer::Delegated`] signer is authenticated even when its address is the
 /// direct invoker of the current `__check_auth`, in which case the host
-/// approves it without a signature. [`do_check_auth`] guards against this; a
-/// custom `__check_auth` that calls this function directly must call
-/// [`validate_no_delegated_context_contract`] first.
+/// approves it without a signature. [`do_check_auth`] guards against this
+/// through [`validate_no_delegated_context_contract`], within the limits
+/// documented there; a custom `__check_auth` that calls this function directly
+/// must call [`validate_no_delegated_context_contract`] first.
 pub fn authenticate(e: &Env, auth_digest: &Hash<32>, signer: &Signer, sig_data: &Bytes) {
     match signer {
         Signer::External(verifier, key_data) => {
@@ -368,11 +374,12 @@ pub fn authenticate(e: &Env, auth_digest: &Hash<32>, signer: &Signer, sig_data: 
 /// Rejects a [`Signer::Delegated`] signer whose address is the contract of any
 /// context being authorized. A delegated signer is authenticated with
 /// `addr.require_auth_for_args`, which the Soroban host approves without a
-/// signature when `addr` is the direct invoker of this `__check_auth`. The
-/// contract of the root context is that invoker, whether it calls into this
-/// account from an ordinary function or from its own `__check_auth` in a mutual
-/// or self delegation. Contracts of sub-invocation contexts are not invokers of
-/// this frame and are rejected conservatively. [`Signer::External`] signers are
+/// signature when `addr` is the direct invoker of this `__check_auth`. When the
+/// host runs this `__check_auth` for a `require_auth` call, the contract of the
+/// root context is that invoker, whether it calls into this account from an
+/// ordinary function or from its own `__check_auth` in a mutual or self
+/// delegation. Contracts of sub-invocation contexts are not invokers of this
+/// frame and are rejected conservatively. [`Signer::External`] signers are
 /// unaffected.
 ///
 /// # Arguments
@@ -386,6 +393,26 @@ pub fn authenticate(e: &Env, auth_digest: &Hash<32>, signer: &Signer, sig_data: 
 /// * [`SmartAccountError::DelegatedSignerIsContextContract`] - When the signer
 ///   is `Delegated(addr)` and `addr` is the contract of a context in
 ///   `auth_contexts`.
+///
+/// # Security Warning
+///
+/// The check does not cover two cases in which a `Delegated(addr)` signer is
+/// authorized without any signature:
+///
+/// * `addr` delegates to this smart account through CAP-71
+///   (`CustomAccount::delegate_auth`). The host runs this `__check_auth` from
+///   the `__check_auth` of `addr` and with the contexts of `addr`, so `addr` is
+///   the invoker without being the contract of any context. `addr`, along with
+///   any account relying on its authorization, can then be authorized without
+///   any key.
+/// * `addr` calls `require_auth` on this smart account from its own
+///   `__check_auth` without an equivalent check. The host approves this smart
+///   account there, so it can be authorized without any key.
+///
+/// Neither case is detectable from within this smart account, so a `Delegated`
+/// signer must not be an account that delegates its authentication back to
+/// this smart account, unless it is an account that authenticates through
+/// [`do_check_auth`].
 pub fn validate_no_delegated_context_contract(
     e: &Env,
     signer: &Signer,
@@ -485,7 +512,8 @@ pub fn validate_signer_key_size(e: &Env, signer: &Signer) {
 /// Only the self-referential case is detectable when signers are configured.
 /// Mutual delegation between accounts and delegates that invoke the account
 /// depend on other contracts' state and are caught at authorization time by
-/// [`validate_no_delegated_context_contract`].
+/// [`validate_no_delegated_context_contract`], within the limits documented
+/// there.
 ///
 /// [`add_context_rule`], [`add_signer`] and [`batch_add_signer`] call this
 /// function for every new signer. It compares against
