@@ -167,6 +167,9 @@ Reversing the two is a common mistake.
   a new one.
 - `__constructor` is the only place where one-shot setters
   (`set_owner`, `set_admin`, ...) may be called without auth.
+- No type aliases in `#[contracttype]` / `#[contractevent]` fields or in
+  contract function signatures. Spell out the underlying type
+  (`BytesN<64>`, not `Point`).
 - Reads are free; writes are expensive. Computation is cheap; developer
   experience is expensive. Optimise accordingly — the `enumerable` and
   `consecutive` extensions are the reference for the right balance.
