@@ -28,7 +28,7 @@ The constructor takes `compliance: Option<ComplianceConfig>`. When `None`, the c
 
 This document refers to an "admin" as the authority gating freeze, unfreeze, configuration rotation, and clawback. The contract does not prescribe how that authority is structured. Implementors can compose with an access-control module from the OpenZeppelin Soroban library (e.g., `ownable` for a single-owner model or `access_control` for role-based separation between freeze, policy, and clawback authorities). Admin-gated entry points invoke the chosen module's check (`only_owner`, `only_role`, etc.) at the top of the function.
 
-Deployments that need separation of duties (distinct freeze, policy, and clawback signers) reach for RBAC; deployments with a single jurisdictional authority use ownable. The contract sees only the result of the access check.
+Deployments that need separation of duties (distinct freeze, policy, and clawback signers) reach for RBAC, as the [compliant-token example](../../../examples/confidential/compliant-token/src/contract.rs) does; deployments with a single jurisdictional authority use ownable. The contract sees only the result of the access check.
 
 ---
 
@@ -78,7 +78,7 @@ trait Policy {
 
 This single hook covers the common deployment modes without baking them into the contract:
 
-- **Allowlist:** the policy returns `true` only for listed addresses.
+- **Allowlist:** the policy returns `true` only for listed addresses ([allowlist-policy example](../../../examples/confidential/allowlist-policy/src/contract.rs)).
 - **Denylist:** the policy returns `true` for everything except listed addresses.
 - **KYC / ASP / sanctions screening:** the policy delegates to an identity registry, attestation provider, or sanctions oracle.
 
@@ -175,7 +175,7 @@ impl Hooks for ApprovedAuditorHooks {
 
 This section specifies seizing value from a single frozen confidential account: reducing its committed claim by a public amount, bounded by what the account holds, and settling the corresponding underlying over a transparent path. The flow is coordinated rather than unilateral, and it presupposes a freeze ([Contract-Level Freeze](#contract-level-freeze)), which keeps the target's commitments from changing between proof construction and submission ([Anti-Replay and the Freeze](#anti-replay-and-the-freeze)).
 
-**Terminology.** This flow is called *clawback* because it mirrors the clawback semantics of Stellar Classic / SAC assets, but it is a distinct mechanism. It is delivered by the opt-in `ConfidentialClawback` trait, whose two entry points are `clawback` and `force_revoke_spender` ([Interface Summary](#interface-summary)); a deployment that omits that impl block ships freeze and policy gating with no seizure capability.
+**Terminology.** This flow is called *clawback* because it mirrors the clawback semantics of Stellar Classic / SAC assets, but it is a distinct mechanism. It is delivered by the opt-in `ConfidentialClawback` trait, whose two entry points are `clawback` and `force_revoke_spender` ([Interface Summary](#interface-summary); implemented in the [compliant-token example](../../../examples/confidential/compliant-token/src/contract.rs)); a deployment that omits that impl block ships freeze and policy gating with no seizure capability.
 
 ### The Pooled-Custody Problem
 

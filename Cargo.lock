@@ -527,6 +527,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "confidential-allowlist-policy-example"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk 28.0.0",
+ "stellar-access 0.7.1",
+ "stellar-confidential",
+ "stellar-macros 0.7.1",
+ "stellar-tokens 0.7.1",
+]
+
+[[package]]
 name = "confidential-auditor-example"
 version = "0.7.1"
 dependencies = [
@@ -535,6 +546,26 @@ dependencies = [
  "stellar-confidential",
  "stellar-contract-utils 0.7.1",
  "stellar-macros 0.7.1",
+]
+
+[[package]]
+name = "confidential-compliant-token-example"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk 28.0.0",
+ "stellar-access 0.7.1",
+ "stellar-confidential",
+ "stellar-contract-utils 0.7.1",
+ "stellar-macros 0.7.1",
+]
+
+[[package]]
+name = "confidential-factory-example"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk 28.0.0",
+ "stellar-confidential",
+ "stellar-contract-utils 0.7.1",
 ]
 
 [[package]]

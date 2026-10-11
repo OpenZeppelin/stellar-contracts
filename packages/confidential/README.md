@@ -26,7 +26,7 @@ confidential/
     └── overview.md                # non-normative user-flows overview
 ```
 
-A single deployment is **three contracts** wired together:
+A single deployment is **three contracts** wired together, each with a deployable example under [`examples/confidential/`](../../examples/confidential/):
 
 1. A `ConfidentialToken` contract.
 2. A `ConfidentialAuditor` registry (Grumpkin public keys, indexed by
