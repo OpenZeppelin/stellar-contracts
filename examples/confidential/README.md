@@ -35,7 +35,7 @@ All commands run from the repository root.
 #### Prerequisites
 
 - Rust with the `wasm32v1-none` target: `rustup target add wasm32v1-none`.
-- [Stellar CLI](https://developers.stellar.org/docs/tools/cli) 25.2.0 or later (earlier versions cannot build soroban-sdk 28 contracts).
+- [Stellar CLI](https://developers.stellar.org/docs/tools/cli) 28.1.0 or later.
 
 #### Clone and Build
 
@@ -423,12 +423,12 @@ stellar contract invoke --id confidential-token --source admin \
     -- clawback \
     --account alice \
     --amount 50000000 \
-    --destination bob \
+    --destination "\"$(stellar keys address bob)\"" \
     --data <hex-encoded ClawbackData from the auditor> \
     --operator admin
 ```
 
-Omit `--destination` to seize without moving underlying; the issuer then extracts the surplus through the SAC ([Contract Flow](../../packages/confidential/docs/compliance.md#contract-flow)). Allowances the account delegated sit outside `clawback`'s reach until `force_revoke_spender` folds them back into its balance:
+`destination` is an `Option<Address>`, which the CLI parses as JSON, so it takes a quoted address rather than an alias. Omit `--destination` to seize without moving underlying; the issuer then extracts the surplus through the SAC ([Contract Flow](../../packages/confidential/docs/compliance.md#contract-flow)). Allowances the account delegated sit outside `clawback`'s reach until `force_revoke_spender` folds them back into its balance:
 
 ```bash
 stellar contract invoke --id confidential-token --source admin \
