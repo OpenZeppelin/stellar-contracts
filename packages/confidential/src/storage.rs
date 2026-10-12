@@ -52,13 +52,13 @@ const STRKEY_LIMB_LEN: usize = 28;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ConfidentialAccount {
     /// `Y = sk · H`, the Grumpkin spending public key.
-    pub spending_public_key: Point,
+    pub spending_public_key: BytesN<64>,
     /// `PVK = vk · H`, the Grumpkin viewing public key.
-    pub viewing_public_key: Point,
+    pub viewing_public_key: BytesN<64>,
     /// Spendable balance commitment `C_spend`.
-    pub spendable_commitment: Point,
+    pub spendable_commitment: BytesN<64>,
     /// Receiving balance commitment `C_receive`.
-    pub receiving_commitment: Point,
+    pub receiving_commitment: BytesN<64>,
     /// Index of the auditor key in the auditor registry.
     pub auditor_id: u32,
 }
@@ -68,11 +68,11 @@ pub struct ConfidentialAccount {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpenderDelegation {
     /// Allowance commitment `C_a = Com(v_a, r_a)`.
-    pub allowance_commitment: Point,
+    pub allowance_commitment: BytesN<64>,
     /// Poseidon-encrypted allowance scalar `ã`.
     pub a_tilde: BytesN<32>,
     /// ECDH escrow of `dvk_i` under the spender's spending key.
-    pub escrowed_dvk: Point,
+    pub escrowed_dvk: BytesN<64>,
     /// Per-delegation salt `σ_a`.
     pub allowance_salt: BytesN<32>,
     /// The ledger number at which the delegation expires. Spending is
@@ -94,8 +94,8 @@ pub struct SpenderDelegation {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegisterPayload {
-    pub y: Point,
-    pub pvk: Point,
+    pub y: BytesN<64>,
+    pub pvk: BytesN<64>,
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
@@ -111,9 +111,9 @@ pub struct RegisterData {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WithdrawPayload {
-    pub c_spend_new: Point,
+    pub c_spend_new: BytesN<64>,
     pub b_tilde: BytesN<32>,
-    pub r_e_point: Point,
+    pub r_e_point: BytesN<64>,
     pub sigma: BytesN<32>,
     pub b_tilde_aud_s: BytesN<32>,
     pub r_tilde_aud_s: BytesN<32>,
@@ -133,9 +133,9 @@ pub struct WithdrawData {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransferPayload {
-    pub c_spend_new: Point,
-    pub c_transfer: Point,
-    pub r_e_point: Point,
+    pub c_spend_new: BytesN<64>,
+    pub c_transfer: BytesN<64>,
+    pub r_e_point: BytesN<64>,
     pub v_tilde: BytesN<32>,
     pub b_tilde: BytesN<32>,
     pub sigma: BytesN<32>,
@@ -160,9 +160,9 @@ pub struct TransferData {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpenderTransferPayload {
-    pub c_a_new: Point,
-    pub c_transfer: Point,
-    pub r_e_point: Point,
+    pub c_a_new: BytesN<64>,
+    pub c_transfer: BytesN<64>,
+    pub r_e_point: BytesN<64>,
     pub v_tilde: BytesN<32>,
     pub a_tilde_new: BytesN<32>,
     pub sigma_a_new: BytesN<32>,
@@ -186,12 +186,12 @@ pub struct SpenderTransferData {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SetSpenderPayload {
-    pub c_spend_new: Point,
-    pub c_a: Point,
-    pub escrowed_dvk: Point,
+    pub c_spend_new: BytesN<64>,
+    pub c_a: BytesN<64>,
+    pub escrowed_dvk: BytesN<64>,
     pub b_tilde: BytesN<32>,
     pub a_tilde: BytesN<32>,
-    pub r_e_point: Point,
+    pub r_e_point: BytesN<64>,
     pub sigma: BytesN<32>,
     pub sigma_a: BytesN<32>,
     pub v_tilde_aud_s: BytesN<32>,
