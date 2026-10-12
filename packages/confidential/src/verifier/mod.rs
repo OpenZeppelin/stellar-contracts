@@ -13,8 +13,7 @@
 //!
 //! [`ConfidentialVerifier::verify_proof`] is backed by the UltraHonk verifier
 //! from
-//! [`NethermindEth/rs-soroban-ultrahonk`](https://github.com/NethermindEth/rs-soroban-ultrahonk),
-//! pinned to a specific commit in the workspace `Cargo.toml`.
+//! [`NethermindEth/rs-soroban-ultrahonk`](https://github.com/NethermindEth/rs-soroban-ultrahonk).
 //!
 //! ## Why a Separate Contract
 //!

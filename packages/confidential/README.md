@@ -70,14 +70,3 @@ Noir sources, build scripts, and the pinned UltraHonk VKs that the verifier regi
 ## Documentation
 
 Start with [`docs/overview.md`](./docs/overview.md) for the design without mathematics, then read the protocol specification from [`docs/protocol/README.md`](./docs/protocol/README.md) onward; each file links to the next. [`docs/README.md`](./docs/README.md) maps the whole set: reading paths per role, the compliance, selective-disclosure, indexer, and SDK companions, and the citation rules that CI enforces with lychee.
-
-## Packaging
-
-The crate's packaging follows from its UltraHonk verifier backend
-(`ultrahonk-soroban-verifier`), which links Rust's `alloc` crate and has no
-crates.io release.
-
-- **Separate from `stellar-tokens`.** As a module of `stellar-tokens`, the verifier would put `alloc` in the dependency graph of every contract that uses a fungible, non-fungible, RWA, or vault token, and each of them would need a global allocator it never uses. A `confidential` cargo feature on `stellar-tokens` would remove that coupling but would leave `stellar-tokens` unpublishable, because `cargo publish` rejects git dependencies even when they are optional.
-- **Contracts provide the allocator.** A wasm binary whose dependency graph includes `alloc` needs exactly one `#[global_allocator]`. Enabling the `alloc` feature of `soroban-sdk` registers the SDK's bump allocator as that allocator, and Cargo features are additive, so a library that enables it prevents every dependent contract from registering its own (`the #[global_allocator] in this crate conflicts with global allocator in: soroban_sdk`). This crate leaves the feature off, and each contract either enables it or registers its own allocator. The verifier's repository splits its library and contracts the same way.
-- **`lib` only.** Without an allocator, a standalone `cdylib` build of this crate fails with `no global memory allocator found but one is required`. The crate is compiled to wasm as a dependency of the contracts under `examples/confidential/`, which provide one.
-- **`publish = false`.** The verifier is a git dependency, which `cargo publish` rejects. The crate can be published once the verifier has a crates.io release.

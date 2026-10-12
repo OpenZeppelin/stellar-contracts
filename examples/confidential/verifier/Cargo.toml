@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
-soroban-sdk = { workspace = true, features = ["alloc"] }
+soroban-sdk = { workspace = true }
 stellar-access = { workspace = true }
 stellar-confidential = { workspace = true }
 stellar-macros = { workspace = true }

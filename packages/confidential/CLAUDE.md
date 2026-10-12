@@ -17,10 +17,6 @@ The crate ships one token contract at its root (`src/lib.rs` / `src/storage.rs` 
 
 Balances are Pedersen commitments on Grumpkin. Every operation that opens or re-randomizes a commitment carries a proof the contract forwards to the verifier contract; `deposit`, `merge`, and `revoke_spender` are proofless homomorphic folds.
 
-## Packaging
-
-The crate is `lib` only, `publish = false`, and depends on `soroban-sdk` without its `alloc` feature, so contracts built on it supply the global allocator. These depart from the root guide's library conventions for reasons recorded in `README.md#packaging`; keep all three when editing `Cargo.toml`.
-
 ## Errors
 
 `ConfidentialTokenError` occupies **3500–3510**. The root guide's range list predates this module and omits it. Stay in the 3500s; do not open a new range for the satellites.

@@ -3,17 +3,15 @@ name = "stellar-confidential"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = false
+publish = true
 version.workspace = true
 description = "Confidential token with encrypted balances and zero-knowledge proofs for the Stellar contracts."
 
 [package.metadata.stellar]
 cargo_inherit = true
 
-# `lib` only, `publish = false`, and no `alloc` feature on `soroban-sdk`: see
-# README.md#packaging.
 [lib]
-crate-type = ["lib"]
+crate-type = ["lib", "cdylib"]
 doctest = false
 
 [dependencies]
