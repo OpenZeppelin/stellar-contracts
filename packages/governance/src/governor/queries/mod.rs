@@ -40,6 +40,9 @@ pub trait GovernorQueries: GovernorSettings {
     /// whole lifecycle, not only what is reported. An override must keep
     /// returning the recorded states unchanged. For example, reporting an
     /// `Executed` proposal as `Succeeded` would allow it to be executed again.
+    /// An override that computes the outcome itself should only do so when
+    /// [`crate::governor::outcome_pending`] returns `true`, as the default
+    /// implementation does.
     ///
     /// # Arguments
     ///
@@ -52,7 +55,10 @@ pub trait GovernorQueries: GovernorSettings {
     ///   does not exist.
     /// * refer to [`GovernorQueries::proposal_succeeded`] errors.
     fn proposal_state(e: &Env, proposal_id: BytesN<32>) -> ProposalState {
-        let succeeded = Self::proposal_succeeded(e, proposal_id.clone());
+        // see `storage::outcome_pending` for why the outcome is not always
+        // computed
+        let succeeded = storage::outcome_pending(e, &proposal_id)
+            && Self::proposal_succeeded(e, proposal_id.clone());
         storage::get_proposal_state(e, &proposal_id, succeeded)
     }
 
@@ -64,7 +70,7 @@ pub trait GovernorQueries: GovernorSettings {
     ///   [`GovernorSettings::quorum`] at the proposal's `vote_snapshot` ledger.
     /// * **Tally**: the `for` votes strictly exceed the `against` votes.
     ///
-    /// An override can change either criterion, e.g. to count `absent` votes
+    /// An override can change either criterion, e.g. to count `against` votes
     /// toward the quorum, or to require "at least 60% of the `for` and
     /// `against` votes to be `for`". An override replaces both criteria, so it
     /// must check the quorum as well to keep requiring it:
@@ -73,15 +79,21 @@ pub trait GovernorQueries: GovernorSettings {
     /// fn proposal_succeeded(e: &Env, proposal_id: BytesN<32>) -> bool {
     ///     let quorum = Self::quorum(e, governor::get_proposal_snapshot(e, &proposal_id));
     ///     let counts = governor::get_proposal_vote_counts(e, &proposal_id);
-    ///     governor::quorum_reached(e, &proposal_id, quorum)
-    ///         && counts.for_votes * 100 >= (counts.for_votes + counts.against_votes) * 60
+    ///     // for / (for + against) >= 60%, multiplied out to avoid integer division
+    ///     let (Some(for_share), Some(required_share)) = (
+    ///         counts.for_votes.checked_mul(100),
+    ///         counts.for_votes.checked_add(counts.against_votes).and_then(|total| total.checked_mul(60)),
+    ///     ) else {
+    ///         panic_with_error!(e, GovernorError::MathOverflow);
+    ///     };
+    ///     governor::quorum_reached(e, &proposal_id, quorum) && for_share >= required_share
     /// }
     /// ```
     ///
-    /// The default [`GovernorQueries::proposal_state`] calls this method on
-    /// every call, but its result only matters once voting has ended. When the
-    /// rule is overridden, [`GovernorSettings::counting_mode`] should be
-    /// updated to describe it.
+    /// The default [`GovernorQueries::proposal_state`] calls this method only
+    /// once voting has ended and no state has been recorded (see
+    /// [`crate::governor::outcome_pending`]). When the rule is overridden,
+    /// [`GovernorSettings::counting_mode`] should be updated to describe it.
     ///
     /// # Arguments
     ///

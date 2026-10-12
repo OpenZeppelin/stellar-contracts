@@ -111,6 +111,58 @@ pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>, succeeded: bool) ->
     derive_proposal_state(e, &core, succeeded)
 }
 
+/// Returns whether the state of a proposal currently depends on the outcome
+/// of its vote, i.e. voting has ended and no state has been recorded yet. In
+/// that case the proposal is either `Succeeded` or `Defeated`, and the
+/// `succeeded` argument of [`get_proposal_state`] decides which one.
+///
+/// In every other case (`Pending`, `Active`, or a recorded state such as
+/// `Queued`, `Executed`, `Canceled` or `Expired`), [`get_proposal_state`]
+/// ignores `succeeded`. Computing the outcome there anyway has two downsides:
+///
+/// * **Wasted reads.** The default outcome check reads the quorum checkpoint
+///   and the vote counts. Without this check, every call to
+///   [`crate::governor::Governor::cast_vote`] pays for those reads although
+///   voting is still open, and so do queries, `queue` and `execute` on
+///   proposals that already have a recorded state.
+/// * **Unrelated failures.** If the outcome check panics (for example with
+///   [`GovernorError::QuorumNotSet`], or because of a bug in a custom
+///   [`GovernorQueries::proposal_succeeded`](crate::governor::GovernorQueries::proposal_succeeded)),
+///   the state can't be read at all. Voting on an `Active` proposal would be
+///   blocked, and `Executed` or `Canceled` proposals could no longer be
+///   queried, even though their state does not depend on the outcome.
+///
+/// The default
+/// [`GovernorQueries::proposal_state`](crate::governor::GovernorQueries::proposal_state)
+/// therefore computes the outcome only when this function returns `true`:
+///
+/// ```ignore
+/// let succeeded = outcome_pending(e, &proposal_id)
+///     && Self::proposal_succeeded(e, proposal_id.clone());
+/// get_proposal_state(e, &proposal_id, succeeded)
+/// ```
+///
+/// When this function returns `false`, `&&` skips the outcome check entirely,
+/// and the `false` passed to [`get_proposal_state`] is never looked at. The
+/// cost is one extra read of the proposal record, which is far cheaper than
+/// the reads it saves.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `proposal_id` - The unique identifier of the proposal.
+///
+/// # Errors
+///
+/// * [`GovernorError::ProposalNotFound`] - Occurs if the proposal does not
+///   exist.
+pub fn outcome_pending(e: &Env, proposal_id: &BytesN<32>) -> bool {
+    let core = get_proposal_core(e, proposal_id);
+    // `Pending` is the initial value from `propose` and means no state has
+    // been recorded yet.
+    core.state == ProposalState::Pending && e.ledger().sequence() > core.vote_end
+}
+
 /// Returns the snapshot ledger for a proposal.
 ///
 /// # Arguments
@@ -323,14 +375,14 @@ pub fn hash_proposal(
 ///   has ended.
 fn derive_proposal_state(e: &Env, core: &ProposalCore, succeeded: bool) -> ProposalState {
     // Stored states: return immediately — the transition already happened.
-    match core.state {
-        ProposalState::Canceled | ProposalState::Executed | ProposalState::Queued => {
-            return core.state;
-        }
-        ProposalState::Expired => {
-            return core.state;
-        }
-        _ => {}
+    if matches!(
+        core.state,
+        ProposalState::Canceled
+            | ProposalState::Executed
+            | ProposalState::Queued
+            | ProposalState::Expired
+    ) {
+        return core.state;
     }
 
     // Derived states: `core.state` is still `Pending` (its initial value

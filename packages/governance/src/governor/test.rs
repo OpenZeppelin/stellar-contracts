@@ -1,5 +1,5 @@
 use soroban_sdk::{
-    contract, contractimpl,
+    contract, contractimpl, panic_with_error,
     testutils::{Address as _, Events, Ledger},
     vec, Address, BytesN, Env, IntoVal, String, Symbol, TryFromVal, Val, Vec,
 };
@@ -7,11 +7,11 @@ use soroban_sdk::{
 use crate::governor::{
     cancel, cast_vote, count_vote, execute, get_proposal_deadline, get_proposal_proposer,
     get_proposal_snapshot, get_proposal_state, get_proposal_threshold, get_proposal_vote_counts,
-    get_quorum, get_voting_delay, get_voting_period, has_voted, hash_proposal, propose, queue,
-    quorum_reached, set_name, set_proposal_threshold, set_quorum, set_token_contract, set_version,
-    set_voting_delay, set_voting_period, tally_succeeded, Governor, GovernorQueries,
-    GovernorSettings, ProposalCore, ProposalSettings, ProposalState, ProposalStorageKey,
-    VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
+    get_quorum, get_voting_delay, get_voting_period, has_voted, hash_proposal, outcome_pending,
+    propose, queue, quorum_reached, set_name, set_proposal_threshold, set_quorum,
+    set_token_contract, set_version, set_voting_delay, set_voting_period, tally_succeeded,
+    Governor, GovernorError, GovernorQueries, GovernorSettings, ProposalCore, ProposalSettings,
+    ProposalState, ProposalStorageKey, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
 };
 
 #[contract]
@@ -65,8 +65,10 @@ pub(crate) fn stored_settings(e: &Env) -> ProposalSettings {
 /// Returns the proposal state exactly as the default
 /// `GovernorQueries::proposal_state` computes it.
 pub(crate) fn default_state(e: &Env, proposal_id: &BytesN<32>) -> ProposalState {
-    let quorum = get_quorum(e, get_proposal_snapshot(e, proposal_id));
-    let succeeded = quorum_reached(e, proposal_id, quorum) && tally_succeeded(e, proposal_id);
+    let succeeded = outcome_pending(e, proposal_id) && {
+        let quorum = get_quorum(e, get_proposal_snapshot(e, proposal_id));
+        quorum_reached(e, proposal_id, quorum) && tally_succeeded(e, proposal_id)
+    };
     get_proposal_state(e, proposal_id, succeeded)
 }
 
@@ -1775,14 +1777,164 @@ fn proposal_state_override_succeeded_proposal_is_executed() {
     assert_eq!(governor.proposal_state(&s.pid), ProposalState::Executed);
 }
 
+/// A governor whose `proposal_state` reports a state set by the test, falling
+/// back to the default derivation when none is set.
+#[contract]
+struct ForcedStateGovernor;
+
+const FORCED_STATE: &str = "forced";
+
+#[contractimpl(contracttrait)]
+impl GovernorSettings for ForcedStateGovernor {}
+
+#[contractimpl(contracttrait)]
+impl GovernorQueries for ForcedStateGovernor {
+    fn proposal_state(e: &Env, proposal_id: BytesN<32>) -> ProposalState {
+        e.storage()
+            .instance()
+            .get(&Symbol::new(e, FORCED_STATE))
+            .unwrap_or_else(|| default_state(e, &proposal_id))
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl Governor for ForcedStateGovernor {
+    fn execute(
+        _e: &Env,
+        _targets: Vec<Address>,
+        _functions: Vec<Symbol>,
+        _args: Vec<Vec<Val>>,
+        _description_hash: BytesN<32>,
+        _executor: Address,
+    ) -> BytesN<32> {
+        unimplemented!("not used in these tests")
+    }
+
+    fn cancel(
+        _e: &Env,
+        _targets: Vec<Address>,
+        _functions: Vec<Symbol>,
+        _args: Vec<Vec<Val>>,
+        _description_hash: BytesN<32>,
+        _operator: Address,
+    ) -> BytesN<32> {
+        unimplemented!("not used in these tests")
+    }
+}
+
+fn force_state(s: &OutcomeSetup, state: ProposalState) {
+    s.e.as_contract(&s.governor, || {
+        s.e.storage().instance().set(&Symbol::new(&s.e, FORCED_STATE), &state);
+    });
+}
+
 #[test]
 #[should_panic(expected = "Error(Contract, #4205)")]
-fn cast_vote_follows_reported_state() {
-    // Voting has ended, so the reported state is `Defeated`, not `Active`.
-    let s = setup_outcome(|e| e.register(StateOverrideGovernor, ()), 60, 40);
-    let governor = StateOverrideGovernorClient::new(&s.e, &s.governor);
+fn cast_vote_rejected_when_reported_state_is_not_active() {
+    let s = setup_outcome(|e| e.register(ForcedStateGovernor, ()), 0, 0);
+    let governor = ForcedStateGovernorClient::new(&s.e, &s.governor);
+
+    // Inside the voting window, so the default state would be `Active`.
+    let snapshot = governor.proposal_snapshot(&s.pid);
+    s.e.ledger().set_sequence_number(snapshot + 1);
+    assert_eq!(s.e.as_contract(&s.governor, || default_state(&s.e, &s.pid)), ProposalState::Active);
+
+    force_state(&s, ProposalState::Canceled);
     let voter = Address::generate(&s.e);
     governor.cast_vote(&s.pid, &VOTE_FOR, &String::from_str(&s.e, ""), &voter);
+}
+
+#[test]
+fn cast_vote_accepted_when_reported_state_is_active() {
+    let s = setup_outcome(|e| e.register(ForcedStateGovernor, ()), 0, 0);
+    let governor = ForcedStateGovernorClient::new(&s.e, &s.governor);
+
+    // Voting has ended, so the default state would not be `Active`.
+    assert_ne!(s.e.as_contract(&s.governor, || default_state(&s.e, &s.pid)), ProposalState::Active);
+
+    force_state(&s, ProposalState::Active);
+    let voter = Address::generate(&s.e);
+    let weight = governor.cast_vote(&s.pid, &VOTE_FOR, &String::from_str(&s.e, ""), &voter);
+    assert_eq!(weight, 1000);
+    assert!(governor.has_voted(&s.pid, &voter));
+}
+
+/// A governor whose `proposal_succeeded` always panics, standing in for a
+/// failing outcome check (e.g. a missing quorum checkpoint or a buggy
+/// override).
+#[contract]
+struct FailingOutcomeGovernor;
+
+#[contractimpl(contracttrait)]
+impl GovernorSettings for FailingOutcomeGovernor {}
+
+#[contractimpl(contracttrait)]
+impl GovernorQueries for FailingOutcomeGovernor {
+    fn proposal_succeeded(e: &Env, _proposal_id: BytesN<32>) -> bool {
+        panic_with_error!(e, GovernorError::QuorumNotSet)
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl Governor for FailingOutcomeGovernor {
+    fn execute(
+        _e: &Env,
+        _targets: Vec<Address>,
+        _functions: Vec<Symbol>,
+        _args: Vec<Vec<Val>>,
+        _description_hash: BytesN<32>,
+        _executor: Address,
+    ) -> BytesN<32> {
+        unimplemented!("not used in these tests")
+    }
+
+    fn cancel(
+        _e: &Env,
+        _targets: Vec<Address>,
+        _functions: Vec<Symbol>,
+        _args: Vec<Vec<Val>>,
+        _description_hash: BytesN<32>,
+        _operator: Address,
+    ) -> BytesN<32> {
+        unimplemented!("not used in these tests")
+    }
+}
+
+#[test]
+fn failing_outcome_check_does_not_block_voting() {
+    let s = setup_outcome(|e| e.register(FailingOutcomeGovernor, ()), 0, 0);
+    let governor = FailingOutcomeGovernorClient::new(&s.e, &s.governor);
+
+    // Back inside the voting window.
+    let snapshot = governor.proposal_snapshot(&s.pid);
+    s.e.ledger().set_sequence_number(snapshot + 1);
+
+    assert_eq!(governor.proposal_state(&s.pid), ProposalState::Active);
+    let voter = Address::generate(&s.e);
+    let weight = governor.cast_vote(&s.pid, &VOTE_FOR, &String::from_str(&s.e, ""), &voter);
+    assert_eq!(weight, 1000);
+}
+
+#[test]
+fn failing_outcome_check_does_not_block_recorded_state() {
+    let s = setup_outcome(|e| e.register(FailingOutcomeGovernor, ()), 0, 0);
+    let governor = FailingOutcomeGovernorClient::new(&s.e, &s.governor);
+
+    // Voting has ended, but the recorded state takes precedence.
+    s.e.as_contract(&s.governor, || {
+        cancel(&s.e, s.targets.clone(), s.functions.clone(), s.args.clone(), &s.desc_hash)
+    });
+    assert_eq!(governor.proposal_state(&s.pid), ProposalState::Canceled);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4218)")]
+fn failing_outcome_check_fails_once_outcome_is_needed() {
+    let s = setup_outcome(|e| e.register(FailingOutcomeGovernor, ()), 0, 0);
+    let governor = FailingOutcomeGovernorClient::new(&s.e, &s.governor);
+
+    // Voting has ended and nothing is recorded, so the outcome is needed.
+    governor.proposal_state(&s.pid);
 }
 
 /// A governor that counts every vote type (including `against`) toward the

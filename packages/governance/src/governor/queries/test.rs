@@ -5,13 +5,14 @@ use soroban_sdk::{
 
 use crate::governor::{
     cast_vote, count_vote, get_proposal_deadline, get_proposal_proposer, get_proposal_snapshot,
-    get_proposal_state, get_proposal_vote_counts, has_voted, hash_proposal, propose,
-    quorum_reached, set_quorum, set_voting_delay, tally_succeeded,
+    get_proposal_state, get_proposal_vote_counts, has_voted, hash_proposal, outcome_pending,
+    propose, quorum_reached, set_quorum, set_voting_delay, tally_succeeded,
     test::{
         default_state, proposal_id, set_mock_voting_power, setup_env, setup_env_with_token,
         setup_governor_config, simple_proposal, store_proposal_with_quorum, stored_settings,
     },
-    GovernorSettingsStorageKey, ProposalState, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
+    GovernorSettingsStorageKey, ProposalCore, ProposalState, ProposalStorageKey, VOTE_ABSTAIN,
+    VOTE_AGAINST, VOTE_FOR,
 };
 
 // ################## INITIAL STATE TESTS ##################
@@ -406,6 +407,54 @@ fn get_proposal_proposer_fails_for_nonexistent() {
 // ################## PROPOSAL STATE TRANSITION TESTS ##################
 
 #[test]
+fn outcome_pending_only_after_voting_ends_without_recorded_state() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, description) = simple_proposal(&e);
+
+    let pid = e.as_contract(&contract_address, || {
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
+    });
+    let (snapshot, deadline) = e.as_contract(&contract_address, || {
+        (get_proposal_snapshot(&e, &pid), get_proposal_deadline(&e, &pid))
+    });
+
+    // Pending
+    e.as_contract(&contract_address, || assert!(!outcome_pending(&e, &pid)));
+
+    // Active, up to and including the deadline
+    e.ledger().set_sequence_number(snapshot + 1);
+    e.as_contract(&contract_address, || assert!(!outcome_pending(&e, &pid)));
+    e.ledger().set_sequence_number(deadline);
+    e.as_contract(&contract_address, || assert!(!outcome_pending(&e, &pid)));
+
+    // Voting has ended, nothing recorded
+    e.ledger().set_sequence_number(deadline + 1);
+    e.as_contract(&contract_address, || assert!(outcome_pending(&e, &pid)));
+
+    // Voting has ended, but a state is recorded
+    let key = ProposalStorageKey::Proposal(pid.clone());
+    e.as_contract(&contract_address, || {
+        let mut core: ProposalCore = e.storage().persistent().get(&key).unwrap();
+        core.state = ProposalState::Queued;
+        e.storage().persistent().set(&key, &core);
+        assert!(!outcome_pending(&e, &pid));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4200)")]
+fn outcome_pending_fails_for_nonexistent() {
+    let (e, contract_address) = setup_env();
+    e.as_contract(&contract_address, || {
+        outcome_pending(&e, &proposal_id(&e, 1));
+    });
+}
+
+#[test]
 fn proposal_transitions_to_active() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -539,5 +588,41 @@ fn zero_voting_period_leaves_proposal_unvotable() {
 
         e.ledger().set_sequence_number(snapshot + 1);
         assert_eq!(default_state(&e, &pid), ProposalState::Defeated);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4215)")]
+fn quorum_reached_fails_on_participation_overflow() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let pid = proposal_id(&e, 1);
+
+    e.as_contract(&contract_address, || {
+        store_proposal_with_quorum(&e, &pid);
+        count_vote(&e, &pid, &alice, VOTE_FOR, u128::MAX);
+        count_vote(&e, &pid, &bob, VOTE_ABSTAIN, 1);
+
+        quorum_reached(&e, &pid, 100);
+    });
+}
+
+#[test]
+fn recorded_expired_state_is_returned() {
+    let (e, contract_address) = setup_env();
+    let pid = proposal_id(&e, 1);
+
+    e.as_contract(&contract_address, || {
+        let core = ProposalCore {
+            proposer: Address::generate(&e),
+            vote_snapshot: 0,
+            vote_end: 0,
+            state: ProposalState::Expired,
+        };
+        e.storage().persistent().set(&ProposalStorageKey::Proposal(pid.clone()), &core);
+
+        // The recorded state wins over the outcome passed in.
+        assert_eq!(get_proposal_state(&e, &pid, true), ProposalState::Expired);
     });
 }

@@ -167,9 +167,9 @@ pub use crate::governor::{
     queries::{
         storage::{
             get_proposal_core, get_proposal_deadline, get_proposal_proposer, get_proposal_snapshot,
-            get_proposal_state, get_proposal_vote_counts, has_voted, hash_proposal, quorum_reached,
-            tally_succeeded, ProposalCore, ProposalStorageKey, ProposalVoteCounts, VOTE_ABSTAIN,
-            VOTE_AGAINST, VOTE_FOR,
+            get_proposal_state, get_proposal_vote_counts, has_voted, hash_proposal,
+            outcome_pending, quorum_reached, tally_succeeded, ProposalCore, ProposalStorageKey,
+            ProposalVoteCounts, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
         },
         GovernorQueries, GovernorQueriesClient, GovernorQueriesSpec,
     },
@@ -538,7 +538,7 @@ pub trait Governor: GovernorSettings + GovernorQueries {
     /// // Only the original proposer can cancel:
     /// fn cancel(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
     ///     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
-    ///     let proposer = storage::get_proposal_proposer(e, &proposal_id);
+    ///     let proposer = get_proposal_proposer(e, &proposal_id);
     ///     assert!(operator == proposer);
     ///     operator.require_auth();
     ///     storage::cancel(e, targets, functions, args, &description_hash)
