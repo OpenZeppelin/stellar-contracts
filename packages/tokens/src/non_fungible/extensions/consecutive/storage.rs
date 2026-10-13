@@ -198,8 +198,11 @@ impl Consecutive {
         Base::get_approval_entry(e, token_id)
     }
 
-    /// Checks that `spender` may move the token with `token_id` on behalf of
-    /// `owner`, following the consecutive ownership model.
+    /// Low-level function for checking if the `spender` has enough approval
+    /// prior a transfer, without checking ownership of `token_id` and
+    /// without handling authorization. Same as
+    /// [`Base::check_spender_approval`], except that the token's existence is
+    /// checked through [`Consecutive::get_approved`].
     ///
     /// # Arguments
     ///

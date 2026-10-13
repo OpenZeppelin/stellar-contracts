@@ -475,8 +475,7 @@ fn transfer_from_non_existent_token_by_non_owner_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // `spender` is neither `owner` nor an operator, so before the
-        // existence check moved into `Base::get_approved` this was `#202`.
+        // `spender` is neither `owner` nor an operator
         Base::transfer_from(&e, &spender, &owner, &recipient, 1);
     });
 }
