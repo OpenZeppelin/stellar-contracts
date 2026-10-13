@@ -615,6 +615,22 @@ fn consecutive_token_uri_panics_for_burned_id_fails() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #200)")]
+fn consecutive_transfer_from_non_existent_token_by_non_owner_fails() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Consecutive::mint_range(&e, &owner, 5);
+        Consecutive::transfer_from(&e, &spender, &owner, &recipient, 5);
+    });
+}
+
+#[test]
 fn consecutive_get_approved_works_for_unapproved_id_in_batch() {
     let e = Env::default();
     e.mock_all_auths();

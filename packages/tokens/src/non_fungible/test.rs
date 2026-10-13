@@ -465,6 +465,23 @@ fn get_approved_non_existent_token_fails() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #200)")]
+fn transfer_from_non_existent_token_by_non_owner_fails() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // `spender` is neither `owner` nor an operator, so before the
+        // existence check moved into `Base::get_approved` this was `#202`.
+        Base::transfer_from(&e, &spender, &owner, &recipient, 1);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #204)")]
 fn approve_with_invalid_live_until_ledger_fails() {
     let e = Env::default();
