@@ -155,18 +155,47 @@ pub mod domain {
 
 // ################## CORE PRIMITIVES ##################
 
+unconstrained fn point_hint(p: EmbeddedCurvePoint, _anchor: Field) -> EmbeddedCurvePoint {
+    p
+}
+
+/// Returns `p` as a witness. Barretenberg routes a multi_scalar_mul through its fixed-base lookup
+/// tables whenever a base point is an ACIR constant equal to one of its precomputed generators (G and
+/// H are), and the non-ZK proof's read-count commitments then expose which table rows the scalars'
+/// 9-bit windows hit more than once. The hint takes a witness `anchor` so the compiler cannot fold it
+/// back to a constant, and `assert_is` must run after the multiplication: an equality asserted before
+/// it lets the compiler substitute the constant back. `scripts/check_witness_lookups.sh` guards both.
+fn as_witness(p: EmbeddedCurvePoint, anchor: Field) -> EmbeddedCurvePoint {
+    // Safety: every caller constrains the result equal to `p` via `assert_is`.
+    unsafe { point_hint(p, anchor) }
+}
+
+fn assert_is(w: EmbeddedCurvePoint, p: EmbeddedCurvePoint) {
+    assert(w.x == p.x);
+    assert(w.y == p.y);
+    assert(w.is_infinite == p.is_infinite);
+}
+
 /// Pedersen commitment `v*G + r*H` on Grumpkin. docs/protocol/primitives.md#pedersen-commitments.
 pub fn commit(value: Field, randomness: Field) -> EmbeddedCurvePoint {
-    multi_scalar_mul(
-        [G, H],
+    let g = as_witness(G, value);
+    let h = as_witness(H, randomness);
+    let out = multi_scalar_mul(
+        [g, h],
         [EmbeddedCurveScalar::from_field(value), EmbeddedCurveScalar::from_field(randomness)],
-    )
+    );
+    assert_is(g, G);
+    assert_is(h, H);
+    out
 }
 
 /// Scalar multiplication `s*P` on Grumpkin. Used for `Y = sk*H`, `PVK = vk*H`,
 /// `R_e = r_e*H`, and as the building block under `ecdh`.
 pub fn scalar_mul(scalar: Field, point: EmbeddedCurvePoint) -> EmbeddedCurvePoint {
-    multi_scalar_mul([point], [EmbeddedCurveScalar::from_field(scalar)])
+    let p = as_witness(point, scalar);
+    let out = multi_scalar_mul([p], [EmbeddedCurveScalar::from_field(scalar)]);
+    assert_is(p, point);
+    out
 }
 
 /// ECDH shared-secret scalar extraction per docs/protocol/primitives.md#elliptic-curve-diffie-hellman: computes

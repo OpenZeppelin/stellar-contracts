@@ -20,34 +20,42 @@
 | Package                     | Function         | Expression Width     | ACIR Opcodes | Brillig Opcodes |
 | circuit_clawback            | decompose_hint   | N/A                  | N/A          | 30              |
 | circuit_clawback            | lte_hint         | N/A                  | N/A          | 33              |
-| circuit_clawback            | main             | Bounded { width: 4 } | 64           | 63              |
+| circuit_clawback            | main             | Bounded { width: 4 } | 84           | 91              |
+| circuit_clawback            | point_hint       | N/A                  | N/A          | 28              |
 | circuit_register            | decompose_hint   | N/A                  | N/A          | 30              |
 | circuit_register            | directive_invert | N/A                  | N/A          | 9               |
 | circuit_register            | lte_hint         | N/A                  | N/A          | 33              |
-| circuit_register            | main             | Bounded { width: 4 } | 33           | 72              |
+| circuit_register            | main             | Bounded { width: 4 } | 41           | 100             |
+| circuit_register            | point_hint       | N/A                  | N/A          | 28              |
 | circuit_set_spender         | decompose_hint   | N/A                  | N/A          | 30              |
 | circuit_set_spender         | directive_invert | N/A                  | N/A          | 9               |
 | circuit_set_spender         | lte_hint         | N/A                  | N/A          | 33              |
-| circuit_set_spender         | main             | Bounded { width: 4 } | 135          | 72              |
+| circuit_set_spender         | main             | Bounded { width: 4 } | 175          | 100             |
+| circuit_set_spender         | point_hint       | N/A                  | N/A          | 28              |
 | circuit_spender_transfer    | decompose_hint   | N/A                  | N/A          | 30              |
 | circuit_spender_transfer    | directive_invert | N/A                  | N/A          | 9               |
 | circuit_spender_transfer    | lte_hint         | N/A                  | N/A          | 33              |
-| circuit_spender_transfer    | main             | Bounded { width: 4 } | 136          | 72              |
+| circuit_spender_transfer    | main             | Bounded { width: 4 } | 180          | 100             |
+| circuit_spender_transfer    | point_hint       | N/A                  | N/A          | 28              |
 | circuit_transfer            | decompose_hint   | N/A                  | N/A          | 30              |
 | circuit_transfer            | directive_invert | N/A                  | N/A          | 9               |
 | circuit_transfer            | lte_hint         | N/A                  | N/A          | 33              |
-| circuit_transfer            | main             | Bounded { width: 4 } | 134          | 72              |
+| circuit_transfer            | main             | Bounded { width: 4 } | 178          | 100             |
+| circuit_transfer            | point_hint       | N/A                  | N/A          | 28              |
 | circuit_withdraw            | decompose_hint   | N/A                  | N/A          | 30              |
 | circuit_withdraw            | directive_invert | N/A                  | N/A          | 9               |
 | circuit_withdraw            | lte_hint         | N/A                  | N/A          | 33              |
-| circuit_withdraw            | main             | Bounded { width: 4 } | 95           | 72              |
+| circuit_withdraw            | main             | Bounded { width: 4 } | 123          | 100             |
+| circuit_withdraw            | point_hint       | N/A                  | N/A          | 28              |
 | gadget_assert_on_curve      | main             | Bounded { width: 4 } | 2            | 0               |
 | gadget_commit               | decompose_hint   | N/A                  | N/A          | 30              |
 | gadget_commit               | lte_hint         | N/A                  | N/A          | 33              |
-| gadget_commit               | main             | Bounded { width: 4 } | 23           | 63              |
+| gadget_commit               | main             | Bounded { width: 4 } | 31           | 91              |
+| gadget_commit               | point_hint       | N/A                  | N/A          | 28              |
 | gadget_ecdh                 | decompose_hint   | N/A                  | N/A          | 30              |
 | gadget_ecdh                 | lte_hint         | N/A                  | N/A          | 33              |
-| gadget_ecdh                 | main             | Bounded { width: 4 } | 17           | 63              |
+| gadget_ecdh                 | main             | Bounded { width: 4 } | 21           | 91              |
+| gadget_ecdh                 | point_hint       | N/A                  | N/A          | 28              |
 | gadget_encrypt_amount       | main             | Bounded { width: 4 } | 4            | 0               |
 | gadget_poseidon_with_domain | main             | Bounded { width: 4 } | 3            | 0               |
 | gadget_sponge_squeeze_2     | main             | Bounded { width: 4 } | 4            | 0               |
