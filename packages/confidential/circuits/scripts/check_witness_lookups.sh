@@ -49,6 +49,11 @@ for artifact in target/*.json; do
                 vals[k++] = op
                 ops = substr(ops, RSTART + RLENGTH)
             }
+            if (k == 0 || k % 5 != 0) {
+                printf "%s: cannot parse MULTI_SCALAR_MUL operands: %s\n", file, $0
+                bad = 1
+                next
+            }
             for (p = 0; p < k / 5; p++) {
                 if (vals[3 * p] !~ /^_/ || vals[3 * p + 1] !~ /^_/) {
                     printf "%s: MULTI_SCALAR_MUL takes a constant base point\n", file
