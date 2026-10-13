@@ -71,6 +71,18 @@ Noir sources, build scripts, and the pinned UltraHonk VKs that the verifier regi
 
 Start with [`docs/overview.md`](./docs/overview.md) for the design without mathematics, then read the protocol specification from [`docs/protocol/README.md`](./docs/protocol/README.md) onward; each file links to the next. [`docs/README.md`](./docs/README.md) maps the whole set: reading paths per role, the compliance, selective-disclosure, indexer, and SDK companions, and the citation rules that CI enforces with lychee.
 
+## Verifier backend
+
+[`ConfidentialVerifier::verify_proof`] delegates to Nethermind's UltraHonk verifier, `ultrahonk_soroban_verifier` from [rs-soroban-ultrahonk](https://github.com/NethermindEth/rs-soroban-ultrahonk). It verifies Barretenberg 0.87.0 UltraHonk proofs over a Keccak transcript; [`circuits/vks/README.md`](./circuits/vks/README.md) gives the exact proving recipe.
+
+### Zero-knowledge setting
+
+The verifier implements only the non-zk UltraHonk flavour, so proofs are generated without `bb prove --zk`. This does not affect soundness; it changes where privacy comes from. The zk flavour masks every committed witness polynomial with fresh randomness, so a proof reveals nothing about the witness by construction. The non-zk flavour commits to the witness as it is, and privacy rests on the circuit construction instead: every part of the proof mixes in high-entropy secrets such as keys, blindings and Poseidon2-derived masks, and no low-entropy value such as an amount or a balance can be separated out. To that end, the Pedersen generators enter every scalar multiplication as witnesses so that no secret indexes a Barretenberg lookup table, which `circuits/scripts/check_witness_lookups.sh` checks in CI.
+
+A non-zk proof does carry an algebraic relation involving the prover's long-term key in BN254, the curve the proof system works over. Recovering the key from it is a discrete-logarithm problem in BN254, estimated at about 100 bits of security and the same assumption the proof system's soundness already relies on, rather than the roughly 127-bit problem posed by the public key on Grumpkin which is beyond practical reach today.
+
+The zk flavour of the verifier removes both considerations. Nethermind has [zk verification in progress](https://github.com/NethermindEth/rs-soroban-ultrahonk/pull/38); adopting it changes the proving recipe and the verifier dependency, not the circuits.
+
 ## Packaging
 
 The crate's packaging follows from its UltraHonk verifier backend
