@@ -159,12 +159,15 @@ unconstrained fn point_hint(p: EmbeddedCurvePoint, _anchor: Field) -> EmbeddedCu
     p
 }
 
-/// Returns `p` as a witness. Barretenberg routes a multi_scalar_mul through its fixed-base lookup
-/// tables whenever a base point is an ACIR constant equal to one of its precomputed generators (G and
-/// H are), and the non-ZK proof's read-count commitments then expose which table rows the scalars'
-/// 9-bit windows hit more than once. The hint takes a witness `anchor` so the compiler cannot fold it
-/// back to a constant, and `assert_is` must run after the multiplication: an equality asserted before
-/// it lets the compiler substitute the constant back. `scripts/check_witness_lookups.sh` guards both.
+/// Returns `p` as a witness. Barretenberg routes a multi_scalar_mul through its
+/// fixed-base lookup tables when a base point is an ACIR constant equal to one of
+/// its precomputed generators (G and H are) and the scalar is a witness; the
+/// non-ZK proof's read-count and read-tag commitments then depend on which table
+/// rows the scalars' 9-bit windows hit, and how often. The hint takes a witness
+/// `anchor` so the compiler does not fold it back to a constant, and `assert_is`
+/// must run after the multiplication: an equality asserted before it lets the
+/// compiler substitute the constant back. `scripts/check_witness_lookups.sh`
+/// guards both.
 fn as_witness(p: EmbeddedCurvePoint, anchor: Field) -> EmbeddedCurvePoint {
     // Safety: every caller constrains the result equal to `p` via `assert_is`.
     unsafe { point_hint(p, anchor) }
