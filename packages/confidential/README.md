@@ -70,3 +70,17 @@ Noir sources, build scripts, and the pinned UltraHonk VKs that the verifier regi
 ## Documentation
 
 Start with [`docs/overview.md`](./docs/overview.md) for the design without mathematics, then read the protocol specification from [`docs/protocol/README.md`](./docs/protocol/README.md) onward; each file links to the next. [`docs/README.md`](./docs/README.md) maps the whole set: reading paths per role, the compliance, selective-disclosure, indexer, and SDK companions, and the citation rules that CI enforces with lychee.
+
+## Verifier backend
+
+[`ConfidentialVerifier::verify_proof`] delegates to Nethermind's UltraHonk verifier, `ultrahonk_soroban_verifier` from [rs-soroban-ultrahonk](https://github.com/NethermindEth/rs-soroban-ultrahonk). It verifies Barretenberg 0.87.0 UltraHonk proofs over a Keccak transcript; [`circuits/vks/README.md`](./circuits/vks/README.md) gives the exact proving recipe.
+
+### Zero-knowledge setting
+
+The verifier implements only the non-zk UltraHonk flavour, so proofs are generated without `bb prove --zk`. This does not affect soundness. The zk flavour masks every committed witness polynomial with fresh randomness, so a proof reveals nothing about the witness by construction; the non-zk flavour commits to the witness as it is, so a proof is a deterministic function of the witness and carries no such guarantee.
+
+The circuits close one known leak. When a base point is a constant equal to one of Barretenberg's precomputed generators, as the Pedersen generators `G` and `H` are, Barretenberg performs the scalar multiplication with fixed-base plookup tables, and the read counts of those tables would expose windows of the secret scalars. `commit` and `scalar_mul` therefore pass the generators as witnesses, so Barretenberg uses its variable-base path, which reads ROM tables instead. `circuits/scripts/check_witness_lookups.sh` checks in CI that no `multi_scalar_mul` takes a constant base point and that every blackbox is on an allowlist of those Barretenberg 0.87.0 lowers without plookup.
+
+This removes the plookup channel only and does not make proofs private. Whether other parts of a non-zk proof, such as the wire commitments or the opened evaluations, leak private values has not been established, beyond one known case: the commitment to the lookup inverses and its opened evaluation determine two BN254 points whose discrete logarithm is the prover's long-term key. Recovering the key from them is a discrete-logarithm problem in BN254, estimated at about 100 bits of security, the level the proof system's soundness already relies on.
+
+Zero knowledge requires the zk flavour of the verifier. Nethermind has [zk verification in progress](https://github.com/NethermindEth/rs-soroban-ultrahonk/pull/38); adopting it changes the proving recipe and the verifier dependency, not the circuits or the verification keys.

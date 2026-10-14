@@ -111,6 +111,10 @@ impl ContractOverrides for ConsecutiveVotes {
         Consecutive::token_uri(e, token_id)
     }
 
+    fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
+        Consecutive::get_approved(e, token_id)
+    }
+
     fn approve(
         e: &Env,
         approver: &Address,
