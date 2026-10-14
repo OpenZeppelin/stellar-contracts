@@ -15,6 +15,7 @@ Run from this directory. CI is `.github/workflows/noir.yml`.
 | Per-primitive constraint counts | `nargo info` |
 | Compile one circuit | `nargo compile --package circuit_<name>` |
 | Regenerate verification keys | `./scripts/extract_vks.sh` |
+| Check no witness reaches a lookup table | `./scripts/check_witness_lookups.sh` |
 
 There is no `nargo fmt` step in CI and no formatter config — Noir formatting is unenforced. The workflow triggers only on `circuits/**`, so a change to the Rust-side parity test in `../test.rs` does **not** run this job.
 
@@ -27,6 +28,10 @@ It appears in all fourteen package `Nargo.toml` files — the workspace manifest
 ### Do not prune unused public inputs
 
 `_acct_f` in `register/src/main.nr` is referenced by no gate and looks like dead code. It is the replay binding: UltraHonk absorbs every public input into the transcript, so a proof produced for one account fails when the contract assembles the blob for another. Removing it lets anyone replay a legitimate registration's published proof and payload to mint duplicate-key accounts. `clawback/src/main.nr` carries four such bindings — `addr_f`, `_acct_f`, `_dest_f`, `_nonce` — removing `_dest_f` lets a compromised clawback signer settle a witness to a destination of its own choosing, and removing `_nonce` lets an approved proof execute again once the commitments are restored. Each operation circuit declares its exact public-input count in a header comment — clawback 11, withdraw 16, transfer / spender_transfer 25, set_spender 26 — and the count is part of the contract with the on-chain assembler.
+
+### `as_witness` in `commit` and `scalar_mul` is not dead code
+
+`as_witness(G, value)` looks like an identity wrapper around a constant. It keeps bb off its fixed-base lookup tables: proofs are non-zk, so the read-count commitments would publish which table rows each secret scalar's windows hit. The doc comment on `as_witness` lists what keeps the generator a witness. `scripts/check_witness_lookups.sh` fails CI on any `multi_scalar_mul` with a constant base point and on any blackbox outside its plookup-free allowlist; extend the allowlist only after confirming bb lowers the new blackbox without lookups.
 
 ### Package names are load-bearing
 

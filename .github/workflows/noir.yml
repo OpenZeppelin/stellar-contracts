@@ -79,6 +79,11 @@ jobs:
       - name: nargo test
         run: nargo test
 
+      - name: Check that no witness reaches a lookup table
+        # Proofs are non-zk, so lookup read counts are committed in the
+        # clear; the script header explains the leak this rules out.
+        run: ./scripts/check_witness_lookups.sh
+
       - name: Diff extracted VKs against committed artifacts
         # Re-extracts both VK forms for each per-operation circuit using the
         # pinned bb version and compares against the committed `vks/*.vk.json`
