@@ -35,6 +35,10 @@ impl ContractOverrides for Consecutive {
         Consecutive::token_uri(e, token_id)
     }
 
+    fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
+        Consecutive::get_approved(e, token_id)
+    }
+
     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
         Consecutive::transfer(e, from, to, token_id);
     }
@@ -168,6 +172,61 @@ impl Consecutive {
             .unwrap_or_else(|| panic_with_error!(&e, NonFungibleTokenError::NonExistentToken))
     }
 
+    /// Returns the address approved for the specified token, following the
+    /// consecutive ownership model.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `token_id` - The identifier of the token to check approval for.
+    ///
+    /// # Errors
+    ///
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
+    ///   exist.
+    pub fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
+        let is_burned =
+            Consecutive::get_persistent_entry(e, &NFTConsecutiveStorageKey::BurnedToken(token_id))
+                .unwrap_or(false);
+        if is_burned || token_id >= sequential::next_token_id(e) {
+            panic_with_error!(e, NonFungibleTokenError::NonExistentToken);
+        }
+
+        // `Base::get_approved` would check existence through `Base::owner_of`,
+        // which doesn't see consecutive ownership, so the approval entry is
+        // read directly.
+        Base::get_approval_entry(e, token_id)
+    }
+
+    /// Low-level function for checking if the `spender` has enough approval
+    /// prior a transfer, without checking ownership of `token_id` and
+    /// without handling authorization. Same as
+    /// [`Base::check_spender_approval`], except that the token's existence is
+    /// checked through [`Consecutive::get_approved`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `spender` - The address attempting to transfer the token.
+    /// * `owner` - The address of the current token owner.
+    /// * `token_id` - The identifier of the token to be transferred.
+    ///
+    /// # Errors
+    ///
+    /// * [`NonFungibleTokenError::InsufficientApproval`] - If the `spender`
+    ///   doesn't have enough approval.
+    /// * refer to [`Consecutive::get_approved`] errors.
+    pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: u32) {
+        // If `spender` is not the owner, they must have explicit approval.
+        let is_spender_owner = spender == owner;
+        let is_spender_approved = Consecutive::get_approved(e, token_id) == Some(spender.clone());
+        let has_spender_approval_for_all = Base::is_approved_for_all(e, owner, spender);
+
+        if !is_spender_owner && !is_spender_approved && !has_spender_approval_for_all {
+            panic_with_error!(e, NonFungibleTokenError::InsufficientApproval);
+        }
+    }
+
     /// Returns the URI for a specific `token_id`.
     ///
     /// # Arguments
@@ -293,7 +352,7 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::check_spender_approval`] errors.
+    /// * refer to [`Consecutive::check_spender_approval`] errors.
     /// * refer to [`Consecutive::update`] errors.
     ///
     /// # Events
@@ -307,7 +366,7 @@ impl Consecutive {
     pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
         spender.require_auth();
 
-        Base::check_spender_approval(e, spender, from, token_id);
+        Consecutive::check_spender_approval(e, spender, from, token_id);
 
         Consecutive::update(e, Some(from), None, token_id);
         emit_burn(e, from, token_id);
@@ -356,7 +415,7 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::check_spender_approval`] errors.
+    /// * refer to [`Consecutive::check_spender_approval`] errors.
     /// * refer to [`Consecutive::update`] errors.
     ///
     /// # Events
@@ -372,7 +431,7 @@ impl Consecutive {
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
         spender.require_auth();
 
-        Base::check_spender_approval(e, spender, from, token_id);
+        Consecutive::check_spender_approval(e, spender, from, token_id);
 
         Consecutive::update(e, Some(from), Some(to), token_id);
         emit_transfer(e, from, to, token_id);

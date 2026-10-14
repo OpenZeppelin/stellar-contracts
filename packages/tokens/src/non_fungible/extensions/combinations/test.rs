@@ -246,6 +246,49 @@ fn consecutive_votes_queries_and_transfer_from() {
 }
 
 #[test]
+fn consecutive_votes_get_approved_and_transfer_from_inside_batch() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        ConsecutiveVotes::mint_range(&e, &alice, 3);
+
+        // id 0 has no `Owner` entry of its own, its owner comes from the batch
+        assert_eq!(<ConsecutiveVotes as ContractOverrides>::get_approved(&e, 0), None);
+        <ConsecutiveVotes as ContractOverrides>::approve(
+            &e,
+            &alice,
+            &spender,
+            0,
+            e.ledger().sequence() + 100,
+        );
+        assert_eq!(
+            <ConsecutiveVotes as ContractOverrides>::get_approved(&e, 0),
+            Some(spender.clone())
+        );
+
+        <ConsecutiveVotes as ContractOverrides>::transfer_from(&e, &spender, &alice, &bob, 0);
+        assert_eq!(Consecutive::owner_of(&e, 0), bob);
+        assert_eq!(get_voting_units(&e, &alice), 2);
+        assert_eq!(get_voting_units(&e, &bob), 1);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #200)")]
+fn consecutive_votes_get_approved_non_existent_token_fails() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        let last_id = ConsecutiveVotes::mint_range(&e, &alice, 3);
+        <ConsecutiveVotes as ContractOverrides>::get_approved(&e, last_id + 1);
+    });
+}
+
+#[test]
 fn consecutive_votes_burn_from() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
