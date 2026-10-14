@@ -84,14 +84,3 @@ The circuits close one known leak. When a base point is a constant equal to one 
 This removes the plookup channel only and does not make proofs private. Whether other parts of a non-zk proof, such as the wire commitments or the opened evaluations, leak private values has not been established, beyond one known case: the commitment to the lookup inverses and its opened evaluation determine two BN254 points whose discrete logarithm is the prover's long-term key. Recovering the key from them is a discrete-logarithm problem in BN254, estimated at about 100 bits of security, the level the proof system's soundness already relies on.
 
 Zero knowledge requires the zk flavour of the verifier. Nethermind has [zk verification in progress](https://github.com/NethermindEth/rs-soroban-ultrahonk/pull/38); adopting it changes the proving recipe and the verifier dependency, not the circuits or the verification keys.
-
-## Packaging
-
-The crate's packaging follows from its UltraHonk verifier backend
-(`ultrahonk-soroban-verifier`), which links Rust's `alloc` crate and has no
-crates.io release.
-
-- **Separate from `stellar-tokens`.** As a module of `stellar-tokens`, the verifier would put `alloc` in the dependency graph of every contract that uses a fungible, non-fungible, RWA, or vault token, and each of them would need a global allocator it never uses. A `confidential` cargo feature on `stellar-tokens` would remove that coupling but would leave `stellar-tokens` unpublishable, because `cargo publish` rejects git dependencies even when they are optional.
-- **Contracts provide the allocator.** A wasm binary whose dependency graph includes `alloc` needs exactly one `#[global_allocator]`. Enabling the `alloc` feature of `soroban-sdk` registers the SDK's bump allocator as that allocator, and Cargo features are additive, so a library that enables it prevents every dependent contract from registering its own (`the #[global_allocator] in this crate conflicts with global allocator in: soroban_sdk`). This crate leaves the feature off, and each contract either enables it or registers its own allocator. The verifier's repository splits its library and contracts the same way.
-- **`lib` only.** Without an allocator, a standalone `cdylib` build of this crate fails with `no global memory allocator found but one is required`. The crate is compiled to wasm as a dependency of the contracts under `examples/confidential/`, which provide one.
-- **`publish = false`.** The verifier is a git dependency, which `cargo publish` rejects. The crate can be published once the verifier has a crates.io release.
