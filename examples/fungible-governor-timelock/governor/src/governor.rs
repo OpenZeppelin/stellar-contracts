@@ -2,7 +2,7 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, Address, BytesN, Env, IntoVal, String, Symbol, Val, Vec,
 };
 use stellar_governance::{
-    governor::{self as governor, Governor, GovernorQueries, GovernorSettings, ProposalState},
+    governor::{self as governor, Governor, ProposalState},
     timelock::TimelockClient,
 };
 
@@ -44,18 +44,12 @@ impl GovernorTimelockContract {
 }
 
 #[contractimpl(contracttrait)]
-impl GovernorSettings for GovernorTimelockContract {
+impl Governor for GovernorTimelockContract {
     /// Enables the queuing step in the proposal lifecycle.
     fn proposals_need_queuing(_e: &Env) -> bool {
         true
     }
-}
 
-#[contractimpl(contracttrait)]
-impl GovernorQueries for GovernorTimelockContract {}
-
-#[contractimpl(contracttrait)]
-impl Governor for GovernorTimelockContract {
     /// Queues a succeeded proposal: transitions governor state to `Queued`
     /// and schedules a timelock operation that will call back into
     /// `execute` after the delay.
@@ -78,7 +72,8 @@ impl Governor for GovernorTimelockContract {
     ) -> BytesN<32> {
         let proposal_id =
             governor::hash_proposal(e, &targets, &functions, &args, &description_hash);
-        let state = Self::proposal_state(e, proposal_id);
+        let snapshot = governor::get_proposal_snapshot(e, &proposal_id);
+        let quorum = Self::quorum(e, snapshot);
         let proposal_id = governor::queue(
             e,
             targets.clone(),
@@ -86,7 +81,7 @@ impl Governor for GovernorTimelockContract {
             args.clone(),
             &description_hash,
             eta,
-            state,
+            quorum,
         );
 
         // Schedule a timelock operation that calls governor.execute() after
@@ -136,7 +131,8 @@ impl Governor for GovernorTimelockContract {
 
         let proposal_id =
             governor::hash_proposal(e, &targets, &functions, &args, &description_hash);
-        let state = Self::proposal_state(e, proposal_id);
+        let snapshot = governor::get_proposal_snapshot(e, &proposal_id);
+        let quorum = Self::quorum(e, snapshot);
         governor::execute(
             e,
             targets,
@@ -144,7 +140,7 @@ impl Governor for GovernorTimelockContract {
             args,
             &description_hash,
             Self::proposals_need_queuing(e),
-            state,
+            quorum,
         )
     }
 
