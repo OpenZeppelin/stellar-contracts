@@ -25,15 +25,16 @@ impl MultisigContract {
     ///
     /// # Arguments
     ///
+    /// * `name` - Human-readable name of the default context rule
     /// * `signers` - Vector of signers (Delegated or External) that can
     ///   authorize transactions
     /// * `policies` - Map of policy contract addresses to their installation
     ///   parameters
-    pub fn __constructor(e: &Env, signers: Vec<Signer>, policies: Map<Address, Val>) {
+    pub fn __constructor(e: &Env, name: String, signers: Vec<Signer>, policies: Map<Address, Val>) {
         smart_account::add_context_rule(
             e,
             &ContextRuleType::Default,
-            &String::from_str(e, "multisig"),
+            &name,
             None,
             &signers,
             &policies,

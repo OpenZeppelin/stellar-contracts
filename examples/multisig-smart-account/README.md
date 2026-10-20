@@ -132,6 +132,7 @@ stellar contract deploy \
     --alias multisig-smart-account \
     --wasm target/wasm32v1-none/release/multisig_account_example.wasm \
     -- \
+    --name multisig \
     --signers '[
         {
             "External": [
