@@ -539,6 +539,26 @@ fn add_context_rule_oversized_external_key_fails() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3018)")]
+fn add_context_rule_self_delegated_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let signers = Vec::from_array(&e, [Signer::Delegated(address.clone())]);
+
+        add_context_rule(
+            &e,
+            &ContextRuleType::Default,
+            &String::from_str(&e, "self_delegated_rule"),
+            None,
+            &signers,
+            &Map::new(&e),
+        );
+    });
+}
+
+#[test]
 fn add_context_rule_max_size_external_key_succeeds() {
     let e = Env::default();
     let address = e.register(MockContract, ());

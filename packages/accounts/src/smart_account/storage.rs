@@ -102,6 +102,11 @@ pub enum Signer {
     /// smart account with the [`AuthDigestPreimage`] as its single argument.
     /// See `src/smart_account/test/auth_entries.rs` for a reference
     /// construction.
+    ///
+    /// The address must not be an account that delegates its authentication
+    /// back to this smart account, unless it is an account that authenticates
+    /// through [`do_check_auth`]; this signer can otherwise be authorized
+    /// without any signature. See [`validate_no_delegated_context_contract`].
     Delegated(Address),
     /// An external signer with custom verification logic.
     /// Contains the verifier contract address and the public key data.
@@ -379,6 +384,15 @@ pub fn get_validated_context_by_id(
 ///
 /// * [`SmartAccountError::ExternalVerificationFailed`] - When an external
 ///   signature fails verification through its verifier contract.
+///
+/// # Security Warning
+///
+/// A [`Signer::Delegated`] signer is authenticated even when its address is the
+/// direct invoker of the current `__check_auth`, in which case the host
+/// approves it without a signature. [`do_check_auth`] guards against this
+/// through [`validate_no_delegated_context_contract`], within the limits
+/// documented there; a custom `__check_auth` that calls this function directly
+/// must call [`validate_no_delegated_context_contract`] first.
 pub fn authenticate(e: &Env, preimage: &AuthDigestPreimage, signer: &Signer, sig_data: &Bytes) {
     match signer {
         Signer::External(verifier, key_data) => {
@@ -394,6 +408,65 @@ pub fn authenticate(e: &Env, preimage: &AuthDigestPreimage, signer: &Signer, sig
         Signer::Delegated(addr) => {
             let args = (preimage.clone(),).into_val(e);
             addr.require_auth_for_args(args)
+        }
+    }
+}
+
+/// Rejects a [`Signer::Delegated`] signer whose address is the contract of any
+/// context being authorized. A delegated signer is authenticated with
+/// `addr.require_auth_for_args`, which the Soroban host approves without a
+/// signature when `addr` is the direct invoker of this `__check_auth`. When the
+/// host runs this `__check_auth` for a `require_auth` call, the contract of the
+/// root context is that invoker, whether it calls into this account from an
+/// ordinary function or from its own `__check_auth` in a mutual or self
+/// delegation. Contracts of sub-invocation contexts are not invokers of this
+/// frame and are rejected conservatively. [`Signer::External`] signers are
+/// unaffected.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer` - The signer to validate.
+/// * `auth_contexts` - The contexts being authorized.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::DelegatedSignerIsContextContract`] - When the signer
+///   is `Delegated(addr)` and `addr` is the contract of a context in
+///   `auth_contexts`.
+///
+/// # Security Warning
+///
+/// The check does not cover two cases in which a `Delegated(addr)` signer is
+/// authorized without any signature:
+///
+/// * `addr` delegates to this smart account through CAP-71
+///   (`CustomAccount::delegate_auth`). The host runs this `__check_auth` from
+///   the `__check_auth` of `addr` and with the contexts of `addr`, so `addr` is
+///   the invoker without being the contract of any context. `addr`, along with
+///   any account relying on its authorization, can then be authorized without
+///   any key.
+/// * `addr` calls `require_auth` on this smart account from its own
+///   `__check_auth` without an equivalent check. The host approves this smart
+///   account there, so it can be authorized without any key.
+///
+/// Neither case is detectable from within this smart account, so a `Delegated`
+/// signer must not be an account that delegates its authentication back to
+/// this smart account, unless it is an account that authenticates through
+/// [`do_check_auth`].
+pub fn validate_no_delegated_context_contract(
+    e: &Env,
+    signer: &Signer,
+    auth_contexts: &Vec<Context>,
+) {
+    let Signer::Delegated(addr) = signer else {
+        return;
+    };
+    for context in auth_contexts.iter() {
+        if let Context::Contract(ContractContext { contract, .. }) = context {
+            if contract == *addr {
+                panic_with_error!(e, SmartAccountError::DelegatedSignerIsContextContract);
+            }
         }
     }
 }
@@ -451,6 +524,60 @@ pub fn validate_signer_key_size(e: &Env, signer: &Signer) {
     }
 }
 
+/// Validates that a signer is not [`Signer::Delegated`] to the smart account
+/// itself, i.e. to the current contract address. [`Signer::External`] signers
+/// and delegated signers pointing to other addresses pass unchanged.
+///
+/// A `Delegated(addr)` signer is authenticated with
+/// `addr.require_auth_for_args((preimage,))`. When `addr` is the smart account,
+/// the host runs the account's own `__check_auth` again, nested in the outer
+/// one, so such a signer:
+///
+/// * never authorizes the account's own functions, because the account is then
+///   the contract of an authorized context and
+///   [`validate_no_delegated_context_contract`] rejects the signer;
+/// * authorizes any other context only when another signer of the account
+///   satisfies the nested `__check_auth` under a `Default` or `CallContract`
+///   rule for the account itself. A separate context rule for the target
+///   context listing those signers grants the same authority, without the extra
+///   authorization entry and without running that rule's policies against a
+///   `__check_auth` context.
+///
+/// A custom `__check_auth` that calls [`authenticate`] without
+/// [`validate_no_delegated_context_contract`] is exposed further: the nested
+/// call can be satisfied by the same self-delegated signer, whose
+/// `require_auth_for_args` the host then approves without a signature.
+/// Rejecting the signer at configuration time keeps it out of any account
+/// configured through this module.
+///
+/// Only the self-referential case is detectable when signers are configured.
+/// Mutual delegation between accounts and delegates that invoke the account
+/// depend on other contracts' state and are caught at authorization time by
+/// [`validate_no_delegated_context_contract`], within the limits documented
+/// there.
+///
+/// [`add_context_rule`], [`add_signer`] and [`batch_add_signer`] call this
+/// function for every new signer. It compares against
+/// `e.current_contract_address()`, so it must run within the smart account's
+/// own contract.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer` - The signer to validate.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::SelfDelegatedSigner`] - When the signer is
+///   `Delegated(addr)` and `addr` is the current contract address.
+pub fn validate_no_self_delegation(e: &Env, signer: &Signer) {
+    if let Signer::Delegated(addr) = signer {
+        if *addr == e.current_contract_address() {
+            panic_with_error!(e, SmartAccountError::SelfDelegatedSigner);
+        }
+    }
+}
+
 /// Validates that a context rule name does not exceed the maximum allowed
 /// length.
 ///
@@ -496,6 +623,7 @@ pub fn validate_context_rule_name(e: &Env, name: &String) {
 ///   `context_rule_ids` has a different length than `auth_contexts`.
 /// * [`SmartAccountError::UnauthorizedSigner`] - When a signer in `AuthPayload`
 ///   is not part of any selected context rule.
+/// * refer to [`validate_no_delegated_context_contract`] errors.
 /// * refer to [`authenticate`] errors.
 /// * refer to [`get_validated_context_by_id`] errors.
 pub fn do_check_auth(
@@ -541,6 +669,7 @@ pub fn do_check_auth(
         if !allowed_signers.contains_key(signer.clone()) {
             panic_with_error!(e, SmartAccountError::UnauthorizedSigner);
         }
+        validate_no_delegated_context_contract(e, &signer, auth_contexts);
         authenticate(e, &preimage, &signer, &sig_data);
     }
 
@@ -649,6 +778,7 @@ pub fn validate_no_canonical_duplicates(e: &Env, signers: &Vec<Signer>) {
 ///   reached `u32::MAX` and cannot be incremented.
 /// * refer to [`validate_context_rule_name`] errors.
 /// * refer to [`validate_signer_key_size`] errors.
+/// * refer to [`validate_no_self_delegation`] errors.
 /// * refer to [`validate_signers_and_policies`] errors.
 ///
 /// # Events
@@ -684,7 +814,10 @@ pub fn add_context_rule(
 
     let count = get_context_rules_count(e);
 
-    signers.iter().for_each(|signer| validate_signer_key_size(e, &signer));
+    signers.iter().for_each(|signer| {
+        validate_signer_key_size(e, &signer);
+        validate_no_self_delegation(e, &signer);
+    });
     validate_no_canonical_duplicates(e, signers);
 
     // Check valid_until
@@ -948,6 +1081,7 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 /// * [`SmartAccountError::DuplicateSigner`] - When the signer already exists in
 ///   the context rule.
 /// * refer to [`validate_signer_key_size`] errors.
+/// * refer to [`validate_no_self_delegation`] errors.
 /// * refer to [`validate_signers_and_policies`] errors.
 ///
 /// # Events
@@ -972,6 +1106,7 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 ///   proper access control is implemented at the contract level.
 pub fn add_signer(e: &Env, id: u32, signer: &Signer) -> u32 {
     validate_signer_key_size(e, signer);
+    validate_no_self_delegation(e, signer);
 
     // Get current entry to access existing IDs
     let data_key = SmartAccountStorageKey::ContextRuleData(id);
@@ -1069,6 +1204,7 @@ pub fn remove_signer(e: &Env, context_rule_id: u32, signer_id: u32) {
 /// * [`SmartAccountError::DuplicateSigner`] - When any signer already exists in
 ///   the context rule or appears more than once in `signers`.
 /// * refer to [`validate_signer_key_size`] errors.
+/// * refer to [`validate_no_self_delegation`] errors.
 /// * refer to [`validate_signers_and_policies`] errors.
 ///
 /// # Events
@@ -1097,8 +1233,11 @@ pub fn batch_add_signer(e: &Env, id: u32, signers: &Vec<Signer>) {
     let mut entry: ContextRuleEntry = get_persistent_entry(e, &data_key)
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
-    // Validate key sizes for all new signers.
-    signers.iter().for_each(|signer| validate_signer_key_size(e, &signer));
+    // Validate all new signers.
+    signers.iter().for_each(|signer| {
+        validate_signer_key_size(e, &signer);
+        validate_no_self_delegation(e, &signer);
+    });
 
     // Check for duplicates across existing + new signers in one batch.
     let mut all_signers = get_signers(e, &entry.signer_ids);

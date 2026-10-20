@@ -149,20 +149,24 @@ fn auth_entry(
     }
 }
 
-fn register_account(e: &Env, signer: &Signer) -> (Address, Address, u32) {
-    let account = e.register(SmartAccountContract, ());
-    let probe = e.register(Probe, ());
-    let rule_id = e.as_contract(&account, || {
+fn add_rule(e: &Env, account: &Address, contract: &Address, signer: &Signer) -> u32 {
+    e.as_contract(account, || {
         add_context_rule(
             e,
-            &ContextRuleType::CallContract(probe.clone()),
-            &String::from_str(e, "probe"),
+            &ContextRuleType::CallContract(contract.clone()),
+            &String::from_str(e, "call"),
             None,
             &vec![e, signer.clone()],
             &Map::new(e),
         )
         .id
-    });
+    })
+}
+
+fn register_account(e: &Env, signer: &Signer) -> (Address, Address, u32) {
+    let account = e.register(SmartAccountContract, ());
+    let probe = e.register(Probe, ());
+    let rule_id = add_rule(e, &account, &probe, signer);
     (account, probe, rule_id)
 }
 
@@ -267,6 +271,74 @@ fn delegated_signer_nested_entry_with_digest_argument_fails() {
     ]);
 
     assert!(ProbeClient::new(&e, &probe).try_ping(&account).is_err());
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3017)")]
+fn mutually_delegated_signers_without_keys_fail() {
+    let e = Env::default();
+    let probe = e.register(Probe, ());
+    let account_a = e.register(SmartAccountContract, ());
+    let account_b = e.register(SmartAccountContract, ());
+    let signer_a = Signer::Delegated(account_b.clone());
+    let signer_b = Signer::Delegated(account_a.clone());
+    let rule_a = add_rule(&e, &account_a, &probe, &signer_a);
+    let rule_b = add_rule(&e, &account_b, &account_a, &signer_b);
+
+    let root_invocation = ping_invocation(&e, &probe, &account_a);
+    let preimage = account_preimage(&e, &account_a, rule_a, &root_invocation);
+    let check_auth_invocation =
+        contract_fn(&account_a, "__check_auth", std::vec![to_scval(&e, preimage)]);
+
+    e.set_auths(&[
+        account_entry(&e, &account_a, &signer_a, Bytes::new(&e), rule_a, root_invocation),
+        account_entry(&e, &account_b, &signer_b, Bytes::new(&e), rule_b, check_auth_invocation),
+    ]);
+
+    ProbeClient::new(&e, &probe).ping(&account_a);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3017)")]
+fn delegated_signer_invoking_account_fails() {
+    let e = Env::default();
+    let probe = e.register(Probe, ());
+    let account = e.register(SmartAccountContract, ());
+    let signer = Signer::Delegated(probe.clone());
+    let rule_id = add_rule(&e, &account, &probe, &signer);
+
+    let root_invocation = ping_invocation(&e, &probe, &account);
+
+    e.set_auths(&[account_entry(&e, &account, &signer, Bytes::new(&e), rule_id, root_invocation)]);
+
+    ProbeClient::new(&e, &probe).ping(&account);
+}
+
+#[test]
+fn mutually_delegated_account_authorizes_with_partner_key() {
+    let e = Env::default();
+    let (key_signer, signing_key) = external_signer(&e);
+    let probe = e.register(Probe, ());
+    let account_a = e.register(SmartAccountContract, ());
+    let account_b = e.register(SmartAccountContract, ());
+    let signer_a = Signer::Delegated(account_b.clone());
+    let rule_a = add_rule(&e, &account_a, &probe, &signer_a);
+    let rule_b = add_rule(&e, &account_b, &account_a, &key_signer);
+    add_rule(&e, &account_b, &probe, &Signer::Delegated(account_a.clone()));
+
+    let root_invocation = ping_invocation(&e, &probe, &account_a);
+    let preimage_a = account_preimage(&e, &account_a, rule_a, &root_invocation);
+    let check_auth_invocation =
+        contract_fn(&account_a, "__check_auth", std::vec![to_scval(&e, preimage_a)]);
+    let preimage_b = account_preimage(&e, &account_b, rule_b, &check_auth_invocation);
+    let sig_data = sign(&e, &signing_key, &preimage_b.digest(&e));
+
+    e.set_auths(&[
+        account_entry(&e, &account_a, &signer_a, Bytes::new(&e), rule_a, root_invocation),
+        account_entry(&e, &account_b, &key_signer, sig_data, rule_b, check_auth_invocation),
+    ]);
+
+    ProbeClient::new(&e, &probe).ping(&account_a);
 }
 
 #[test]
