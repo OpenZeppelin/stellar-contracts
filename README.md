@@ -74,13 +74,13 @@ We recommend pinning to a specific version, because rapid iterations are expecte
 
 ```toml
 [dependencies]
-stellar-tokens = "=0.7.2"
-stellar-access = "=0.7.2"
-stellar-contract-utils = "=0.7.2"
-stellar-governance = "=0.7.2"
-stellar-accounts = "=0.7.2"
-stellar-fee-abstraction = "=0.7.2"
-stellar-macros = "=0.7.2"
+stellar-tokens = "=0.7.3"
+stellar-access = "=0.7.3"
+stellar-contract-utils = "=0.7.3"
+stellar-governance = "=0.7.3"
+stellar-accounts = "=0.7.3"
+stellar-fee-abstraction = "=0.7.3"
+stellar-macros = "=0.7.3"
 ```
 
 ## Notes
