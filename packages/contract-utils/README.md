@@ -6,6 +6,7 @@ This crate is part of the [OpenZeppelin Stellar Contracts](https://github.com/Op
 
 - [stellar-access](https://crates.io/crates/stellar-access): Role-based access controls and ownable
 - [stellar-accounts](https://crates.io/crates/stellar-accounts): Smart accounts with custom authentication and authorization
+- [stellar-confidential](https://crates.io/crates/stellar-confidential): Confidential token with encrypted balances and zero-knowledge proofs
 - **[stellar-contract-utils](https://crates.io/crates/stellar-contract-utils)**: Utilities for contracts (pausable, upgradeable, cryptography, etc.)
 - [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
 - [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
@@ -115,7 +116,7 @@ impl Ownable for ExampleContract {}
 
 ### Crypto
 
-The `crypto` module provides cryptographic utilities including hash functions and Merkle tree verification.
+The `crypto` module provides cryptographic utilities including hash functions, Merkle tree verification, and Grumpkin curve arithmetic.
 
 #### Usage Examples
 
@@ -135,6 +136,7 @@ pub fn hash_data(e: &Env, data: Bytes) -> BytesN<32> {
 - **Hash Functions**: SHA-256 and Keccak-256 implementations
 - **Merkle Verification**: Verify Merkle proofs for data integrity
 - **Utility Functions**: Hash pairs and commutative hashing
+- **Grumpkin**: Affine point arithmetic (add, sub, neg, scalar mul) and point validation on the Grumpkin curve, built on the BN254 scalar-field host functions
 
 ### Merkle Distributor
 
@@ -149,6 +151,8 @@ The `merkle_distributor` module implements a Merkle-based claim distribution sys
 ### Math
 
 The `math` module provides fixed-point arithmetic: a `Wad` decimal type with 18 decimal places, and free functions for `x * y / denominator` on both `i128` and `I256` with an explicit rounding direction.
+
+`Wad` also provides the natural logarithm (`ln`), the natural exponential (`exp`), and powers with an integer (`powi`) or a `Wad` (`powf`) exponent.
 
 Each operation comes in a panicking and a checked variant. The panicking variants raise `SorobanFixedPointError::Overflow` (1500) when the result overflows; the checked variants return `None`. `Wad`'s operators (`+`, `-`, `*`, `/`) work directly on `i128` and panic with a native arithmetic error instead (see the `# Overflow` section on `Wad`).
 
@@ -196,9 +200,9 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-contract-utils = "=0.7.1"
+stellar-contract-utils = "=0.8.0"
 # Add this if you want to use macros
-stellar-macros = "=0.7.1"
+stellar-macros = "=0.8.0"
 ```
 
 ## Examples

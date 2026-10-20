@@ -1,6 +1,6 @@
 # Confidential Token — Agent Guide
 
-Scoped to `packages/confidential/`. The root `CLAUDE.md` still applies in full; this file only covers what is specific to this subtree. The Noir workspace has its own guide at `circuits/CLAUDE.md`.
+Scoped to `packages/confidential/`. The root `CLAUDE.md` still applies in full; this file only covers what is specific to this subtree.
 
 ## Orientation
 
@@ -39,6 +39,27 @@ Beyond the root guide's conventions:
 - Use `fixture_point` / `fixture_field`, not arbitrary bytes. The fixtures are canonical and on-curve; random values fail the canonicality guards before reaching any logic under test.
 - Two mocks model proof semantics on purpose: the register mock in `src/test.rs` binds the first `acct_f` it sees, and `ClawbackReplayGuardVerifier` in `src/compliance/test.rs` binds the first whole blob, both standing in for UltraHonk's absorption of public inputs, so replay tests are meaningful. Keep that behaviour if either flow changes.
 
+## Noir circuits
+
+Run from `circuits/`; CI is `.github/workflows/noir.yml`. There is no `nargo fmt` step and no formatter config.
+
+```bash
+nargo check && nargo test
+nargo info                          # per-package constraint counts
+./scripts/extract_vks.sh            # regenerate vks/*.vk.json
+./scripts/build_vk_bins.sh          # regenerate vks/*.vk.bin
+./scripts/check_witness_lookups.sh  # no witness reaches a lookup table
+```
+
+Each change below spans several files and lands in one PR with all of its sites:
+
+- **Adding a circuit.** The package, the `members` list in `circuits/Nargo.toml`, and the hardcoded `CIRCUITS` arrays in both `circuits/scripts/extract_vks.sh` and `circuits/scripts/build_vk_bins.sh`; then regenerate `constraints.baseline` and both VK formats.
+- **Renaming a package.** Directory `transfer/` is package `circuit_transfer`. Both VK scripts derive `circuit_${name}` and `target/${pkg}.json` from the directory name, and every row of `constraints.baseline` is keyed on the package name.
+- **Bumping the toolchain.** `NARGO_VERSION` and `BB_VERSION` in `noir.yml` are the source of truth and move together; the VKs are byte-sensitive to bb. Both versions are restated in the comment above `compiler_version` in every package `Nargo.toml` and in `circuits/vks/README.md`; the nargo version in the `constraints.baseline` header; the bb version in `circuits/scripts/check_witness_lookups.sh`, whose blackbox allowlist must be re-confirmed against the new bb, and in `README.md`, which names the bb version the on-chain verifier accepts. The CI installers are pinned by commit with SHA256 verification; bump URL and hash together, then regenerate the baseline and both VK formats.
+- **`address_to_field` vectors.** The derivation has no Noir implementation (circuits take `addr_f` as an opaque public input), so `circuits/lib/testdata/address_to_field.json` is guarded only by `address_to_field_matches_testdata_vectors` in `src/test.rs`, which transcribes the hex values as literals rather than reading the JSON. Update both together.
+
+Regenerating `constraints.baseline` with the command in its header overwrites that header, and CI strips comments before diffing, so nothing flags the loss. Restore the header by hand.
+
 ## The documentation set
 
 `docs/` is a specification, not commentary, and it is the single largest maintenance hazard in this module — doc-consistency fixes outnumber code commits on this branch.
@@ -54,7 +75,7 @@ Most facts now have exactly one owning section and are linked from everywhere el
 | Content | Owner | Copies live in |
 |:---|:---|:---|
 | `Clawback` is a `T₀` anchor alongside `Merge` | `docs/protocol/wallet-state.md#recovery` | `docs/compliance.md#wallet-and-auditor-consequences`, the role column of `docs/indexer.md#events-in-scope` |
-| Per-circuit public-input counts | the `Public inputs` heading of each `docs/protocol/operations/*.md` and `docs/compliance.md#circuit` | header comments of `circuits/*/src/main.nr`, `circuits/CLAUDE.md` |
+| Per-circuit public-input counts | the `Public inputs` heading of each `docs/protocol/operations/*.md` and `docs/compliance.md#circuit` | header comments of `circuits/*/src/main.nr` |
 | Domain-separation tag values | `docs/protocol/domain-separators.md` | `circuits/lib/src/lib.nr`, `circuits/lib/testdata/*.json` |
 
 The tags are a cross-language wire contract. `docs/protocol/domain-separators.md` is their only authoritative source: it assigns every value, states which layer absorbs each, and states which subset `circuits/lib/src/lib.nr` implements. Changing any assigned value is a new deployment, not an upgrade.

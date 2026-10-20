@@ -6,6 +6,7 @@ This crate is part of the [OpenZeppelin Stellar Contracts](https://github.com/Op
 
 - [stellar-access](https://crates.io/crates/stellar-access): Role-based access controls and ownable
 - [stellar-accounts](https://crates.io/crates/stellar-accounts): Smart accounts with custom authentication and authorization
+- [stellar-confidential](https://crates.io/crates/stellar-confidential): Confidential token with encrypted balances and zero-knowledge proofs
 - [stellar-contract-utils](https://crates.io/crates/stellar-contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
 - [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
 - [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
@@ -163,9 +164,9 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-tokens = "=0.7.1"
+stellar-tokens = "=0.8.0"
 # Add this if you want to use macros
-stellar-macros = "=0.7.1"
+stellar-macros = "=0.8.0"
 ```
 
 ## Examples
@@ -174,7 +175,7 @@ See the following examples in the repository:
 - [`examples/fungible-pausable/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-pausable) - Pausable fungible token
 - [`examples/nft-sequential-minting/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/nft-sequential-minting) - Basic non-fungible token
 - [`examples/fungible-merkle-airdrop/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-merkle-airdrop) - Airdrop with merkle proofs
-- [`examples/rwa/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/rwa) - A complete RWA contract suite and a step-by-step deployment guide.
+- [`examples/rwa/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/rwa) - A complete RWA contract suite, ready-made compliance modules, and a step-by-step deployment guide.
 
 ## License
 

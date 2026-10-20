@@ -224,19 +224,19 @@ stellar contract invoke --id identity-registry --source admin \
     -- add_identity \
     --account alice \
     --identity $ALICE_IDENTITY \
-    --initial_profiles '[{"country": {"Individual": {"Residence": 840}}, "metadata": null}]' \
+    --initial_profiles '[{"map": [{"key": {"symbol": "country"}, "val": {"vec": [{"symbol": "Individual"}, {"vec": [{"symbol": "Residence"}, {"u32": 840}]}]}}, {"key": {"symbol": "metadata"}, "val": "void"}]}]' \
     --operator admin
 ```
 
-`CountryData` uses a nested enum structure. The outer `CountryRelation` variant is either `Individual` or `Organization`, and the inner variant is the relationship type (e.g., `Residence`, `Citizenship`, `Incorporation`) wrapping an ISO 3166-1 numeric country code (e.g., 840 = United States).
+`initial_profiles` is a `Vec<Val>`, so the CLI cannot infer the `CountryData` type and each profile is passed as a raw `ScVal` JSON value. `CountryData` is a struct, encoded as a `map` with the symbol keys `country` and `metadata` in that order; a `metadata` of `None` is `"void"`. `country` is a nested enum: the outer `CountryRelation` variant is either `Individual` or `Organization`, and the inner variant is the relationship type (e.g., `Residence`, `Citizenship`, `Incorporation`) wrapping an ISO 3166-1 numeric country code (e.g., 840 = United States). Each enum variant is encoded as a `vec` holding its name as a `symbol` followed by its value.
 
-Examples of valid `CountryData` JSON values:
+Examples of valid `CountryData` values:
 
 ```json
-{"country": {"Individual": {"Residence": 840}},    "metadata": null}
-{"country": {"Individual": {"Citizenship": 276}},  "metadata": null}
-{"country": {"Organization": {"Incorporation": 840}}, "metadata": null}
-{"country": {"Organization": {"OperatingJurisdiction": 276}}, "metadata": null}
+{"map": [{"key": {"symbol": "country"}, "val": {"vec": [{"symbol": "Individual"}, {"vec": [{"symbol": "Residence"}, {"u32": 840}]}]}}, {"key": {"symbol": "metadata"}, "val": "void"}]}
+{"map": [{"key": {"symbol": "country"}, "val": {"vec": [{"symbol": "Individual"}, {"vec": [{"symbol": "Citizenship"}, {"u32": 276}]}]}}, {"key": {"symbol": "metadata"}, "val": "void"}]}
+{"map": [{"key": {"symbol": "country"}, "val": {"vec": [{"symbol": "Organization"}, {"vec": [{"symbol": "Incorporation"}, {"u32": 840}]}]}}, {"key": {"symbol": "metadata"}, "val": "void"}]}
+{"map": [{"key": {"symbol": "country"}, "val": {"vec": [{"symbol": "Organization"}, {"vec": [{"symbol": "OperatingJurisdiction"}, {"u32": 276}]}]}}, {"key": {"symbol": "metadata"}, "val": "void"}]}
 ```
 
 ### 6. Deploy Identity Verifier Contract
@@ -259,7 +259,7 @@ export VERIFIER_ADDRESS=$(stellar contract alias show identity-verifier 2>&1 | t
 
 ### 7. Deploy Compliance Contract
 
-The compliance contract enforces business rules through pluggable modules registered on specific hooks.
+The compliance contract enforces business rules through pluggable modules registered on specific hooks. Modules are configured in step 9, once the token exists.
 
 ```bash
 stellar contract deploy --alias compliance \
@@ -272,22 +272,6 @@ stellar contract deploy --alias compliance \
 ```bash
 export COMPLIANCE_ADDRESS=$(stellar contract alias show compliance 2>&1 | tail -n 1)
 ```
-
-#### Register Compliance Modules (Optional)
-
-If you have custom compliance module contracts (e.g., transfer limits, country restrictions), register them on the appropriate hooks:
-
-```bash
-stellar contract invoke --id compliance --source admin \
-    -- add_module_to \
-    --hook CanTransfer \
-    --module <MODULE_ADDRESS> \
-    --operator admin
-```
-
-Available hooks: `CanTransfer`, `CanCreate`, `Transferred`, `Created`, `Destroyed`.
-
-> **Note:** Without any registered modules, the compliance contract allows all operations by default.
 
 ### 8. Deploy RWA Token Contract
 
@@ -325,7 +309,157 @@ stellar contract invoke --id compliance --source admin \
     --operator admin
 ```
 
-### 9. Mint Tokens
+### 9. Configure Compliance Modules (Optional)
+
+Compliance modules are separate contracts registered on the hooks they act on. Available hooks: `Transferred`, `Created`, `Destroyed`. Each hook runs after the token operation in the same transaction, and a module rejects the operation by panicking.
+
+The following ready-made module examples are ports of the T-REX modular compliance modules. Each takes `--admin` and `--manager` in its constructor:
+
+| Directory                           | Contract                      | Description                                                         | Hooks                                 |
+| ----------------------------------- | ----------------------------- | ------------------------------------------------------------------- | ------------------------------------- |
+| `compliance-country-allow/`         | `CountryAllowContract`        | Only recipients with an allowed country code may receive tokens     | `Transferred`, `Created`              |
+| `compliance-country-restrict/`      | `CountryRestrictContract`     | Recipients with a restricted country code may not receive tokens    | `Transferred`, `Created`              |
+| `compliance-initial-lockup-period/` | `InitialLockupPeriodContract` | Locks minted tokens for a configured period                         | `Transferred`, `Created`, `Destroyed` |
+| `compliance-max-balance/`           | `MaxBalanceContract`          | Caps the aggregate balance per identity                             | `Transferred`, `Created`, `Destroyed` |
+| `compliance-supply-limit/`          | `SupplyLimitContract`         | Caps the total supply                                               | `Created`, `Destroyed`                |
+| `compliance-time-transfers-limits/` | `TimeTransfersLimitsContract` | Caps cumulative outgoing transfers per identity within time windows | `Transferred`                         |
+| `compliance-transfer-allow/`        | `TransferAllowContract`       | Allows a transfer only when the sender or recipient is allowlisted  | `Transferred`                         |
+
+Module settings are keyed by token address, so they are set after the token is deployed in step 8. Configure a module fully before registering it on its hooks: a registered module enforces its policy from the next token operation.
+
+> **Note:** Without any registered modules, the compliance contract allows all operations by default.
+
+#### Deploy and Bind a Module
+
+The commands below alias each module after its directory name without the `compliance-` prefix. Deploy the supply limit module; the other modules follow the same pattern with their own alias and WASM file (e.g. `max-balance` and `compliance_max_balance.wasm`):
+
+```bash
+stellar contract deploy --alias supply-limit \
+    --wasm target/wasm32v1-none/release/compliance_supply_limit.wasm \
+    -- \
+    --admin admin \
+    --manager admin
+```
+
+```bash
+export SUPPLY_LIMIT_ADDRESS=$(stellar contract alias show supply-limit 2>&1 | tail -n 1)
+```
+
+Bind the module to the compliance contract for the token with `set_compliance_address`:
+
+```bash
+stellar contract invoke --id supply-limit --source admin \
+    -- set_compliance_address \
+    --token $TOKEN_ADDRESS \
+    --compliance $COMPLIANCE_ADDRESS \
+    --operator admin
+```
+
+The country, max-balance, and time-transfers-limits modules also resolve identities, so they need the Identity Registry address set with `set_identity_registry_storage`:
+
+```bash
+stellar contract invoke --id max-balance --source admin \
+    -- set_identity_registry_storage \
+    --token $TOKEN_ADDRESS \
+    --irs $REGISTRY_ADDRESS \
+    --operator admin
+```
+
+#### Set the Module Policy
+
+Each module starts with an empty policy for the token. The example values below let the mint in step 10 and the transfer under Key Operations go through, unless noted otherwise. Amounts use the token's 7 decimals, and durations are in ledgers (17280 ledgers ≈ 1 day).
+
+**Supply limit:** the cap defaults to `0`, which rejects every mint. Cap the supply at 1,000,000 tokens:
+
+```bash
+stellar contract invoke --id supply-limit --source admin \
+    -- set_supply_limit \
+    --token $TOKEN_ADDRESS \
+    --limit 10000000000000 \
+    --operator admin
+```
+
+**Max balance:** the cap defaults to `0`, which rejects every mint and regular transfer. Cap the aggregate balance of each identity at 500 tokens:
+
+```bash
+stellar contract invoke --id max-balance --source admin \
+    -- set_max_balance \
+    --token $TOKEN_ADDRESS \
+    --max 5000000000 \
+    --operator admin
+```
+
+**Initial lockup period:** the period defaults to `0`, so mints create no locks. Lock minted tokens for about 1 day:
+
+```bash
+stellar contract invoke --id initial-lockup-period --source admin \
+    -- set_lockup_period \
+    --token $TOKEN_ADDRESS \
+    --period 17280 \
+    --operator admin
+```
+
+With this module registered, the tokens minted in step 10 stay locked for the period, so the transfer under Key Operations reverts until it elapses.
+
+**Time transfers limits:** no time windows are configured by default, so transfers are not limited. Cap the outgoing transfers of each identity at 100 tokens per day:
+
+```bash
+stellar contract invoke --id time-transfers-limits --source admin \
+    -- set_time_transfer_limit \
+    --token $TOKEN_ADDRESS \
+    --limit '{"limit_duration": 17280, "limit_value": "1000000000"}' \
+    --operator admin
+```
+
+**Country allow:** the allowlist starts empty, which rejects every mint and regular transfer. Allow the United States (840), the country registered for the investors in step 5.1:
+
+```bash
+stellar contract invoke --id country-allow --source admin \
+    -- add_allowed_country \
+    --token $TOKEN_ADDRESS \
+    --country 840 \
+    --operator admin
+```
+
+**Country restrict:** the restriction list starts empty, so no country is blocked. Restrict North Korea (408):
+
+```bash
+stellar contract invoke --id country-restrict --source admin \
+    -- add_country_restriction \
+    --token $TOKEN_ADDRESS \
+    --country 408 \
+    --operator admin
+```
+
+**Transfer allow:** the allowlist starts empty, which rejects every regular transfer. A transfer passes when the sender or the recipient is allowlisted, so allowlist `alice`:
+
+```bash
+stellar contract invoke --id transfer-allow --source admin \
+    -- allow_user \
+    --token $TOKEN_ADDRESS \
+    --user alice \
+    --operator admin
+```
+
+#### Register the Module on Its Hooks
+
+Register the module on each of its hooks listed in the table, e.g. `Created` and `Destroyed` for the supply limit module:
+
+```bash
+stellar contract invoke --id compliance --source admin \
+    -- add_module_to \
+    --hook Created \
+    --module $SUPPLY_LIMIT_ADDRESS \
+    --operator admin
+
+stellar contract invoke --id compliance --source admin \
+    -- add_module_to \
+    --hook Destroyed \
+    --module $SUPPLY_LIMIT_ADDRESS \
+    --operator admin
+```
+
+### 10. Mint Tokens
 
 With everything configured, mint tokens to verified investors:
 
@@ -348,9 +482,10 @@ Use this checklist to verify your deployment is complete:
 - [ ] Identity contracts deployed for each investor, claims added
 - [ ] Identity Registry Storage deployed, identities registered
 - [ ] Identity Verifier deployed, linked to Claim Topics and Issuers + Identity Registry Storage
-- [ ] Compliance deployed, modules registered (if any)
+- [ ] Compliance deployed
 - [ ] RWA Token deployed, linked to Compliance + Identity Verifier
 - [ ] Token bound to Identity Registry and Compliance contracts
+- [ ] Compliance modules (if any) deployed, bound, configured, and registered on their hooks
 - [ ] Initial token supply minted to verified addresses
 
 ## Key Operations

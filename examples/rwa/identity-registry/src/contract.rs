@@ -40,7 +40,7 @@ impl TokenBinder for IdentityRegistryContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl IdentityRegistryStorage for IdentityRegistryContract {
     #[only_role(operator, "manager")]
     fn add_identity(
@@ -102,7 +102,7 @@ impl IdentityRegistryStorage for IdentityRegistryContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl CountryDataManager for IdentityRegistryContract {
     #[only_role(operator, "manager")]
     fn add_country_data_entries(e: &Env, account: Address, profiles: Vec<Val>, operator: Address) {
