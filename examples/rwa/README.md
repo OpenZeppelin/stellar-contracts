@@ -275,17 +275,29 @@ export COMPLIANCE_ADDRESS=$(stellar contract alias show compliance 2>&1 | tail -
 
 #### Register Compliance Modules (Optional)
 
-If you have custom compliance module contracts (e.g., transfer limits, country restrictions), register them on the appropriate hooks:
+Compliance modules are separate contracts registered on the hooks they act on. Available hooks: `Transferred`, `Created`, `Destroyed`. Each hook runs after the token operation in the same transaction, and a module rejects the operation by panicking.
+
+The following ready-made module examples are ports of the T-REX modular compliance modules. Each takes `--admin` and `--manager` in its constructor:
+
+| Directory                           | Contract                      | Description                                                         | Hooks                                 |
+| ----------------------------------- | ----------------------------- | ------------------------------------------------------------------- | ------------------------------------- |
+| `compliance-country-allow/`         | `CountryAllowContract`        | Only recipients with an allowed country code may receive tokens     | `Transferred`, `Created`              |
+| `compliance-country-restrict/`      | `CountryRestrictContract`     | Recipients with a restricted country code may not receive tokens    | `Transferred`, `Created`              |
+| `compliance-initial-lockup-period/` | `InitialLockupPeriodContract` | Locks minted tokens for a configured period                         | `Transferred`, `Created`, `Destroyed` |
+| `compliance-max-balance/`           | `MaxBalanceContract`          | Caps the aggregate balance per identity                             | `Transferred`, `Created`, `Destroyed` |
+| `compliance-supply-limit/`          | `SupplyLimitContract`         | Caps the total supply                                               | `Created`, `Destroyed`                |
+| `compliance-time-transfers-limits/` | `TimeTransfersLimitsContract` | Caps cumulative outgoing transfers per identity within time windows | `Transferred`                         |
+| `compliance-transfer-allow/`        | `TransferAllowContract`       | Allows a transfer only when the sender or recipient is allowlisted  | `Transferred`                         |
+
+Bind each module to the compliance contract for the token with `set_compliance_address`. The country, max-balance, and time-transfers-limits modules also resolve identities, so they need the Identity Registry address set with `set_identity_registry_storage`. Then register the module on each of its hooks:
 
 ```bash
 stellar contract invoke --id compliance --source admin \
     -- add_module_to \
-    --hook CanTransfer \
+    --hook Transferred \
     --module <MODULE_ADDRESS> \
     --operator admin
 ```
-
-Available hooks: `CanTransfer`, `CanCreate`, `Transferred`, `Created`, `Destroyed`.
 
 > **Note:** Without any registered modules, the compliance contract allows all operations by default.
 

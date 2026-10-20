@@ -12,18 +12,26 @@ The OpenZeppelin Stellar Contracts library follows a modular, trait-based archit
 stellar-contracts/
 ├── packages/                    # Core library packages
 │   ├── access/                  # Role-based access controls and ownable patterns
-│   ├── contract-utils/          # Utilities (pausable, upgradeable, cryptography)
-│   ├── macros/                  # Procedural and derive macros
-│   └── tokens/                  # Token implementations (fungible, non-fungible)
-│       ├── src/
-│       │   ├── fungible/        # Fungible token implementation
-│       │   │   ├── extensions/  # Optional token extensions
-│       │   │   ├── utils/       # Utility functions and helpers
-│       │   │   ├── mod.rs       # Core trait definitions, constants, errors, and events
-│       │   │   ├── storage.rs   # Storage management and state operations
-│       │   │   └── test.rs      # Comprehensive test suite
-│       │   └── non_fungible/    # Non-fungible token implementation
-│       └── lib.rs
+│   ├── accounts/                # Smart accounts (context rules, signers, verifiers, policies)
+│   ├── confidential/            # Confidential token (encrypted balances, ZK proofs, Noir circuits)
+│   ├── contract-utils/          # Utilities (pausable, upgradeable, cryptography, math, merkle distributor)
+│   ├── fee-abstraction/         # Fee forwarding (pay transaction fees in fungible tokens)
+│   ├── governance/              # Governor, votes, timelock
+│   ├── macros/                  # Procedural macros
+│   ├── tokens/                  # Token implementations (fungible, non-fungible, RWA, vault)
+│   │   └── src/
+│   │       ├── fungible/        # Fungible token implementation
+│   │       │   ├── extensions/  # Optional token extensions
+│   │       │   ├── utils/       # Utility functions and helpers
+│   │       │   ├── mod.rs       # Core trait definitions, constants, errors, and events
+│   │       │   ├── overrides.rs # Base contract type and override traits
+│   │       │   ├── storage.rs   # Storage management and state operations
+│   │       │   └── test.rs      # Comprehensive test suite
+│   │       ├── non_fungible/    # Non-fungible token implementation
+│   │       ├── rwa/             # Real-world asset token (T-REX) and its periphery
+│   │       ├── vault/           # Tokenized vault (ERC-4626)
+│   │       └── lib.rs
+│   └── zk-email/                # DKIM registry for zkEmail verification
 ├── examples/                    # Example contract implementations
 └── audits/                      # Security audit reports
 ```
@@ -60,18 +68,18 @@ pub struct Consecutive; // For batch minting optimization
 Extensions are constrained to specific contract types using associated type bounds:
 
 ```rust
-// Enumerable can only be used with Enumerable contract type
-trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
+// Enumerable requires a contract type that keeps the enumeration bookkeeping
+trait NonFungibleEnumerable: NonFungibleToken<ContractType: EnumerableContractType> {
     fn total_supply(e: &Env) -> u32;
     fn get_owner_token_id(e: &Env, owner: Address, index: u32) -> u32;
     // ...
 }
 
-// Consecutive can only be used with Consecutive contract type
-trait NonFungibleConsecutive: NonFungibleToken<ContractType = Consecutive> {
-    // Batch minting functionality
-}
+// Consecutive requires a contract type that follows the consecutive accounting model
+trait NonFungibleConsecutive: NonFungibleToken<ContractType: ConsecutiveContractType> {}
 ```
+
+`EnumerableContractType` and `ConsecutiveContractType` are marker traits implemented by `Enumerable` and `Consecutive` and by the curated combinations that include them (`EnumerableVotes`, `ConsecutiveVotes`).
 
 #### Mutual Exclusivity Enforcement
 
@@ -87,9 +95,13 @@ impl NonFungibleEnumerable for MyContract {
     // ... enumerable methods
 }
 
-// ❌ This CANNOT compile - Consecutive requires different ContractType
-// impl NonFungibleConsecutive for MyContract { ... }
-//     ^^^ Error: expected `Consecutive`, found `Enumerable`
+// ❌ This CANNOT compile - Consecutive requires a consecutive ContractType
+// impl NonFungibleConsecutive for MyContract {}
+//      ^^^ error[E0277]: the trait bound `Enumerable: ConsecutiveContractType` is not satisfied
+
+// ❌ Neither can listing both in `Compose`
+// type ContractType = Compose<(Enumerable, Consecutive)>;
+//      ^^^ error[E0277]: `Enumerable` cannot be combined with `Consecutive` in a `Compose` list
 ```
 
 #### Override Mechanism Through ContractOverrides
@@ -208,10 +220,11 @@ The library provides two levels of abstraction:
 The architecture supports optional extensions that can be mixed and matched. Below is the list of the extensions for the Fungible Token:
 
 - **Burnable**: Token destruction capabilities
+- **TotalSupply**: Total supply tracking
 - **Capped**: Maximum supply limits
 - **Allowlist**: Whitelist-based access control
 - **Blocklist**: Blacklist-based access control
-- **Metadata**: Enhanced token information (name, symbol, decimals)
+- **Votes**: Voting power tracking for governance
 - **Vault**: Asset deposit/withdrawal with share tokenization
 
 ## Storage Architecture
@@ -222,8 +235,8 @@ The library uses a structured approach to storage keys:
 
 ```rust
 #[contracttype]
-pub enum StorageKey {
-    TotalSupply,
+pub enum FungibleStorageKey {
+    Meta,
     Balance(Address),
     Allowance(AllowanceKey),
 }
@@ -387,7 +400,6 @@ The non-fungible token implementation is designed to be compatible with existing
 - **Unit Tests**: Individual function testing
 - **Integration Tests**: Cross-module interaction testing
 - **Property-Based Testing**: Invariant verification
-- **Fuzzing**: Edge case discovery
 
 ## Deployment Architecture
 
@@ -415,19 +427,22 @@ Noir artifacts for a package live under `packages/<package>/circuits/`:
 ```text
 packages/<package>/circuits/
 ├── Nargo.toml               # Nargo workspace manifest
+├── constraints.baseline     # normalized `nargo info` output
 ├── lib/                     # Shared primitives (type = "lib", no `main`)
 │   ├── src/lib.nr
 │   └── testdata/*.json      # cross-language test vectors
 ├── gadgets/<primitive>/     # one tiny `bin` crate per primitive
 │   └── src/main.nr          # measurement-only: wraps one lib call
-└── <operation>/             # full circuits (planned -- one per proof type,
-    └── src/main.nr          # e.g. register / withdraw / transfer)
+├── <operation>/             # full circuits, one per proof type
+│   └── src/main.nr          # (e.g. register / withdraw / transfer)
+├── scripts/                 # VK extraction and CI checks
+└── vks/                     # pinned verification keys
 ```
 
 The `main.nr` files in `gadgets/` and `<operation>/` are both Noir circuit entry points, but they serve very different purposes:
 
 - **Gadget `main`s** are measurement-only. Each one wraps a single lib primitive in the smallest circuit that exercises it, so `nargo info` can report per-primitive constraint costs. A Noir `bin` package has exactly one `fn main`, and `nargo info` only measures `main`. Per-primitive constraint counts therefore require one `bin` package per primitive. The alternative (one gadget that calls every primitive in sequence) collapses everything into a single combined number and loses the per-primitive breakdown the constraint baseline depends on.
-- **Operation `main`s** *are* the production circuits — one per proof type listed in the design doc's §7. They consume on-chain state as public inputs and enforce the constraint set that the wrapper contract relies on.
+- **Operation `main`s** *are* the production circuits — one per proof type (in `confidential/`: register, withdraw, transfer, set_spender, spender_transfer, clawback). They consume on-chain state as public inputs and enforce the constraint set that the wrapper contract relies on.
 
 ### Commands
 
@@ -436,9 +451,9 @@ The `main.nr` files in `gadgets/` and `<operation>/` are both Noir circuit entry
 | Type-check the workspace        | `nargo check`                                     |
 | Run all tests                   | `nargo test`                                      |
 | Per-primitive constraint counts | `nargo info`                                      |
-| Compile a single circuit        | `nargo compile --package <name>`                  |
+| Compile a single circuit        | `nargo compile --package circuit_<name>`          |
 
-Compiled ACIR and proving artifacts are gitignored; `testdata/*.json` is the only Noir-side artifact committed to the repo.
+Build output (`target/`) and `Prover.toml` are gitignored. Four kinds of generated file are committed: `constraints.baseline`, `vks/*.vk.json`, `vks/*.vk.bin`, and `lib/testdata/*.json`. CI regenerates the baseline and the verification keys and fails when they differ from the committed ones; `nargo test` checks the test vectors against the primitives.
 
 ## Code Conventions
 

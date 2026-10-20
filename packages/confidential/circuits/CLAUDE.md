@@ -53,7 +53,7 @@ The `G` and `H` generators are hardcoded but provenance-checked at runtime by th
 
 ## Committed artifacts
 
-Four kinds of generated file are committed: `constraints.baseline`, `vks/*.vk.json`, `vks/*.vk.bin`, and `lib/testdata/*.json`. CI regenerates and diffs all four. (`Architecture.md` claims `testdata/*.json` is the only one — that statement is stale.) `target/` and `Prover.toml` are gitignored.
+Four kinds of generated file are committed: `constraints.baseline`, `vks/*.vk.json`, `vks/*.vk.bin`, and `lib/testdata/*.json`. CI regenerates and diffs all four. `target/` and `Prover.toml` are gitignored.
 
 ### `constraints.baseline`
 
