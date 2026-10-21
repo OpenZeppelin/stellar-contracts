@@ -451,6 +451,51 @@ pub fn validate_signer_key_size(e: &Env, signer: &Signer) {
     }
 }
 
+/// Validates that a delegated signer is not self-delegated to bypass signature requirements.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer` - The signer to validate.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::SelfDelegatedSigner`] - When the signer delegates to the smart account itself.
+pub fn validate_no_self_delegation(e: &Env, signer: &Signer) {
+    if let Signer::Delegated(addr) = signer {
+        if *addr == e.current_contract_address() {
+            panic_with_error!(e, SmartAccountError::SelfDelegatedSigner);
+        }
+    }
+}
+
+/// Validates that a delegated signer is not the target context contract to bypass authentication.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer` - The signer to validate.
+/// * `auth_contexts` - The authorization contexts to check against.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::DelegatedSignerIsContextContract`] - When the delegated signer matches a context contract.
+pub fn validate_no_delegated_context_contract(
+    e: &Env,
+    signer: &Signer,
+    auth_contexts: &Vec<Context>,
+) {
+    if let Signer::Delegated(addr) = signer {
+        for context in auth_contexts.iter() {
+            if let Context::Contract(ContractContext { contract, .. }) = context {
+                if *addr == contract {
+                    panic_with_error!(e, SmartAccountError::DelegatedSignerIsContextContract);
+                }
+            }
+        }
+    }
+}
+
 /// Validates that a context rule name does not exceed the maximum allowed
 /// length.
 ///
@@ -541,6 +586,9 @@ pub fn do_check_auth(
         if !allowed_signers.contains_key(signer.clone()) {
             panic_with_error!(e, SmartAccountError::UnauthorizedSigner);
         }
+        
+        validate_no_delegated_context_contract(e, &signer, auth_contexts);
+        
         authenticate(e, &preimage, &signer, &sig_data);
     }
 
@@ -649,6 +697,7 @@ pub fn validate_no_canonical_duplicates(e: &Env, signers: &Vec<Signer>) {
 ///   reached `u32::MAX` and cannot be incremented.
 /// * refer to [`validate_context_rule_name`] errors.
 /// * refer to [`validate_signer_key_size`] errors.
+/// * refer to [`validate_no_self_delegation`] errors.
 /// * refer to [`validate_signers_and_policies`] errors.
 ///
 /// # Events
@@ -684,7 +733,10 @@ pub fn add_context_rule(
 
     let count = get_context_rules_count(e);
 
-    signers.iter().for_each(|signer| validate_signer_key_size(e, &signer));
+    signers.iter().for_each(|signer| {
+        validate_signer_key_size(e, &signer);
+        validate_no_self_delegation(e, &signer);
+    });
     validate_no_canonical_duplicates(e, signers);
 
     // Check valid_until
@@ -948,6 +1000,7 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 /// * [`SmartAccountError::DuplicateSigner`] - When the signer already exists in
 ///   the context rule.
 /// * refer to [`validate_signer_key_size`] errors.
+/// * refer to [`validate_no_self_delegation`] errors.
 /// * refer to [`validate_signers_and_policies`] errors.
 ///
 /// # Events
@@ -972,6 +1025,7 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 ///   proper access control is implemented at the contract level.
 pub fn add_signer(e: &Env, id: u32, signer: &Signer) -> u32 {
     validate_signer_key_size(e, signer);
+    validate_no_self_delegation(e, signer);
 
     // Get current entry to access existing IDs
     let data_key = SmartAccountStorageKey::ContextRuleData(id);
@@ -1069,6 +1123,7 @@ pub fn remove_signer(e: &Env, context_rule_id: u32, signer_id: u32) {
 /// * [`SmartAccountError::DuplicateSigner`] - When any signer already exists in
 ///   the context rule or appears more than once in `signers`.
 /// * refer to [`validate_signer_key_size`] errors.
+/// * refer to [`validate_no_self_delegation`] errors.
 /// * refer to [`validate_signers_and_policies`] errors.
 ///
 /// # Events
@@ -1097,8 +1152,11 @@ pub fn batch_add_signer(e: &Env, id: u32, signers: &Vec<Signer>) {
     let mut entry: ContextRuleEntry = get_persistent_entry(e, &data_key)
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
-    // Validate key sizes for all new signers.
-    signers.iter().for_each(|signer| validate_signer_key_size(e, &signer));
+    // Validate key sizes and self-delegations for all new signers.
+    signers.iter().for_each(|signer| {
+        validate_signer_key_size(e, &signer);
+        validate_no_self_delegation(e, &signer);
+    });
 
     // Check for duplicates across existing + new signers in one batch.
     let mut all_signers = get_signers(e, &entry.signer_ids);
