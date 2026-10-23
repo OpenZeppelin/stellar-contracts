@@ -2,10 +2,10 @@ extern crate std;
 
 use soroban_sdk::{
     contract, contractimpl, symbol_short,
-    testutils::{Address as _, Events},
+    testutils::{Address as _, Events, MuxedAddress as _},
     token::StellarAssetClient,
     xdr::{AccountFlags, ToXdr},
-    Address, Bytes, BytesN, Env,
+    Address, Bytes, BytesN, Env, MuxedAddress,
 };
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
@@ -25,7 +25,7 @@ use crate::{
     verifier::CircuitType,
     ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, ConfidentialTokenStorageKey,
     Hooks, RegisterData, RegisterPayload, SetSpenderPayload, SpenderDelegation,
-    SpenderTransferPayload, TransferPayload, WithdrawPayload,
+    SpenderTransferPayload, TransferData, TransferPayload, WithdrawPayload,
 };
 
 // ################## MOCK CONTRACTS ##################
@@ -828,6 +828,29 @@ fn compliance_hooks_blocks_deposit_to_frozen_recipient() {
     h.sac.mint(&depositor, &100);
     let token = ConfidentialTokenClient::new(&h.e, &h.host);
     token.deposit(&depositor, &alice, &50);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3601)")]
+fn compliance_hooks_blocks_transfer_to_muxed_address_of_frozen_account() {
+    // The hook receives the muxed recipient's base address, so a muxed ID
+    // cannot route a transfer around a freeze on the account behind it.
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let bob = MuxedAddress::generate(&h.e).address();
+    let admin_client = ConfidentialComplianceClient::new(&h.e, &h.host);
+
+    h.e.as_contract(&h.host, || {
+        register_minimal_account(&h.e, &alice);
+        register_minimal_account(&h.e, &bob);
+    });
+    admin_client.set_compliance_config(&base_config(), &h.admin);
+    admin_client.freeze(&bob, &h.admin);
+
+    let data =
+        TransferData { payload: transfer_payload(&h.e), proof: Bytes::new(&h.e) }.to_xdr(&h.e);
+    let token = ConfidentialTokenClient::new(&h.e, &h.host);
+    token.confidential_transfer(&alice, MuxedAddress::new(&bob, 1), &data);
 }
 
 #[test]

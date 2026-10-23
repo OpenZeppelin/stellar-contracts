@@ -146,7 +146,9 @@ pub mod verifier;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Bytes, BytesN, Env};
+use soroban_sdk::{
+    contracterror, contractevent, contracttrait, Address, Bytes, BytesN, Env, MuxedAddress,
+};
 pub use storage::{
     ConfidentialAccount, ConfidentialTokenStorageKey, RegisterData, RegisterPayload,
     SetSpenderData, SetSpenderPayload, SpenderDelegation, SpenderTransferData,
@@ -168,6 +170,10 @@ pub use storage::{
 /// payload (e.g. [`TransferPayload`] for [`Self::on_transfer`]). The proof
 /// is not forwarded. The proofless ops [`Self::on_deposit`],
 /// [`Self::on_merge`] and [`Self::on_revoke_spender`] receive no `payload`.
+///
+/// A muxed recipient reaches [`Self::on_transfer`] and
+/// [`Self::on_spender_transfer`] as its base address: the muxed ID is routing
+/// metadata for the event, never a compliance subject.
 ///
 /// Default bodies are empty no-ops — overriding only the methods relevant
 /// to a given deployment is the expected pattern.
@@ -363,7 +369,8 @@ pub trait ConfidentialToken {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `from` - The sender.
-    /// * `to` - The recipient.
+    /// * `to` - The recipient. A muxed address is credited to its base account
+    ///   and its ID is emitted as `to_muxed_id`.
     /// * `data` - XDR-encoded [`TransferData`].
     ///
     /// # Errors
@@ -374,13 +381,14 @@ pub trait ConfidentialToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[r_e_point, v_tilde, sigma, b_tilde, v_tilde_aud_r,
-    ///   r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s]`
-    fn confidential_transfer(e: &Env, from: Address, to: Address, data: Bytes) {
+    /// * data - `[to_muxed_id: Option<u64>, r_e_point, v_tilde, sigma, b_tilde,
+    ///   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s,
+    ///   r_tilde_aud_s]`
+    fn confidential_transfer(e: &Env, from: Address, to: MuxedAddress, data: Bytes) {
         from.require_auth();
 
         let decoded: TransferData = storage::decode_data(e, &data);
-        Self::Hooks::on_transfer(e, &from, &to, &decoded.payload);
+        Self::Hooks::on_transfer(e, &from, &to.address(), &decoded.payload);
         storage::confidential_transfer(e, &from, &to, &decoded.payload, &decoded.proof);
     }
 
@@ -394,7 +402,8 @@ pub trait ConfidentialToken {
     /// * `e` - Access to the Soroban environment.
     /// * `spender` - The delegated spender (the auth principal).
     /// * `from` - The owner whose allowance is being spent.
-    /// * `to` - The recipient.
+    /// * `to` - The recipient. A muxed address is credited to its base account
+    ///   and its ID is emitted as `to_muxed_id`.
     /// * `data` - XDR-encoded [`SpenderTransferData`].
     ///
     /// # Errors
@@ -406,19 +415,20 @@ pub trait ConfidentialToken {
     ///
     /// * topics - `["spender_transfer", spender: Address, from: Address, to:
     ///   Address]`
-    /// * data - `[r_e_point, v_tilde, sigma_a_new, v_tilde_aud_r,
-    ///   r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s, r_tilde_aud_s]`
+    /// * data - `[to_muxed_id: Option<u64>, r_e_point, v_tilde, sigma_a_new,
+    ///   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s,
+    ///   r_tilde_aud_s]`
     fn confidential_transfer_from(
         e: &Env,
         spender: Address,
         from: Address,
-        to: Address,
+        to: MuxedAddress,
         data: Bytes,
     ) {
         spender.require_auth();
 
         let decoded: SpenderTransferData = storage::decode_data(e, &data);
-        Self::Hooks::on_spender_transfer(e, &spender, &from, &to, &decoded.payload);
+        Self::Hooks::on_spender_transfer(e, &spender, &from, &to.address(), &decoded.payload);
         storage::confidential_transfer_from(
             e,
             &spender,
@@ -699,6 +709,9 @@ pub fn emit_withdraw(
 }
 
 /// Event emitted on a confidential transfer.
+///
+/// `to` is the recipient's base address and `to_muxed_id` the ID of a muxed
+/// recipient, omitted from the data map when `None`.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Transfer {
@@ -706,6 +719,7 @@ pub struct Transfer {
     pub from: Address,
     #[topic]
     pub to: Address,
+    pub to_muxed_id: Option<u64>,
     pub r_e_point: BytesN<64>,
     pub v_tilde: BytesN<32>,
     pub sigma: BytesN<32>,
@@ -723,6 +737,7 @@ pub fn emit_transfer(
     e: &Env,
     from: &Address,
     to: &Address,
+    to_muxed_id: Option<u64>,
     r_e_point: &BytesN<64>,
     v_tilde: &BytesN<32>,
     sigma: &BytesN<32>,
@@ -736,6 +751,7 @@ pub fn emit_transfer(
     Transfer {
         from: from.clone(),
         to: to.clone(),
+        to_muxed_id,
         r_e_point: r_e_point.clone(),
         v_tilde: v_tilde.clone(),
         sigma: sigma.clone(),
@@ -750,6 +766,8 @@ pub fn emit_transfer(
 }
 
 /// Event emitted on an spender transfer.
+///
+/// `to` and `to_muxed_id` follow [`Transfer`].
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpenderTransfer {
@@ -759,6 +777,7 @@ pub struct SpenderTransfer {
     pub from: Address,
     #[topic]
     pub to: Address,
+    pub to_muxed_id: Option<u64>,
     pub r_e_point: BytesN<64>,
     pub v_tilde: BytesN<32>,
     pub sigma_a_new: BytesN<32>,
@@ -776,6 +795,7 @@ pub fn emit_spender_transfer(
     spender: &Address,
     from: &Address,
     to: &Address,
+    to_muxed_id: Option<u64>,
     r_e_point: &BytesN<64>,
     v_tilde: &BytesN<32>,
     sigma_a_new: &BytesN<32>,
@@ -789,6 +809,7 @@ pub fn emit_spender_transfer(
         spender: spender.clone(),
         from: from.clone(),
         to: to.clone(),
+        to_muxed_id,
         r_e_point: r_e_point.clone(),
         v_tilde: v_tilde.clone(),
         sigma_a_new: sigma_a_new.clone(),

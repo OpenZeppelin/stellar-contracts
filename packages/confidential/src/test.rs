@@ -1,11 +1,11 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, symbol_short,
-    testutils::{Address as _, Events, Ledger},
+    contract, contractevent, contractimpl, symbol_short,
+    testutils::{Address as _, Events, Ledger, MuxedAddress as _},
     token::StellarAssetClient,
     xdr::ToXdr,
-    Address, Bytes, BytesN, Env, Event,
+    Address, Bytes, BytesN, Env, Event, MuxedAddress,
 };
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
@@ -643,6 +643,7 @@ fn confidential_transfer_updates_both_sides() {
         &Transfer {
             from: alice.clone(),
             to: bob.clone(),
+            to_muxed_id: None,
             r_e_point: fixture_point(&h.e),
             v_tilde: fixture_field(&h.e, 0x11),
             sigma: fixture_field(&h.e, 0x13),
@@ -662,6 +663,98 @@ fn confidential_transfer_updates_both_sides() {
     // Receiver's receiving balance accumulated.
     let bob_acc = h.token.confidential_balance(&bob);
     assert_ne!(bob_acc.receiving_commitment.to_array(), [0u8; 64]);
+}
+
+/// `Transfer` with `to_muxed_id` removed from its data map.
+#[contractevent(topics = ["transfer"])]
+struct TransferWithoutMuxedId {
+    #[topic]
+    from: Address,
+    #[topic]
+    to: Address,
+    r_e_point: BytesN<64>,
+    v_tilde: BytesN<32>,
+    sigma: BytesN<32>,
+    b_tilde: BytesN<32>,
+    v_tilde_aud_r: BytesN<32>,
+    r_tilde_aud_r: BytesN<32>,
+    v_tilde_aud_s: BytesN<32>,
+    b_tilde_aud_s: BytesN<32>,
+    r_tilde_aud_s: BytesN<32>,
+}
+
+/// An unmuxed recipient leaves no `to_muxed_id` key in the event's data map,
+/// so consumers that decode the remaining fields by name read the event
+/// unchanged.
+#[test]
+fn confidential_transfer_to_plain_address_omits_muxed_id() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let bob = Address::generate(&h.e);
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&bob, &1u32, &register_data(&h.e));
+
+    h.token.confidential_transfer(&alice, &bob, &transfer_data(&h.e));
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &TransferWithoutMuxedId {
+            from: alice.clone(),
+            to: bob.clone(),
+            r_e_point: fixture_point(&h.e),
+            v_tilde: fixture_field(&h.e, 0x11),
+            sigma: fixture_field(&h.e, 0x13),
+            b_tilde: fixture_field(&h.e, 0x12),
+            v_tilde_aud_r: fixture_field(&h.e, 0x14),
+            r_tilde_aud_r: fixture_field(&h.e, 0x15),
+            v_tilde_aud_s: fixture_field(&h.e, 0x16),
+            b_tilde_aud_s: fixture_field(&h.e, 0x17),
+            r_tilde_aud_s: fixture_field(&h.e, 0x18),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
+}
+
+/// Transfers to two muxed IDs of one account both land in that account's
+/// receiving balance, and each event names the base address and the ID.
+#[test]
+fn confidential_transfer_to_muxed_address_credits_base_account() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let bob = MuxedAddress::generate(&h.e).address();
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&bob, &1u32, &register_data(&h.e));
+
+    h.token.confidential_transfer(&alice, MuxedAddress::new(&bob, 1), &transfer_data(&h.e));
+    h.token.confidential_transfer(&alice, MuxedAddress::new(&bob, 2), &transfer_data(&h.e));
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &Transfer {
+            from: alice.clone(),
+            to: bob.clone(),
+            to_muxed_id: Some(2),
+            r_e_point: fixture_point(&h.e),
+            v_tilde: fixture_field(&h.e, 0x11),
+            sigma: fixture_field(&h.e, 0x13),
+            b_tilde: fixture_field(&h.e, 0x12),
+            v_tilde_aud_r: fixture_field(&h.e, 0x14),
+            r_tilde_aud_r: fixture_field(&h.e, 0x15),
+            v_tilde_aud_s: fixture_field(&h.e, 0x16),
+            b_tilde_aud_s: fixture_field(&h.e, 0x17),
+            r_tilde_aud_s: fixture_field(&h.e, 0x18),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
+
+    let expected = h.e.as_contract(&h.token_addr, || {
+        Grumpkin::add(&h.e, &fixture_point(&h.e), &fixture_point(&h.e))
+    });
+    assert_eq!(h.token.confidential_balance(&bob).receiving_commitment, expected);
 }
 
 // ################## SET / REVOKE SPENDER ##################
@@ -869,6 +962,7 @@ fn auditor_key_rotation_rescopes_the_escrowed_allowance_opening() {
             spender: spender.clone(),
             from: alice.clone(),
             to: bob.clone(),
+            to_muxed_id: None,
             r_e_point: fixture_point(&h.e),
             v_tilde: fixture_field(&h.e, 0x31),
             sigma_a_new: fixture_field(&h.e, 0x33),
@@ -932,6 +1026,7 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
             spender: spender.clone(),
             from: alice.clone(),
             to: bob.clone(),
+            to_muxed_id: None,
             r_e_point: fixture_point(&h.e),
             v_tilde: fixture_field(&h.e, 0x31),
             // The payload's sigma_a', not the stored allowance_salt (0x24) it
@@ -984,6 +1079,7 @@ fn confidential_transfer_from_emits_new_salt_as_channel_nonce() {
             spender: spender.clone(),
             from: alice.clone(),
             to: bob.clone(),
+            to_muxed_id: None,
             r_e_point: fixture_point(&h.e),
             v_tilde: fixture_field(&h.e, 0x31),
             sigma_a_new: fixture_field(&h.e, 0x33),
@@ -997,6 +1093,47 @@ fn confidential_transfer_from_emits_new_salt_as_channel_nonce() {
     );
     let delegation = h.token.get_spender_delegation(&alice, &spender);
     assert_eq!(delegation.allowance_salt, fixture_field(&h.e, 0x33));
+}
+
+#[test]
+fn confidential_transfer_from_to_muxed_address_credits_base_account() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+    let bob = MuxedAddress::generate(&h.e).address();
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.register(&bob, &1u32, &register_data(&h.e));
+    h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
+
+    h.token.confidential_transfer_from(
+        &spender,
+        &alice,
+        MuxedAddress::new(&bob, 7),
+        &spender_transfer_data(&h.e),
+    );
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &SpenderTransfer {
+            spender: spender.clone(),
+            from: alice.clone(),
+            to: bob.clone(),
+            to_muxed_id: Some(7),
+            r_e_point: fixture_point(&h.e),
+            v_tilde: fixture_field(&h.e, 0x31),
+            sigma_a_new: fixture_field(&h.e, 0x33),
+            v_tilde_aud_r: fixture_field(&h.e, 0x34),
+            r_tilde_aud_r: fixture_field(&h.e, 0x35),
+            v_tilde_aud_s: fixture_field(&h.e, 0x36),
+            a_tilde_aud_s: fixture_field(&h.e, 0x37),
+            r_tilde_aud_s: fixture_field(&h.e, 0x38),
+        }
+        .to_xdr(&h.e, &h.token_addr)
+    );
+    assert_eq!(h.token.confidential_balance(&bob).receiving_commitment, fixture_point(&h.e));
 }
 
 #[test]

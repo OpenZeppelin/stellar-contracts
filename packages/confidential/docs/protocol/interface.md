@@ -17,10 +17,10 @@ trait ConfidentialToken {
 
     fn withdraw(e: Env, from: Address, to: Address, amount: i128, data: Bytes);
 
-    fn confidential_transfer(e: Env, from: Address, to: Address, data: Bytes);
+    fn confidential_transfer(e: Env, from: Address, to: MuxedAddress, data: Bytes);
 
     fn confidential_transfer_from(e: Env, spender: Address,
-                                   from: Address, to: Address, data: Bytes);
+                                   from: Address, to: MuxedAddress, data: Bytes);
 
     fn set_spender(e: Env, account: Address, spender: Address,
                     live_until_ledger: u32, data: Bytes);
@@ -38,6 +38,8 @@ trait ConfidentialToken {
 A deployment that enables the optional compliance extension adds `compliance: Option<ComplianceConfig>` to this constructor and the freeze, configuration-rotation, read, and — when it opts into `ConfidentialClawback` — seizure entry points of [Interface Summary](../compliance.md#interface-summary) to this interface. The admin-gated ones are authorized by the deployment's own access-control module.
 
 **Hooks.** Every entry point invokes the deployment's `Hooks` implementation after authorization and payload decoding and before the storage-layer operation. Hooks for operations that carry `data` receive the decoded payload by reference; the proofless `on_deposit`, `on_merge`, and `on_revoke_spender` receive none. The two seizure entry points, `clawback` and `force_revoke_spender`, invoke no hook, since a gating hook rejects exactly their precondition — a frozen target ([Clawback](../compliance.md#clawback)).
+
+**Muxed recipients.** `confidential_transfer` and `confidential_transfer_from` take `to` as a `MuxedAddress`, as SEP-41 `transfer` does, so a recipient that collects many payments on one account — an anchor matching inbound transfers to its SEP transactions — can attribute each one. The contract narrows `to` to its base address before reading anything: the account entry, the auditor key, the hook, the receiving balance, and the event's `to` topic all name the base account. The ID reaches only the event's `to_muxed_id` field ([Event Schema](#event-schema)). No circuit absorbs it; the caller's `require_auth()` binds it ([Authorization Model](#authorization-model)). A plain `Address` is accepted as is, and only `G…` accounts can carry an ID.
 
 This table is authoritative: every entry is exactly the set of prover-supplied public inputs from the corresponding [Operations](operations/README.md) operation (the contract loads the remaining public inputs from trusted state per [Public Input Sources](operations/README.md#public-input-sources)), plus the `proof` blob. Names map directly to the [Operations](operations/README.md) symbols.
 
@@ -83,13 +85,13 @@ Each state-modifying operation emits a structured event. Events carry the data n
 | `Deposit` | `from`, `to`, `amount` |
 | `Merge` | `account` |
 | `Withdraw` | `from`, `to`, `amount`, $$R\_e$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ |
-| `Transfer` | `from`, `to`, $$R\_e$$, $$\tilde{v}$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ |
-| `SpenderTransfer` | `spender`, `from`, `to`, $$R\_e$$, $$\tilde{v}$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ |
+| `Transfer` | `from`, `to`, `to_muxed_id`, $$R\_e$$, $$\tilde{v}$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ |
+| `SpenderTransfer` | `spender`, `from`, `to`, `to_muxed_id`, $$R\_e$$, $$\tilde{v}$$, $$\sigma\_a'$$, $$\tilde{v}\_{\text{aud,r}}$$, $$\tilde{r}\_{\text{aud,r}}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{a}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$ |
 | `SetSpender` | `account`, `spender`, `live_until_ledger`, $$R\_e$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, $$\tilde{r}\_{a,\text{aud,s}}$$ |
 | `RevokeSpender` | `account`, `spender`, $$\tilde{a}$$, $$\sigma\_a$$ |
 | `Clawback` | `account`, `amount`, `destination` |
 
-Amount fields in `Deposit`, `Withdraw`, and `Clawback` are typed `i128`, matching SEP-41.
+Amount fields in `Deposit`, `Withdraw`, and `Clawback` are typed `i128`, matching SEP-41. `to_muxed_id` is typed `Option<u64>`, as in CAP-67, and is omitted from the data map when `to` carries no ID.
 
 `Clawback` is emitted only by deployments that enable the optional compliance extension ([Clawback](../compliance.md#clawback)).
 

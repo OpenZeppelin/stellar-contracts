@@ -1,7 +1,7 @@
 use soroban_poseidon::poseidon2_hash;
 use soroban_sdk::{
     contracttype, crypto::bn254::Bn254Fr, panic_with_error, token, xdr::FromXdr, Address, Bytes,
-    BytesN, Env, TryFromVal, Val, U256,
+    BytesN, Env, MuxedAddress, TryFromVal, Val, U256,
 };
 use stellar_contract_utils::crypto::grumpkin::{Grumpkin, Point};
 
@@ -640,8 +640,8 @@ pub fn withdraw(
 ///
 /// # Errors
 ///
-/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `from` or `to` is
-///   not registered.
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `from` or the base
+///   address of `to` is not registered.
 /// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
 ///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
@@ -651,8 +651,18 @@ pub fn withdraw(
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[r_e_point, v_tilde, sigma, b_tilde, v_tilde_aud_r, r_tilde_aud_r,
-///   v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s]`
+/// * data - `[to_muxed_id: Option<u64>, r_e_point, v_tilde, sigma, b_tilde,
+///   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s,
+///   r_tilde_aud_s]`
+///
+/// # Notes
+///
+/// A muxed `to` is narrowed to its base address before any lookup, so the
+/// recipient's keys, auditor and receiving balance are those of the base
+/// account. The muxed ID reaches the event only, where it lets the recipient
+/// attribute the transfer to an off-chain reference such as an anchor
+/// transaction. The proof does not bind it; `from.require_auth()` at the
+/// trait entry point does.
 ///
 /// # Security Warning
 ///
@@ -661,12 +671,13 @@ pub fn withdraw(
 pub fn confidential_transfer(
     e: &Env,
     from: &Address,
-    to: &Address,
+    to: &MuxedAddress,
     payload: &TransferPayload,
     proof: &Bytes,
 ) {
+    let to_address = to.address();
     let sender = get_account(e, from);
-    let recipient = get_account(e, to);
+    let recipient = get_account(e, &to_address);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_r = auditor.get_key(&recipient.auditor_id);
     let k_aud_s = auditor.get_key(&sender.auditor_id);
@@ -699,12 +710,13 @@ pub fn confidential_transfer(
     verify(e, CircuitType::Transfer, &pi, proof);
 
     set_spendable(e, from, &payload.c_spend_new);
-    add_to_receiving(e, to, &payload.c_transfer);
+    add_to_receiving(e, &to_address, &payload.c_transfer);
 
     emit_transfer(
         e,
         from,
-        to,
+        &to_address,
+        to.id(),
         &payload.r_e_point,
         &payload.v_tilde,
         &payload.sigma,
@@ -732,7 +744,7 @@ pub fn confidential_transfer(
 /// # Errors
 ///
 /// * [`ConfidentialTokenError::AccountNotRegistered`] - When `from`, `spender`,
-///   or `to` is not registered.
+///   or the base address of `to` is not registered.
 /// * [`ConfidentialTokenError::DelegationNotFound`] - When `(from, spender)`
 ///   has no delegation.
 /// * [`ConfidentialTokenError::DelegationExpired`] - When the delegation has
@@ -747,8 +759,14 @@ pub fn confidential_transfer(
 ///
 /// * topics - `["spender_transfer", spender: Address, from: Address, to:
 ///   Address]`
-/// * data - `[r_e_point, v_tilde, sigma_a_new, v_tilde_aud_r, r_tilde_aud_r,
-///   v_tilde_aud_s, a_tilde_aud_s, r_tilde_aud_s]`
+/// * data - `[to_muxed_id: Option<u64>, r_e_point, v_tilde, sigma_a_new,
+///   v_tilde_aud_r, r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s,
+///   r_tilde_aud_s]`
+///
+/// # Notes
+///
+/// A muxed `to` is handled as in [`confidential_transfer`], with
+/// `spender.require_auth()` binding the muxed ID.
 ///
 /// # Security Warning
 ///
@@ -758,10 +776,11 @@ pub fn confidential_transfer_from(
     e: &Env,
     spender: &Address,
     from: &Address,
-    to: &Address,
+    to: &MuxedAddress,
     payload: &SpenderTransferPayload,
     proof: &Bytes,
 ) {
+    let to_address = to.address();
     let mut delegation = get_spender_delegation(e, from, spender);
     if e.ledger().sequence() > delegation.live_until_ledger {
         panic_with_error!(e, ConfidentialTokenError::DelegationExpired);
@@ -769,7 +788,7 @@ pub fn confidential_transfer_from(
 
     let owner = get_account(e, from);
     let spender_account = get_account(e, spender);
-    let recipient = get_account(e, to);
+    let recipient = get_account(e, &to_address);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_r = auditor.get_key(&recipient.auditor_id);
     // Sender-auditor key is the OWNER's auditor, not the spender's
@@ -811,13 +830,14 @@ pub fn confidential_transfer_from(
         .persistent()
         .set(&ConfidentialTokenStorageKey::Delegation(from.clone(), spender.clone()), &delegation);
 
-    add_to_receiving(e, to, &payload.c_transfer);
+    add_to_receiving(e, &to_address, &payload.c_transfer);
 
     emit_spender_transfer(
         e,
         spender,
         from,
-        to,
+        &to_address,
+        to.id(),
         &payload.r_e_point,
         &payload.v_tilde,
         &payload.sigma_a_new,

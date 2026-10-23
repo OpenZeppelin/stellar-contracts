@@ -22,7 +22,7 @@
 //!
 //! The constructor grants none of them; the admin grants each role after
 //! deployment.
-use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, MuxedAddress, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_confidential::{
     compliance::{
