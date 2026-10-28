@@ -846,6 +846,8 @@ pub fn confidential_transfer_from(
 ///
 /// # Errors
 ///
+/// * [`ConfidentialTokenError::InvalidLiveUntilLedger`] - When
+///   `live_until_ledger` is less than the current ledger number.
 /// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` or
 ///   `spender` is not registered.
 /// * [`ConfidentialTokenError::DelegationAlreadyExists`] - When a delegation
@@ -874,6 +876,13 @@ pub fn set_spender(
     payload: &SetSpenderPayload,
     proof: &Bytes,
 ) {
+    // Reject a delegation that would be expired on arrival before paying for
+    // the auditor lookup and proof verification. The bound is inclusive to
+    // match the liveness check (`ledger.sequence() <= live_until_ledger`).
+    if live_until_ledger < e.ledger().sequence() {
+        panic_with_error!(e, ConfidentialTokenError::InvalidLiveUntilLedger);
+    }
+
     let owner = get_account(e, account);
     let spender_account = get_account(e, spender);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));

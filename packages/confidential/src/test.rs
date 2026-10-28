@@ -714,6 +714,36 @@ fn set_spender_twice_panics() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3515)")]
+fn set_spender_with_past_live_until_ledger_panics() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+
+    h.e.ledger().set_sequence_number(100);
+    h.token.set_spender(&alice, &spender, &99u32, &set_spender_data(&h.e));
+}
+
+#[test]
+fn set_spender_with_current_ledger_is_live() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
+
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+
+    h.e.ledger().set_sequence_number(100);
+    h.token.set_spender(&alice, &spender, &100u32, &set_spender_data(&h.e));
+
+    assert_eq!(h.token.get_spender_delegation(&alice, &spender).live_until_ledger, 100);
+    assert!(h.token.is_spender(&alice, &spender));
+}
+
+#[test]
 fn revoke_spender_deletes_delegation() {
     let h = setup();
     let alice = Address::generate(&h.e);

@@ -596,6 +596,10 @@ pub enum ConfidentialTokenError {
     /// boundary to keep stored state and emitted events byte-unique per
     /// logical value.
     NonCanonicalEncoding = 3514,
+    /// Indicates `live_until_ledger` is already in the past
+    /// (`live_until_ledger < ledger.sequence()`), so the delegation would be
+    /// expired on arrival.
+    InvalidLiveUntilLedger = 3515,
 }
 
 // ################## CONSTANTS ##################
