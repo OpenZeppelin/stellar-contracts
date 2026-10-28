@@ -1,8 +1,37 @@
 //! # Spending Limit Policy Module
 //!
-//! This policy implements spending limit functionality where transactions above
-//! the specified amount are blocked. It intersects transfer operations and
-//! enforces spending limits over a configurable rolling time window.
+//! This policy implements spending limit functionality where transfers above
+//! the specified amount are blocked. It intercepts the `transfer` calls the
+//! smart account authorizes and caps the total amount authorized over a
+//! configurable rolling time window.
+//!
+//! ## Budget is consumed at authorization time
+//!
+//! The policy counts the amounts of the `transfer` calls the smart account
+//! **authorizes**, not the transfers that end up executing. [`enforce`] runs
+//! during `__check_auth`, before the root invocation executes, and records the
+//! declared amount right away. This is inherent to Soroban custom accounts:
+//! `__check_auth` sees the declared authorization tree once, and nothing at the
+//! end of the transaction requires every declared sub-invocation to have run.
+//! The account therefore cannot observe whether the authorized child was
+//! actually invoked.
+//!
+//! As a consequence, if the root contract returns successfully without
+//! invoking a declared `transfer`, its amount still counts against the limit
+//! until it leaves the rolling window.
+//!
+//! Integration guidance:
+//!
+//! - Roots that gate a declared transfer on mutable state should fail (and so
+//!   revert the whole transaction, including the recorded amount) rather than
+//!   succeed as a no-op.
+//! - Relayed authorization entries should carry a short
+//!   `signature_expiration_ledger`, so a signed entry cannot be held and
+//!   submitted once the state it was signed against has changed.
+//!
+//! To recover budget consumed by transfers that never happened,
+//! [`set_spending_limit`] can raise the cap, but it does not clear the
+//! recorded history. Uninstalling and reinstalling the policy resets it.
 //!
 //! ## Rolling window semantics
 //!
@@ -86,8 +115,8 @@ pub struct SpendingLimitUninstalled {
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct SpendingLimitAccountParams {
-    /// The maximum amount that can be spent within the specified period (in
-    /// stroops).
+    /// The maximum total amount of authorized transfers within the specified
+    /// period (in stroops).
     pub spending_limit: i128,
     /// The period in ledgers over which the spending limit applies.
     pub period_ledgers: u32,
@@ -101,7 +130,7 @@ pub struct SpendingLimitData {
     pub spending_limit: i128,
     /// The period in ledgers over which the spending limit applies.
     pub period_ledgers: u32,
-    /// History of spending transactions with their ledger sequences.
+    /// History of authorized transfer amounts with their ledger sequences.
     pub spending_history: Vec<SpendingEntry>,
     /// Cached total of all amounts in spending_history.
     pub cached_total_spent: i128,
@@ -111,9 +140,9 @@ pub struct SpendingLimitData {
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct SpendingEntry {
-    /// The amount spent in this transaction.
+    /// The transfer amount authorized by the smart account.
     pub amount: i128,
-    /// The ledger sequence when this transaction occurred.
+    /// The ledger sequence at which the transfer was authorized.
     pub ledger_sequence: u32,
 }
 
@@ -206,6 +235,10 @@ pub fn get_spending_limit_data(
 
 /// Enforces the spending limit policy and updates the spending history.
 /// Requires authorization from the smart account.
+///
+/// Runs during `__check_auth`, so the transfer amount is recorded when it is
+/// authorized, before the root invocation executes. See the module-level
+/// "Budget is consumed at authorization time" section.
 ///
 /// # Arguments
 ///
@@ -476,7 +509,7 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
 ///
 /// # Arguments
 ///
-/// * `spending_history` - The mutable history of spending transactions.
+/// * `spending_history` - The mutable history of authorized transfer amounts.
 /// * `current_ledger` - The current ledger sequence.
 /// * `period_ledgers` - The period in ledgers for the rolling window.
 ///
