@@ -49,9 +49,12 @@
 //!
 //! ## Required Operation Ordering
 //!
-//! Both `set_threshold()` and `set_signer_weight()` enforce the invariant
-//! `threshold <= total signer weight` on **every individual call**. Because
-//! each call is validated in isolation, reconfiguration is order-sensitive:
+//! `install()`, `set_threshold()` and `set_signer_weight()` enforce the
+//! invariant `threshold <= total signer weight` on **every individual call**,
+//! where the total signer weight only counts the weights of signers that are
+//! part of the ContextRule (weights configured for other signers can never be
+//! used to authorize through the rule). Because each call is validated in
+//! isolation, reconfiguration is order-sensitive:
 //!
 //! - **When adding weight and raising the threshold**: call
 //!   `set_signer_weight()` **first** to increase the total weight, then
@@ -392,10 +395,11 @@ pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_
 
     params.threshold = threshold;
 
-    // Check if threshold is reachable with current signer weights
-    let total_weight = calculate_total_weight(e, &params.signer_weights);
+    // Check if threshold is reachable by the rule's signers with current
+    // weights
+    let reachable_weight = calculate_reachable_weight(e, &params.signer_weights, context_rule);
 
-    if threshold > total_weight {
+    if threshold > reachable_weight {
         panic_with_error!(e, WeightedThresholdError::InvalidThreshold);
     }
 
@@ -459,10 +463,11 @@ pub fn set_signer_weight(
 
     params.signer_weights.set(signer.clone(), weight);
 
-    // Check if threshold is still reachable with updated signer weights
-    let total_weight = calculate_total_weight(e, &params.signer_weights);
+    // Check if threshold is still reachable by the rule's signers with updated
+    // signer weights
+    let reachable_weight = calculate_reachable_weight(e, &params.signer_weights, context_rule);
 
-    if params.threshold > total_weight {
+    if params.threshold > reachable_weight {
         panic_with_error!(e, WeightedThresholdError::InvalidThreshold);
     }
 
@@ -499,7 +504,8 @@ pub fn set_signer_weight(
 /// # Errors
 ///
 /// * [`WeightedThresholdError::InvalidThreshold`] - When threshold is 0 or
-///   exceeds the total weight of all signers.
+///   exceeds the total weight of the context rule's signers. Weights configured
+///   for signers that are not part of the rule are not counted.
 /// * [`WeightedThresholdError::MathOverflow`] - When the total weight
 ///   calculation would overflow.
 /// * [`WeightedThresholdError::AlreadyInstalled`] - When policy was already
@@ -525,9 +531,9 @@ pub fn install(
         panic_with_error!(e, WeightedThresholdError::AlreadyInstalled)
     }
 
-    let total_weight = calculate_total_weight(e, &params.signer_weights);
+    let reachable_weight = calculate_reachable_weight(e, &params.signer_weights, context_rule);
 
-    if params.threshold == 0 || params.threshold > total_weight {
+    if params.threshold == 0 || params.threshold > reachable_weight {
         panic_with_error!(e, WeightedThresholdError::InvalidThreshold);
     }
 
@@ -576,23 +582,35 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
         .publish(e);
 }
 
-/// Helper to calculate the total weight from a map of signer weights.
+/// Helper to calculate the weight the context rule's signers can reach, i.e.
+/// the sum of the configured weights of the signers in `context_rule.signers`.
+///
+/// Entries in `signer_weights` for signers that are not part of the rule are
+/// ignored: [`calculate_weight`] only ever sees signers that authenticated
+/// through the rule, so such weights can never count towards the threshold.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `signer_weights` - Map of signers to their weights.
+/// * `context_rule` - The context rule whose signers are counted.
 ///
 /// # Errors
 ///
 /// * [`WeightedThresholdError::MathOverflow`] - When the total weight
 ///   calculation would overflow.
-fn calculate_total_weight(e: &Env, signer_weights: &Map<Signer, u32>) -> u32 {
+fn calculate_reachable_weight(
+    e: &Env,
+    signer_weights: &Map<Signer, u32>,
+    context_rule: &ContextRule,
+) -> u32 {
     let mut total_weight: u32 = 0;
-    for weight in signer_weights.values() {
-        total_weight = total_weight
-            .checked_add(weight)
-            .unwrap_or_else(|| panic_with_error!(e, WeightedThresholdError::MathOverflow));
+    for signer in context_rule.signers.iter() {
+        if let Some(weight) = signer_weights.get(signer) {
+            total_weight = total_weight
+                .checked_add(weight)
+                .unwrap_or_else(|| panic_with_error!(e, WeightedThresholdError::MathOverflow));
+        }
     }
     total_weight
 }
