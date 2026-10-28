@@ -251,13 +251,13 @@ fn calculate_weight_overflow_fails() {
         weights.set(Signer::Delegated(addr2.clone()), 1u32);
 
         let params = WeightedThresholdAccountParams { signer_weights: weights, threshold: 100 };
-        // Only addr1 is a rule signer, so install's reachable weight is
-        // u32::MAX
-        let context_rule = create_test_context_rule_with_signers(
-            &e,
-            Vec::from_array(&e, [Signer::Delegated(addr1.clone())]),
+        // `install` rejects weights that can overflow, so store them directly
+        // to exercise the overflow check in `calculate_weight`
+        let context_rule = create_test_context_rule(&e);
+        e.storage().persistent().set(
+            &WeightedThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id),
+            &params,
         );
-        install(&e, &params, &context_rule, &smart_account);
 
         (addr1, addr2)
     });
@@ -702,5 +702,61 @@ fn set_signer_weight_counts_only_rule_signers_fails() {
         // ...so lowering a rule signer's weight still makes 150 unreachable
         let (_, addr1, _) = create_test_weights(&e);
         set_signer_weight(&e, &Signer::Delegated(addr1), 10, &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3212)")]
+fn install_non_rule_signer_weight_overflow_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let addr1 = Address::generate(&e);
+        let mut weights = Map::new(&e);
+        weights.set(Signer::Delegated(addr1.clone()), u32::MAX);
+        // Not a rule signer yet, but could be added to the rule later
+        weights.set(Signer::Delegated(Address::generate(&e)), 1u32);
+
+        let params =
+            WeightedThresholdAccountParams { signer_weights: weights, threshold: u32::MAX };
+        let context_rule = create_test_context_rule_with_signers(
+            &e,
+            Vec::from_array(&e, [Signer::Delegated(addr1)]),
+        );
+
+        install(&e, &params, &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3212)")]
+fn set_signer_weight_non_rule_signer_overflow_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let (weights, _, _) = create_test_weights(&e);
+        let params = WeightedThresholdAccountParams { signer_weights: weights, threshold: 150 };
+        let context_rule = create_test_context_rule(&e);
+
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        let context_rule = create_test_context_rule(&e);
+        set_signer_weight(
+            &e,
+            &Signer::Delegated(Address::generate(&e)),
+            u32::MAX,
+            &context_rule,
+            &smart_account,
+        );
     });
 }
