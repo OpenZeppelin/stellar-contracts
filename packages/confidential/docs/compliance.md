@@ -22,7 +22,7 @@ struct ComplianceConfig {
 | `policy` | Optional external authorization contract ([Policy Contract](#policy-contract)). `None` means no policy gate. |
 | `sac_passthrough` | When `true`, every state-modifying operation additionally consults the underlying SAC's `authorized()` check ([Contract-Level Freeze](#contract-level-freeze)). |
 
-The constructor takes `compliance: Option<ComplianceConfig>`. When `None`, the contract behaves exactly as [the protocol specification](protocol/README.md) specifies: no pre-checks run, and the admin-gated entry points in [Interface Summary](#interface-summary) revert with `NotConfigured`.
+The constructor takes `compliance: Option<ComplianceConfig>`. When `None`, the contract behaves exactly as [the protocol specification](protocol/README.md) specifies: no pre-checks run. Of the admin-gated entry points in [Interface Summary](#interface-summary), `freeze` and `unfreeze` revert with `NotConfigured`. Because no account can be frozen, `clawback` and `force_revoke_spender` revert with `AccountNotFrozen`. `set_compliance_config` has no such guard: it is the single setter for both the deployment-time write and later rotations, so it can also turn compliance on after construction.
 
 ### Admin Authority
 
@@ -98,7 +98,7 @@ The policy address is rotatable via `set_compliance_config` ([Interface Summary]
 
 The compliance surface of [Contract-Level Freeze](#contract-level-freeze) and [Policy Contract](#policy-contract) is delivered as `ComplianceHooks`, a turnkey implementation of the contract's `Hooks` trait. Deployments that need behaviour beyond the default gating — for example, the deposit-side policies sketched below — replace `ComplianceHooks` with a bespoke `Hooks` impl. The custom impl typically delegates to the same primitives the default uses (`storage::gate_account`, `storage::check_policy`, `storage::check_sac`) and only overrides the callbacks that require non-default semantics.
 
-`deposit` is the canonical entry point for customization because it is the only operation where `from` may legitimately be an address that has never registered with the contract (the depositor only needs to hold the underlying SEP-41). The default `ComplianceHooks::on_deposit` gates both `from` and `to` unconditionally, which means every depositor must first register and pass the policy gate. Deployments that need other semantics override `on_deposit`.
+`deposit` is the canonical entry point for customization because it is the only operation where `from` may legitimately be an address that has never registered with the contract (the depositor only needs to hold the underlying SEP-41). The default `ComplianceHooks::on_deposit` gates both `from` and `to` (freeze, policy and SAC checks) but does not require `from` to be registered: the core checks registration for `to` only. An unregistered depositor is therefore accepted as long as it is not frozen and the policy and SAC authorize it. Deployments that need other semantics override `on_deposit`.
 
 ### Permit Unregistered Deposits
 
@@ -151,7 +151,7 @@ At `register`, the account owner chooses which `auditor_id` the account binds to
 
 ```rust
 impl Hooks for ApprovedAuditorHooks {
-    fn on_register(e: &Env, account: &Address, auditor_id: u32, payload: Val) {
+    fn on_register(e: &Env, account: &Address, auditor_id: u32, payload: &RegisterPayload) {
         let approved: Vec<u32> = e
             .storage()
             .instance()
@@ -278,7 +278,7 @@ impl Token {
     fn unfreeze(e: Env, account: Address, operator: Address);
     fn is_frozen(e: Env, account: Address) -> bool;
 
-    // Config rotation (admin auth per Admin Authority, reverts when compliance.is_none())
+    // Config write and rotation (admin auth per Admin Authority; also works when compliance.is_none())
     // Replaces the entire ComplianceConfig in one call.
     fn set_compliance_config(e: Env, config: ComplianceConfig, operator: Address);
 

@@ -140,7 +140,7 @@ where $$[x]\_1 = x \cdot G\_1$$ and $$[x]\_2 = x \cdot G\_2$$ are BN254 group el
 
 ## Dependency: CAP-80
 
-[CAP-80](https://github.com/stellar/stellar-protocol/blob/master/core/cap-0080.md) introduces the host functions required for efficient UltraHonk verification and on-chain Grumpkin point arithmetic. The rollout spans two protocols; both are required, so **protocol 26 is the effective minimum**.
+[CAP-80](https://github.com/stellar/stellar-protocol/blob/master/core/cap-0080.md) introduces the host functions required for efficient UltraHonk verification and on-chain Grumpkin point arithmetic. The rollout spans two protocols, 25 and 26, and both are required by the host functions. The contracts are built with `soroban-sdk` 28 and the `ultrahonk_soroban_verifier` 0.1.0 crate, which require Stellar protocol 28 or newer, so **protocol 28 is the effective minimum for deployment**.
 
 - **Protocol 25:** `bn254_g1_{add, mul}`, `bn254_multi_pairing_check`.
 - **Protocol 26:** `bn254_g1_msm`, `bn254_g1_is_on_curve`, `bn254_fr_{add, sub, mul, inv, pow}` -- the $$\mathbb{F}\_r$$ scalar arithmetic underpinning Grumpkin point operations.

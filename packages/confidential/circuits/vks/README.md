@@ -31,6 +31,11 @@ Reproducible from the circuit sources with the pinned toolchain:
 Both versions are pinned in `.github/workflows/noir.yml`. CI re-runs the
 extraction and diffs against the files here; any drift fails the build.
 
+The `ultrahonk_soroban_verifier` crate's README lists Nargo `1.0.0-beta.9` +
+Barretenberg `0.87.0` as its compatible tooling. This repository uses and
+tests `1.0.0-beta.11` with the same `bb 0.87.0`, and the proofs it
+produces verify in the test suite.
+
 ## Proving
 
 Proofs the deployed verifier accepts must be generated with the same
