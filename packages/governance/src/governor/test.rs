@@ -6,12 +6,35 @@ use soroban_sdk::{
 
 use crate::governor::{
     storage::{
-        self, cancel, cast_vote, count_vote, counting_mode, execute, get_proposal_vote_counts,
-        get_quorum, get_token_contract, has_voted, hash_proposal, propose, queue, quorum_reached,
-        set_quorum, set_token_contract, tally_succeeded, GovernorStorageKey, ProposalCore,
+        self, cancel, cast_vote, count_vote, counting_mode, execute, get_proposal_threshold,
+        get_proposal_vote_counts, get_quorum, get_token_contract, get_voting_delay,
+        get_voting_period, has_voted, hash_proposal, queue, quorum_reached, set_quorum,
+        set_token_contract, tally_succeeded, GovernorStorageKey, ProposalCore,
     },
     ProposalState, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
 };
+
+/// Test helper: propose using the values currently stored (default trait getters).
+fn propose(
+    e: &Env,
+    targets: soroban_sdk::Vec<Address>,
+    functions: soroban_sdk::Vec<Symbol>,
+    args: soroban_sdk::Vec<soroban_sdk::Vec<Val>>,
+    description: String,
+    proposer: &Address,
+) -> BytesN<32> {
+    storage::propose(
+        e,
+        targets,
+        functions,
+        args,
+        description,
+        proposer,
+        get_proposal_threshold(e),
+        get_voting_delay(e),
+        get_voting_period(e),
+    )
+}
 
 #[contract]
 struct MockContract;
@@ -1315,6 +1338,65 @@ fn propose_with_exact_threshold() {
             storage::get_proposal_state(&e, &pid, get_quorum(&e, e.ledger().sequence())),
             ProposalState::Pending
         );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4202)")]
+fn propose_honors_explicit_threshold_over_storage() {
+    // storage threshold is 100 (from setup); call propose with 10_000 so a
+    // 1000-power proposer (enough for storage) still fails — mirrors an
+    // override of Governor::proposal_threshold.
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, description) = simple_proposal(&e);
+
+    e.as_contract(&contract_address, || {
+        storage::propose(
+            &e,
+            targets,
+            functions,
+            args,
+            description,
+            &proposer,
+            10_000, // explicit override threshold
+            get_voting_delay(&e),
+            get_voting_period(&e),
+        );
+    });
+}
+
+#[test]
+fn propose_honors_explicit_voting_delay_over_storage() {
+    // storage voting_delay is 10; pass 50 and assert vote_snapshot uses 50.
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, description) = simple_proposal(&e);
+
+    let pid = e.as_contract(&contract_address, || {
+        storage::propose(
+            &e,
+            targets,
+            functions,
+            args,
+            description,
+            &proposer,
+            get_proposal_threshold(&e),
+            50, // explicit override delay
+            get_voting_period(&e),
+        )
+    });
+
+    e.as_contract(&contract_address, || {
+        let snapshot = storage::get_proposal_snapshot(&e, &pid);
+        // setup starts at ledger 100; delay 50 → snapshot 150
+        assert_eq!(snapshot, 150);
     });
 }
 

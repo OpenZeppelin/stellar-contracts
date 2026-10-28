@@ -192,6 +192,9 @@ pub trait Governor {
     /// The voting delay is the number of ledgers between proposal creation
     /// and the start of voting.
     ///
+    /// [`Governor::propose`] enforces this method's return value when
+    /// computing the proposal's vote snapshot.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
@@ -208,6 +211,9 @@ pub trait Governor {
     ///
     /// The voting period is the number of ledgers during which voting is open.
     ///
+    /// [`Governor::propose`] enforces this method's return value when
+    /// computing the proposal's voting deadline.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
@@ -221,6 +227,9 @@ pub trait Governor {
     }
 
     /// Returns the minimum voting power required to create a proposal.
+    ///
+    /// [`Governor::propose`] enforces this method's return value (not a raw
+    /// storage read), so an override is what gets applied.
     ///
     /// # Arguments
     ///
@@ -236,6 +245,14 @@ pub trait Governor {
 
     /// Returns the address of the token contract that implements the Votes
     /// trait.
+    ///
+    /// The token used for proposer and voter weight checks is the address
+    /// stored via [`storage::set_token_contract`], which may be set only once.
+    /// Overriding this getter changes the reported token but **does not**
+    /// change the token used for enforcement. A governor that needs a
+    /// different token must set the correct address at construction (or
+    /// replace the governance deployment); it cannot switch tokens by
+    /// overriding this method.
     ///
     /// # Arguments
     ///
@@ -460,7 +477,18 @@ pub trait Governor {
         proposer: Address,
     ) -> BytesN<32> {
         proposer.require_auth();
-        storage::propose(e, targets, functions, args, description, &proposer)
+        // Enforce the overridable getters (same pattern as Self::quorum in cast_vote).
+        storage::propose(
+            e,
+            targets,
+            functions,
+            args,
+            description,
+            &proposer,
+            Self::proposal_threshold(e),
+            Self::voting_delay(e),
+            Self::voting_period(e),
+        )
     }
 
     /// Casts a vote on a proposal and returns the voter's voting power.

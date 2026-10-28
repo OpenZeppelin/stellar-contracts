@@ -475,10 +475,12 @@ pub fn set_token_contract(e: &Env, token_contract: &Address) {
 ///   lacks sufficient voting power.
 /// * [`GovernorError::MathOverflow`] - Occurs if voting schedule calculation
 ///   overflows.
-/// * refer to [`get_proposal_threshold()`] errors.
-/// * refer to [`get_voting_delay()`] errors.
-/// * refer to [`get_voting_period()`] errors.
 /// * refer to [`get_token_contract()`] errors.
+///
+/// `proposal_threshold`, `voting_delay`, and `voting_period` are passed in by
+/// the caller (typically [`crate::governor::Governor::propose`], which reads
+/// them from the overridable trait methods). Storage getters alone are not
+/// authoritative when a governor overrides those methods.
 ///
 /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
 ///
@@ -492,6 +494,9 @@ pub fn propose(
     args: Vec<Vec<Val>>,
     description: String,
     proposer: &Address,
+    proposal_threshold: u128,
+    voting_delay: u32,
+    voting_period: u32,
 ) -> BytesN<32> {
     // Validate proposal length
     let targets_len = targets.len();
@@ -512,8 +517,7 @@ pub fn propose(
     let proposer_votes = get_voting_power(e, proposer, snapshot);
 
     // Check proposer has sufficient voting power
-    let threshold = get_proposal_threshold(e);
-    if proposer_votes < threshold {
+    if proposer_votes < proposal_threshold {
         panic_with_error!(e, GovernorError::InsufficientProposerVotes);
     }
 
@@ -528,9 +532,7 @@ pub fn propose(
         panic_with_error!(e, GovernorError::ProposalAlreadyExists);
     }
 
-    // Calculate voting schedule
-    let voting_delay = get_voting_delay(e);
-    let voting_period = get_voting_period(e);
+    // Calculate voting schedule from the caller-supplied delay/period
     let Some(vote_snapshot) = current_ledger.checked_add(voting_delay) else {
         panic_with_error!(e, GovernorError::MathOverflow);
     };
