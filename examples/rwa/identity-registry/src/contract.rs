@@ -1,4 +1,4 @@
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, FromVal, Symbol, Val, Vec};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, FromVal, IntoVal, Symbol, Val, Vec};
 use stellar_access::access_control::{self as access_control};
 use stellar_macros::only_role;
 use stellar_tokens::rwa::{
@@ -126,5 +126,22 @@ impl CountryDataManager for IdentityRegistryContract {
     #[only_role(operator, "manager")]
     fn delete_country_data(e: &Env, account: Address, index: u32, operator: Address) {
         identity_storage::delete_country_data(e, &account, index);
+    }
+
+    // Explicitly export the CountryDataManager getters. Trait defaults are only
+    // included in the contract interface with `#[contractimpl(contracttrait)]`;
+    // spelling them out keeps compliance modules (`country_allow` /
+    // `country_restrict`) able to call the example registry.
+    fn get_country_data_entries(e: &Env, account: Address) -> Vec<Val> {
+        Vec::from_iter(
+            e,
+            identity_storage::get_country_data_entries(e, &account)
+                .iter()
+                .map(|entry| entry.into_val(e)),
+        )
+    }
+
+    fn get_country_data(e: &Env, account: Address, index: u32) -> Val {
+        identity_storage::get_country_data(e, &account, index).into_val(e)
     }
 }
