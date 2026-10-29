@@ -222,8 +222,36 @@ pub fn get_proposal_core(e: &Env, proposal_id: &BytesN<32>) -> ProposalCore {
 /// * [`GovernorError::ProposalNotFound`] - Occurs if the proposal does not
 ///   exist.
 pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>, quorum: u128) -> ProposalState {
+    let outcome_succeeded = quorum_reached(e, proposal_id, quorum) && tally_succeeded(e, proposal_id);
+    get_proposal_state_with_outcome(e, proposal_id, outcome_succeeded)
+}
+
+/// Returns the current state of a proposal using a caller-supplied outcome.
+///
+/// Timing-based states (`Pending` / `Active`) and stored terminal states are
+/// derived here. Whether a finished vote is `Succeeded` or `Defeated` is
+/// decided by `outcome_succeeded`, which the [`crate::governor::Governor`]
+/// trait computes via the overridable [`crate::governor::Governor::quorum_reached`]
+/// and [`crate::governor::Governor::vote_succeeded`] hooks.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `proposal_id` - The unique identifier of the proposal.
+/// * `outcome_succeeded` - Whether the proposal met the caller's success
+///   criteria (quorum and vote share).
+///
+/// # Errors
+///
+/// * [`GovernorError::ProposalNotFound`] - Occurs if the proposal does not
+///   exist.
+pub fn get_proposal_state_with_outcome(
+    e: &Env,
+    proposal_id: &BytesN<32>,
+    outcome_succeeded: bool,
+) -> ProposalState {
     let core = get_proposal_core(e, proposal_id);
-    derive_proposal_state(e, proposal_id, &core, quorum)
+    derive_proposal_state(e, proposal_id, &core, outcome_succeeded)
 }
 
 /// Returns the snapshot ledger for a proposal.
@@ -599,15 +627,15 @@ pub fn execute(
     args: Vec<Vec<Val>>,
     description_hash: &BytesN<32>,
     queue_enabled: bool,
-    quorum: u128,
+    state: ProposalState,
 ) -> BytesN<32> {
     let proposal_id = hash_proposal(e, &targets, &functions, &args, description_hash);
 
     // Get proposal and verify it exists
     let mut proposal = get_proposal_core(e, &proposal_id);
 
-    // Check proposal state
-    let state = derive_proposal_state(e, &proposal_id, &proposal, quorum);
+    // `state` is supplied by the caller (typically `Governor::proposal_state`),
+    // so custom outcome rules are enforced the same way as the state query.
     if state == ProposalState::Executed {
         panic_with_error!(e, GovernorError::ProposalAlreadyExecuted);
     }
@@ -661,9 +689,8 @@ pub fn execute(
 /// * `description_hash` - The hash of the proposal description.
 /// * `eta` - The estimated ledger sequence for execution. Emitted in the event
 ///   only; not stored or enforced by the governor.
-/// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
+/// * `state` - The proposal state from [`crate::governor::Governor::proposal_state`]
+///   (or an equivalent). Must be `Succeeded` to queue.
 ///
 /// # Errors
 ///
@@ -688,11 +715,11 @@ pub fn queue(
     args: Vec<Vec<Val>>,
     description_hash: &BytesN<32>,
     eta: u32,
-    quorum: u128,
+    state: ProposalState,
 ) -> BytesN<32> {
     let proposal_id = hash_proposal(e, &targets, &functions, &args, description_hash);
     let mut proposal = get_proposal_core(e, &proposal_id);
-    let state = derive_proposal_state(e, &proposal_id, &proposal, quorum);
+    // `state` comes from `Governor::proposal_state` so custom outcome hooks apply.
     if state != ProposalState::Succeeded {
         panic_with_error!(e, GovernorError::ProposalNotSuccessful);
     }
@@ -810,18 +837,17 @@ pub fn hash_proposal(
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `proposal_id` - The unique identifier of the proposal.
-/// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
+/// * `state` - The proposal state from [`crate::governor::Governor::proposal_state`]
+///   (or an equivalent). Must be `Active` to vote.
 ///
 /// # Errors
 ///
 /// * [`GovernorError::ProposalNotActive`] - Occurs if the proposal is not in
 ///   the active state.
 /// * refer to [`get_proposal_core()`] errors.
-pub fn check_proposal_state(e: &Env, proposal_id: &BytesN<32>, quorum: u128) -> u32 {
+pub fn check_proposal_state(e: &Env, proposal_id: &BytesN<32>, state: ProposalState) -> u32 {
     let core = get_proposal_core(e, proposal_id);
-    let state = derive_proposal_state(e, proposal_id, &core, quorum);
+    // `state` comes from `Governor::proposal_state` so overrides apply uniformly.
     if state != ProposalState::Active {
         panic_with_error!(e, GovernorError::ProposalNotActive);
     }
@@ -866,21 +892,16 @@ pub fn check_proposal_state(e: &Env, proposal_id: &BytesN<32>, quorum: u128) -> 
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
+/// * `proposal_id` - The unique identifier of the proposal (unused; kept for
+///   call-site clarity).
 /// * `core` - The proposal's stored core data.
-/// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
-///
-/// # Errors
-///
-/// * [`GovernorError::MathOverflow`] - Occurs if the participation tally
-///   overflows when summing `for` and `abstain` votes.
+/// * `outcome_succeeded` - Whether the finished vote met the caller's success
+///   criteria.
 fn derive_proposal_state(
     e: &Env,
-    proposal_id: &BytesN<32>,
+    _proposal_id: &BytesN<32>,
     core: &ProposalCore,
-    quorum: u128,
+    outcome_succeeded: bool,
 ) -> ProposalState {
     // Stored states: return immediately — the transition already happened.
     match core.state {
@@ -895,7 +916,7 @@ fn derive_proposal_state(
 
     // Derived states: `core.state` is still `Pending` (its initial value
     // from `propose`), so we determine the actual state from timing and
-    // vote tallies.
+    // the caller-supplied outcome.
     let current_ledger = e.ledger().sequence();
 
     // `vote_snapshot` is the snapshot ledger; voting opens on the next ledger.
@@ -910,12 +931,9 @@ fn derive_proposal_state(
         return ProposalState::Active;
     }
 
-    // Voting has ended — check whether quorum and majority were met.
-    let counts = get_proposal_vote_counts(e, proposal_id);
-    let Some(participation) = counts.for_votes.checked_add(counts.abstain_votes) else {
-        panic_with_error!(e, GovernorError::MathOverflow);
-    };
-    if participation >= quorum && counts.for_votes > counts.against_votes {
+    // Voting has ended — `outcome_succeeded` encodes quorum + vote-share
+    // (see `Governor::quorum_reached` / `Governor::vote_succeeded`).
+    if outcome_succeeded {
         return ProposalState::Succeeded;
     }
 
@@ -1220,9 +1238,8 @@ pub fn count_vote(
 /// * `vote_type` - The type of vote (0 = Against, 1 = For, 2 = Abstain).
 /// * `reason` - An optional explanation for the vote.
 /// * `voter` - The address casting the vote.
-/// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
+/// * `state` - The proposal state from [`crate::governor::Governor::proposal_state`]
+///   (or an equivalent). Must be `Active`.
 ///
 /// # Errors
 ///
@@ -1244,9 +1261,9 @@ pub fn cast_vote(
     vote_type: u32,
     reason: &String,
     voter: &Address,
-    quorum: u128,
+    state: ProposalState,
 ) -> u128 {
-    let snapshot = check_proposal_state(e, proposal_id, quorum);
+    let snapshot = check_proposal_state(e, proposal_id, state);
     let voter_weight = get_voting_power(e, voter, snapshot);
     count_vote(e, proposal_id, voter, vote_type, voter_weight);
     emit_vote_cast(e, voter, proposal_id, vote_type, voter_weight, reason);

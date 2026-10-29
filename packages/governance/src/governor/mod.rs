@@ -22,6 +22,12 @@
 //!   are stored as checkpoints, so updates do not retroactively affect existing
 //!   proposals
 //!
+//! Custom counting rules belong in overrides of
+//! [`Governor::quorum_reached`] and [`Governor::vote_succeeded`]. Those hooks
+//! feed [`Governor::proposal_state`], which is the single source of truth used
+//! by voting, queueing, and execution — not a private re-derivation of the
+//! simple tally.
+//!
 //! The [`Governor`] trait does not define how to store, manage, and access
 //! votes. But Governor trait needs to be able to access the voting power of
 //! an account at a specific ledger. [`crate::votes::Votes`] trait is expected
@@ -138,7 +144,7 @@ use soroban_sdk::{
 pub use crate::governor::storage::{
     cancel, cast_vote, check_proposal_state, count_vote, counting_mode, execute, get_name,
     get_proposal_core, get_proposal_deadline, get_proposal_proposer, get_proposal_snapshot,
-    get_proposal_state, get_proposal_threshold, get_proposal_vote_counts, get_quorum,
+    get_proposal_state, get_proposal_state_with_outcome, get_proposal_threshold, get_proposal_vote_counts, get_quorum,
     get_token_contract, get_version, get_voting_delay, get_voting_period, has_voted, hash_proposal,
     propose, queue, quorum_reached, set_name, set_proposal_threshold, set_quorum,
     set_token_contract, set_version, set_voting_delay, set_voting_period, tally_succeeded,
@@ -328,10 +334,32 @@ pub trait Governor {
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
     /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
     ///   before the proposal's `vote_snapshot` ledger.
-    fn proposal_state(e: &Env, proposal_id: BytesN<32>) -> ProposalState {
+    /// Returns whether the proposal has met the quorum requirement.
+    ///
+    /// Default: `for + abstain >= quorum` at the proposal's vote snapshot,
+    /// via [`storage::quorum_reached`]. Override together with
+    /// [`Governor::vote_succeeded`] for custom counting strategies; both hooks
+    /// are consulted by [`Governor::proposal_state`].
+    fn quorum_reached(e: &Env, proposal_id: BytesN<32>) -> bool {
         let snapshot = storage::get_proposal_snapshot(e, &proposal_id);
         let quorum = Self::quorum(e, snapshot);
-        storage::get_proposal_state(e, &proposal_id, quorum)
+        storage::quorum_reached(e, &proposal_id, quorum)
+    }
+
+    /// Returns whether the vote tally meets the success criteria.
+    ///
+    /// Default: `for > against` via [`storage::tally_succeeded`]. Override
+    /// together with [`Governor::quorum_reached`] for custom counting
+    /// strategies; both hooks are consulted by [`Governor::proposal_state`].
+    fn vote_succeeded(e: &Env, proposal_id: BytesN<32>) -> bool {
+        storage::tally_succeeded(e, &proposal_id)
+    }
+
+    fn proposal_state(e: &Env, proposal_id: BytesN<32>) -> ProposalState {
+        // Single source of truth: timing + overridable outcome hooks.
+        let outcome_succeeded =
+            Self::quorum_reached(e, proposal_id.clone()) && Self::vote_succeeded(e, proposal_id.clone());
+        storage::get_proposal_state_with_outcome(e, &proposal_id, outcome_succeeded)
     }
 
     /// Returns the ledger number at which voting power is retrieved for a
@@ -501,9 +529,8 @@ pub trait Governor {
         voter: Address,
     ) -> u128 {
         voter.require_auth();
-        let snapshot = storage::get_proposal_snapshot(e, &proposal_id);
-        let quorum = Self::quorum(e, snapshot);
-        storage::cast_vote(e, &proposal_id, vote_type, &reason, &voter, quorum)
+        let state = Self::proposal_state(e, proposal_id.clone());
+        storage::cast_vote(e, &proposal_id, vote_type, &reason, &voter, state)
     }
 
     /// Queues a succeeded proposal for execution and returns its unique
@@ -569,8 +596,8 @@ pub trait Governor {
     ///         assert!(operator == timelock);
     ///         operator.require_auth();
     ///         let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
-    ///         let quorum = Self::quorum(e, get_proposal_snapshot(e, &proposal_id));
-    ///         storage::queue(e, targets, functions, args, &description_hash, eta, quorum)
+    ///         let state = Self::proposal_state(e, proposal_id);
+    ///         storage::queue(e, targets, functions, args, &description_hash, eta, state)
     ///     }
     /// }
     /// ```
@@ -616,9 +643,8 @@ pub trait Governor {
             soroban_sdk::panic_with_error!(e, GovernorError::QueueNotEnabled);
         }
         let proposal_id = storage::hash_proposal(e, &targets, &functions, &args, &description_hash);
-        let snapshot = storage::get_proposal_snapshot(e, &proposal_id);
-        let quorum = Self::quorum(e, snapshot);
-        storage::queue(e, targets, functions, args, &description_hash, eta, quorum)
+        let state = Self::proposal_state(e, proposal_id);
+        storage::queue(e, targets, functions, args, &description_hash, eta, state)
     }
 
     /// Executes a proposal and returns its unique identifier.
@@ -670,8 +696,8 @@ pub trait Governor {
     /// // Open execution — anyone can trigger a succeeded proposal:
     /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
     ///     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
-    ///     let quorum = Self::quorum(e, get_proposal_snapshot(e, &proposal_id));
-    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), quorum)
+    ///     let state = Self::proposal_state(e, proposal_id);
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), state)
     /// }
     ///
     /// // Restricted — only a timelock contract can execute:
@@ -680,16 +706,16 @@ pub trait Governor {
     ///     assert!(executor == timelock);
     ///     executor.require_auth();
     ///     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
-    ///     let quorum = Self::quorum(e, get_proposal_snapshot(e, &proposal_id));
-    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), quorum)
+    ///     let state = Self::proposal_state(e, proposal_id);
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), state)
     /// }
     ///
     /// // Role-based — using the `stellar-macros` access control macro:
     /// #[only_role(executor, "executor")]
     /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
     ///     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
-    ///     let quorum = Self::quorum(e, get_proposal_snapshot(e, &proposal_id));
-    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), quorum)
+    ///     let state = Self::proposal_state(e, proposal_id);
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), state)
     /// }
     /// ```
     fn execute(
