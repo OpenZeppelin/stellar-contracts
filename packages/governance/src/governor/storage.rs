@@ -44,7 +44,7 @@ pub enum GovernorStorageKey {
     ProposalVote(BytesN<32>),
     /// Whether an account has voted on a proposal.
     HasVoted(BytesN<32>, Address),
-    /// The address of the token contract that implements the Votes trait.
+    /// The address of the token contract that implements the VotesInterface.
     TokenContract,
 }
 
@@ -274,7 +274,7 @@ pub fn get_proposal_proposer(e: &Env, proposal_id: &BytesN<32>) -> Address {
     core.proposer
 }
 
-/// Returns the address of the token contract that implements the Votes trait.
+/// Returns the address of the token contract that implements the VotesInterface.
 ///
 /// # Arguments
 ///
@@ -418,7 +418,7 @@ pub fn set_voting_period(e: &Env, period: u32) {
     e.storage().instance().set(&GovernorStorageKey::VotingPeriod, &period);
 }
 
-/// Sets the address of the token contract that implements the Votes trait.
+/// Sets the address of the token contract that implements the VotesInterface.
 ///
 /// This function can only be called **once**. It is expected to be called
 /// during the constructor of the governor contract. Subsequent calls will

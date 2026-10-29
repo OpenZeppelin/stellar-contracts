@@ -128,8 +128,8 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// * [`crate::vault::Vault`] (enabling the compatibility and overrides for the
 ///   [`crate::vault::FungibleVault`] and
 ///   [`crate::fungible::total_supply::FungibleTotalSupply`] traits).
-/// * [`crate::fungible::votes::FungibleVotes`] (enabling the compatibility and
-///   overrides for the [`stellar_governance::votes::Votes`] trait).
+/// * [`crate::fungible::votes::Votes`] (enabling the compatibility and
+///   overrides for the [`crate::fungible::votes::FungibleVotes`] trait).
 /// * [`crate::fungible::capped::Capped`] (additionally enforcing a maximum
 ///   total supply on mint, enabling the compatibility for the
 ///   [`crate::fungible::capped::FungibleCapped`] and
@@ -154,15 +154,15 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// ```
 ///
 /// `Compose` takes a tuple, so contract types that are compatible with each
-/// other can be listed together. `AllowList` and `FungibleVotes` are such a
+/// other can be listed together. `AllowList` and `Votes` are such a
 /// pair: listing both (in any order) yields a governance token whose
 /// transfers are gated by the allowlist and whose balances count as voting
-/// units, so both `FungibleAllowList` and `Votes` can be implemented:
+/// units, so both `FungibleAllowList` and `FungibleVotes` can be implemented:
 ///
 /// ```ignore
 /// #[contractimpl(contracttrait)]
 /// impl FungibleToken for MyToken {
-///     type ContractType = Compose<(AllowList, FungibleVotes)>;
+///     type ContractType = Compose<(AllowList, Votes)>;
 /// }
 ///
 /// #[contractimpl(contracttrait)]
@@ -171,7 +171,7 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// }
 ///
 /// #[contractimpl(contracttrait)]
-/// impl Votes for MyToken {}
+/// impl FungibleVotes for MyToken {}
 /// ```
 ///
 /// Not every contract type can be combined with every other one. A

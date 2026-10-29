@@ -6,35 +6,42 @@ use crate::fungible::{
     Base, ContractOverrides,
 };
 
-pub struct FungibleVotes;
+/// Marker for contract types that back the votes extension: transfers, mints
+/// and burns update voting-unit checkpoints.
+pub trait VotesContractType {}
 
-impl ContractOverrides for FungibleVotes {
+/// Contract type that tracks voting units on every balance change.
+pub struct Votes;
+
+impl VotesContractType for Votes {}
+
+impl ContractOverrides for Votes {
     fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
-        FungibleVotes::transfer(e, from, to, amount);
+        Votes::transfer(e, from, to, amount);
     }
 
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
-        FungibleVotes::transfer_from(e, spender, from, to, amount);
+        Votes::transfer_from(e, spender, from, to, amount);
     }
 }
 
-impl BurnableOverrides for FungibleVotes {
+impl BurnableOverrides for Votes {
     fn burn(e: &Env, from: &Address, amount: i128) {
-        FungibleVotes::burn(e, from, amount);
+        Votes::burn(e, from, amount);
     }
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
-        FungibleVotes::burn_from(e, spender, from, amount);
+        Votes::burn_from(e, spender, from, amount);
     }
 }
 
-impl MintOverrides for FungibleVotes {
+impl MintOverrides for Votes {
     fn mint(e: &Env, to: &Address, amount: i128) {
-        FungibleVotes::mint(e, to, amount);
+        Votes::mint(e, to, amount);
     }
 }
 
-impl FungibleVotes {
+impl Votes {
     /// Transfers `amount` of tokens from `from` to `to`.
     /// Also updates voting units for the respective delegates.
     ///

@@ -3,7 +3,7 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env, MuxedAddress};
 use stellar_governance::votes::{delegate, get_delegate, get_votes, get_voting_units};
 
-use crate::fungible::{extensions::votes::FungibleVotes, Base, ContractOverrides};
+use crate::fungible::{extensions::votes::Votes, Base, ContractOverrides};
 
 #[contract]
 struct MockContract;
@@ -21,7 +21,7 @@ fn mint_updates_voting_units() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
+        Votes::mint(&e, &alice, 100);
 
         assert_eq!(Base::balance(&e, &alice), 100);
         assert_eq!(get_voting_units(&e, &alice), 100);
@@ -36,7 +36,7 @@ fn mint_with_delegation_updates_votes() {
 
     e.as_contract(&contract_address, || {
         delegate(&e, &alice, &bob);
-        FungibleVotes::mint(&e, &alice, 100);
+        Votes::mint(&e, &alice, 100);
 
         assert_eq!(Base::balance(&e, &alice), 100);
         assert_eq!(get_voting_units(&e, &alice), 100);
@@ -50,8 +50,8 @@ fn burn_updates_voting_units() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
-        FungibleVotes::burn(&e, &alice, 30);
+        Votes::mint(&e, &alice, 100);
+        Votes::burn(&e, &alice, 30);
 
         assert_eq!(Base::balance(&e, &alice), 70);
         assert_eq!(get_voting_units(&e, &alice), 70);
@@ -66,12 +66,12 @@ fn burn_with_delegation_updates_votes() {
 
     e.as_contract(&contract_address, || {
         delegate(&e, &alice, &bob);
-        FungibleVotes::mint(&e, &alice, 100);
+        Votes::mint(&e, &alice, 100);
         assert_eq!(get_votes(&e, &bob), 100);
     });
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::burn(&e, &alice, 40);
+        Votes::burn(&e, &alice, 40);
         assert_eq!(get_votes(&e, &bob), 60);
     });
 }
@@ -83,9 +83,9 @@ fn burn_from_updates_voting_units() {
     let spender = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &owner, 100);
+        Votes::mint(&e, &owner, 100);
         Base::approve(&e, &owner, &spender, 50, 1000);
-        FungibleVotes::burn_from(&e, &spender, &owner, 30);
+        Votes::burn_from(&e, &spender, &owner, 30);
 
         assert_eq!(Base::balance(&e, &owner), 70);
         assert_eq!(get_voting_units(&e, &owner), 70);
@@ -99,8 +99,8 @@ fn transfer_updates_voting_units() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
-        FungibleVotes::transfer(&e, &alice, &MuxedAddress::from(bob.clone()), 40);
+        Votes::mint(&e, &alice, 100);
+        Votes::transfer(&e, &alice, &MuxedAddress::from(bob.clone()), 40);
 
         assert_eq!(Base::balance(&e, &alice), 60);
         assert_eq!(Base::balance(&e, &bob), 40);
@@ -118,19 +118,19 @@ fn transfer_with_delegation_updates_votes() {
     let delegate_b = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
+        Votes::mint(&e, &alice, 100);
         delegate(&e, &alice, &delegate_a);
         assert_eq!(get_votes(&e, &delegate_a), 100);
     });
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &bob, 50);
+        Votes::mint(&e, &bob, 50);
         delegate(&e, &bob, &delegate_b);
         assert_eq!(get_votes(&e, &delegate_b), 50);
     });
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::transfer(&e, &alice, &MuxedAddress::from(bob.clone()), 30);
+        Votes::transfer(&e, &alice, &MuxedAddress::from(bob.clone()), 30);
 
         assert_eq!(get_votes(&e, &delegate_a), 70);
         assert_eq!(get_votes(&e, &delegate_b), 80);
@@ -145,9 +145,9 @@ fn transfer_from_updates_voting_units() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &owner, 100);
+        Votes::mint(&e, &owner, 100);
         Base::approve(&e, &owner, &spender, 50, 1000);
-        FungibleVotes::transfer_from(&e, &spender, &owner, &recipient, 30);
+        Votes::transfer_from(&e, &spender, &owner, &recipient, 30);
 
         assert_eq!(Base::balance(&e, &owner), 70);
         assert_eq!(Base::balance(&e, &recipient), 30);
@@ -166,7 +166,7 @@ fn transfer_from_with_delegation_updates_votes() {
     let delegate_recipient = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &owner, 100);
+        Votes::mint(&e, &owner, 100);
         delegate(&e, &owner, &delegate_owner);
     });
 
@@ -176,7 +176,7 @@ fn transfer_from_with_delegation_updates_votes() {
 
     e.as_contract(&contract_address, || {
         Base::approve(&e, &owner, &spender, 50, 1000);
-        FungibleVotes::transfer_from(&e, &spender, &owner, &recipient, 30);
+        Votes::transfer_from(&e, &spender, &owner, &recipient, 30);
 
         assert_eq!(get_votes(&e, &delegate_owner), 70);
         assert_eq!(get_votes(&e, &delegate_recipient), 30);
@@ -190,13 +190,13 @@ fn zero_mint_is_noop() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
+        Votes::mint(&e, &alice, 100);
         delegate(&e, &alice, &bob);
         assert_eq!(get_votes(&e, &bob), 100);
     });
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 0);
+        Votes::mint(&e, &alice, 0);
         assert_eq!(get_voting_units(&e, &alice), 100);
     });
 }
@@ -207,12 +207,12 @@ fn zero_burn_is_noop() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
+        Votes::mint(&e, &alice, 100);
         assert_eq!(get_voting_units(&e, &alice), 100);
     });
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::burn(&e, &alice, 0);
+        Votes::burn(&e, &alice, 0);
         assert_eq!(get_voting_units(&e, &alice), 100);
     });
 }
@@ -224,12 +224,12 @@ fn zero_transfer_is_noop() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
+        Votes::mint(&e, &alice, 100);
         assert_eq!(get_voting_units(&e, &alice), 100);
     });
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::transfer(&e, &alice, &MuxedAddress::from(bob.clone()), 0);
+        Votes::transfer(&e, &alice, &MuxedAddress::from(bob.clone()), 0);
         assert_eq!(get_voting_units(&e, &alice), 100);
     });
 }
@@ -245,7 +245,7 @@ fn delegate_before_mint() {
         assert_eq!(get_delegate(&e, &alice), Some(bob.clone()));
         assert_eq!(get_votes(&e, &bob), 0);
 
-        FungibleVotes::mint(&e, &alice, 100);
+        Votes::mint(&e, &alice, 100);
         assert_eq!(get_votes(&e, &bob), 100);
     });
 }
@@ -256,7 +256,7 @@ fn self_delegation() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
+        Votes::mint(&e, &alice, 100);
         delegate(&e, &alice, &alice);
 
         assert_eq!(get_delegate(&e, &alice), Some(alice.clone()));
@@ -272,7 +272,7 @@ fn change_delegate_after_mint() {
     let charlie = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
+        Votes::mint(&e, &alice, 100);
         delegate(&e, &alice, &bob);
         assert_eq!(get_votes(&e, &bob), 100);
     });
@@ -291,8 +291,8 @@ fn burn_insufficient_balance_panics() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
-        FungibleVotes::burn(&e, &alice, 150);
+        Votes::mint(&e, &alice, 100);
+        Votes::burn(&e, &alice, 150);
     });
 }
 
@@ -304,8 +304,8 @@ fn transfer_insufficient_balance_panics() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
-        FungibleVotes::transfer(&e, &alice, &MuxedAddress::from(bob.clone()), 150);
+        Votes::mint(&e, &alice, 100);
+        Votes::transfer(&e, &alice, &MuxedAddress::from(bob.clone()), 150);
     });
 }
 
@@ -318,9 +318,9 @@ fn transfer_from_insufficient_allowance_panics() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &owner, 100);
+        Votes::mint(&e, &owner, 100);
         Base::approve(&e, &owner, &spender, 20, 1000);
-        FungibleVotes::transfer_from(&e, &spender, &owner, &recipient, 50);
+        Votes::transfer_from(&e, &spender, &owner, &recipient, 50);
     });
 }
 
@@ -332,8 +332,8 @@ fn multiple_holders_with_same_delegate() {
     let charlie = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
-        FungibleVotes::mint(&e, &bob, 50);
+        Votes::mint(&e, &alice, 100);
+        Votes::mint(&e, &bob, 50);
 
         delegate(&e, &alice, &charlie);
         delegate(&e, &bob, &charlie);
@@ -349,8 +349,8 @@ fn transfer_between_delegated_accounts() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
-        FungibleVotes::mint(&e, &bob, 50);
+        Votes::mint(&e, &alice, 100);
+        Votes::mint(&e, &bob, 50);
         delegate(&e, &alice, &alice);
     });
 
@@ -362,7 +362,7 @@ fn transfer_between_delegated_accounts() {
         assert_eq!(get_votes(&e, &alice), 100);
         assert_eq!(get_votes(&e, &bob), 50);
 
-        FungibleVotes::transfer(&e, &alice, &MuxedAddress::from(bob.clone()), 30);
+        Votes::transfer(&e, &alice, &MuxedAddress::from(bob.clone()), 30);
 
         assert_eq!(get_votes(&e, &alice), 70);
         assert_eq!(get_votes(&e, &bob), 80);
@@ -376,12 +376,12 @@ fn contract_overrides_transfer() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
+        Votes::mint(&e, &alice, 100);
         assert_eq!(get_voting_units(&e, &alice), 100);
     });
 
     e.as_contract(&contract_address, || {
-        <FungibleVotes as ContractOverrides>::transfer(
+        <Votes as ContractOverrides>::transfer(
             &e,
             &alice,
             &MuxedAddress::from(bob.clone()),
@@ -403,12 +403,12 @@ fn contract_overrides_transfer_from() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &owner, 100);
+        Votes::mint(&e, &owner, 100);
         Base::approve(&e, &owner, &spender, 50, 1000);
     });
 
     e.as_contract(&contract_address, || {
-        <FungibleVotes as ContractOverrides>::transfer_from(&e, &spender, &owner, &recipient, 30);
+        <Votes as ContractOverrides>::transfer_from(&e, &spender, &owner, &recipient, 30);
 
         assert_eq!(Base::balance(&e, &owner), 70);
         assert_eq!(Base::balance(&e, &recipient), 30);
@@ -424,13 +424,13 @@ fn burn_all_tokens() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::mint(&e, &alice, 100);
+        Votes::mint(&e, &alice, 100);
         delegate(&e, &alice, &bob);
         assert_eq!(get_votes(&e, &bob), 100);
     });
 
     e.as_contract(&contract_address, || {
-        FungibleVotes::burn(&e, &alice, 100);
+        Votes::burn(&e, &alice, 100);
 
         assert_eq!(Base::balance(&e, &alice), 0);
         assert_eq!(get_voting_units(&e, &alice), 0);

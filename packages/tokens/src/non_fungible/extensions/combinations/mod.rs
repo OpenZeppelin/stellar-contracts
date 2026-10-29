@@ -29,9 +29,9 @@
 //! impl NonFungibleBurnable for MyToken {}
 //! ```
 //!
-//! Curated multi-type combinations: [`NonFungibleVotes`] can be combined with
+//! Curated multi-type combinations: [`Votes`] can be combined with
 //! either [`Enumerable`] or [`Consecutive`], e.g.
-//! `Compose<(Enumerable, NonFungibleVotes)>`. Invalid lists do not compile:
+//! `Compose<(Enumerable, Votes)>`. Invalid lists do not compile:
 //! `Enumerable` and `Consecutive` are mutually exclusive, and implementing an
 //! extension trait the list does not back (e.g.
 //! [`crate::non_fungible::enumerable::NonFungibleEnumerable`] without
@@ -47,7 +47,7 @@ use storage::{ConsecutiveVotes, EnumerableVotes};
 use crate::non_fungible::{
     extensions::{
         burnable::Burnable, consecutive::Consecutive, enumerable::Enumerable, royalties::Royalties,
-        votes::NonFungibleVotes,
+        votes::Votes,
     },
     Base, ContractOverrides,
 };
@@ -70,9 +70,9 @@ pub type Compose<L> = <L as Composable>::Out;
 /// them together does not compile.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a valid contract type combination",
-    note = "valid single contract types: `Base`, `Enumerable`, `Consecutive`, `NonFungibleVotes`",
-    note = "curated combinations: `(Enumerable, NonFungibleVotes)`, `(Consecutive, \
-            NonFungibleVotes)`",
+    note = "valid single contract types: `Base`, `Enumerable`, `Consecutive`, `Votes`",
+    note = "curated combinations: `(Enumerable, Votes)`, `(Consecutive, \
+            Votes)`",
     note = "additive extensions (e.g. `Burnable`, `Royalties`) may be listed alongside a contract \
             type; they do not affect the resolved type",
     note = "lists of up to 5 entries are supported"
@@ -97,7 +97,7 @@ mod fold {
     #[diagnostic::on_unimplemented(
         message = "`{Self}` cannot appear in a `Compose` list",
         note = "valid entries are the contract types (`Base`, `Enumerable`, `Consecutive`, \
-                `NonFungibleVotes`) and the additive extensions (`Burnable`, `Royalties`)"
+                `Votes`) and the additive extensions (`Burnable`, `Royalties`)"
     )]
     pub trait Extension {
         type Contribution;
@@ -138,8 +138,8 @@ impl Extension for Enumerable {
 impl Extension for Consecutive {
     type Contribution = Consecutive;
 }
-impl Extension for NonFungibleVotes {
-    type Contribution = NonFungibleVotes;
+impl Extension for Votes {
+    type Contribution = Votes;
 }
 // Additive extensions contribute nothing.
 impl Extension for Burnable {
@@ -174,11 +174,11 @@ impl Combine<Nil> for Consecutive {
 impl Combine<Consecutive> for Nil {
     type Out = Consecutive;
 }
-impl Combine<Nil> for NonFungibleVotes {
-    type Out = NonFungibleVotes;
+impl Combine<Nil> for Votes {
+    type Out = Votes;
 }
-impl Combine<NonFungibleVotes> for Nil {
-    type Out = NonFungibleVotes;
+impl Combine<Votes> for Nil {
+    type Out = Votes;
 }
 impl Combine<Nil> for EnumerableVotes {
     type Out = EnumerableVotes;
@@ -188,16 +188,16 @@ impl Combine<Nil> for ConsecutiveVotes {
 }
 
 // Curated pairs.
-impl Combine<NonFungibleVotes> for Enumerable {
+impl Combine<Votes> for Enumerable {
     type Out = EnumerableVotes;
 }
-impl Combine<Enumerable> for NonFungibleVotes {
+impl Combine<Enumerable> for Votes {
     type Out = EnumerableVotes;
 }
-impl Combine<NonFungibleVotes> for Consecutive {
+impl Combine<Votes> for Consecutive {
     type Out = ConsecutiveVotes;
 }
-impl Combine<Consecutive> for NonFungibleVotes {
+impl Combine<Consecutive> for Votes {
     type Out = ConsecutiveVotes;
 }
 
@@ -213,8 +213,8 @@ impl Finalize for Enumerable {
 impl Finalize for Consecutive {
     type Out = Consecutive;
 }
-impl Finalize for NonFungibleVotes {
-    type Out = NonFungibleVotes;
+impl Finalize for Votes {
+    type Out = Votes;
 }
 impl Finalize for EnumerableVotes {
     type Out = EnumerableVotes;
@@ -235,8 +235,8 @@ impl Composable for Enumerable {
 impl Composable for Consecutive {
     type Out = Consecutive;
 }
-impl Composable for NonFungibleVotes {
-    type Out = NonFungibleVotes;
+impl Composable for Votes {
+    type Out = Votes;
 }
 impl Composable for Burnable {
     type Out = Base;

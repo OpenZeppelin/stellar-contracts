@@ -50,7 +50,7 @@
 //! next to them in the list, e.g. `Compose<(RWA, TotalSupply)>`, and
 //! [`crate::rwa::RWAToken`] and [`crate::vault::FungibleVault`] require
 //! [`FungibleTotalSupply`] as well.
-//! [`crate::fungible::votes::FungibleVotes`] tracks voting units, which are
+//! [`crate::fungible::votes::Votes`] tracks voting units, which are
 //! not the token supply, so it does not back this extension.
 //!
 //! The supply is stored in its own `persistent` entry, ensuring that mints
@@ -99,7 +99,7 @@ use crate::fungible::FungibleToken;
 /// [`crate::rwa::RWAToken`] and [`crate::vault::FungibleVault`] have it as a
 /// supertrait, so implementing them without it does not compile.
 ///
-/// [`crate::fungible::votes::FungibleVotes`] (alone or combined with the list
+/// [`crate::fungible::votes::Votes`] (alone or combined with the list
 /// policies) tracks voting units rather than the token supply and does not
 /// back this trait.
 ///

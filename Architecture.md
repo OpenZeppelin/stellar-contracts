@@ -149,7 +149,7 @@ impl ContractOverrides for Consecutive {
 Minting is not part of any public trait, because no single `mint` signature
 fits every contract type. The contract type decides what the underlying primitive
 does: `TotalSupply` also increases the supply counter, `Capped` also checks the
-cap, `FungibleVotes` also moves voting units, `Enumerable` also records the token
+cap, `Votes` also moves voting units, `Enumerable` also records the token
 in its enumeration lists, and so on.
 
 The contract's own mint function reaches that primitive through the contract

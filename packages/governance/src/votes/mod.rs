@@ -49,7 +49,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env};
+use soroban_sdk::{contractclient, contracterror, contractevent, Address, Env};
 
 pub use crate::votes::storage::{
     delegate, get_checkpoint, get_delegate, get_total_supply, get_total_supply_at_checkpoint,
@@ -57,19 +57,25 @@ pub use crate::votes::storage::{
     Checkpoint, CheckpointType, VotesStorageKey,
 };
 
-/// Trait for contracts that support vote tracking with delegation.
+/// Body-less client interface for vote tracking with delegation.
 ///
-/// This trait defines the interface for vote tracking functionality.
-/// Contracts implementing this trait can be used in governance systems
-/// that require historical vote queries and delegation.
+/// Token contracts should not implement this trait directly. They expose the
+/// same entry points through the bounded `FungibleVotes` /
+/// `NonFungibleVotes` traits in `stellar-tokens`, which require the matching
+/// `Votes` contract type in `Compose`. Implementing this interface with an
+/// empty body does not compile (there are no defaults).
+///
+/// Non-token voting sources (for example staking contracts) can implement
+/// these methods themselves. The Governor uses [`VotesClient`] to call
+/// [`VotesInterface::get_votes_at_checkpoint`] on the configured token.
 ///
 /// # Implementation Notes
 ///
 /// The implementing contract must:
 /// - Call `transfer_voting_units` on every balance change
 /// - Expose `delegate` functionality to users
-#[contracttrait]
-pub trait Votes {
+#[contractclient(name = "VotesClient")]
+pub trait VotesInterface {
     /// Returns the current voting power (delegated votes) of an account.
     ///
     /// Returns `0` if the account has no delegated voting power or does not
@@ -79,9 +85,7 @@ pub trait Votes {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to query voting power for.
-    fn get_votes(e: &Env, account: Address) -> u128 {
-        storage::get_votes(e, &account)
-    }
+    fn get_votes(e: &Env, account: Address) -> u128;
 
     /// Returns the voting power (delegated votes) of an account at a specific
     /// past ledger sequence number.
@@ -99,9 +103,7 @@ pub trait Votes {
     ///
     /// * [`VotesError::FutureLookup`] - If `ledger` >= current ledger sequence
     ///   number.
-    fn get_votes_at_checkpoint(e: &Env, account: Address, ledger: u32) -> u128 {
-        storage::get_votes_at_checkpoint(e, &account, ledger)
-    }
+    fn get_votes_at_checkpoint(e: &Env, account: Address, ledger: u32) -> u128;
 
     /// Returns the current total supply of voting units.
     ///
@@ -113,9 +115,7 @@ pub trait Votes {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn get_total_supply(e: &Env) -> u128 {
-        storage::get_total_supply(e)
-    }
+    fn get_total_supply(e: &Env) -> u128;
 
     /// Returns the total supply of voting units at a specific past ledger
     /// sequence number.
@@ -134,9 +134,7 @@ pub trait Votes {
     ///
     /// * [`VotesError::FutureLookup`] - If `ledger` >= current ledger sequence
     ///   number.
-    fn get_total_supply_at_checkpoint(e: &Env, ledger: u32) -> u128 {
-        storage::get_total_supply_at_checkpoint(e, ledger)
-    }
+    fn get_total_supply_at_checkpoint(e: &Env, ledger: u32) -> u128;
 
     /// Returns the current delegate for an account.
     ///
@@ -151,10 +149,9 @@ pub trait Votes {
     ///   self-delegated).
     /// * `None` - If the account has never delegated. An account whose delegate
     ///   is `None` has **no active voting power**; it must call
-    ///   [`Votes::delegate`] (even to itself) before its votes are counted.
-    fn get_delegate(e: &Env, account: Address) -> Option<Address> {
-        storage::get_delegate(e, &account)
-    }
+    ///   [`VotesInterface::delegate`] (even to itself) before its votes are
+    ///   counted.
+    fn get_delegate(e: &Env, account: Address) -> Option<Address>;
 
     /// Delegates voting power from `account` to `delegatee`.
     ///
@@ -180,10 +177,9 @@ pub trait Votes {
     /// # Notes
     ///
     /// Authorization for `account` is required.
-    fn delegate(e: &Env, account: Address, delegatee: Address) {
-        storage::delegate(e, &account, &delegatee);
-    }
+    fn delegate(e: &Env, account: Address, delegatee: Address);
 }
+
 // ################## ERRORS ##################
 
 /// Errors that can occur in votes operations.

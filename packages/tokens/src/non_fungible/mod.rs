@@ -111,9 +111,9 @@ pub use utils::sequential;
 ///   [`crate::non_fungible::extensions::consecutive::NonFungibleConsecutive`]
 ///   trait), incompatible with
 ///   [`crate::non_fungible::extensions::enumerable::Enumerable`].
-/// * [`crate::non_fungible::extensions::votes::NonFungibleVotes`] (enabling the
-///   compatibility and overrides for the [`stellar_governance::votes::Votes`]
-///   trait).
+/// * [`crate::non_fungible::extensions::votes::Votes`] (enabling the
+///   compatibility and overrides for the
+///   [`crate::non_fungible::extensions::votes::NonFungibleVotes`] trait).
 ///
 /// The contract type is selected with
 /// [`crate::non_fungible::combinations::Compose`]; invalid combinations are

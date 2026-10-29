@@ -5,6 +5,7 @@ use crate::non_fungible::{
     extensions::{
         consecutive::{Consecutive, ConsecutiveContractType},
         enumerable::{Enumerable, EnumerableContractType},
+        votes::VotesContractType,
     },
     overrides::{
         BurnableOverrides, ContractOverrides, MintOverrides, MintRangeOverrides,
@@ -20,6 +21,7 @@ pub struct EnumerableVotes;
 
 // The combined contract type keeps backing the enumerable extension.
 impl EnumerableContractType for EnumerableVotes {}
+impl VotesContractType for EnumerableVotes {}
 
 impl ContractOverrides for EnumerableVotes {
     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
@@ -99,6 +101,7 @@ pub struct ConsecutiveVotes;
 
 // The combined contract type keeps backing the consecutive extension.
 impl ConsecutiveContractType for ConsecutiveVotes {}
+impl VotesContractType for ConsecutiveVotes {}
 
 impl ContractOverrides for ConsecutiveVotes {
     // Ownership resolution and metadata follow the consecutive bucket model

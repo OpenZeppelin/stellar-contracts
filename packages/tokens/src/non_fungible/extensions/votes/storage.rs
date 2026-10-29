@@ -7,46 +7,54 @@ use crate::non_fungible::{
     Base, ContractOverrides,
 };
 
-pub struct NonFungibleVotes;
+/// Marker for contract types that back the votes extension: transfers, mints
+/// and burns update voting-unit checkpoints.
+pub trait VotesContractType {}
 
-impl ContractOverrides for NonFungibleVotes {
+/// Contract type that tracks voting units on every balance change (1 unit per
+/// NFT).
+pub struct Votes;
+
+impl VotesContractType for Votes {}
+
+impl ContractOverrides for Votes {
     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
-        NonFungibleVotes::transfer(e, from, to, token_id);
+        Votes::transfer(e, from, to, token_id);
     }
 
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
-        NonFungibleVotes::transfer_from(e, spender, from, to, token_id);
+        Votes::transfer_from(e, spender, from, to, token_id);
     }
 }
 
-impl BurnableOverrides for NonFungibleVotes {
+impl BurnableOverrides for Votes {
     fn burn(e: &Env, from: &Address, token_id: u32) {
-        NonFungibleVotes::burn(e, from, token_id);
+        Votes::burn(e, from, token_id);
     }
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
-        NonFungibleVotes::burn_from(e, spender, from, token_id);
+        Votes::burn_from(e, spender, from, token_id);
     }
 }
 
-// Implemented for `NonFungibleVotes`, so that the royalty existence check
-// routes through `NonFungibleVotes`'s `owner_of` (one `Owner` entry per
+// Implemented for `Votes`, so that the royalty existence check
+// routes through `Votes`'s `owner_of` (one `Owner` entry per
 // token).
-impl RoyaltySupport for NonFungibleVotes {}
+impl RoyaltySupport for Votes {}
 
-impl MintWithIdOverrides for NonFungibleVotes {
+impl MintWithIdOverrides for Votes {
     fn mint_with_id(e: &Env, to: &Address, token_id: u32) {
-        NonFungibleVotes::mint_with_id(e, to, token_id);
+        Votes::mint_with_id(e, to, token_id);
     }
 }
 
-impl MintOverrides for NonFungibleVotes {
+impl MintOverrides for Votes {
     fn mint(e: &Env, to: &Address) -> u32 {
-        NonFungibleVotes::mint(e, to)
+        Votes::mint(e, to)
     }
 }
 
-impl NonFungibleVotes {
+impl Votes {
     /// Transfers a non-fungible token from `from` to `to`.
     /// Also updates voting units for the respective delegates (1 unit per NFT).
     ///

@@ -27,7 +27,7 @@
 //! impl FungibleToken for MyToken {
 //!     // resolves to the contract type gating transfers by the allowlist
 //!     // and tracking voting units; `Burnable` is declarative
-//!     type ContractType = Compose<(AllowList, FungibleVotes, Burnable)>;
+//!     type ContractType = Compose<(AllowList, Votes, Burnable)>;
 //! }
 //!
 //! #[contractimpl(contracttrait)]
@@ -36,17 +36,17 @@
 //! }
 //!
 //! #[contractimpl(contracttrait)]
-//! impl Votes for MyToken {}
+//! impl FungibleVotes for MyToken {}
 //!
 //! #[contractimpl(contracttrait)]
 //! impl FungibleBurnable for MyToken {}
 //! ```
 //!
 //! Curated multi-type combinations: [`AllowList`], [`BlockList`] and
-//! [`FungibleVotes`] can be combined with each other, in pairs or all three
+//! [`Votes`] can be combined with each other, in pairs or all three
 //! together, e.g. `Compose<(AllowList, BlockList)>`,
-//! `Compose<(AllowList, FungibleVotes)>` or
-//! `Compose<(AllowList, BlockList, FungibleVotes)>`. [`TotalSupply`] can be
+//! `Compose<(AllowList, Votes)>` or
+//! `Compose<(AllowList, BlockList, Votes)>`. [`TotalSupply`] can be
 //! added to `AllowList`, `BlockList` or both, e.g.
 //! `Compose<(AllowList, TotalSupply)>` or
 //! `Compose<(AllowList, BlockList, TotalSupply)>`. `Capped` can be added to
@@ -57,10 +57,10 @@
 //! `Compose<(RWA, TotalSupply)>`; a list with one of them but without
 //! `TotalSupply` is rejected with a dedicated compile error, as is a list
 //! naming `TotalSupply` twice.
-//! `FungibleVotes` tracks voting units, not the token supply, and has no
+//! `Votes` tracks voting units, not the token supply, and has no
 //! curated combination with `TotalSupply`. The resolved contract type
 //! enforces every listed transfer
-//! policy, tracks voting units when `FungibleVotes` is listed, tracks the
+//! policy, tracks voting units when `Votes` is listed, tracks the
 //! total supply when `TotalSupply` is listed, and backs the corresponding
 //! extension traits. The list is order-insensitive:
 //! `Compose<(BlockList, AllowList)>` resolves to the same contract type as
@@ -85,7 +85,7 @@ use crate::{
     fungible::{
         extensions::{
             allowlist::AllowList, blocklist::BlockList, burnable::Burnable, capped::Capped,
-            total_supply::TotalSupply, votes::FungibleVotes,
+            total_supply::TotalSupply, votes::Votes,
         },
         Base, ContractOverrides,
     },
@@ -96,7 +96,7 @@ use crate::{
 /// Resolves a list of contract types and additive extensions to the combined
 /// contract type, e.g. `Compose<(AllowList,)>` or
 /// `Compose<(AllowList, Burnable)>` (both resolve to `AllowList`), or
-/// `Compose<(AllowList, FungibleVotes)>` (resolving to the curated
+/// `Compose<(AllowList, Votes)>` (resolving to the curated
 /// combination of the two).
 ///
 /// This is shorthand for `<L as Composable>::Out`; refer to [`Composable`] for
@@ -115,9 +115,9 @@ pub type Compose<L> = <L as Composable>::Out;
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a valid contract type combination",
     note = "valid single contract types: `Base`, `AllowList`, `BlockList`, `TotalSupply`, \
-            `FungibleVotes`",
-    note = "curated combinations: `(AllowList, BlockList)`, `(AllowList, FungibleVotes)`, \
-            `(BlockList, FungibleVotes)`, `(AllowList, BlockList, FungibleVotes)`, `(AllowList, \
+            `Votes`",
+    note = "curated combinations: `(AllowList, BlockList)`, `(AllowList, Votes)`, \
+            `(BlockList, Votes)`, `(AllowList, BlockList, Votes)`, `(AllowList, \
             TotalSupply)`, `(BlockList, TotalSupply)`, `(AllowList, BlockList, TotalSupply)`, \
             `(RWA, TotalSupply)`, `(Vault, TotalSupply)`",
     note = "capped combinations: `(Capped, TotalSupply)`, `(AllowList, Capped, TotalSupply)`, \
@@ -148,7 +148,7 @@ mod fold {
     #[diagnostic::on_unimplemented(
         message = "`{Self}` cannot appear in a `Compose` list",
         note = "valid entries are the contract types (`Base`, `AllowList`, `BlockList`, \
-                `TotalSupply`, `RWA`, `Vault`, `FungibleVotes`, `Capped`) and the additive \
+                `TotalSupply`, `RWA`, `Vault`, `Votes`, `Capped`) and the additive \
                 extension `Burnable`"
     )]
     pub trait Extension {
@@ -297,8 +297,8 @@ impl Extension for RWA {
 impl Extension for Vault {
     type Contribution = NeedsSupply<Vault>;
 }
-impl Extension for FungibleVotes {
-    type Contribution = FungibleVotes;
+impl Extension for Votes {
+    type Contribution = Votes;
 }
 // `Capped` is a contract type of its own (its mint checks the cap), and like
 // `RWA` and `Vault` it needs the supply to be tracked, so it opens the same
@@ -355,11 +355,11 @@ impl Combine<Nil> for Vault {
 impl Combine<Vault> for Nil {
     type Out = Vault;
 }
-impl Combine<Nil> for FungibleVotes {
-    type Out = FungibleVotes;
+impl Combine<Nil> for Votes {
+    type Out = Votes;
 }
-impl Combine<FungibleVotes> for Nil {
-    type Out = FungibleVotes;
+impl Combine<Votes> for Nil {
+    type Out = Votes;
 }
 impl Combine<Nil> for AllowBlockList {
     type Out = AllowBlockList;
@@ -411,16 +411,16 @@ impl Combine<BlockList> for AllowList {
 impl Combine<AllowList> for BlockList {
     type Out = AllowBlockList;
 }
-impl Combine<FungibleVotes> for AllowList {
+impl Combine<Votes> for AllowList {
     type Out = AllowListVotes;
 }
-impl Combine<AllowList> for FungibleVotes {
+impl Combine<AllowList> for Votes {
     type Out = AllowListVotes;
 }
-impl Combine<FungibleVotes> for BlockList {
+impl Combine<Votes> for BlockList {
     type Out = BlockListVotes;
 }
-impl Combine<BlockList> for FungibleVotes {
+impl Combine<BlockList> for Votes {
     type Out = BlockListVotes;
 }
 impl Combine<TotalSupply> for AllowList {
@@ -438,7 +438,7 @@ impl Combine<BlockList> for TotalSupply {
 
 // Curated triples: reached from any of their pairs by adding the missing
 // member, so every ordering of the three resolves to the same type.
-impl Combine<FungibleVotes> for AllowBlockList {
+impl Combine<Votes> for AllowBlockList {
     type Out = AllowBlockListVotes;
 }
 impl Combine<BlockList> for AllowListVotes {
@@ -561,8 +561,8 @@ impl<X: Combine<AllowList>> Combine<AllowList> for NeedsSupply<X> {
 impl<X: Combine<BlockList>> Combine<BlockList> for NeedsSupply<X> {
     type Out = NeedsSupply<Pair<X, BlockList>>;
 }
-impl<X: Combine<FungibleVotes>> Combine<FungibleVotes> for NeedsSupply<X> {
-    type Out = NeedsSupply<Pair<X, FungibleVotes>>;
+impl<X: Combine<Votes>> Combine<Votes> for NeedsSupply<X> {
+    type Out = NeedsSupply<Pair<X, Votes>>;
 }
 impl<X: Combine<Y>, Y> Combine<NeedsSupply<Y>> for NeedsSupply<X> {
     type Out = NeedsSupply<Pair<X, Y>>;
@@ -672,11 +672,11 @@ where
 {
     type Out = NeedsSupply<Pair<AllowBlockList, Y>>;
 }
-impl<Y> Combine<NeedsSupply<Y>> for FungibleVotes
+impl<Y> Combine<NeedsSupply<Y>> for Votes
 where
-    FungibleVotes: Combine<Y>,
+    Votes: Combine<Y>,
 {
-    type Out = NeedsSupply<Pair<FungibleVotes, Y>>;
+    type Out = NeedsSupply<Pair<Votes, Y>>;
 }
 impl<Y> Combine<NeedsSupply<Y>> for AllowListVotes
 where
@@ -819,8 +819,8 @@ impl Finalize for RWA {
 impl Finalize for Vault {
     type Out = Vault;
 }
-impl Finalize for FungibleVotes {
-    type Out = FungibleVotes;
+impl Finalize for Votes {
+    type Out = Votes;
 }
 impl Finalize for AllowBlockList {
     type Out = AllowBlockList;
@@ -901,8 +901,8 @@ where
 {
     type Out = Vault;
 }
-impl Composable for FungibleVotes {
-    type Out = FungibleVotes;
+impl Composable for Votes {
+    type Out = Votes;
 }
 impl Composable for Burnable {
     type Out = Base;

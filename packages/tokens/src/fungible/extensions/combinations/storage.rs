@@ -7,7 +7,7 @@ use crate::fungible::{
         blocklist::{BlockList, BlockListContractType},
         capped::{Capped, CappedContractType},
         total_supply::{decrease_total_supply, mint, total_supply, TotalSupplyOverrides},
-        votes::FungibleVotes,
+        votes::{Votes, VotesContractType},
     },
     overrides::{Base, BurnableOverrides, ContractOverrides, MintOverrides},
     FungibleTokenError,
@@ -156,7 +156,7 @@ impl AllowListVotes {
     }
 
     pub fn mint(e: &Env, to: &Address, amount: i128) {
-        FungibleVotes::mint(e, to, amount);
+        Votes::mint(e, to, amount);
     }
 
     pub fn burn(e: &Env, from: &Address, amount: i128) {
@@ -220,7 +220,7 @@ impl BlockListVotes {
     }
 
     pub fn mint(e: &Env, to: &Address, amount: i128) {
-        FungibleVotes::mint(e, to, amount);
+        Votes::mint(e, to, amount);
     }
 
     pub fn burn(e: &Env, from: &Address, amount: i128) {
@@ -284,7 +284,7 @@ impl AllowBlockListVotes {
     }
 
     pub fn mint(e: &Env, to: &Address, amount: i128) {
-        FungibleVotes::mint(e, to, amount);
+        Votes::mint(e, to, amount);
     }
 
     pub fn burn(e: &Env, from: &Address, amount: i128) {
@@ -300,12 +300,15 @@ impl AllowBlockListVotes {
 
 // The combined contract types keep backing their list extensions.
 impl AllowListContractType for AllowListVotes {}
+impl VotesContractType for AllowListVotes {}
 impl BlockListContractType for BlockListVotes {}
+impl VotesContractType for BlockListVotes {}
 impl AllowListContractType for AllowBlockListVotes {}
 impl BlockListContractType for AllowBlockListVotes {}
+impl VotesContractType for AllowBlockListVotes {}
 
 // Voting units mirror balances; a zero amount moves nothing, matching
-// [`FungibleVotes`].
+// [`Votes`].
 fn move_voting_units(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i128) {
     if amount > 0 {
         transfer_voting_units(e, from, to, amount as u128);

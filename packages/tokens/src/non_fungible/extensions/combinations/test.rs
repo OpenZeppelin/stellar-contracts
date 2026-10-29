@@ -12,7 +12,7 @@ use crate::non_fungible::{
         consecutive::Consecutive,
         enumerable::Enumerable,
         royalties::{Royalties, RoyaltySupport},
-        votes::NonFungibleVotes,
+        votes::{Votes, VotesContractType},
     },
     overrides::{
         BurnableOverrides, ContractOverrides, MintOverrides, MintRangeOverrides,
@@ -21,10 +21,10 @@ use crate::non_fungible::{
     Base,
 };
 
-type EnumerableVotes = Compose<(Enumerable, NonFungibleVotes)>;
+type EnumerableVotes = Compose<(Enumerable, Votes)>;
 // deliberately the swapped order, asserting that the list is
 // order-insensitive
-type ConsecutiveVotes = Compose<(NonFungibleVotes, Consecutive)>;
+type ConsecutiveVotes = Compose<(Votes, Consecutive)>;
 
 // Pins every `Composable` mapping: the resolved `Out` type must be exactly the
 // expected contract type. Invalid lists are rejected at compile time and
@@ -43,7 +43,7 @@ fn bare_forms_resolve_to_themselves() {
     assert_composes_to::<Base, Base>();
     assert_composes_to::<Enumerable, Enumerable>();
     assert_composes_to::<Consecutive, Consecutive>();
-    assert_composes_to::<NonFungibleVotes, NonFungibleVotes>();
+    assert_composes_to::<Votes, Votes>();
 }
 
 #[test]
@@ -51,7 +51,7 @@ fn tuple_forms_resolve_to_themselves() {
     assert_composes_to::<(Base,), Base>();
     assert_composes_to::<(Enumerable,), Enumerable>();
     assert_composes_to::<(Consecutive,), Consecutive>();
-    assert_composes_to::<(NonFungibleVotes,), NonFungibleVotes>();
+    assert_composes_to::<(Votes,), Votes>();
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn additive_extensions_are_ignored() {
     assert_composes_to::<(Base, Royalties), Base>();
     // Higher arities, covering every tuple impl.
     assert_composes_to::<(Enumerable, Burnable, Royalties), Enumerable>();
-    assert_composes_to::<(Royalties, NonFungibleVotes, Burnable, Royalties), NonFungibleVotes>();
+    assert_composes_to::<(Royalties, Votes, Burnable, Royalties), Votes>();
     assert_composes_to::<(Burnable, Royalties, Consecutive, Burnable, Royalties), Consecutive>();
 }
 
@@ -77,20 +77,20 @@ fn additive_only_lists_resolve_to_base() {
 #[test]
 fn votes_combinations_are_order_insensitive() {
     assert_eq!(
-        TypeId::of::<Compose<(Enumerable, NonFungibleVotes)>>(),
-        TypeId::of::<Compose<(NonFungibleVotes, Enumerable)>>(),
+        TypeId::of::<Compose<(Enumerable, Votes)>>(),
+        TypeId::of::<Compose<(Votes, Enumerable)>>(),
     );
     assert_eq!(
-        TypeId::of::<Compose<(Consecutive, NonFungibleVotes)>>(),
-        TypeId::of::<Compose<(NonFungibleVotes, Consecutive)>>(),
+        TypeId::of::<Compose<(Consecutive, Votes)>>(),
+        TypeId::of::<Compose<(Votes, Consecutive)>>(),
     );
     // the combined types are distinct from their members
     assert_ne!(TypeId::of::<EnumerableVotes>(), TypeId::of::<Enumerable>());
-    assert_ne!(TypeId::of::<EnumerableVotes>(), TypeId::of::<NonFungibleVotes>());
+    assert_ne!(TypeId::of::<EnumerableVotes>(), TypeId::of::<Votes>());
     assert_ne!(TypeId::of::<ConsecutiveVotes>(), TypeId::of::<Consecutive>());
     // additive markers stay ignored around a curated pair
     assert_eq!(
-        TypeId::of::<Compose<(Enumerable, Burnable, NonFungibleVotes, Royalties)>>(),
+        TypeId::of::<Compose<(Enumerable, Burnable, Votes, Royalties)>>(),
         TypeId::of::<EnumerableVotes>(),
     );
 }
@@ -104,9 +104,19 @@ fn all_contract_types_support_royalties() {
     assert_support::<Base>();
     assert_support::<Enumerable>();
     assert_support::<Consecutive>();
-    assert_support::<NonFungibleVotes>();
+    assert_support::<Votes>();
     assert_support::<EnumerableVotes>();
     assert_support::<ConsecutiveVotes>();
+}
+
+// The votes contract type and its curated combinations have to back
+// `NonFungibleVotes`, so that selecting one of them lets the trait compile.
+#[test]
+fn combinations_back_votes_extension() {
+    fn assert_votes<T: VotesContractType>() {}
+    assert_votes::<Votes>();
+    assert_votes::<EnumerableVotes>();
+    assert_votes::<ConsecutiveVotes>();
 }
 
 #[contract]
@@ -315,7 +325,7 @@ fn contract_types_implement_their_mint_primitives() {
     fn assert_range<T: MintRangeOverrides>() {}
     assert_per_token::<Base>();
     assert_per_token::<Enumerable>();
-    assert_per_token::<NonFungibleVotes>();
+    assert_per_token::<Votes>();
     assert_per_token::<EnumerableVotes>();
     assert_range::<Consecutive>();
     assert_range::<ConsecutiveVotes>();
@@ -415,10 +425,10 @@ fn non_fungible_votes_mint_overrides_move_voting_units() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        mint_with_id_through::<NonFungibleVotes>(&e, &owner, 42);
-        let id = mint_through::<NonFungibleVotes>(&e, &owner);
-        assert_eq!(<NonFungibleVotes as ContractOverrides>::owner_of(&e, 42), owner);
-        assert_eq!(<NonFungibleVotes as ContractOverrides>::owner_of(&e, id), owner);
+        mint_with_id_through::<Votes>(&e, &owner, 42);
+        let id = mint_through::<Votes>(&e, &owner);
+        assert_eq!(<Votes as ContractOverrides>::owner_of(&e, 42), owner);
+        assert_eq!(<Votes as ContractOverrides>::owner_of(&e, id), owner);
         assert_eq!(get_voting_units(&e, &owner), 2);
     });
 }

@@ -100,7 +100,7 @@ impl BurnableOverrides for Base {}
 /// Minting is not part of any public trait, because no single `mint`
 /// signature fits every contract type. The underlying business logic depends on
 /// the contract type: `Base` only updates the balance, `TotalSupply` also
-/// increases the supply counter, `FungibleVotes` also moves voting units,
+/// increases the supply counter, `Votes` also moves voting units,
 /// `Capped` also checks the cap, `RWA` also runs its compliance checks.
 ///
 /// This trait gives that primitive a single dispatch point. The author's
@@ -179,7 +179,7 @@ impl MintOverrides for Base {
 /// Unlike `BurnableOverrides`, there is deliberately no implementation for
 /// [`Base`]: exposing the total supply requires a supply-tracking contract
 /// type. The same holds for the contract types that do not track the supply:
-/// `AllowList`, `BlockList`, `AllowBlockList`, `FungibleVotes` and the votes
+/// `AllowList`, `BlockList`, `AllowBlockList`, `Votes` and the votes
 /// combinations.
 pub trait TotalSupplyOverrides {
     fn total_supply(e: &Env) -> i128 {

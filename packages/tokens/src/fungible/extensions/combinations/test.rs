@@ -17,7 +17,7 @@ use crate::{
             capped::{Capped, CappedContractType},
             combinations::{Composable, Compose},
             total_supply::{mint, total_supply, TotalSupply},
-            votes::FungibleVotes,
+            votes::{Votes, VotesContractType},
         },
         overrides::{BurnableOverrides, MintOverrides, TotalSupplyOverrides},
         Base, ContractOverrides,
@@ -29,9 +29,9 @@ use crate::{
 // deliberately the swapped orders, asserting that the lists are
 // order-insensitive
 type AllowBlockList = Compose<(BlockList, AllowList)>;
-type AllowListVotes = Compose<(FungibleVotes, AllowList)>;
-type BlockListVotes = Compose<(BlockList, FungibleVotes)>;
-type AllowBlockListVotes = Compose<(FungibleVotes, BlockList, AllowList)>;
+type AllowListVotes = Compose<(Votes, AllowList)>;
+type BlockListVotes = Compose<(BlockList, Votes)>;
+type AllowBlockListVotes = Compose<(Votes, BlockList, AllowList)>;
 type TotalSupplyAllowList = Compose<(AllowList, TotalSupply)>;
 type TotalSupplyBlockList = Compose<(TotalSupply, BlockList)>;
 type TotalSupplyAllowBlockList = Compose<(BlockList, TotalSupply, AllowList)>;
@@ -54,7 +54,7 @@ fn bare_forms_resolve_to_themselves() {
     assert_composes_to::<AllowList, AllowList>();
     assert_composes_to::<BlockList, BlockList>();
     assert_composes_to::<TotalSupply, TotalSupply>();
-    assert_composes_to::<FungibleVotes, FungibleVotes>();
+    assert_composes_to::<Votes, Votes>();
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn tuple_forms_resolve_to_themselves() {
     assert_composes_to::<(AllowList,), AllowList>();
     assert_composes_to::<(BlockList,), BlockList>();
     assert_composes_to::<(TotalSupply,), TotalSupply>();
-    assert_composes_to::<(FungibleVotes,), FungibleVotes>();
+    assert_composes_to::<(Votes,), Votes>();
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn additive_extensions_are_ignored() {
     assert_composes_to::<(Vault, TotalSupply, Burnable), Vault>();
     assert_composes_to::<(RWA, Burnable, TotalSupply), RWA>();
     // Higher arities, covering every tuple impl.
-    assert_composes_to::<(Burnable, FungibleVotes, Burnable), FungibleVotes>();
+    assert_composes_to::<(Burnable, Votes, Burnable), Votes>();
     assert_composes_to::<(BlockList, Burnable, Burnable, Burnable), BlockList>();
     assert_composes_to::<(Burnable, Burnable, Base, Burnable, Burnable), Base>();
     // Curated pairs are not disturbed by additive markers either.
@@ -198,7 +198,7 @@ fn free_minting_contract_types_implement_mint_overrides() {
     assert_mint::<TotalSupplyAllowList>();
     assert_mint::<TotalSupplyBlockList>();
     assert_mint::<TotalSupplyAllowBlockList>();
-    assert_mint::<FungibleVotes>();
+    assert_mint::<Votes>();
     assert_mint::<AllowListVotes>();
     assert_mint::<BlockListVotes>();
     assert_mint::<AllowBlockListVotes>();
@@ -227,29 +227,29 @@ fn list_combination_is_order_insensitive() {
 #[test]
 fn votes_combinations_are_order_insensitive() {
     assert_eq!(
-        TypeId::of::<Compose<(AllowList, FungibleVotes)>>(),
-        TypeId::of::<Compose<(FungibleVotes, AllowList)>>(),
+        TypeId::of::<Compose<(AllowList, Votes)>>(),
+        TypeId::of::<Compose<(Votes, AllowList)>>(),
     );
     assert_eq!(
-        TypeId::of::<Compose<(BlockList, FungibleVotes)>>(),
-        TypeId::of::<Compose<(FungibleVotes, BlockList)>>(),
+        TypeId::of::<Compose<(BlockList, Votes)>>(),
+        TypeId::of::<Compose<(Votes, BlockList)>>(),
     );
     // every ordering of the triple resolves to the same type
-    assert_composes_to::<(AllowList, BlockList, FungibleVotes), AllowBlockListVotes>();
-    assert_composes_to::<(AllowList, FungibleVotes, BlockList), AllowBlockListVotes>();
-    assert_composes_to::<(BlockList, AllowList, FungibleVotes), AllowBlockListVotes>();
-    assert_composes_to::<(BlockList, FungibleVotes, AllowList), AllowBlockListVotes>();
-    assert_composes_to::<(FungibleVotes, AllowList, BlockList), AllowBlockListVotes>();
+    assert_composes_to::<(AllowList, BlockList, Votes), AllowBlockListVotes>();
+    assert_composes_to::<(AllowList, Votes, BlockList), AllowBlockListVotes>();
+    assert_composes_to::<(BlockList, AllowList, Votes), AllowBlockListVotes>();
+    assert_composes_to::<(BlockList, Votes, AllowList), AllowBlockListVotes>();
+    assert_composes_to::<(Votes, AllowList, BlockList), AllowBlockListVotes>();
     // the combined types are distinct from their members and from each other
     assert_ne!(TypeId::of::<AllowListVotes>(), TypeId::of::<AllowList>());
-    assert_ne!(TypeId::of::<AllowListVotes>(), TypeId::of::<FungibleVotes>());
+    assert_ne!(TypeId::of::<AllowListVotes>(), TypeId::of::<Votes>());
     assert_ne!(TypeId::of::<BlockListVotes>(), TypeId::of::<BlockList>());
     assert_ne!(TypeId::of::<AllowBlockListVotes>(), TypeId::of::<AllowBlockList>());
     assert_ne!(TypeId::of::<AllowBlockListVotes>(), TypeId::of::<AllowListVotes>());
     // additive markers stay ignored around curated combinations
-    assert_composes_to::<(Burnable, AllowList, FungibleVotes), AllowListVotes>();
+    assert_composes_to::<(Burnable, AllowList, Votes), AllowListVotes>();
     assert_composes_to::<
-        (AllowList, Burnable, BlockList, FungibleVotes, Burnable),
+        (AllowList, Burnable, BlockList, Votes, Burnable),
         AllowBlockListVotes,
     >();
 }
@@ -274,6 +274,19 @@ fn combinations_back_their_list_extensions() {
     assert_allowlist::<TotalSupplyAllowBlockList>();
     assert_blocklist::<TotalSupplyBlockList>();
     assert_blocklist::<TotalSupplyAllowBlockList>();
+}
+
+// The votes contract type and its list combinations have to back
+// `FungibleVotes`, so that selecting one of them lets the trait compile.
+// A missing impl fails here at compile time instead of at some downstream
+// contract's build.
+#[test]
+fn combinations_back_votes_extension() {
+    fn assert_votes<T: VotesContractType>() {}
+    assert_votes::<Votes>();
+    assert_votes::<AllowListVotes>();
+    assert_votes::<BlockListVotes>();
+    assert_votes::<AllowBlockListVotes>();
 }
 
 #[test]
@@ -1407,7 +1420,7 @@ fn mint_overrides_of_votes_types_move_voting_units() {
     let alice = Address::generate(&e);
 
     e.as_contract(&address, || {
-        mint_through::<FungibleVotes>(&e, &alice, 1);
+        mint_through::<Votes>(&e, &alice, 1);
         mint_through::<AllowListVotes>(&e, &alice, 2);
         mint_through::<BlockListVotes>(&e, &alice, 3);
         mint_through::<AllowBlockListVotes>(&e, &alice, 4);

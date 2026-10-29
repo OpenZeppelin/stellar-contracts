@@ -24,10 +24,10 @@
 //!
 //! The [`Governor`] trait does not define how to store, manage, and access
 //! votes. But Governor trait needs to be able to access the voting power of
-//! an account at a specific ledger. [`crate::votes::Votes`] trait is expected
+//! an account at a specific ledger. [`crate::votes::VotesInterface`] trait is expected
 //! to be implemented on a token contract, and the governor contract (which
 //! implements [`Governor`] trait) is expected to call the
-//! [`crate::votes::Votes`] trait methods on the token contract to access the
+//! [`crate::votes::VotesInterface`] trait methods on the token contract to access the
 //! voting power of an account.
 //!
 //! ## Governance Flow
@@ -82,7 +82,7 @@
 //! voting_delay`) is recorded as the voting power snapshot. When voters
 //! cast their votes (at any ledger after `vote_start`), their voting
 //! power is looked up at the `vote_start` ledger using
-//! [`crate::votes::Votes::get_votes_at_checkpoint()`]. Because
+//! [`crate::votes::VotesInterface::get_votes_at_checkpoint()`]. Because
 //! checkpoints record the state **after** all transactions in a ledger
 //! are finalized, a flash loan that borrows and returns tokens within
 //! the same ledger at `vote_start` would show a net-zero balance in the

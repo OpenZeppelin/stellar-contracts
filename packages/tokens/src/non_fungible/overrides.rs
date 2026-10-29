@@ -129,7 +129,7 @@ impl BurnableOverrides for Base {}
 /// }
 /// ```
 ///
-/// Implemented by `Base`, `Enumerable`, `NonFungibleVotes` and their
+/// Implemented by `Base`, `Enumerable`, `Votes` and their
 /// combination. Not implemented by `Consecutive`, which mints ranges instead
 /// (refer to [`MintRangeOverrides`]).
 ///
@@ -138,7 +138,7 @@ impl BurnableOverrides for Base {}
 /// Minting is not part of any public trait, because no single `mint`
 /// signature fits every contract type: what the underlying primitive has to do
 /// depends on the contract type (`Enumerable` also records the token in its
-/// enumeration lists, `NonFungibleVotes` also moves a voting unit, ...). The
+/// enumeration lists, `Votes` also moves a voting unit, ...). The
 /// author's entry point calls `Self::ContractType::mint`, which reaches the
 /// mint of whatever contract type `Compose` resolved to. Calling `Base::mint`
 /// on an `Enumerable` token instead would compile, and silently leave the
@@ -146,7 +146,7 @@ impl BurnableOverrides for Base {}
 ///
 /// The primitives a contract type offers depend on how it stores ownership:
 ///
-/// - `Base`, `Enumerable`, `NonFungibleVotes`, `EnumerableVotes` store one
+/// - `Base`, `Enumerable`, `Votes`, `EnumerableVotes` store one
 ///   owner per token: `mint(to) -> u32` mints the next id of the sequential
 ///   counter and returns it, and `mint_with_id(to, token_id)` mints an id
 ///   chosen by the caller.
@@ -203,7 +203,7 @@ pub trait MintOverrides {
 /// }
 /// ```
 ///
-/// Implemented by `Base`, `Enumerable`, `NonFungibleVotes` and their
+/// Implemented by `Base`, `Enumerable`, `Votes` and their
 /// combination. Not implemented by `Consecutive`, whose ownership is stored
 /// per batch and which only mints ranges (refer to [`MintRangeOverrides`]).
 pub trait MintWithIdOverrides {
