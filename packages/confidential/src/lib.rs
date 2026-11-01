@@ -441,8 +441,8 @@ pub trait ConfidentialToken {
     ///   account so its spending key is available for the `dvk` escrow ECDH.
     /// * `live_until_ledger` - The ledger number at which the delegation
     ///   expires. Spending is authorized while `ledger.sequence() <=
-    ///   live_until_ledger`. The escrowed value persists until
-    ///   [`ConfidentialToken::revoke_spender`].
+    ///   live_until_ledger`. Must not be lower than the current ledger. The
+    ///   escrowed value persists until [`ConfidentialToken::revoke_spender`].
     /// * `data` - XDR-encoded [`SetSpenderData`].
     ///
     /// # Errors
@@ -596,6 +596,10 @@ pub enum ConfidentialTokenError {
     /// boundary to keep stored state and emitted events byte-unique per
     /// logical value.
     NonCanonicalEncoding = 3514,
+    /// Indicates `live_until_ledger` is already in the past
+    /// (`live_until_ledger < ledger.sequence()`), so the delegation would be
+    /// expired on creation.
+    InvalidLiveUntilLedger = 3515,
 }
 
 // ################## CONSTANTS ##################
