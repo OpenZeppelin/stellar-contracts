@@ -19,7 +19,7 @@ Balances are Pedersen commitments on Grumpkin. Every operation that opens or re-
 
 ## Errors
 
-`ConfidentialTokenError` occupies **3500–3510**. The root guide's range list predates this module and omits it. Stay in the 3500s; do not open a new range for the satellites.
+`ConfidentialTokenError` occupies **3500–3599**. The root guide's range list predates this module and omits it. Stay in the 3500s; do not open a new range for the satellites.
 
 ## Canonical encoding is a security boundary
 

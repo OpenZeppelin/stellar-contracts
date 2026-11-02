@@ -841,7 +841,8 @@ pub fn confidential_transfer_from(
 ///   account so its spending key is available for the `dvk` escrow ECDH.
 /// * `live_until_ledger` - The ledger number at which the delegation expires.
 ///   Spending is authorized while `ledger.sequence() <= live_until_ledger`.
-///   Must not be lower than the current ledger.
+///   Must not be lower than the current ledger
+///   (`docs/protocol/account-state.md#live_until_ledger`).
 /// * `payload` - The decoded [`SetSpenderPayload`].
 /// * `proof` - The raw UltraHonk proof bytes.
 ///
