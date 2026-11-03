@@ -83,7 +83,8 @@ pub fn mul_div_floor(x: &I256, y: &I256, denominator: &I256) -> I256 {
     match x.checked_mul(y) {
         Some(r) => div_floor(&r, denominator),
         // Reaching `None` means either the true result does not fit `I256`, or
-        // `|denominator|` is above the `2^128` ceiling described in the module docs.
+        // `|denominator|` is above the `2^128` ceiling described in the module
+        // docs.
         None => checked_mul_div_decomposed(x, y, denominator, Rounding::Floor)
             .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow)),
     }
