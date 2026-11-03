@@ -878,8 +878,8 @@ pub fn set_spender(
     payload: &SetSpenderPayload,
     proof: &Bytes,
 ) {
-    // Same bounds as the fungible `set_allowance`, checked before any external
-    // call or proof verification.
+    // Same bounds as the fungible `set_allowance`, checked before the account
+    // lookups, the auditor call and proof verification.
     if live_until_ledger < e.ledger().sequence()
         || live_until_ledger > e.ledger().max_live_until_ledger()
     {
