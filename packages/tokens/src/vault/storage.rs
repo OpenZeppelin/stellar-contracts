@@ -492,10 +492,16 @@ impl Vault {
     /// deposit, depositing this amount can pay up to one share's worth of
     /// assets more than the shares it mints cost (refer to the rounding notes
     /// on [`Vault`]); [`Self::preview_mint()`] of [`Self::max_mint`] is the
-    /// exact cost of the remaining shares. Returns `0` when the vault's totals
-    /// are too
-    /// large for any deposit to succeed: `deposit` computes `total_assets + 1`
-    /// and `total_supply + 10^offset`, and panics when either overflows.
+    /// exact cost of the remaining shares.
+    ///
+    /// Returns `0` exactly when no positive deposit would be accepted:
+    ///
+    /// * when [`Self::max_mint`] is `0`,
+    /// * when even a deposit of 1 asset would mint more than [`Self::max_mint`]
+    ///   shares, or
+    /// * when the vault's totals are too large: `deposit` computes
+    ///   `total_assets + 1` and `total_supply + 10^offset`, and panics when
+    ///   either overflows.
     ///
     /// # Arguments
     ///
@@ -1288,10 +1294,16 @@ impl Vault {
     /// which report a limit instead of failing. A positive result always
     /// mints at least one share, so `deposit` accepts it.
     ///
-    /// Returns `0` for `shares == 0`, and also when `total_assets + 1` or
-    /// `total_supply + 10^offset` overflows: `deposit` computes these same two
-    /// sums and panics when they overflow, so no deposit is possible in that
-    /// state. Returns `i128::MAX` when the largest amount does not fit in an
+    /// Returns `0` exactly when no positive deposit would be accepted:
+    ///
+    /// * for `shares == 0`,
+    /// * when even a deposit of 1 asset would mint more than `shares` shares,
+    ///   or
+    /// * when `total_assets + 1` or `total_supply + 10^offset` overflows:
+    ///   `deposit` computes these same two sums and panics when they overflow,
+    ///   so no deposit is possible in that state.
+    ///
+    /// Returns `i128::MAX` when the largest amount does not fit in an
     /// `i128`: a deposit cannot pay more than `i128::MAX` assets, and
     /// depositing `i128::MAX` still mints at most `shares` shares.
     ///
