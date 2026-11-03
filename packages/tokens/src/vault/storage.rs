@@ -200,7 +200,10 @@ impl CappedVault {
     /// The remaining shares ([`CappedVault::max_mint`]) are converted to
     /// assets rounding down, so depositing this amount never mints more shares
     /// than the cap allows. The edge cases are those of
-    /// [`Vault::max_deposit`].
+    /// [`Vault::max_deposit`]: in particular, when one share is left under the
+    /// cap and its price in assets is not a whole number, this returns `0`,
+    /// because the rounded-down amount would mint zero shares. That last share
+    /// can still be minted with [`CappedVault::mint`].
     ///
     /// # Arguments
     ///
@@ -487,6 +490,9 @@ impl Vault {
     /// than the vault accepts. Returns `0` when the vault's totals are too
     /// large for any deposit to succeed: `deposit` computes `total_assets +
     /// 1` and `total_supply + 10^offset`, and panics when either overflows.
+    /// Also returns `0` when the rounded-down amount would mint zero shares,
+    /// which `deposit` rejects. This can only happen when a single share is
+    /// left to mint.
     ///
     /// # Arguments
     ///
@@ -1286,6 +1292,12 @@ impl Vault {
     /// `i128::MAX` assets can pay for); the fallback only keeps this view
     /// panic-free.
     ///
+    /// Also returns `0` when the rounded-down amount would mint zero shares,
+    /// which `deposit` rejects with [`VaultTokenError::VaultZeroShares`]. This
+    /// happens when `shares == 1` and one share costs a non-whole number of
+    /// asset base units above one: the amount is then rounded down below the
+    /// price of that share.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
@@ -1302,7 +1314,14 @@ impl Vault {
         ) else {
             return 0;
         };
-        checked_mul_div_with_rounding(e, shares, y, denominator, Rounding::Floor)
-            .unwrap_or(i128::MAX)
+        let assets = checked_mul_div_with_rounding(e, shares, y, denominator, Rounding::Floor)
+            .unwrap_or(i128::MAX);
+        // `deposit` rejects a positive amount that mints zero shares. Rounding
+        // down lands on such an amount when one share is left and a share
+        // costs a non-whole number of assets, so no deposit fits.
+        if checked_mul_div_with_rounding(e, assets, denominator, y, Rounding::Floor) == Some(0) {
+            return 0;
+        }
+        assets
     }
 }

@@ -1217,6 +1217,51 @@ fn capped_vault_max_deposit_never_overshoots_the_cap() {
     });
 }
 
+// With one share left under the cap and a share price that is not a whole
+// number, rounding down lands below the price of that share. Such an amount
+// would mint zero shares, which `deposit` rejects, so `max_deposit` reports
+// `0`, and the last share is minted through `mint` instead.
+#[test]
+fn capped_vault_max_deposit_is_zero_when_it_would_mint_zero_shares() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 101);
+        <CappedVault as VaultOverrides>::deposit(
+            &e,
+            100,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+    });
+    // donation: 150 assets back 100 shares, one share costs 151 / 101 assets
+    asset_client.mint(&vault_address, &50);
+
+    e.as_contract(&vault_address, || {
+        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), 1);
+        // floor(151 / 101) = 1 asset would mint floor(101 / 151) = 0 shares
+        assert_eq!(Vault::preview_deposit(&e, 1), 0);
+        assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), 0);
+
+        let assets = <CappedVault as VaultOverrides>::mint(
+            &e,
+            1,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+        // ceil(151 / 101)
+        assert_eq!(assets, 2);
+        assert_eq!(total_supply(&e), 101);
+    });
+}
+
 // The cap may be lowered below the current supply (refer to `set_cap`); the
 // limits then report zero instead of a negative amount.
 #[test]
