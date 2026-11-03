@@ -185,8 +185,8 @@ impl CustomAccountInterface for TimelockController {
                     if get_role_member_count(&e, &EXECUTOR_ROLE) != 0 {
                         // Check the role and the authorization of the executor
                         let args_for_auth = (
-                            // adding an additional symbol argument so that intention for the
-                            // authorizer is more explicit
+                            // adding an additional symbol argument so that
+                            // intention for the authorizer is more explicit
                             Symbol::new(&e, "execute_op"),
                             contract.clone(),
                             fn_name.clone(),
