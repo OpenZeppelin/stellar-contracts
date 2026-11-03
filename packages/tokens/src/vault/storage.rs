@@ -200,9 +200,9 @@ impl CappedVault {
     /// This is the largest amount whose deposit mints at most the remaining
     /// shares ([`CappedVault::max_mint`]), computed as in
     /// [`Vault::max_deposit`]: depositing it never mints more shares than the
-    /// cap allows, and never zero, and unless it is `i128::MAX`, depositing
-    /// one more asset would exceed the cap. The edge cases are those of
-    /// [`Vault::max_deposit`].
+    /// cap allows, and when it is positive, depositing it mints at least one
+    /// share. Unless it is `i128::MAX`, depositing one more asset would
+    /// exceed the cap. The edge cases are those of [`Vault::max_deposit`].
     ///
     /// # Arguments
     ///
@@ -487,12 +487,13 @@ impl Vault {
     ///
     /// This is the largest amount whose deposit mints at most the number of
     /// shares [`Self::max_mint`] returns: depositing it never mints more
-    /// shares than the vault accepts, and never zero, and unless it is
-    /// `i128::MAX`, depositing one more asset would mint more. As with any
-    /// deposit, depositing this amount can pay up to one share's worth of
-    /// assets more than the shares it mints cost (refer to the rounding notes
-    /// on [`Vault`]); [`Self::preview_mint()`] of [`Self::max_mint`] is the
-    /// exact cost of the remaining shares.
+    /// shares than the vault accepts, and when it is positive, depositing it
+    /// mints at least one share. Unless it is `i128::MAX`, depositing one more
+    /// asset would mint more. As with any deposit, depositing this amount can
+    /// pay up to one share's worth of assets more than the shares it mints
+    /// cost (refer to the rounding notes on [`Vault`]);
+    /// [`Self::preview_mint()`] of [`Self::max_mint`] is the exact cost of the
+    /// remaining shares.
     ///
     /// Returns `0` exactly when no positive deposit would be accepted:
     ///
