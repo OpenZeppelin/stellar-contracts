@@ -197,13 +197,12 @@ impl CappedVault {
     /// Returns the amount of underlying assets that can still be deposited
     /// before the cap is reached, and never more than [`Vault::max_deposit`].
     ///
-    /// The remaining shares ([`CappedVault::max_mint`]) are converted to
-    /// assets rounding down, so depositing this amount never mints more shares
-    /// than the cap allows. The edge cases are those of
-    /// [`Vault::max_deposit`]: in particular, when one share is left under the
-    /// cap and its price in assets is not a whole number, this returns `0`,
-    /// because the rounded-down amount would mint zero shares. That last share
-    /// can still be minted with [`CappedVault::mint`].
+    /// This is the largest amount whose deposit mints at most the remaining
+    /// shares ([`CappedVault::max_mint`]), computed as in
+    /// [`Vault::max_deposit`]: depositing it never mints more shares than the
+    /// cap allows, and never zero, and unless it is `i128::MAX`, depositing
+    /// one more asset would exceed the cap. The edge cases are those of
+    /// [`Vault::max_deposit`].
     ///
     /// # Arguments
     ///
@@ -216,7 +215,8 @@ impl CappedVault {
     /// * refer to [`Vault::max_mint`] errors.
     pub fn max_deposit(e: &Env, receiver: Address) -> i128 {
         // `CappedVault::max_mint` is never above `Vault::max_mint`, and the
-        // conversion is monotonic, so this is never above `Vault::max_deposit`.
+        // largest amount minting at most a number of shares grows with that
+        // number, so this is never above `Vault::max_deposit`.
         Vault::max_assets_for_shares(e, CappedVault::max_mint(e, receiver))
     }
 
@@ -485,14 +485,17 @@ impl Vault {
     /// Returns the maximum amount of underlying assets that can be deposited
     /// for the given receiver address.
     ///
-    /// This is the number of shares [`Self::max_mint`] returns, converted to
-    /// assets rounding down, so depositing this amount never mints more shares
-    /// than the vault accepts. Returns `0` when the vault's totals are too
-    /// large for any deposit to succeed: `deposit` computes `total_assets +
-    /// 1` and `total_supply + 10^offset`, and panics when either overflows.
-    /// Also returns `0` when the rounded-down amount would mint zero shares,
-    /// which `deposit` rejects. This can only happen when a single share is
-    /// left to mint.
+    /// This is the largest amount whose deposit mints at most the number of
+    /// shares [`Self::max_mint`] returns: depositing it never mints more
+    /// shares than the vault accepts, and never zero, and unless it is
+    /// `i128::MAX`, depositing one more asset would mint more. As with any
+    /// deposit, depositing this amount can pay up to one share's worth of
+    /// assets more than the shares it mints cost (refer to the rounding notes
+    /// on [`Vault`]); [`Self::preview_mint()`] of [`Self::max_mint`] is the
+    /// exact cost of the remaining shares. Returns `0` when the vault's totals
+    /// are too
+    /// large for any deposit to succeed: `deposit` computes `total_assets + 1`
+    /// and `total_supply + 10^offset`, and panics when either overflows.
     ///
     /// # Arguments
     ///
@@ -723,8 +726,8 @@ impl Vault {
         // Checking `assets` against `max_deposit` would enforce the same
         // limit, but `max_deposit` reads `total_assets` again, after
         // `preview_deposit` already read it above. Depositing exactly
-        // `max_deposit` still passes this check, because `max_deposit` is
-        // rounded down.
+        // `max_deposit` still passes this check, because `max_deposit` is the
+        // largest amount that mints at most `max_mint` shares.
         if shares > Self::max_mint_under_supply_bound(e) {
             panic_with_error!(e, VaultTokenError::VaultExceededMaxDeposit);
         }
@@ -1280,23 +1283,17 @@ impl Vault {
         (i128::MAX - virtual_shares - Self::total_supply(e)).max(0)
     }
 
-    /// Converts `shares` to assets rounding down, like
-    /// [`Self::convert_to_assets()`], but never panics: this backs the
-    /// `max_deposit` views, which report a limit instead of failing.
+    /// Returns the largest amount of assets whose deposit mints at most
+    /// `shares` shares, and never panics: this backs the `max_deposit` views,
+    /// which report a limit instead of failing. A positive result always
+    /// mints at least one share, so `deposit` accepts it.
     ///
     /// Returns `0` for `shares == 0`, and also when `total_assets + 1` or
     /// `total_supply + 10^offset` overflows: `deposit` computes these same two
     /// sums and panics when they overflow, so no deposit is possible in that
-    /// state. Returns `i128::MAX` when only the final conversion overflows,
-    /// which [`Self::max_mint()`] rules out (it never exceeds the shares
-    /// `i128::MAX` assets can pay for); the fallback only keeps this view
-    /// panic-free.
-    ///
-    /// Also returns `0` when the rounded-down amount would mint zero shares,
-    /// which `deposit` rejects with [`VaultTokenError::VaultZeroShares`]. This
-    /// happens when `shares == 1` and one share costs a non-whole number of
-    /// asset base units above one: the amount is then rounded down below the
-    /// price of that share.
+    /// state. Returns `i128::MAX` when the largest amount does not fit in an
+    /// `i128`: a deposit cannot pay more than `i128::MAX` assets, and
+    /// depositing `i128::MAX` still mints at most `shares` shares.
     ///
     /// # Arguments
     ///
@@ -1306,7 +1303,16 @@ impl Vault {
         if shares <= 0 {
             return 0;
         }
-        let (Some(y), Some(denominator)) = (
+
+        // `effective_assets` is the vault's asset balance plus 1.
+        // `effective_supply` is the number of shares that exist plus
+        // `10^offset`. The added 1 and `10^offset` are virtual: nobody owns
+        // them. They make the inflation attack expensive, and keep the price
+        // defined when the vault is empty.
+        //
+        // If either sum overflows, `deposit` panics, so no
+        // deposit is possible.
+        let (Some(effective_assets), Some(effective_supply)) = (
             Self::total_assets(e).checked_add(1),
             10_i128
                 .checked_pow(Self::get_decimals_offset(e))
@@ -1314,14 +1320,110 @@ impl Vault {
         ) else {
             return 0;
         };
-        let assets = checked_mul_div_with_rounding(e, shares, y, denominator, Rounding::Floor)
-            .unwrap_or(i128::MAX);
-        // `deposit` rejects a positive amount that mints zero shares. Rounding
-        // down lands on such an amount when one share is left and a share
-        // costs a non-whole number of assets, so no deposit fits.
-        if checked_mul_div_with_rounding(e, assets, denominator, y, Rounding::Floor) == Some(0) {
-            return 0;
-        }
-        assets
+
+        // # The largest deposit that `deposit` accepts
+        //
+        // `M` is the amount returned here. Let
+        // `P = effective_assets / effective_supply`, the price of one share in
+        // assets. Depositing `a` assets mints `floor(a / P)` shares, and
+        // `deposit` accepts it only if:
+        //
+        // * it mints at most `shares` shares (the limit), and
+        // * it mints at least one share, when `a > 0` (a positive deposit that
+        //   mints zero shares is rejected with `VaultZeroShares`).
+        //
+        // ## Depositing `M` mints at most `shares` shares
+        //
+        // A deposit only mints whole shares: depositing `a` assets mints
+        // `a / P` shares with the fraction dropped.
+        //
+        // So the limit is exceeded only when a deposit pays the full cost of
+        // `shares + 1` shares, which is `(shares + 1) * P`. Every deposit below
+        // that cost mints at most `shares` shares.
+        //
+        // `M` is therefore the largest whole amount below `(shares + 1) * P`.
+        // When that cost has a fraction, `M` should be the cost rounded down
+        // (2.99 gives 2). When the cost is whole, `M` should be one
+        // less (3 gives 2). In both cases, the cost can be rounded up,
+        // and then minus one: `ceil((shares + 1) * P) - 1`, which is
+        // what this function returns.
+        //
+        // For example, with one share left and a price of 1.495 assets: two
+        // shares cost 2.99 assets. Rounding up gives 3, and minus one makes
+        // `M = 2`. Depositing 2 assets mints 1 share.
+        //
+        // ## Depositing `M`, when positive, mints at least one share
+        //
+        // `deposit` rejects a positive deposit that mints zero shares, so a
+        // positive `M` has to pay at least the price of one share. Here
+        // `shares` is at least one, as `shares <= 0` already returned early.
+        //
+        // There are two cases, depending on the price of one share:
+        //
+        // ### Case 1 (trivial): one share costs less than one asset (`P < 1`)
+        //
+        // Even the smallest positive `M`, which is 1 asset, is already more
+        // than the price of one share. So any positive `M` pays for at least
+        // one share. For example, with a share price of 0.55 assets, 1 asset
+        // pays for one share.
+        //
+        // ### Case 2: one share costs one asset or more (`P >= 1`)
+        //
+        // * Let `C = (shares + 1) * P`, the cost of `shares + 1` shares. `M` is
+        //   `C` rounded up, minus one, so `M` is at most one asset below `C`.
+        // * `shares + 1` is at least two, so `C` is at least the price of two
+        //   shares.
+        // * One asset is no more than the price of one share. So going at most
+        //   one asset below `C` still leaves at least the price of one share.
+        //
+        // So `M` pays for at least one share. For example, with one share left
+        // and a price of 1.495 assets: `C = 2 * 1.495 = 2.99`, and `M = 2` is
+        // still more than the 1.495 that one share costs.
+        //
+        // ## Examples
+        //
+        // * `P = 151 / 101 ~ 1.495`, one share left: `M = ceil(2.99) - 1 = 2`.
+        //   Depositing 2 mints 1 share, depositing 3 mints 2. Rounding the cost
+        //   of one share down instead gives 1, which mints 0 shares.
+        // * `P = 61 / 110 ~ 0.55`, one share left: `M = ceil(1.11) - 1 = 1`.
+        //   Depositing 1 mints 1 share, depositing 2 mints 3. Rounding the cost
+        //   of one share down instead gives 0, although 1 is accepted.
+        // * `P = 1 / 10`, two shares left: `M = ceil(0.3) - 1 = 0`. The
+        //   smallest deposit, 1 asset, already mints 10 shares.
+        //
+        // ## Overflow
+        //
+        // `shares + 1` does not overflow for the two callers. `shares` is at
+        // most `Vault::max_mint` (`CappedVault::max_mint` never exceeds it),
+        // which is at most `i128::MAX - 10^offset - total_supply`. As
+        // `10^offset` is at least 1 and `total_supply` is not negative, that is
+        // at most `i128::MAX - 1`.
+        //
+        // The addition still saturates, so this view keeps its promise not to
+        // panic even if a future caller passes `i128::MAX`. A plain `+` would
+        // panic there, as overflow checks are on. Saturating also gives a
+        // correct result in that case: the sum stays at `i128::MAX`, so the
+        // result is the largest deposit minting at most `i128::MAX - 1` shares,
+        // which is still within the limit.
+        //
+        // `amount - 1` does not underflow, so it does not need to saturate.
+        // `shares + 1` is at least 2, `effective_assets` is at least 1 (the
+        // vault's asset balance is a token balance, never negative), and
+        // `effective_supply` is at least 1. So the rounded-up cost `amount` is
+        // at least 1, and `amount - 1` is at least `0`.
+        //
+        // When the cost of `shares + 1` shares does not fit in an `i128`, it is
+        // above `i128::MAX`, so a deposit of `i128::MAX` is below it and mints
+        // at most `shares` shares. It also mints at least one, as
+        // `P <= effective_assets <= i128::MAX`. So `i128::MAX`, the largest
+        // amount a deposit can pay, is returned.
+        checked_mul_div_with_rounding(
+            e,
+            shares.saturating_add(1),
+            effective_assets,
+            effective_supply,
+            Rounding::Ceil,
+        )
+        .map_or(i128::MAX, |amount| amount - 1)
     }
 }

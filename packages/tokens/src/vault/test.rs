@@ -7,7 +7,7 @@ use soroban_sdk::{
 use crate::{
     fungible::{
         capped::{Capped, FungibleCapped},
-        total_supply::{total_supply, FungibleTotalSupply, TotalSupply},
+        total_supply::{total_supply, FungibleTotalSupply, TotalSupply, TotalSupplyStorageKey},
         Base, Compose, ContractOverrides, FungibleToken, FungibleTokenError,
     },
     vault::{
@@ -1032,8 +1032,12 @@ fn max_mint_is_limited_by_what_i128_max_assets_can_pay() {
         assert!(max_shares < i128::MAX - 1 - 100);
         // paying for the reported shares fits in an `i128`
         assert!(Vault::preview_mint(&e, max_shares) > i128::MAX - 201);
-        // and `max_deposit` converts back to at most what they cost
-        assert!(Vault::max_deposit(&e, user.clone()) <= Vault::preview_mint(&e, max_shares));
+        // the largest deposit minting at most those shares does not fit in an
+        // `i128`, so `max_deposit` is the most a deposit can pay, and
+        // depositing it mints exactly the reported shares
+        let max_assets = Vault::max_deposit(&e, user.clone());
+        assert_eq!(max_assets, i128::MAX);
+        assert_eq!(Vault::preview_deposit(&e, max_assets), max_shares);
     });
 }
 
@@ -1178,88 +1182,220 @@ fn capped_vault_limits_follow_the_decimals_offset() {
     });
 }
 
-// At a share price that is not a whole number, the reported `max_deposit` is
-// rounded down, so depositing it never mints past the cap.
+// A capped vault holding `supply` shares and `assets` assets, with no cap yet
+// (`i128::MAX`): the shares are minted into an empty vault, and the rest of
+// the assets is donated.
+fn capped_vault_with(e: &Env, admin: &Address, offset: u32, supply: i128, assets: i128) -> Address {
+    let asset_address = create_asset_contract(e, 1_000_000, admin);
+    let vault_address = create_vault_contract(e, &asset_address, offset);
+    e.mock_all_auths();
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(e, i128::MAX);
+        if supply > 0 {
+            <CappedVault as VaultOverrides>::mint(
+                e,
+                supply,
+                admin.clone(),
+                admin.clone(),
+                admin.clone(),
+            );
+        }
+    });
+    let held = e.as_contract(&vault_address, || Vault::total_assets(e));
+    MockAssetContractClient::new(e, &asset_address).mint(&vault_address, &(assets - held));
+    e.as_contract(&vault_address, || {
+        assert_eq!(total_supply(e), supply);
+        assert_eq!(Vault::total_assets(e), assets);
+    });
+    vault_address
+}
+
+// Price above one asset, not a whole number (1_334 / 1_001 ~ 1.333): the
+// largest deposit minting at most the 1_000 remaining shares is
+// `ceil(1_001 * 1_334 / 1_001) - 1 = 1_333`, and depositing it fills the cap.
 #[test]
-fn capped_vault_max_deposit_never_overshoots_the_cap() {
+fn capped_vault_max_deposit_fills_the_cap() {
     let e = Env::default();
     let admin = Address::generate(&e);
-    let asset_address = create_asset_contract(&e, 10_000, &admin);
-    let asset_client = MockAssetContractClient::new(&e, &asset_address);
-    let vault_address = create_vault_contract(&e, &asset_address, 0);
-    e.mock_all_auths();
+    let vault_address = capped_vault_with(&e, &admin, 0, 1_000, 1_333);
 
     e.as_contract(&vault_address, || {
         Capped::set_cap(&e, 2_000);
-        <CappedVault as VaultOverrides>::deposit(
-            &e,
-            1_000,
-            admin.clone(),
-            admin.clone(),
-            admin.clone(),
-        );
-    });
-    // donation: 1_333 assets back 1_000 shares
-    asset_client.mint(&vault_address, &333);
-
-    e.as_contract(&vault_address, || {
         let max_assets = <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
-        // floor(1_000 * 1_334 / 1_001)
-        assert_eq!(max_assets, 1_332);
-        <CappedVault as VaultOverrides>::deposit(
+        assert_eq!(max_assets, 1_333);
+        // rounding the cost down (1_332) would leave a share unminted
+        assert_eq!(Vault::preview_deposit(&e, 1_332), 999);
+        // one more asset mints past the cap
+        assert_eq!(Vault::preview_deposit(&e, max_assets + 1), 1_001);
+
+        let shares = <CappedVault as VaultOverrides>::deposit(
             &e,
             max_assets,
             admin.clone(),
             admin.clone(),
             admin.clone(),
         );
-        assert!(total_supply(&e) <= 2_000);
+        assert_eq!(shares, 1_000);
+        assert_eq!(total_supply(&e), 2_000);
+        assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), 0);
     });
 }
 
-// With one share left under the cap and a share price that is not a whole
-// number, rounding down lands below the price of that share. Such an amount
-// would mint zero shares, which `deposit` rejects, so `max_deposit` reports
-// `0`, and the last share is minted through `mint` instead.
+// One share left at a price above one asset (151 / 101 ~ 1.495): rounding the
+// cost of that share down gives 1, which mints zero shares and is rejected.
+// The largest accepted deposit is `ceil(2 * 151 / 101) - 1 = 2`.
 #[test]
-fn capped_vault_max_deposit_is_zero_when_it_would_mint_zero_shares() {
+fn capped_vault_max_deposit_mints_the_last_share() {
     let e = Env::default();
     let admin = Address::generate(&e);
-    let asset_address = create_asset_contract(&e, 1_000, &admin);
-    let asset_client = MockAssetContractClient::new(&e, &asset_address);
-    let vault_address = create_vault_contract(&e, &asset_address, 0);
-    e.mock_all_auths();
+    let vault_address = capped_vault_with(&e, &admin, 0, 100, 150);
 
     e.as_contract(&vault_address, || {
         Capped::set_cap(&e, 101);
-        <CappedVault as VaultOverrides>::deposit(
-            &e,
-            100,
-            admin.clone(),
-            admin.clone(),
-            admin.clone(),
-        );
-    });
-    // donation: 150 assets back 100 shares, one share costs 151 / 101 assets
-    asset_client.mint(&vault_address, &50);
-
-    e.as_contract(&vault_address, || {
-        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), 1);
-        // floor(151 / 101) = 1 asset would mint floor(101 / 151) = 0 shares
         assert_eq!(Vault::preview_deposit(&e, 1), 0);
-        assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), 0);
+        let max_assets = <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+        assert_eq!(max_assets, 2);
+        assert_eq!(Vault::preview_deposit(&e, max_assets + 1), 2);
 
-        let assets = <CappedVault as VaultOverrides>::mint(
+        let shares = <CappedVault as VaultOverrides>::deposit(
             &e,
-            1,
+            max_assets,
             admin.clone(),
             admin.clone(),
             admin.clone(),
         );
-        // ceil(151 / 101)
-        assert_eq!(assets, 2);
+        assert_eq!(shares, 1);
         assert_eq!(total_supply(&e), 101);
     });
+}
+
+// Pins that the limit above is tight through `deposit` itself.
+#[test]
+#[should_panic(expected = "Error(Contract, #106)")]
+fn capped_vault_deposit_one_asset_above_max_deposit_exceeds_the_cap() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let vault_address = capped_vault_with(&e, &admin, 0, 100, 150);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 101);
+        let max_assets = <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+        <CappedVault as VaultOverrides>::deposit(
+            &e,
+            max_assets + 1,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+    });
+}
+
+// One share left at a price below one asset (61 / 110 ~ 0.55): rounding the
+// cost of that share down gives 0, although depositing 1 asset mints exactly
+// the last share. The largest accepted deposit is `ceil(2 * 61 / 110) - 1 = 1`.
+#[test]
+fn capped_vault_max_deposit_below_one_asset_per_share() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let vault_address = capped_vault_with(&e, &admin, 1, 100, 60);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 101);
+        let max_assets = <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+        assert_eq!(max_assets, 1);
+        assert_eq!(Vault::preview_deposit(&e, max_assets + 1), 3);
+
+        let shares = <CappedVault as VaultOverrides>::deposit(
+            &e,
+            max_assets,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+        assert_eq!(shares, 1);
+        assert_eq!(total_supply(&e), 101);
+    });
+}
+
+// Below one asset per share, the smallest deposit can already mint past the
+// cap: an empty vault with offset 1 mints 10 shares for 1 asset, and the cap
+// allows 2, so no deposit fits.
+#[test]
+fn capped_vault_max_deposit_is_zero_when_one_asset_mints_past_the_cap() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let vault_address = capped_vault_with(&e, &admin, 1, 0, 0);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 2);
+        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), 2);
+        assert_eq!(Vault::preview_deposit(&e, 1), 10);
+        assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), 0);
+    });
+}
+
+// At a whole price of 10 assets with one share left, every deposit from 10 to
+// 19 assets mints that share, so `max_deposit` is 19 (`2 * 10 - 1`), not the
+// cost of the share. The extra assets stay in the vault, as with any deposit.
+#[test]
+fn capped_vault_max_deposit_can_exceed_the_cost_of_the_remaining_shares() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    // empty supply, 9 assets: one share costs 10 / 1
+    let vault_address = capped_vault_with(&e, &admin, 0, 0, 9);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 1);
+        assert_eq!(Vault::preview_mint(&e, 1), 10);
+        let max_assets = <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+        assert_eq!(max_assets, 19);
+        assert_eq!(Vault::preview_deposit(&e, max_assets + 1), 2);
+
+        let shares = <CappedVault as VaultOverrides>::deposit(
+            &e,
+            max_assets,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+        assert_eq!(shares, 1);
+        assert_eq!(total_supply(&e), 1);
+    });
+}
+
+// Sweeps small vault states through the real conversion: in each one,
+// depositing `max_deposit` must mint at most the remaining shares and, when
+// positive, at least one, and one more asset must mint past the cap.
+#[test]
+fn capped_vault_max_deposit_is_the_largest_accepted_deposit() {
+    let e = Env::default();
+    e.cost_estimate().budget().reset_unlimited();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 0, &admin);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+
+    for offset in 0..=2u32 {
+        let vault_address = create_vault_contract(&e, &asset_address, offset);
+        for supply in 0..12i128 {
+            for assets in 0..20i128 {
+                let held = e.as_contract(&vault_address, || Vault::total_assets(&e));
+                asset_client.mint(&vault_address, &(assets - held));
+                e.as_contract(&vault_address, || {
+                    e.storage().persistent().set(&TotalSupplyStorageKey::TotalSupply, &supply);
+                    for left in 1..=6i128 {
+                        Capped::set_cap(&e, supply + left);
+                        let max_assets =
+                            <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+                        let minted = Vault::preview_deposit(&e, max_assets);
+                        let state = (offset, supply, assets, left, max_assets);
+                        assert!(minted <= left, "{state:?}");
+                        assert!(max_assets == 0 || minted >= 1, "{state:?}");
+                        assert!(Vault::preview_deposit(&e, max_assets + 1) > left, "{state:?}");
+                    }
+                });
+            }
+        }
+    }
 }
 
 // The cap may be lowered below the current supply (refer to `set_cap`); the
@@ -1289,7 +1425,8 @@ fn capped_vault_limits_are_zero_above_the_cap() {
 
 // A cap far above anything the vault can reach, with a share price high
 // enough that the remaining shares cost more than `i128::MAX` assets: the
-// views must not panic, and report the shares `i128::MAX` assets can pay for.
+// views must not panic. `max_mint` reports the shares `i128::MAX` assets can
+// pay for, and `max_deposit` reports `i128::MAX`, which mints exactly those.
 #[test]
 fn capped_vault_max_deposit_does_not_overflow() {
     let e = Env::default();
@@ -1305,10 +1442,9 @@ fn capped_vault_max_deposit_does_not_overflow() {
         // offset 0, empty supply: floor(i128::MAX * 1 / (10^30 + 1))
         let max_shares = i128::MAX / (assets + 1);
         assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), max_shares);
-        assert_eq!(
-            <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()),
-            max_shares * (assets + 1)
-        );
+        let max_assets = <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+        assert_eq!(max_assets, i128::MAX);
+        assert_eq!(Vault::preview_deposit(&e, max_assets), max_shares);
     });
 }
 

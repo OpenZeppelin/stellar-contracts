@@ -126,11 +126,10 @@ pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: Vault
     /// Returns the maximum amount of underlying assets that can be deposited
     /// for the given receiver address.
     ///
-    /// This is `max_mint` converted to assets rounding down, so
-    /// depositing this amount never mints more shares than the vault accepts.
-    /// Returns `0` when the vault's totals are too large for any deposit to
-    /// succeed, and when the rounded-down amount would mint zero shares (only
-    /// possible with a single share left to mint).
+    /// This is the largest amount whose deposit mints at most `max_mint`
+    /// shares: depositing it never mints more shares than the vault accepts,
+    /// and never zero. Returns `0` when the vault's totals are too large for
+    /// any deposit to succeed.
     ///
     /// # Arguments
     ///
