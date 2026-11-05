@@ -50,7 +50,10 @@ pub enum FeeAbstractionApproval {
 /// * `fee_token` - The token address to pay the fee with.
 /// * `fee_amount` - The actual fee amount to charge.
 /// * `max_fee_amount` - The maximum fee amount the user approved.
-/// * `expiration_ledger` - The ledger sequence at which the approval expires.
+/// * `expiration_ledger` - The ledger sequence at which a new approval expires.
+///   Rejected if in the past: by the fee token's `approve` when an approval is
+///   made, and by [`validate_expiration_ledger`] when `Lazy` reuses the
+///   existing allowance.
 /// * `target_contract` - The contract address to invoke.
 /// * `target_fn` - The function to invoke on the target contract.
 /// * `target_args` - The arguments to pass to the target contract function.
@@ -156,8 +159,9 @@ pub fn collect_fee_and_invoke(
 /// * `fee_amount` - The actual fee amount to charge.
 /// * `max_fee_amount` - The maximum fee amount the user approved.
 /// * `expiration_ledger` - The ledger sequence at which a new approval expires.
-///   Rejected if in the past, including when `Lazy` reuses the existing
-///   allowance without approving.
+///   Rejected if in the past: by the fee token's `approve` when an approval is
+///   made, and by [`validate_expiration_ledger`] when `Lazy` reuses the
+///   existing allowance.
 /// * `user` - The address of the user paying the fee.
 /// * `fee_recipient` - The address that receives the collected fee.
 /// * `approval` - The approval strategy to use (`Lazy` or `Eager`).
