@@ -841,11 +841,15 @@ pub fn confidential_transfer_from(
 ///   account so its spending key is available for the `dvk` escrow ECDH.
 /// * `live_until_ledger` - The ledger number at which the delegation expires.
 ///   Spending is authorized while `ledger.sequence() <= live_until_ledger`.
+///   Must be between the current ledger and `max_live_until_ledger`, inclusive.
 /// * `payload` - The decoded [`SetSpenderPayload`].
 /// * `proof` - The raw UltraHonk proof bytes.
 ///
 /// # Errors
 ///
+/// * [`ConfidentialTokenError::InvalidLiveUntilLedger`] - When
+///   `live_until_ledger` is lower than the current ledger sequence or greater
+///   than `max_live_until_ledger`.
 /// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` or
 ///   `spender` is not registered.
 /// * [`ConfidentialTokenError::DelegationAlreadyExists`] - When a delegation
@@ -874,6 +878,14 @@ pub fn set_spender(
     payload: &SetSpenderPayload,
     proof: &Bytes,
 ) {
+    // Same bounds as the fungible `set_allowance`, checked before the account
+    // lookups, the auditor call and proof verification.
+    if live_until_ledger < e.ledger().sequence()
+        || live_until_ledger > e.ledger().max_live_until_ledger()
+    {
+        panic_with_error!(e, ConfidentialTokenError::InvalidLiveUntilLedger);
+    }
+
     let owner = get_account(e, account);
     let spender_account = get_account(e, spender);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
