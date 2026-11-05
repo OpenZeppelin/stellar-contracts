@@ -6,7 +6,7 @@ user_invocable: true
 
 # Release
 
-Publishing the GitHub release `v<X.Y.Z>` creates the tag, and the tag triggers `.github/workflows/publish-crates.yml`, which publishes every crate to crates.io (skipped for `-rc.` tags). A published crate can only be yanked, never deleted. No release branch is needed, except for a patch on an older version line.
+Publishing the GitHub release `v<X.Y.Z>` creates the tag, and the tag triggers `.github/workflows/publish-crates.yml`, which publishes the crates it lists to crates.io (skipped for `-rc.` tags). A published crate can only be yanked, never deleted. No release branch is needed, except for a patch on an older version line.
 
 ## Rules
 
@@ -48,7 +48,11 @@ Ask for: the new version (`-rc.N` means RC), the release line (`main`, or a patc
 
 ### 1–3. Prepare the release PR
 
-On a new branch from `PREFLIGHT_SHA`: follow `version-bump` for steps 1–2. Step 3: copy the PDF into `audits/`, matching the naming pattern already used there; skip if there's no report or it's an unaudited RC. Open the PR.
+On a new branch from `PREFLIGHT_SHA`: follow `version-bump` for steps 1–2. Step 3: copy the PDF into `audits/`, matching the naming pattern already used there; skip if there's no report or it's an unaudited RC.
+
+If a package is new, or about to be published for the first time, add it to `publish-crates.yml`: a publish step after the crates it depends on, and a dry-run step (or a `# Skipped:` note if it depends on unpublished workspace versions). Ask the user which packages should be published.
+
+Open the PR.
 
 ### 4. Update the docs site
 

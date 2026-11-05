@@ -20,7 +20,7 @@ Steps 1–2 of `/release`; also runnable on its own. Ask for the new version, an
 
 ## 3. Lockfiles
 
-`cargo build` at the root, and `cargo build --manifest-path bench/rwa-batch/Cargo.toml`. Never regenerate a lockfile from scratch.
+`cargo build` at the root, then `cargo build --manifest-path <crate>/Cargo.toml` for `bench/rwa-batch` and `examples/rwa/sign-claim`. Never regenerate a lockfile from scratch.
 
 ## 4. Verify
 
@@ -29,4 +29,4 @@ grep -rn '"=OLD"' --include='*.md' .
 grep -rnE 'version = "=?OLD"' --include=Cargo.toml . | grep -v /target/   # review hits: third-party deps may match
 ```
 
-Both `Cargo.lock` files show up in `git diff`.
+All `Cargo.lock` files show up in `git diff`.
