@@ -23,7 +23,7 @@ fn consecutive_transfer_override_works() {
     let client = create_client(&e, &owner);
 
     e.mock_all_auths();
-    client.batch_mint(&owner, &100);
+    client.mint_range(&owner, &100);
     client.transfer(&owner, &recipient, &10);
     assert_eq!(client.balance(&owner), 99);
     assert_eq!(client.balance(&recipient), 1);
@@ -31,15 +31,15 @@ fn consecutive_transfer_override_works() {
 }
 
 #[test]
-fn consecutive_batch_mint_works() {
+fn consecutive_mint_range_works() {
     let e = Env::default();
     let owner = Address::generate(&e);
     let client = create_client(&e, &owner);
     e.mock_all_auths();
-    client.batch_mint(&owner, &100);
+    client.mint_range(&owner, &100);
     client.burn(&owner, &0);
     assert_eq!(client.balance(&owner), 99);
-    client.batch_mint(&owner, &100);
+    client.mint_range(&owner, &100);
     assert_eq!(client.owner_of(&101), owner);
 }
 
@@ -49,7 +49,7 @@ fn consecutive_burn_works() {
     let owner = Address::generate(&e);
     let client = create_client(&e, &owner);
     e.mock_all_auths();
-    client.batch_mint(&owner, &100);
+    client.mint_range(&owner, &100);
     client.burn(&owner, &0);
     assert_eq!(client.balance(&owner), 99);
 }
@@ -60,7 +60,7 @@ fn consecutive_burn_override_works() {
     let owner = Address::generate(&e);
     let client = create_client(&e, &owner);
     e.mock_all_auths();
-    client.batch_mint(&owner, &100);
+    client.mint_range(&owner, &100);
     assert_eq!(client.owner_of(&50), owner);
     client.burn(&owner, &50);
     assert_eq!(client.balance(&owner), 99);
@@ -76,7 +76,7 @@ fn consecutive_burn_from_override_works() {
     let spender = Address::generate(&e);
     let client = create_client(&e, &owner);
     e.mock_all_auths();
-    client.batch_mint(&owner, &100);
+    client.mint_range(&owner, &100);
     client.approve(&owner, &spender, &50, &1000);
     client.burn_from(&spender, &owner, &50);
     assert_eq!(client.balance(&owner), 99);

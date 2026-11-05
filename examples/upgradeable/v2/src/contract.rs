@@ -1,28 +1,27 @@
-/// The contract in "v1" needs to be upgraded with this one. It demonstrates a
-/// realistic storage migration: the `Config` struct gains a new `active` field,
-/// so the `migrate()` function reads the old format, converts it, and writes
-/// back in the new format. A schema version guard prevents double invocation.
+/// The token from "v1", built with the current library. It shows the storage
+/// migration required when upgrading a token built with `stellar-tokens`
+/// v0.7.x or older.
+///
+/// Up to v0.7.x, `Base` tracked the total supply in `instance` storage. The
+/// current `Base` no longer tracks it: the opt-in `TotalSupply` contract type
+/// does, in a `persistent` entry. Right after the upgrade, that entry does not
+/// exist yet, so `total_supply()` returns `0` and burning panics, as the
+/// burned amount exceeds the recorded supply. `migrate()` moves the stored
+/// supply to its new place.
+///
+/// Balances, allowances, metadata, roles and the rest of the stored data keep
+/// their layout and need no migration.
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol, Vec,
+    contract, contractimpl, Address, BytesN, Env, MuxedAddress, String, Symbol, Vec,
 };
 use stellar_access::access_control::AccessControl;
 use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
 use stellar_macros::only_role;
-
-/// The old config type — field names and types must match what v1 stored.
-#[contracttype]
-pub struct ConfigV1 {
-    pub rate: u32,
-}
-
-/// The new config type with an additional field.
-#[contracttype]
-pub struct Config {
-    pub rate: u32,
-    pub active: bool,
-}
-
-pub const CONFIG_KEY: Symbol = symbol_short!("CONFIG");
+use stellar_tokens::fungible::{
+    burnable::FungibleBurnable,
+    total_supply::{migrate_total_supply, FungibleTotalSupply, TotalSupply},
+    Compose, FungibleToken,
+};
 
 #[contract]
 pub struct ExampleContract;
@@ -37,29 +36,38 @@ impl Upgradeable for ExampleContract {
 
 #[contractimpl]
 impl ExampleContract {
-    /// Migrates instance storage from v1 to v2 format. Reads the old `Config`
-    /// (single `rate` field), converts it to the new shape (with `active`
-    /// defaulting to `true`), and writes it back. A schema version prevents
-    /// this from running twice.
+    /// Moves the total supply from its v0.7.x `instance` entry to the
+    /// `persistent` entry read by the `TotalSupply` contract type. A schema
+    /// version prevents this from running twice.
+    ///
+    /// Tokens minted between the upgrade and this call stay accounted for,
+    /// but burns in that window panic, so upgrading and migrating in the same
+    /// transaction (see the "upgrader" example) is preferable.
     #[only_role(operator, "migrator")]
     pub fn migrate(e: &Env, operator: Address) {
         assert!(upgradeable::get_schema_version(e) < 2, "already migrated");
 
-        let old: ConfigV1 = e.storage().instance().get(&CONFIG_KEY).unwrap();
-        let new = Config { rate: old.rate, active: true };
-        e.storage().instance().set(&CONFIG_KEY, &new);
-
+        migrate_total_supply(e);
         upgradeable::set_schema_version(e, 2);
     }
 
-    pub fn get_rate(e: &Env) -> u32 {
-        e.storage().instance().get::<_, Config>(&CONFIG_KEY).unwrap().rate
-    }
-
-    pub fn is_active(e: &Env) -> bool {
-        e.storage().instance().get::<_, Config>(&CONFIG_KEY).unwrap().active
+    #[only_role(caller, "minter")]
+    pub fn mint(e: &Env, to: Address, amount: i128, caller: Address) {
+        // Routed through the contract type so the total supply is tracked.
+        <Self as FungibleToken>::ContractType::mint(e, &to, amount);
     }
 }
+
+#[contractimpl(contracttrait)]
+impl FungibleToken for ExampleContract {
+    type ContractType = Compose<(TotalSupply,)>;
+}
+
+#[contractimpl(contracttrait)]
+impl FungibleTotalSupply for ExampleContract {}
+
+#[contractimpl(contracttrait)]
+impl FungibleBurnable for ExampleContract {}
 
 #[contractimpl(contracttrait)]
 impl AccessControl for ExampleContract {}

@@ -6,7 +6,8 @@ use crate::non_fungible::{
     burnable::emit_burn,
     emit_transfer,
     extensions::consecutive::emit_consecutive_mint,
-    overrides::BurnableOverrides,
+    overrides::{BurnableOverrides, MintRangeOverrides},
+    royalties::RoyaltySupport,
     sequential::{self as sequential},
     Base, ContractOverrides, NonFungibleTokenError, OWNERSHIP_EXTEND_AMOUNT,
     OWNERSHIP_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT,
@@ -15,6 +16,16 @@ use crate::non_fungible::{
 
 pub struct Consecutive;
 
+/// Marker for the contract types backing the
+/// [`crate::non_fungible::consecutive::NonFungibleConsecutive`] trait:
+/// [`Consecutive`] itself and the curated combinations that include it.
+/// Contract authors never interact with this trait; it only appears as the
+/// bound enforcing that the selected `ContractType` follows the consecutive
+/// accounting model.
+pub trait ConsecutiveContractType {}
+
+impl ConsecutiveContractType for Consecutive {}
+
 impl ContractOverrides for Consecutive {
     fn owner_of(e: &Env, token_id: u32) -> Address {
         Consecutive::owner_of(e, token_id)
@@ -22,6 +33,10 @@ impl ContractOverrides for Consecutive {
 
     fn token_uri(e: &Env, token_id: u32) -> String {
         Consecutive::token_uri(e, token_id)
+    }
+
+    fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
+        Consecutive::get_approved(e, token_id)
     }
 
     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
@@ -53,6 +68,17 @@ impl BurnableOverrides for Consecutive {
     }
 }
 
+// Implemented for `Consecutive`, so that the royalty existence check routes
+// through `Consecutive`'s `owner_of` (sparse, bucket-based ownership)
+// instead of `Base`'s direct entry lookup.
+impl RoyaltySupport for Consecutive {}
+
+impl MintRangeOverrides for Consecutive {
+    fn mint_range(e: &Env, to: &Address, amount: u32) -> u32 {
+        Consecutive::mint_range(e, to, amount)
+    }
+}
+
 /// For 32,000 total IDs with ITEM of type u32 and 100 items per bucket:
 ///
 /// Bucket 0
@@ -76,7 +102,7 @@ pub const IDS_IN_ITEM: usize = mem::size_of::<u32>() * 8; // 32
 /// Total number of IDs in the whole bucket
 pub const IDS_IN_BUCKET: usize = ITEMS_IN_BUCKET * IDS_IN_ITEM; // 3,200
 /// Max. amount of tokens allowed to be minted at once in
-/// [`Consecutive::batch_mint`]
+/// [`Consecutive::mint_range`]
 pub const MAX_TOKENS_IN_BATCH: usize = 32_000; // 10 buckets * 100 items * 32
 
 /// Storage keys for the data associated with the consecutive extension of
@@ -146,6 +172,61 @@ impl Consecutive {
             .unwrap_or_else(|| panic_with_error!(&e, NonFungibleTokenError::NonExistentToken))
     }
 
+    /// Returns the address approved for the specified token, following the
+    /// consecutive ownership model.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `token_id` - The identifier of the token to check approval for.
+    ///
+    /// # Errors
+    ///
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
+    ///   exist.
+    pub fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
+        let is_burned =
+            Consecutive::get_persistent_entry(e, &NFTConsecutiveStorageKey::BurnedToken(token_id))
+                .unwrap_or(false);
+        if is_burned || token_id >= sequential::next_token_id(e) {
+            panic_with_error!(e, NonFungibleTokenError::NonExistentToken);
+        }
+
+        // `Base::get_approved` would check existence through `Base::owner_of`,
+        // which doesn't see consecutive ownership, so the approval entry is
+        // read directly.
+        Base::get_approval_entry(e, token_id)
+    }
+
+    /// Low-level function for checking if the `spender` has enough approval
+    /// prior a transfer, without checking ownership of `token_id` and
+    /// without handling authorization. Same as
+    /// [`Base::check_spender_approval`], except that the token's existence is
+    /// checked through [`Consecutive::get_approved`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `spender` - The address attempting to transfer the token.
+    /// * `owner` - The address of the current token owner.
+    /// * `token_id` - The identifier of the token to be transferred.
+    ///
+    /// # Errors
+    ///
+    /// * [`NonFungibleTokenError::InsufficientApproval`] - If the `spender`
+    ///   doesn't have enough approval.
+    /// * refer to [`Consecutive::get_approved`] errors.
+    pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: u32) {
+        // If `spender` is not the owner, they must have explicit approval.
+        let is_spender_owner = spender == owner;
+        let is_spender_approved = Consecutive::get_approved(e, token_id) == Some(spender.clone());
+        let has_spender_approval_for_all = Base::is_approved_for_all(e, owner, spender);
+
+        if !is_spender_owner && !is_spender_approved && !has_spender_approval_for_all {
+            panic_with_error!(e, NonFungibleTokenError::InsufficientApproval);
+        }
+    }
+
     /// Returns the URI for a specific `token_id`.
     ///
     /// # Arguments
@@ -200,18 +281,18 @@ impl Consecutive {
     /// must be implemented in the calling function. For example:
     ///
     /// ```ignore,rust
-    /// fn mint_batch(e: &Env, to: &Address, amount: u32) {
+    /// fn mint_range(e: &Env, to: &Address, amount: u32) {
     ///     // 1. Verify admin has minting privileges (optional)
     ///     let admin = e.storage().instance().get(&ADMIN_KEY).unwrap();
     ///     admin.require_auth();
     ///
     ///     // 2. Only then call the actual mint function
-    ///     Consecutive::batch_mint(e, &to, amount);
+    ///     Consecutive::mint_range(e, &to, amount);
     /// }
     /// ```
     ///
     /// Failure to add proper authorization could allow anyone to mint tokens.
-    pub fn batch_mint(e: &Env, to: &Address, amount: u32) -> u32 {
+    pub fn mint_range(e: &Env, to: &Address, amount: u32) -> u32 {
         if amount == 0 || amount > MAX_TOKENS_IN_BATCH as u32 {
             panic_with_error!(&e, NonFungibleTokenError::InvalidAmount);
         }
@@ -271,7 +352,7 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::check_spender_approval`] errors.
+    /// * refer to [`Consecutive::check_spender_approval`] errors.
     /// * refer to [`Consecutive::update`] errors.
     ///
     /// # Events
@@ -285,7 +366,7 @@ impl Consecutive {
     pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
         spender.require_auth();
 
-        Base::check_spender_approval(e, spender, from, token_id);
+        Consecutive::check_spender_approval(e, spender, from, token_id);
 
         Consecutive::update(e, Some(from), None, token_id);
         emit_burn(e, from, token_id);
@@ -334,7 +415,7 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::check_spender_approval`] errors.
+    /// * refer to [`Consecutive::check_spender_approval`] errors.
     /// * refer to [`Consecutive::update`] errors.
     ///
     /// # Events
@@ -350,7 +431,7 @@ impl Consecutive {
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
         spender.require_auth();
 
-        Base::check_spender_approval(e, spender, from, token_id);
+        Consecutive::check_spender_approval(e, spender, from, token_id);
 
         Consecutive::update(e, Some(from), Some(to), token_id);
         emit_transfer(e, from, to, token_id);
@@ -538,7 +619,7 @@ impl Consecutive {
         let mut item = bucket.get(item_index).expect("token_id out of allowed range");
 
         // return early if the bit was already set in a previous action
-        // (transfer, burn or batch_mint)
+        // (transfer, burn or mint_range)
         if item & mask != 0 {
             return;
         }

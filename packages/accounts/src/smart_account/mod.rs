@@ -11,6 +11,11 @@
 //! - **External**: A public key paired with a verifier contract for custom
 //!   cryptographic verification (e.g., secp256r1, passkeys).
 //!
+//! Both kinds commit to an [`AuthDigestPreimage`] that binds the smart account
+//! address, the host `signature_payload`, and the selected `context_rule_ids`.
+//! External signers sign its SHA-256 digest. Delegated signers authorize the
+//! preimage itself through `require_auth_for_args`.
+//!
 //! ### Context Rules - Scope and Routing
 //! - A context rule binds a set of signers and policies to a specific operation
 //!   scope (`Default`, `CallContract(Address)`, or
@@ -121,16 +126,18 @@ mod storage;
 #[cfg(test)]
 mod test;
 use soroban_sdk::{
-    auth::CustomAccountInterface, contracterror, contractevent, contracttrait, Address, Env, Map,
-    String, Symbol, Val, Vec,
+    auth::CustomAccountInterface, contracterror, contractevent, contracttrait, Address, BytesN,
+    Env, Map, String, Symbol, Val, Vec,
 };
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, batch_add_signer, do_check_auth,
-    get_context_rule, get_context_rules_count, get_validated_context_by_id, remove_context_rule,
-    remove_policy, remove_signer, update_context_rule_name, update_context_rule_valid_until,
-    validate_context_rule_name, validate_no_canonical_duplicates, validate_signer_key_size,
-    validate_signers_and_policies, AuthPayload, ContextRule, ContextRuleEntry, ContextRuleType,
-    Signer, SmartAccountStorageKey,
+    get_context_rule, get_context_rules_count, get_policy_id, get_signer_id,
+    get_validated_context_by_id, remove_context_rule, remove_policy, remove_signer,
+    update_context_rule_name, update_context_rule_valid_until, validate_context_rule_name,
+    validate_no_canonical_duplicates, validate_no_delegated_context_contract,
+    validate_no_self_delegation, validate_signer_key_size, validate_signers_and_policies,
+    AuthDigestPreimage, AuthPayload, ContextRule, ContextRuleEntry, ContextRuleType, Signer,
+    SmartAccountStorageKey,
 };
 
 /// Core trait for smart account functionality, extending Soroban's
@@ -143,6 +150,11 @@ pub use storage::{
 pub trait SmartAccount: CustomAccountInterface {
     /// Retrieves the number of all context rules, including expired rules.
     /// Defaults to 0.
+    ///
+    /// A count of 0 means the account cannot authorize anything, including
+    /// adding a rule back. A non-zero count does not rule this out either,
+    /// since the remaining rules may all be expired or scoped to other
+    /// contracts (refer to [`SmartAccount::remove_context_rule`]).
     ///
     /// # Arguments
     ///
@@ -198,6 +210,21 @@ pub trait SmartAccount: CustomAccountInterface {
         storage::get_policy_id(e, &policy)
     }
 
+    /// Computes the digest that [`Signer::External`] signers sign for
+    /// `preimage`, that is `sha256(preimage.to_xdr())`. A pure helper for
+    /// off-chain clients: simulating it verifies a locally computed digest
+    /// before any signature is collected, and it exposes
+    /// [`AuthDigestPreimage`] in the contract spec so generated bindings can
+    /// encode the value that [`Signer::Delegated`] signers authorize.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `preimage` - The structured message that signers commit to.
+    fn auth_digest(e: &Env, preimage: AuthDigestPreimage) -> BytesN<32> {
+        preimage.digest(e)
+    }
+
     /// Creates a new context rule with the specified configuration, returning
     /// the newly created `ContextRule` with a unique ID assigned. Installs
     /// all specified policies during creation.
@@ -231,6 +258,7 @@ pub trait SmartAccount: CustomAccountInterface {
     /// * topics - `["context_rule_added", context_rule_id: u32]`
     /// * data - `[name: String, context_type: ContextRuleType, valid_until:
     ///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]`
+    ///   (`valid_until` is left out of the data when it is `None`)
     ///
     /// # Notes
     ///
@@ -271,7 +299,8 @@ pub trait SmartAccount: CustomAccountInterface {
     /// # Events
     ///
     /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
-    /// * data - `[name: String, valid_until: Option<u32>]`
+    /// * data - `[name: String, valid_until: Option<u32>]` (`valid_until` is
+    ///   left out of the data when it is `None`)
     ///
     /// # Notes
     ///
@@ -303,13 +332,22 @@ pub trait SmartAccount: CustomAccountInterface {
     /// # Events
     ///
     /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
-    /// * data - `[name: String, valid_until: Option<u32>]`
+    /// * data - `[name: String, valid_until: Option<u32>]` (`valid_until` is
+    ///   left out of the data when it is `None`)
     ///
     /// # Notes
     ///
     /// Defaults to requiring authorization from the smart account itself
     /// (`e.current_contract_address().require_auth()`) and then delegating to
     /// [`storage::update_context_rule_valid_until`].
+    ///
+    /// The library does not stop the account from giving an expiry to the last
+    /// context rule that can authorize calls to the account itself (a
+    /// `Default` rule, or a `CallContract` rule for the account's own
+    /// address). Every management function, including
+    /// [`SmartAccount::add_context_rule`], needs such a rule, so once none
+    /// is valid the account is locked permanently. Refer to the caveats in
+    /// the package README.
     fn update_context_rule_valid_until(
         e: &Env,
         context_rule_id: u32,
@@ -343,6 +381,13 @@ pub trait SmartAccount: CustomAccountInterface {
     /// Defaults to requiring authorization from the smart account itself
     /// (`e.current_contract_address().require_auth()`) and then delegating to
     /// [`storage::remove_context_rule`].
+    ///
+    /// The library does not stop the account from removing the last context
+    /// rule that can authorize calls to the account itself (a `Default` rule,
+    /// or a `CallContract` rule for the account's own address). Every
+    /// management function, including [`SmartAccount::add_context_rule`],
+    /// needs such a rule, so once none is valid the account is locked
+    /// permanently. Refer to the caveats in the package README.
     fn remove_context_rule(e: &Env, context_rule_id: u32) {
         e.current_contract_address().require_auth();
         storage::remove_context_rule(e, context_rule_id);
@@ -574,6 +619,11 @@ pub enum SmartAccountError {
     NameTooLong = 3015,
     /// A signer in `AuthPayload` is not part of any selected context rule.
     UnauthorizedSigner = 3016,
+    /// A delegated signer's address is the contract of a context being
+    /// authorized.
+    DelegatedSignerIsContextContract = 3017,
+    /// A delegated signer's address is the smart account itself.
+    SelfDelegatedSigner = 3018,
 }
 
 // ################## EVENTS ##################
@@ -607,7 +657,8 @@ pub struct ContextRuleAdded {
 ///
 /// * topics - `["context_rule_added", context_rule_id: u32]`
 /// * data - `[name: String, context_type: ContextRuleType, valid_until:
-///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]`
+///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]` (`valid_until`
+///   is left out of the data when it is `None`)
 pub fn emit_context_rule_added(
     e: &Env,
     context_rule_id: u32,
@@ -651,7 +702,8 @@ pub struct ContextRuleMetaUpdated {
 /// # Events
 ///
 /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
-/// * data - `[name: String, valid_until: Option<u32>]`
+/// * data - `[name: String, valid_until: Option<u32>]` (`valid_until` is left
+///   out of the data when it is `None`)
 pub fn emit_context_rule_meta_updated(
     e: &Env,
     context_rule_id: u32,

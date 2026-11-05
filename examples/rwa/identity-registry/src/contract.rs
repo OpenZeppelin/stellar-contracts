@@ -40,7 +40,7 @@ impl TokenBinder for IdentityRegistryContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl IdentityRegistryStorage for IdentityRegistryContract {
     #[only_role(operator, "manager")]
     fn add_identity(
@@ -56,6 +56,30 @@ impl IdentityRegistryStorage for IdentityRegistryContract {
             &identity,
             IdentityType::Individual,
             &Vec::from_iter(e, initial_profiles.iter().map(|p| CountryData::from_val(e, &p))),
+        );
+    }
+
+    #[only_role(operator, "manager")]
+    fn batch_add_identity(
+        e: &Env,
+        accounts: Vec<Address>,
+        identities: Vec<Address>,
+        initial_profiles: Vec<Vec<Val>>,
+        operator: Address,
+    ) {
+        let country_data_lists = Vec::from_iter(
+            e,
+            initial_profiles.iter().map(|profiles| {
+                Vec::from_iter(e, profiles.iter().map(|p| CountryData::from_val(e, &p)))
+            }),
+        );
+
+        identity_storage::batch_add_identity(
+            e,
+            &accounts,
+            &identities,
+            IdentityType::Individual,
+            &country_data_lists,
         );
     }
 
@@ -78,7 +102,7 @@ impl IdentityRegistryStorage for IdentityRegistryContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl CountryDataManager for IdentityRegistryContract {
     #[only_role(operator, "manager")]
     fn add_country_data_entries(e: &Env, account: Address, profiles: Vec<Val>, operator: Address) {

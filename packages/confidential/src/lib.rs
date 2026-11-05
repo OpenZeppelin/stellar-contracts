@@ -1,0 +1,939 @@
+//! # Confidential Token
+//!
+//! Core token contract that provides confidential balances and transfers for
+//! SEP-41 assets. Balances are stored as Pedersen commitments on the Grumpkin
+//! curve; every state-changing operation that consumes private state is
+//! accompanied by an UltraHonk proof that the contract verifies via a separate
+//! verifier contract. Auditor keys are read from a separate registry contract
+//! and dual auditor ciphertexts are emitted in each transfer event. See
+//! `docs/README.md` for the full specification.
+//!
+//! ## What This Crate Provides
+//!
+//! - The [`ConfidentialToken`] trait — eleven entry points (register, deposit,
+//!   merge, withdraw, two transfer variants, two spender management methods,
+//!   and three read methods) with default bodies that delegate to the matching
+//!   free functions in [`storage`].
+//! - The on-chain account state types [`ConfidentialAccount`] and
+//!   [`SpenderDelegation`] (`docs/protocol/account-state.md`).
+//! - The five XDR payload types carried in the `data: Bytes` parameter
+//!   (`docs/protocol/interface.md`). `revoke_spender` is proofless and carries
+//!   none.
+//! - Storage helpers and operation-level orchestration under [`storage`].
+//!
+//! ## Public-Input Encoding
+//!
+//! The contract assembles the public-input blob handed to the verifier by
+//! concatenating canonical 32-byte big-endian `Bn254Fr` representatives in
+//! the order specified by each operation's table under
+//! `docs/protocol/operations/`. Grumpkin points contribute two consecutive
+//! 32-byte limbs (`x` then `y`). Public
+//! `i128` amounts are zero-padded to 32 bytes. The encoding is positional
+//! (no length prefix); any divergence from the order the prover used will
+//! cause verification to fail.
+//!
+//! ### Encoding Validation
+//!
+//! Each 32-byte chunk of the public-input blob is deserialised into a
+//! `Bn254Fr` by the Soroban host's `bn254_fr_from_u256val`. The host
+//! silently reduces values `≥ r` modulo `r` rather than rejecting them. Two
+//! distinct byte strings (`x` and `x + r`) therefore deserialise to the same
+//! field element, the verifier accepts both for a proof generated against `x`,
+//! and the contract would persist whichever bytes the caller supplied —
+//! breaking byte-uniqueness for stored state and emitted events.
+//!
+//! The contract closes this gap at the verifier boundary. The append
+//! helpers in [`storage`] (`append_field`, `append_point`) call
+//! [`Grumpkin::is_canonical_field`](stellar_contract_utils::crypto::grumpkin::Grumpkin::is_canonical_field)
+//! / [`Grumpkin::is_canonical_point`](stellar_contract_utils::crypto::grumpkin::Grumpkin::is_canonical_point).
+//! By the
+//! time `verify_proof` is invoked, every caller-supplied scalar and Grumpkin
+//! coordinate is guaranteed to be the unique canonical big-endian
+//! representative of its field element, and values the contract subsequently
+//! persists are byte-unique per logical value.
+//!
+//! The check is by deliberate design **not** an on-curve check. Prover-
+//! supplied points are constrained on-curve in-circuit by their
+//! `multi_scalar_mul` derivation and pinned to `≠ O` by explicit
+//! nonzero-scalar constraints (R4/R5, W8, T13, S13, O13;
+//! `docs/protocol/proof-system.md#on-chain-point-arithmetic`).
+//! The only proof-less Grumpkin entry point is the auditor key, which the
+//! auditor contract validates canonical-encoding, on-curve, and non-identity
+//! at insertion via [`auditor::storage::validate_point`].
+//!
+//! Together these three boundaries discharge the trust-boundary rule of
+//! `docs/protocol/operations/README.md#public-input-sources`: the
+//! canonical-encoding guard at the verifier boundary keeps caller bytes
+//! byte-unique, the in-circuit constraints keep prover-supplied
+//! points on-curve, and the auditor registry's insertion-time validation
+//! covers the lone proof-less point input.
+//!
+//! ## Contract Binding
+//!
+//! Every owner-initiated proof references a `addr_f` field, computed once at
+//! construction as `Poseidon2(δ_addr, lo, hi)` over the contract's own
+//! address (`docs/protocol/primitives.md#address-to-field-encoding`,
+//! `docs/protocol/system-model.md#governance-and-upgradeability`) and stored
+//! in instance storage.
+//!
+//! ## Underlying Token Requirements
+//!
+//! The contract assumes the underlying SEP-41 token has **exact-transfer
+//! semantics**: a successful `transfer(from, to, amount)` moves exactly
+//! `amount` units between the two accounts, with no fees deducted in transit
+//! and no rebasing applied. [`storage::deposit`] credits the
+//! confidential receiving balance with `amount · G` after the SEP-41
+//! transfer, [`storage::withdraw`] debits the confidential
+//! spendable balance by `amount` before transferring the same amount out,
+//! and [`compliance::storage::clawback`] does the same on its
+//! `Some(destination)` branch; none of the three re-measures the contract's
+//! own balance. With a
+//! fee-on-transfer, rebasing, or otherwise malicious token implementation,
+//! the confidential ledger would drift from the on-chain reserves —
+//! credit a higher amount than was actually received, or pay out less than
+//! was debited.
+//!
+//! Tokens that are SEP-41 compliant are supported, for example:
+//!
+//! - the Stellar Asset Contract (SAC), or
+//! - OpenZeppelin's fungible token (`stellar_tokens::fungible`).
+//!
+//! Deploying this contract over any other token implementation is the
+//! deployer's responsibility — verify that `transfer` does not skim a fee
+//! or otherwise diverge from exact-transfer semantics before doing so.
+//!
+//! **Issuer control over a SAC underlying can lock or drain the pool.**
+//! All deposits sit in a single pooled balance held by the contract's own
+//! address, and every withdrawal pays out of it via `token.transfer`. If
+//! the underlying is a Stellar Asset Contract, its issuer holds two
+//! distinct powers over that pooled balance
+//! (`docs/protocol/system-model.md#underlying-token-assumptions`), and they
+//! behave very differently.
+//!
+//! *Freeze / deauthorization* is a reversible block that removes no value.
+//! One issuer action against the contract's address blocks every deposit
+//! and withdrawal, for all holders, for as long as it stands; confidential
+//! transfers between registered accounts keep working, but no value can
+//! enter or exit until the issuer restores authorization.
+//!
+//! *Clawback* instead extracts value from the pooled balance. It does not
+//! block anything but it leaves the pool holding less than the sum of all
+//! confidential balances, which directly harms the holders. A partial clawback
+//! socializes the shortfall across everyone: withdrawals become
+//! first-come-first-served and whoever exits last cannot fully redeem. A full
+//! clawback empties the pool, leaving all holders' confidential balances
+//! unbacked and unwithdrawable. Issuer-led SAC deployments must weigh both
+//! powers explicitly alongside the exact-transfer assumption.
+//!
+//! The compliance extension's
+//! [`clawback`](compliance::ConfidentialClawback::clawback) gives the issuer a
+//! *legitimate* reason to make such a call. A seizure with `destination: None`
+//! reduces the target's confidential claim without moving any underlying, so
+//! the pool ends up over-collateralized by exactly that amount, which the
+//! issuer's own SAC clawback against this contract's address then extracts.
+//! The order matters: seizing first passes through surplus, while extracting
+//! first passes through a deficit borne by every other holder. An issuer
+//! extracting more than the accumulated surplus creates the shortfall
+//! described above.
+
+#![no_std]
+
+pub mod auditor;
+pub mod compliance;
+pub mod storage;
+pub mod verifier;
+
+#[cfg(test)]
+mod test;
+
+use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Bytes, BytesN, Env};
+pub use storage::{
+    ConfidentialAccount, ConfidentialTokenStorageKey, RegisterData, RegisterPayload,
+    SetSpenderData, SetSpenderPayload, SpenderDelegation, SpenderTransferData,
+    SpenderTransferPayload, TransferData, TransferPayload, WithdrawData, WithdrawPayload,
+};
+
+/// Lifecycle hooks invoked by [`ConfidentialToken`] at each
+/// state-changing entry point, after auth and payload decode, before the
+/// state mutation runs.
+///
+/// Hooks are general-purpose extension points: compliance gates (freeze /
+/// allowlist / sanctions screen via panic), audit mirroring to a separate
+/// log contract, per-account rate limiting, or any other synchronous
+/// concern that must happen atomically with the token op. For pure
+/// observability, prefer subscribing to the token's events instead.
+///
+/// For ops that carry a `data: Bytes` argument, the last parameter
+/// `payload` on the matching hook is a reference to the decoded operation
+/// payload (e.g. [`TransferPayload`] for [`Self::on_transfer`]). The proof
+/// is not forwarded. The proofless ops [`Self::on_deposit`],
+/// [`Self::on_merge`] and [`Self::on_revoke_spender`] receive no `payload`.
+///
+/// Default bodies are empty no-ops — overriding only the methods relevant
+/// to a given deployment is the expected pattern.
+#[allow(unused_variables)]
+pub trait Hooks {
+    /// Invoked after `register`'s auth and payload decode, before account
+    /// creation. `auditor_id` is the caller-selected auditor key index —
+    /// forwarded so the hook can enforce an approved-auditor policy. The
+    /// core checks only that the id exists in the auditor registry;
+    /// restricting which auditors an account may bind to is the
+    /// deployment's responsibility.
+    fn on_register(e: &Env, account: &Address, auditor_id: u32, payload: &RegisterPayload) {}
+
+    /// Invoked after `deposit`'s auth, before SEP-41 transfer and balance
+    /// update.
+    fn on_deposit(e: &Env, from: &Address, to: &Address, amount: i128) {}
+
+    /// Invoked after `merge`'s auth, before the receiving→spendable fold.
+    fn on_merge(e: &Env, account: &Address) {}
+
+    /// Invoked after `withdraw`'s auth and decode, before proof verification.
+    fn on_withdraw(e: &Env, from: &Address, to: &Address, amount: i128, payload: &WithdrawPayload) {
+    }
+
+    /// Invoked after `confidential_transfer`'s auth and decode.
+    fn on_transfer(e: &Env, from: &Address, to: &Address, payload: &TransferPayload) {}
+
+    /// Invoked after `confidential_transfer_from`'s auth and decode.
+    fn on_spender_transfer(
+        e: &Env,
+        spender: &Address,
+        from: &Address,
+        to: &Address,
+        payload: &SpenderTransferPayload,
+    ) {
+    }
+
+    /// Invoked after `set_spender`'s auth and decode.
+    fn on_set_spender(
+        e: &Env,
+        account: &Address,
+        spender: &Address,
+        live_until_ledger: u32,
+        payload: &SetSpenderPayload,
+    ) {
+    }
+
+    /// Invoked after `revoke_spender`'s auth, before the allowance fold.
+    fn on_revoke_spender(e: &Env, account: &Address, spender: &Address) {}
+}
+
+/// Zero-cost [`Hooks`] implementation whose every callback is an empty
+/// no-op. Wire this as `type Hooks = NoHooks;` for deployments that need
+/// no extension behaviour.
+pub struct NoHooks;
+
+impl Hooks for NoHooks {}
+
+/// Trait for the confidential token.
+///
+/// Each entry point has a default body that authorizes the caller,
+/// XDR-decodes the `data` envelope, runs the matching [`Hooks`] callback,
+/// then delegates to a matching free function in [`storage`]. The
+/// storage layer loads every trusted-state public input from on-chain
+/// state (never from caller-controlled bytes), assembles the public-input
+/// blob in the prescribed order, calls
+/// [`ConfidentialVerifier::verify_proof`] cross-contract, applies the
+/// post-verification state mutation, and emits the event.
+///
+/// [`ConfidentialVerifier::verify_proof`]: verifier::ConfidentialVerifier::verify_proof
+#[contracttrait]
+pub trait ConfidentialToken {
+    /// Lifecycle hook impl invoked at each state-changing entry point.
+    /// Use [`NoHooks`] for deployments that need no extension behaviour.
+    type Hooks: Hooks;
+
+    /// Registers a confidential account under `account`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The owner address being registered.
+    /// * `auditor_id` - The auditor key index this account commits to.
+    /// * `data` - XDR-encoded [`RegisterData`].
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::decode_data`] errors.
+    /// * refer to [`storage::register`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["register", account: Address]`
+    /// * data - `[auditor_id: u32]`
+    fn register(e: &Env, account: Address, auditor_id: u32, data: Bytes) {
+        account.require_auth();
+
+        let decoded: RegisterData = storage::decode_data(e, &data);
+        Self::Hooks::on_register(e, &account, auditor_id, &decoded.payload);
+        storage::register(e, &account, auditor_id, &decoded.payload, &decoded.proof);
+    }
+
+    /// Deposits `amount` units of the underlying SEP-41 token from `from`
+    /// into `to`'s confidential receiving balance.
+    ///
+    /// No proof is required. The deposit commitment is `a · G` with zero
+    /// blinding, added homomorphically to `to.receiving_commitment`. The
+    /// depositor `from` does not need a registered confidential account;
+    /// only `to` does.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The depositor (SEP-41 holder).
+    /// * `to` - The confidential recipient.
+    /// * `amount` - The non-negative deposit amount.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::deposit`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["deposit", from: Address, to: Address]`
+    /// * data - `[amount: i128]`
+    fn deposit(e: &Env, from: Address, to: Address, amount: i128) {
+        from.require_auth();
+
+        Self::Hooks::on_deposit(e, &from, &to, amount);
+        storage::deposit(e, &from, &to, amount);
+    }
+
+    /// Folds `account.receiving_commitment` into `account.spendable_commitment`
+    /// and resets the receiving storage entry to the identity.
+    ///
+    /// No proof is required; correctness follows from the homomorphic
+    /// property of Pedersen commitments. Only the account holder can
+    /// authorize a merge — third parties cannot weaponize it.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The owner address.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::merge`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["merge", account: Address]`
+    /// * data - `[]`
+    fn merge(e: &Env, account: Address) {
+        account.require_auth();
+
+        Self::Hooks::on_merge(e, &account);
+        storage::merge(e, &account);
+    }
+
+    /// Withdraws `amount` units to the public SEP-41 address `to` from the
+    /// confidential spendable balance of `from`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The confidential account spending the funds.
+    /// * `to` - The SEP-41 recipient.
+    /// * `amount` - The non-negative withdrawal amount.
+    /// * `data` - XDR-encoded [`WithdrawData`].
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::decode_data`] errors.
+    /// * refer to [`storage::withdraw`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["withdraw", from: Address, to: Address]`
+    /// * data - `[amount: i128, r_e_point: BytesN<64>, sigma: BytesN<32>,
+    ///   b_tilde: BytesN<32>, b_tilde_aud_s: BytesN<32>, r_tilde_aud_s:
+    ///   BytesN<32>]`
+    fn withdraw(e: &Env, from: Address, to: Address, amount: i128, data: Bytes) {
+        from.require_auth();
+
+        let decoded: WithdrawData = storage::decode_data(e, &data);
+        Self::Hooks::on_withdraw(e, &from, &to, amount, &decoded.payload);
+        storage::withdraw(e, &from, &to, amount, &decoded.payload, &decoded.proof);
+    }
+
+    /// Sends a confidential transfer from `from` to `to`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The sender.
+    /// * `to` - The recipient.
+    /// * `data` - XDR-encoded [`TransferData`].
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::decode_data`] errors.
+    /// * refer to [`storage::confidential_transfer`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["transfer", from: Address, to: Address]`
+    /// * data - `[r_e_point, v_tilde, sigma, b_tilde, v_tilde_aud_r,
+    ///   r_tilde_aud_r, v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s]`
+    fn confidential_transfer(e: &Env, from: Address, to: Address, data: Bytes) {
+        from.require_auth();
+
+        let decoded: TransferData = storage::decode_data(e, &data);
+        Self::Hooks::on_transfer(e, &from, &to, &decoded.payload);
+        storage::confidential_transfer(e, &from, &to, &decoded.payload, &decoded.proof);
+    }
+
+    /// Spends from `from`'s allowance escrowed to `spender`, transferring
+    /// confidentially to `to`. The owner's authorization was
+    /// granted at `set_spender` and persists in the on-chain delegation
+    /// entry; only the spender authorizes this call.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `spender` - The delegated spender (the auth principal).
+    /// * `from` - The owner whose allowance is being spent.
+    /// * `to` - The recipient.
+    /// * `data` - XDR-encoded [`SpenderTransferData`].
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::decode_data`] errors.
+    /// * refer to [`storage::confidential_transfer_from`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["spender_transfer", spender: Address, from: Address, to:
+    ///   Address]`
+    /// * data - `[r_e_point, v_tilde, sigma_a_new, v_tilde_aud_r,
+    ///   r_tilde_aud_r, v_tilde_aud_s, a_tilde_aud_s, r_tilde_aud_s]`
+    fn confidential_transfer_from(
+        e: &Env,
+        spender: Address,
+        from: Address,
+        to: Address,
+        data: Bytes,
+    ) {
+        spender.require_auth();
+
+        let decoded: SpenderTransferData = storage::decode_data(e, &data);
+        Self::Hooks::on_spender_transfer(e, &spender, &from, &to, &decoded.payload);
+        storage::confidential_transfer_from(
+            e,
+            &spender,
+            &from,
+            &to,
+            &decoded.payload,
+            &decoded.proof,
+        );
+    }
+
+    /// Escrows an allowance from `account`'s spendable balance and delegates it
+    /// to `spender`. Reverts if a delegation already exists for the `(account,
+    /// spender)` pair.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The delegating owner.
+    /// * `spender` - The delegated spender. Must be a registered confidential
+    ///   account so its spending key is available for the `dvk` escrow ECDH.
+    /// * `live_until_ledger` - The ledger number at which the delegation
+    ///   expires. Spending is authorized while `ledger.sequence() <=
+    ///   live_until_ledger`. Must be between the current ledger and
+    ///   `max_live_until_ledger`, inclusive. The escrowed value persists until
+    ///   [`ConfidentialToken::revoke_spender`].
+    /// * `data` - XDR-encoded [`SetSpenderData`].
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::decode_data`] errors.
+    /// * refer to [`storage::set_spender`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["set_spender", account: Address, spender: Address]`
+    /// * data - `[live_until_ledger: u32, r_e_point, sigma, b_tilde,
+    ///   v_tilde_aud_s, b_tilde_aud_s, r_tilde_aud_s, r_a_tilde_aud_s]`
+    fn set_spender(
+        e: &Env,
+        account: Address,
+        spender: Address,
+        live_until_ledger: u32,
+        data: Bytes,
+    ) {
+        account.require_auth();
+
+        let decoded: SetSpenderData = storage::decode_data(e, &data);
+        Self::Hooks::on_set_spender(e, &account, &spender, live_until_ledger, &decoded.payload);
+        storage::set_spender(
+            e,
+            &account,
+            &spender,
+            live_until_ledger,
+            &decoded.payload,
+            &decoded.proof,
+        );
+    }
+
+    /// Revokes the `(account, spender)` delegation and folds the
+    /// remaining escrowed allowance back into `account`'s spendable balance.
+    /// Works for both active and expired-but-not-revoked delegations.
+    ///
+    /// No proof is required; correctness follows from the homomorphic
+    /// property of Pedersen commitments.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The owner reclaiming the allowance.
+    /// * `spender` - The previously-delegated spender.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::revoke_spender`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["revoke_spender", account: Address, spender: Address]`
+    /// * data - `[a_tilde: BytesN<32>, allowance_salt: BytesN<32>]`
+    fn revoke_spender(e: &Env, account: Address, spender: Address) {
+        account.require_auth();
+
+        Self::Hooks::on_revoke_spender(e, &account, &spender);
+        storage::revoke_spender(e, &account, &spender);
+    }
+
+    /// Returns the [`ConfidentialAccount`] stored under `account`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The owner address.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::get_account`] errors.
+    fn confidential_balance(e: &Env, account: Address) -> ConfidentialAccount {
+        storage::get_account(e, &account)
+    }
+
+    /// Returns `true` iff a delegation exists for `(account, spender)`
+    /// and is still live (`ledger.sequence() <= live_until_ledger`).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The delegating account.
+    /// * `spender` - The delegated spender.
+    fn is_spender(e: &Env, account: Address, spender: Address) -> bool {
+        storage::is_spender(e, &account, &spender)
+    }
+
+    /// Returns the [`SpenderDelegation`] stored under `(account,
+    /// spender)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The delegating account.
+    /// * `spender` - The delegated spender.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::get_spender_delegation`] errors.
+    fn get_spender_delegation(e: &Env, account: Address, spender: Address) -> SpenderDelegation {
+        storage::get_spender_delegation(e, &account, &spender)
+    }
+}
+
+// ################## ERRORS ##################
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum ConfidentialTokenError {
+    /// Indicates `account` already has a confidential account registered.
+    AccountAlreadyRegistered = 3500,
+    /// Indicates the target account is not registered.
+    AccountNotRegistered = 3501,
+    /// Indicates a public amount argument is negative.
+    NegativeAmount = 3502,
+    /// Indicates a delegation already exists for `(account, spender)`.
+    DelegationAlreadyExists = 3503,
+    /// Indicates no delegation exists for `(account, spender)`.
+    DelegationNotFound = 3504,
+    /// Indicates the delegation has expired
+    /// (`ledger.sequence() > live_until_ledger`).
+    DelegationExpired = 3505,
+    /// Indicates the verifier rejected the accompanying proof.
+    InvalidProof = 3506,
+    /// Indicates the `data` payload could not be decoded into the expected
+    /// `…Payload` struct.
+    InvalidData = 3507,
+    /// Indicates the contract has not been constructed: the SEP-41 token
+    /// address is missing.
+    UnderlyingAssetNotSet = 3508,
+    /// Indicates the contract has not been constructed: the verifier
+    /// address is missing.
+    VerifierNotSet = 3509,
+    /// Indicates the contract has not been constructed: the auditor
+    /// registry address is missing.
+    AuditorNotSet = 3510,
+    /// Indicates the contract has not been constructed: the `addr_f` field is
+    /// missing.
+    AddressAsFieldNotSet = 3511,
+    /// Indicates the `addr_f` field has already been set; re-initialization is
+    /// forbidden.
+    AddressAsFieldAlreadySet = 3512,
+    /// Indicates the SEP-41 token address has already been set;
+    /// re-initialization is forbidden.
+    UnderlyingAssetAlreadySet = 3513,
+    /// Indicates a prover-supplied 32-byte field representative or Grumpkin
+    /// coordinate is not a canonical `Bn254Fr` value (`≥ r`). The Soroban
+    /// host's `bn254_fr_*` deserialiser silently reduces non-canonical
+    /// encodings, so the contract enforces canonicality at the verifier
+    /// boundary to keep stored state and emitted events byte-unique per
+    /// logical value.
+    NonCanonicalEncoding = 3514,
+    /// Indicates `live_until_ledger` is outside the accepted range: below the
+    /// current ledger, so the delegation would be expired on creation, or above
+    /// `max_live_until_ledger`.
+    InvalidLiveUntilLedger = 3515,
+}
+
+// ################## CONSTANTS ##################
+
+const DAY_IN_LEDGERS: u32 = 17280;
+pub const ACCOUNT_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const ACCOUNT_TTL_THRESHOLD: u32 = ACCOUNT_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+pub const DELEGATION_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const DELEGATION_TTL_THRESHOLD: u32 = DELEGATION_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
+/// Domain-separation tag for `address_to_field`.
+pub const DELTA_ADDR: u32 = 1;
+
+// ################## EVENTS ##################
+
+/// Event emitted when a confidential account is registered.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Register {
+    #[topic]
+    pub account: Address,
+    pub auditor_id: u32,
+}
+
+/// Emits a `Register` event.
+pub fn emit_register(e: &Env, account: &Address, auditor_id: u32) {
+    Register { account: account.clone(), auditor_id }.publish(e);
+}
+
+/// Event emitted when a deposit moves SEP-41 tokens into a confidential
+/// receiving balance.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Deposit {
+    #[topic]
+    pub from: Address,
+    #[topic]
+    pub to: Address,
+    pub amount: i128,
+}
+
+/// Emits a `Deposit` event.
+pub fn emit_deposit(e: &Env, from: &Address, to: &Address, amount: i128) {
+    Deposit { from: from.clone(), to: to.clone(), amount }.publish(e);
+}
+
+/// Event emitted when a confidential account merges its receiving balance
+/// into its spendable balance.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Merge {
+    #[topic]
+    pub account: Address,
+}
+
+/// Emits a `Merge` event.
+pub fn emit_merge(e: &Env, account: &Address) {
+    Merge { account: account.clone() }.publish(e);
+}
+
+/// Event emitted on a confidential withdrawal.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Withdraw {
+    #[topic]
+    pub from: Address,
+    #[topic]
+    pub to: Address,
+    pub amount: i128,
+    pub r_e_point: BytesN<64>,
+    pub sigma: BytesN<32>,
+    pub b_tilde: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
+}
+
+/// Emits a `Withdraw` event.
+#[allow(clippy::too_many_arguments)]
+pub fn emit_withdraw(
+    e: &Env,
+    from: &Address,
+    to: &Address,
+    amount: i128,
+    r_e_point: &BytesN<64>,
+    sigma: &BytesN<32>,
+    b_tilde: &BytesN<32>,
+    b_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
+) {
+    Withdraw {
+        from: from.clone(),
+        to: to.clone(),
+        amount,
+        r_e_point: r_e_point.clone(),
+        sigma: sigma.clone(),
+        b_tilde: b_tilde.clone(),
+        b_tilde_aud_s: b_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
+    }
+    .publish(e);
+}
+
+/// Event emitted on a confidential transfer.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Transfer {
+    #[topic]
+    pub from: Address,
+    #[topic]
+    pub to: Address,
+    pub r_e_point: BytesN<64>,
+    pub v_tilde: BytesN<32>,
+    pub sigma: BytesN<32>,
+    pub b_tilde: BytesN<32>,
+    pub v_tilde_aud_r: BytesN<32>,
+    pub r_tilde_aud_r: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
+}
+
+/// Emits a `Transfer` event.
+#[allow(clippy::too_many_arguments)]
+pub fn emit_transfer(
+    e: &Env,
+    from: &Address,
+    to: &Address,
+    r_e_point: &BytesN<64>,
+    v_tilde: &BytesN<32>,
+    sigma: &BytesN<32>,
+    b_tilde: &BytesN<32>,
+    v_tilde_aud_r: &BytesN<32>,
+    r_tilde_aud_r: &BytesN<32>,
+    v_tilde_aud_s: &BytesN<32>,
+    b_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
+) {
+    Transfer {
+        from: from.clone(),
+        to: to.clone(),
+        r_e_point: r_e_point.clone(),
+        v_tilde: v_tilde.clone(),
+        sigma: sigma.clone(),
+        b_tilde: b_tilde.clone(),
+        v_tilde_aud_r: v_tilde_aud_r.clone(),
+        r_tilde_aud_r: r_tilde_aud_r.clone(),
+        v_tilde_aud_s: v_tilde_aud_s.clone(),
+        b_tilde_aud_s: b_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
+    }
+    .publish(e);
+}
+
+/// Event emitted on an spender transfer.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SpenderTransfer {
+    #[topic]
+    pub spender: Address,
+    #[topic]
+    pub from: Address,
+    #[topic]
+    pub to: Address,
+    pub r_e_point: BytesN<64>,
+    pub v_tilde: BytesN<32>,
+    pub sigma_a_new: BytesN<32>,
+    pub v_tilde_aud_r: BytesN<32>,
+    pub r_tilde_aud_r: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub a_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
+}
+
+/// Emits an `SpenderTransfer` event.
+#[allow(clippy::too_many_arguments)]
+pub fn emit_spender_transfer(
+    e: &Env,
+    spender: &Address,
+    from: &Address,
+    to: &Address,
+    r_e_point: &BytesN<64>,
+    v_tilde: &BytesN<32>,
+    sigma_a_new: &BytesN<32>,
+    v_tilde_aud_r: &BytesN<32>,
+    r_tilde_aud_r: &BytesN<32>,
+    v_tilde_aud_s: &BytesN<32>,
+    a_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
+) {
+    SpenderTransfer {
+        spender: spender.clone(),
+        from: from.clone(),
+        to: to.clone(),
+        r_e_point: r_e_point.clone(),
+        v_tilde: v_tilde.clone(),
+        sigma_a_new: sigma_a_new.clone(),
+        v_tilde_aud_r: v_tilde_aud_r.clone(),
+        r_tilde_aud_r: r_tilde_aud_r.clone(),
+        v_tilde_aud_s: v_tilde_aud_s.clone(),
+        a_tilde_aud_s: a_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
+    }
+    .publish(e);
+}
+
+/// Event emitted when an spender is set up.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SetSpender {
+    #[topic]
+    pub account: Address,
+    #[topic]
+    pub spender: Address,
+    pub live_until_ledger: u32,
+    pub r_e_point: BytesN<64>,
+    pub sigma: BytesN<32>,
+    pub b_tilde: BytesN<32>,
+    pub v_tilde_aud_s: BytesN<32>,
+    pub b_tilde_aud_s: BytesN<32>,
+    pub r_tilde_aud_s: BytesN<32>,
+    pub r_a_tilde_aud_s: BytesN<32>,
+}
+
+/// Emits a `SetSpender` event.
+#[allow(clippy::too_many_arguments)]
+pub fn emit_set_spender(
+    e: &Env,
+    account: &Address,
+    spender: &Address,
+    live_until_ledger: u32,
+    r_e_point: &BytesN<64>,
+    sigma: &BytesN<32>,
+    b_tilde: &BytesN<32>,
+    v_tilde_aud_s: &BytesN<32>,
+    b_tilde_aud_s: &BytesN<32>,
+    r_tilde_aud_s: &BytesN<32>,
+    r_a_tilde_aud_s: &BytesN<32>,
+) {
+    SetSpender {
+        account: account.clone(),
+        spender: spender.clone(),
+        live_until_ledger,
+        r_e_point: r_e_point.clone(),
+        sigma: sigma.clone(),
+        b_tilde: b_tilde.clone(),
+        v_tilde_aud_s: v_tilde_aud_s.clone(),
+        b_tilde_aud_s: b_tilde_aud_s.clone(),
+        r_tilde_aud_s: r_tilde_aud_s.clone(),
+        r_a_tilde_aud_s: r_a_tilde_aud_s.clone(),
+    }
+    .publish(e);
+}
+
+/// Event emitted when a delegation's escrowed allowance is folded back into
+/// the owner's spendable balance and the delegation deleted — by the owner
+/// through [`ConfidentialToken::revoke_spender`], or by the compliance module
+/// through `ConfidentialClawback::force_revoke_spender`.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RevokeSpender {
+    #[topic]
+    pub account: Address,
+    #[topic]
+    pub spender: Address,
+    pub a_tilde: BytesN<32>,
+    pub allowance_salt: BytesN<32>,
+}
+
+/// Emits a `RevokeSpender` event.
+pub fn emit_revoke_spender(
+    e: &Env,
+    account: &Address,
+    spender: &Address,
+    a_tilde: &BytesN<32>,
+    allowance_salt: &BytesN<32>,
+) {
+    RevokeSpender {
+        account: account.clone(),
+        spender: spender.clone(),
+        a_tilde: a_tilde.clone(),
+        allowance_salt: allowance_salt.clone(),
+    }
+    .publish(e);
+}
+
+/// Event emitted when the SEP-41 token address is set. Expected to fire
+/// exactly once, from the contract's constructor.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UnderlyingAssetSet {
+    pub underlying_asset: Address,
+}
+
+/// Emits an `UnderlyingAssetSet` event.
+pub fn emit_underlying_asset_set(e: &Env, underlying_asset: &Address) {
+    UnderlyingAssetSet { underlying_asset: underlying_asset.clone() }.publish(e);
+}
+
+/// Event emitted when the verifier registry contract address is set or
+/// rotated. May fire more than once over the lifetime of the contract.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifierSet {
+    pub verifier: Address,
+}
+
+/// Emits a `VerifierSet` event.
+pub fn emit_verifier_set(e: &Env, verifier: &Address) {
+    VerifierSet { verifier: verifier.clone() }.publish(e);
+}
+
+/// Event emitted when the auditor registry contract address is set or
+/// rotated. May fire more than once over the lifetime of the contract.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuditorSet {
+    pub auditor: Address,
+}
+
+/// Emits an `AuditorSet` event.
+pub fn emit_auditor_set(e: &Env, auditor: &Address) {
+    AuditorSet { auditor: auditor.clone() }.publish(e);
+}
+
+/// Event emitted when the contract's compressed `addr_f` field is computed and
+/// stored. Expected to fire exactly once, from the contract's constructor.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AddressAsFieldSet {
+    pub address_as_field: BytesN<32>,
+}
+
+/// Emits an `AddressAsFieldSet` event.
+pub fn emit_address_as_field_set(e: &Env, address_as_field: &BytesN<32>) {
+    AddressAsFieldSet { address_as_field: address_as_field.clone() }.publish(e);
+}

@@ -66,6 +66,16 @@ impl IdentityRegistryStorage for MockIRSContract {
         unreachable!("add_identity is not used in these tests");
     }
 
+    fn batch_add_identity(
+        _e: &Env,
+        _accounts: Vec<Address>,
+        _identities: Vec<Address>,
+        _country_data_lists: Vec<Vec<Val>>,
+        _operator: Address,
+    ) {
+        unreachable!("batch_add_identity is not used in these tests");
+    }
+
     fn remove_identity(_e: &Env, _account: Address, _operator: Address) {
         unreachable!("remove_identity is not used in these tests");
     }
@@ -313,7 +323,7 @@ fn hooks_pass_for_unrestricted_recipient() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #405)")]
+#[should_panic(expected = "Error(Contract, #387)")]
 fn on_transfer_panics_for_restricted_recipient() {
     let e = Env::default();
     e.mock_all_auths();
@@ -344,7 +354,7 @@ fn on_transfer_panics_for_restricted_recipient() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #405)")]
+#[should_panic(expected = "Error(Contract, #387)")]
 fn on_created_panics_for_restricted_recipient() {
     let e = Env::default();
     e.mock_all_auths();

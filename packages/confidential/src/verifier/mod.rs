@@ -1,0 +1,336 @@
+//! # Confidential Verifier Registry
+//!
+//! Stores UltraHonk verification keys used by the confidential token to
+//! verify zero-knowledge proofs accompanying every state-changing operation.
+//! Each key is indexed by [`CircuitType`]. A single deployment can serve
+//! multiple confidential tokens: per-token binding is enforced inside the
+//! circuit via the `addr_f` field
+//! (`docs/protocol/primitives.md#address-to-field-encoding`,
+//! `docs/protocol/keys-and-commitments.md#viewing-key`), not by the verifier,
+//! so
+//! the same VK set is reusable across every confidential token that targets the
+//! same protocol version.
+//!
+//! [`ConfidentialVerifier::verify_proof`] is backed by the UltraHonk verifier
+//! from
+//! [`NethermindEth/rs-soroban-ultrahonk`](https://github.com/NethermindEth/rs-soroban-ultrahonk).
+//!
+//! ## Why a Separate Contract
+//!
+//! Verification keys are referenced by the confidential token on every
+//! state-changing operation (register, withdraw, transfer, spender flows).
+//! Keeping them in a separate registry allows:
+//!
+//! - **Isolation**: VK-management privileges are scoped to the verifier admin,
+//!   distinct from token admin powers.
+//! - **Lifecycle**: per-circuit VKs can be rotated (e.g. when a circuit is
+//!   patched) without redeploying the confidential token, subject to the
+//!   deployer's governance posture (see
+//!   `docs/protocol/system-model.md#governance-and-upgradeability`).
+//!
+//! ## VK Encoding
+//!
+//! Verification keys are opaque [`Bytes`] blobs from the storage layer's point
+//! of view: [`register_verification_key`] and [`update_verification_key`] store
+//! them verbatim without inspection. Structural validation happens lazily, in
+//! the UltraHonk backend, the first time [`verify_proof`] parses the stored
+//! bytes.
+//!
+//! The bytes registered on-chain must be the backend's packed binary VK
+//! encoding: a fixed-size header followed by the curve-point commitments,
+//! committed per circuit as `circuits/vks/<name>.vk.bin`. The sibling
+//! `<name>.vk.json` is the review-friendly form — a JSON array of hex-encoded
+//! `Fr` field elements produced by `bb write_vk --output_format fields` — and
+//! is **not** accepted by the backend.
+//!
+//! ## Storage
+//!
+//! Verification keys live in **instance** storage: there is exactly one VK per
+//! [`CircuitType`] for the lifetime of the verifier contract, and they are
+//! consulted on every confidential token invocation. Per the workspace
+//! conventions, instance-TTL management is the contract developer's
+//! responsibility — this module's helpers never call `instance().extend_ttl()`.
+//!
+//! ## Updating a Verification Key Is a Last Resort
+//!
+//! [`ConfidentialVerifier::update_verification_key`] (and the underlying
+//! [`storage::update_verification_key`] helper) is **soundness-critical** and
+//! should be treated as a break-glass operation.
+//! `docs/protocol/system-model.md#governance-and-upgradeability` makes the
+//! strongest possible recommendation: ship VKs immutably and require a fresh
+//! deployment for any circuit change. If a deployment exposes an update path
+//! at all, it should be reserved for one situation: a discovered soundness
+//! bug in a circuit or verifier that needs a fast fix.
+//!
+//! Concretely, an update:
+//!
+//! - **Can silently break soundness.** A VK that does not correspond to the
+//!   audited circuit will happily verify forged proofs — including proofs that
+//!   mint tokens, drain accounts, or impersonate registered users. The on-chain
+//!   bytes are an opaque blob to this module; nothing here can detect a wrong,
+//!   corrupted, or maliciously crafted replacement.
+//! - **Invalidates every in-flight proof for the affected circuit.** Any proof
+//!   generated against the previous VK fails verification the instant the new
+//!   VK is activated, so the corresponding transactions revert at the
+//!   proof-verification boundary. Wallets must regenerate against the new VK
+//!   and resubmit
+//!   (`docs/protocol/auditing.md#auditor-key-management-and-rotation` discusses
+//!   this for the related auditor-key rotation case; the same reasoning applies
+//!   here).
+//! - **Should be gated.** Implementors are expected to put the update path
+//!   behind strong access control (multisig + timelock at a minimum) and to
+//!   publish enough material — circuit source, toolchain pin, SRS transcript
+//!   reference (`docs/protocol/proof-system.md#structured-reference-string`) —
+//!   that any user can independently reproduce the new VK before trusting it.
+//!
+//! Treat every call to `update_verification_key` as an emergency, not a
+//! routine operation.
+
+pub mod storage;
+
+#[cfg(test)]
+mod test;
+
+use soroban_sdk::{contracterror, contractevent, contracttrait, contracttype, Address, Bytes, Env};
+pub use storage::{
+    get_verification_key, register_verification_key, update_verification_key, verify_proof,
+    VerifierStorageKey,
+};
+
+/// Identifier of a zero-knowledge circuit whose verification key is stored in
+/// the registry. The numeric values are part of the on-chain interface and
+/// MUST NOT change. Core token circuits occupy `0..=4`; circuits shipped by
+/// optional extensions start at `100`.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum CircuitType {
+    Register = 0,
+    Withdraw = 1,
+    Transfer = 2,
+    SpenderTransfer = 3,
+    SetSpender = 4,
+    Clawback = 100,
+}
+
+/// Trait for managing UltraHonk verification keys used by the confidential
+/// token.
+///
+/// The confidential token calls [`ConfidentialVerifier::verify_proof`] on
+/// every state-changing operation, passing the [`CircuitType`] that identifies
+/// the circuit, the serialized public inputs, and the proof blob.
+/// [`ConfidentialVerifier::register_verification_key`] and
+/// [`ConfidentialVerifier::update_verification_key`] are privileged operations
+/// expected to be gated by the implementor's access-control scheme.
+#[contracttrait]
+pub trait ConfidentialVerifier {
+    /// Registers an UltraHonk verification key under a fresh [`CircuitType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `circuit_type` - The circuit to register the key under.
+    /// * `verification_key` - The serialized UltraHonk verification key.
+    /// * `operator` - The address authorizing the invocation.
+    ///
+    /// # Errors
+    ///
+    /// * [`VerifierError::VerificationKeyAlreadyRegistered`] - When
+    ///   `circuit_type` already has a verification key registered.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["verification_key_registered", circuit_type: CircuitType]`
+    /// * data - `[verification_key: Bytes]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should
+    /// be enforced on `operator` before calling
+    /// [`storage::register_verification_key`] for the implementation.
+    fn register_verification_key(
+        e: &Env,
+        circuit_type: CircuitType,
+        verification_key: Bytes,
+        operator: Address,
+    );
+
+    /// Replaces the UltraHonk verification key registered under `circuit_type`.
+    ///
+    /// # ⚠️ Soundness-Critical Break-Glass Operation
+    ///
+    /// Updating a verification key is **not** a routine operation. A wrong,
+    /// corrupted, or maliciously crafted replacement makes the affected
+    /// circuit accept forged proofs — minting, draining, impersonation, and
+    /// every other constraint the circuit was meant to enforce silently
+    /// collapse. Activating a new VK also invalidates every in-flight proof
+    /// produced against the previous one.
+    ///
+    /// The recommended posture is **full immutability**: ship VKs fixed at
+    /// deployment and require a fresh deployment for any circuit change.
+    /// Exposing this method should be reserved for fixing a discovered
+    /// soundness bug in a circuit or verifier, and should be behind strong
+    /// governance (multisig + timelock at minimum). The new VK must be
+    /// independently reproducible from the audited circuit source, pinned
+    /// toolchain, and SRS transcript
+    /// (`docs/protocol/proof-system.md#structured-reference-string`).
+    ///
+    /// Only an operator with sufficient permissions should be able to call
+    /// this function.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `circuit_type` - The circuit whose key is being updated.
+    /// * `new_verification_key` - The new serialized UltraHonk verification
+    ///   key.
+    /// * `operator` - The address authorizing the invocation.
+    ///
+    /// # Errors
+    ///
+    /// * [`VerifierError::VerificationKeyNotRegistered`] - When `circuit_type`
+    ///   has no registered key.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["verification_key_updated", circuit_type: CircuitType]`
+    /// * data - `[old_verification_key: Bytes, new_verification_key: Bytes]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should
+    /// be enforced on `operator` before calling
+    /// [`storage::update_verification_key`] for the implementation.
+    fn update_verification_key(
+        e: &Env,
+        circuit_type: CircuitType,
+        new_verification_key: Bytes,
+        operator: Address,
+    );
+
+    /// Verifies an UltraHonk proof against the verification key registered
+    /// under `circuit_type` and returns `true` iff the proof is valid for the
+    /// given `public_inputs`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `circuit_type` - The circuit the proof was produced against.
+    /// * `public_inputs` - The serialized public inputs the prover committed
+    ///   to.
+    /// * `proof` - The serialized UltraHonk proof.
+    ///
+    /// # Errors
+    ///
+    /// * [`VerifierError::VerificationKeyNotRegistered`] - When `circuit_type`
+    ///   has no registered key.
+    /// * [`VerifierError::InvalidVerificationKey`] - When the registered key
+    ///   cannot be parsed as a valid UltraHonk verification key.
+    ///
+    /// # Notes
+    ///
+    /// The default implementation delegates to [`storage::verify_proof`], which
+    /// runs the UltraHonk verifier from
+    /// [`NethermindEth/rs-soroban-ultrahonk`](https://github.com/NethermindEth/rs-soroban-ultrahonk).
+    fn verify_proof(
+        e: &Env,
+        circuit_type: CircuitType,
+        public_inputs: Bytes,
+        proof: Bytes,
+    ) -> bool {
+        storage::verify_proof(e, circuit_type, &public_inputs, &proof)
+    }
+
+    /// Returns the UltraHonk verification key registered under `circuit_type`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `circuit_type` - The circuit whose key is requested.
+    ///
+    /// # Errors
+    ///
+    /// * [`VerifierError::VerificationKeyNotRegistered`] - When `circuit_type`
+    ///   has no registered key.
+    fn get_verification_key(e: &Env, circuit_type: CircuitType) -> Bytes {
+        storage::get_verification_key(e, circuit_type)
+    }
+}
+
+// ################## ERRORS ##################
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum VerifierError {
+    /// Indicates `circuit_type` already has a verification key registered.
+    VerificationKeyAlreadyRegistered = 3400,
+    /// Indicates no verification key is registered under `circuit_type`.
+    VerificationKeyNotRegistered = 3401,
+    /// Indicates the proof failed UltraHonk verification.
+    InvalidProof = 3402,
+    /// Indicates the registered verification key could not be parsed as a valid
+    /// UltraHonk verification key.
+    InvalidVerificationKey = 3403,
+}
+
+// ################## EVENTS ##################
+
+/// Event emitted when a new verification key is registered.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerificationKeyRegistered {
+    #[topic]
+    pub circuit_type: CircuitType,
+    pub verification_key: Bytes,
+}
+
+/// Emits an event indicating a verification key has been registered.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `circuit_type` - The circuit the key was registered under.
+/// * `verification_key` - The serialized UltraHonk verification key.
+pub fn emit_verification_key_registered(
+    e: &Env,
+    circuit_type: CircuitType,
+    verification_key: &Bytes,
+) {
+    VerificationKeyRegistered { circuit_type, verification_key: verification_key.clone() }
+        .publish(e);
+}
+
+/// Event emitted when a verification key is updated.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerificationKeyUpdated {
+    #[topic]
+    pub circuit_type: CircuitType,
+    pub old_verification_key: Bytes,
+    pub new_verification_key: Bytes,
+}
+
+/// Emits an event indicating a verification key has been updated.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `circuit_type` - The circuit whose key was updated.
+/// * `old_verification_key` - The previously registered verification key.
+/// * `new_verification_key` - The newly registered verification key.
+pub fn emit_verification_key_updated(
+    e: &Env,
+    circuit_type: CircuitType,
+    old_verification_key: &Bytes,
+    new_verification_key: &Bytes,
+) {
+    VerificationKeyUpdated {
+        circuit_type,
+        old_verification_key: old_verification_key.clone(),
+        new_verification_key: new_verification_key.clone(),
+    }
+    .publish(e);
+}

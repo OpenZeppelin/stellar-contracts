@@ -6,6 +6,7 @@ This crate is part of the [OpenZeppelin Stellar Contracts](https://github.com/Op
 
 - [stellar-access](https://crates.io/crates/stellar-access): Role-based access controls and ownable
 - [stellar-accounts](https://crates.io/crates/stellar-accounts): Smart accounts with custom authentication and authorization
+- [stellar-confidential](https://crates.io/crates/stellar-confidential): Confidential token with encrypted balances and zero-knowledge proofs
 - **[stellar-contract-utils](https://crates.io/crates/stellar-contract-utils)**: Utilities for contracts (pausable, upgradeable, cryptography, etc.)
 - [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
 - [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
@@ -115,7 +116,7 @@ impl Ownable for ExampleContract {}
 
 ### Crypto
 
-The `crypto` module provides cryptographic utilities including hash functions and Merkle tree verification.
+The `crypto` module provides cryptographic utilities including hash functions, Merkle tree verification, and Grumpkin curve arithmetic.
 
 #### Usage Examples
 
@@ -135,6 +136,7 @@ pub fn hash_data(e: &Env, data: Bytes) -> BytesN<32> {
 - **Hash Functions**: SHA-256 and Keccak-256 implementations
 - **Merkle Verification**: Verify Merkle proofs for data integrity
 - **Utility Functions**: Hash pairs and commutative hashing
+- **Grumpkin**: Affine point arithmetic (add, sub, neg, scalar mul) and point validation on the Grumpkin curve, built on the BN254 scalar-field host functions
 
 ### Merkle Distributor
 
@@ -146,6 +148,51 @@ The `merkle_distributor` module implements a Merkle-based claim distribution sys
 - **Flexible Leaf Structure**: Support for custom claim data structures
 - **Use Cases**: Token airdrops, NFT distributions, allowlists, snapshot voting
 
+### Math
+
+The `math` module provides fixed-point arithmetic: a `Wad` decimal type with 18 decimal places, and free functions for `x * y / denominator` on both `i128` and `I256` with an explicit rounding direction.
+
+`Wad` also provides the natural logarithm (`ln`), the natural exponential (`exp`), and powers with an integer (`powi`) or a `Wad` (`powf`) exponent.
+
+Each operation comes in a panicking and a checked variant. The panicking variants raise `SorobanFixedPointError::Overflow` (1500) when the result overflows; the checked variants return `None`. `Wad`'s operators (`+`, `-`, `*`, `/`) work directly on `i128` and panic with a native arithmetic error instead (see the `# Overflow` section on `Wad`).
+
+#### Usage Examples
+
+```rust
+use soroban_sdk::{Env, I256};
+use stellar_contract_utils::math::{i256_fixed_point, i128_fixed_point, wad::Wad, Rounding};
+
+// Share conversion, rounding in the vault's favour.
+pub fn to_shares(e: &Env, assets: i128, total_shares: i128, total_assets: i128) -> i128 {
+    i128_fixed_point::mul_div_with_rounding(e, assets, total_shares, total_assets, Rounding::Floor)
+}
+
+// The same computation at 256-bit width. `I256` carries its own `Env`,
+// so these signatures take no `&Env`.
+pub fn to_shares_256(assets: &I256, total_shares: &I256, total_assets: &I256) -> I256 {
+    i256_fixed_point::mul_div_floor(assets, total_shares, total_assets)
+}
+
+// 18-decimal fixed point, where 1.0 is 10^18.
+pub fn apply_rate(e: &Env, principal: i128) -> Option<i128> {
+    let rate = Wad::from_raw(1_050_000_000_000_000_000); // 1.05
+    Wad::from_integer(e, principal).checked_mul(e, rate).map(|w| w.to_integer())
+}
+```
+
+#### Phantom Overflow
+
+Both widths recover from an intermediate `x * y` that overflows while the final result is representable, a case known as *phantom overflow*.
+
+- **`i128`**: the operands are promoted to `I256`, and the result is scaled back if it fits `i128`.
+- **`I256`**: there is no wider type to promote to, so the operands are split by the denominator and the division is distributed, which is an exact identity rather than an approximation. This holds for every denominator with `|denominator| <= 2^128` (roughly `3.4e38`, far above the fixed-point scales in practical use: `10^18`, `10^27`, `2^96`, `10^38`). Within that domain the result is bit-for-bit what a 512-bit intermediate would produce.
+
+Above `2^128` the operation rejects rather than returning an incorrect value, and rejection is permitted rather than guaranteed: a large denominator whose remainders happen to be small still succeeds.
+
+Phantom overflow handling does not extend to `Wad`'s operator implementations (`+`, `-`, `*`, `/`), because an operator cannot reach an `Env` to build the intermediate. Their narrower bounds are tabulated in the `# Overflow` section of `Wad`'s documentation, and `checked_mul` / `checked_div` should be preferred wherever an operand can plausibly exceed them.
+
+Zero denominators and `MIN / -1` are left to the platform rather than mapped to a contract error, since these are plain arithmetic operations; the checked variants return `None` for them. The `math` module documentation details which error each failure surfaces as.
+
 ## Installation
 
 Add this to your `Cargo.toml`:
@@ -153,9 +200,9 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-contract-utils = "=0.7.1"
+stellar-contract-utils = "=0.8.0"
 # Add this if you want to use macros
-stellar-macros = "=0.7.1"
+stellar-macros = "=0.8.0"
 ```
 
 ## Examples

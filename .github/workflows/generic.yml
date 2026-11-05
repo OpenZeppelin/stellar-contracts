@@ -53,6 +53,10 @@ jobs:
             code:
               - '!**/*.md'
 
+      - name: Check error codes are unique
+        if: steps.changes.outputs.code == 'true'
+        run: python3 .github/scripts/check_error_codes.py
+
       - name: Run sccache
         if: steps.changes.outputs.code == 'true'
         uses: mozilla-actions/sccache-action@v0.0.8

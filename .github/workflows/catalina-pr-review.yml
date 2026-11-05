@@ -1,0 +1,66 @@
+name: Catalina PR Review
+
+# Asks Catalina to review a PR when someone requests a review from catalina-oz.
+# Only accounts with triage access or higher can request a review, so the request is the gate.
+on:
+  pull_request_target:
+    types: [review_requested]
+
+permissions: {}
+
+jobs:
+  trigger-catalina:
+    # A team request has no requested_reviewer, so it is skipped too.
+    if: github.event.requested_reviewer.login == 'catalina-oz'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call Catalina webhook
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CATALINA_WEBHOOK_SECRET: ${{ secrets.CATALINA_WEBHOOK_SECRET }}
+          WEBHOOK_URL: ${{ secrets.CATALINA_WEBHOOK_URL }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          REQUESTED_BY: ${{ github.event.sender.login }}
+        run: |
+          # jq builds the JSON, so a quote in a branch name cannot break it.
+          body=$(jq -cn \
+            --arg repo "$REPO" \
+            --argjson pr_number "$PR_NUMBER" \
+            --arg pr_url "$PR_URL" \
+            --arg head_sha "$HEAD_SHA" \
+            --arg requested_by "$REQUESTED_BY" \
+            --arg base_ref "$BASE_REF" \
+            '{action: "review_requested", repo: $repo, pr_number: $pr_number, pr_url: $pr_url,
+              head_sha: $head_sha, requested_by: $requested_by, base_ref: $base_ref}')
+          echo "body: $body"
+
+          for attempt in 1 2 3 4; do
+            # Sign again on each attempt: the gateway accepts a signature only once.
+            ts=$(date +%s)
+            sig=$(printf '%s.%s' "$ts" "$body" \
+              | openssl dgst -sha256 -hmac "$CATALINA_WEBHOOK_SECRET" | awk '{print $NF}')
+
+            status=$(curl --silent --show-error --max-time 30 \
+              --output /dev/null --write-out '%{http_code}' \
+              -X POST "$WEBHOOK_URL" \
+              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              -H "Content-Type: application/json" \
+              -H "x-catalina-timestamp: $ts" \
+              -H "x-catalina-signature: ws=$sig" \
+              --data-binary "$body") || status=000
+            echo "attempt $attempt: HTTP $status"
+
+            case "$status" in
+              2??) exit 0 ;;
+              429|5??|000) [ "$attempt" -lt 4 ] && sleep 5 ;;
+              *) exit 1 ;;
+            esac
+          done
+          exit 1

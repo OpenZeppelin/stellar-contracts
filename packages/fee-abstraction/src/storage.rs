@@ -25,8 +25,13 @@ pub enum FeeAbstractionStorageKey {
 #[contracttype]
 pub enum FeeAbstractionApproval {
     /// Only approve `max_fee_amount` if the existing allowance is insufficient.
+    /// The unspent remainder stays approved for later collections.
     Lazy,
-    /// Always approve `max_fee_amount`, overwriting previous allowances.
+    /// Always approve `max_fee_amount`, overwriting previous allowances, and
+    /// consume the whole approval within the same collection so that no
+    /// allowance remains afterwards. Requires a fee token whose transfers
+    /// credit the receiver exactly the amount debited from the sender; use
+    /// `Lazy` for fee-on-transfer and other non-conserving tokens.
     Eager,
 }
 
@@ -119,9 +124,30 @@ pub fn collect_fee_and_invoke(
 /// Low-level helper to collect a fee from the user in a given token by checking
 /// whether the token is allowed when allow list is enabled.
 ///
-/// It can be used with either eager or lazy approval semantics. `Eager` always
-/// approves `max_fee_amount` (overwriting any existing allowance); `Lazy` only
-/// approves if the current allowance is less than `max_fee_amount`.
+/// It can be used with either eager or lazy approval semantics. `Lazy` only
+/// approves if the current allowance is less than `max_fee_amount` and leaves
+/// the unspent remainder approved for later collections. `Eager` always
+/// approves `max_fee_amount` (overwriting any existing allowance) and consumes
+/// the whole approval at once: `max_fee_amount` is pulled from the user, the
+/// fee is paid to the recipient and the remainder is returned to the user, so
+/// no allowance survives the collection. The user therefore needs a spendable
+/// balance of at least `max_fee_amount` for an eager collection; the token
+/// rejects it otherwise.
+///
+/// `Eager` pays out the fee and the remainder from the current contract
+/// regardless of the amount it received, so it requires a fee token whose
+/// transfers credit the receiver exactly the amount debited from the sender.
+/// With fee-on-transfer or otherwise non-conserving tokens, the shortfall is
+/// drawn from the current contract's own balance, or the collection reverts
+/// when that balance is insufficient. When `fee_recipient` is the current
+/// contract, the fee transfer is skipped and only the remainder is paid out,
+/// so the retained fee absorbs the shortfall first and the current contract's
+/// own balance is drawn on only when the shortfall exceeds `fee_amount`.
+/// `Lazy` transfers directly from the user
+/// to `fee_recipient` without touching the current contract's balance and is
+/// the strategy to use for such tokens. In both cases, the emitted
+/// `fee_collected` event reports the requested `fee_amount`, which can exceed
+/// the amount `fee_recipient` receives from a non-conserving token.
 ///
 /// # Arguments
 ///
@@ -175,34 +201,32 @@ pub fn collect_fee(
     validate_fee_bounds(e, fee_amount, max_fee_amount);
 
     let token_client = TokenClient::new(e, fee_token);
+    let contract_address = e.current_contract_address();
 
     match approval {
         FeeAbstractionApproval::Eager => {
-            token_client.approve(
-                user,
-                &e.current_contract_address(),
-                &max_fee_amount,
-                &expiration_ledger,
-            );
+            token_client.approve(user, &contract_address, &max_fee_amount, &expiration_ledger);
+            token_client.transfer_from(&contract_address, user, &contract_address, &max_fee_amount);
+            if *fee_recipient != contract_address {
+                token_client.transfer(&contract_address, fee_recipient, &fee_amount);
+            }
+            let remainder = max_fee_amount - fee_amount;
+            if remainder > 0 {
+                token_client.transfer(&contract_address, user, &remainder);
+            }
         }
         FeeAbstractionApproval::Lazy => {
-            let allowance = token_client.allowance(user, &e.current_contract_address());
+            let allowance = token_client.allowance(user, &contract_address);
             if allowance < max_fee_amount {
-                token_client.approve(
-                    user,
-                    &e.current_contract_address(),
-                    &max_fee_amount,
-                    &expiration_ledger,
-                );
+                token_client.approve(user, &contract_address, &max_fee_amount, &expiration_ledger);
             } else {
                 // assuming that in the other cases the expiration ledger is
                 // validated in `token.approve()`
                 validate_expiration_ledger(e, expiration_ledger);
             }
+            token_client.transfer_from(&contract_address, user, fee_recipient, &fee_amount);
         }
     }
-
-    token_client.transfer_from(&e.current_contract_address(), user, fee_recipient, &fee_amount);
 
     emit_fee_collected(e, user, fee_recipient, fee_token, fee_amount);
 }
@@ -279,14 +303,24 @@ pub fn set_allowed_fee_token(e: &Env, token: &Address, allowed: bool) {
             let last_token: Address =
                 e.storage().persistent().get(&last_key).expect("last token to be present");
 
-            e.storage()
-                .persistent()
-                .set(&FeeAbstractionStorageKey::Token(remove_index), &last_token);
+            let slot_key = FeeAbstractionStorageKey::Token(remove_index);
+            e.storage().persistent().set(&slot_key, &last_token);
 
             // Update moved token's index mapping.
-            e.storage()
-                .persistent()
-                .set(&FeeAbstractionStorageKey::TokenIndex(last_token.clone()), &remove_index);
+            let moved_index_key = FeeAbstractionStorageKey::TokenIndex(last_token);
+            e.storage().persistent().set(&moved_index_key, &remove_index);
+
+            // Overwrites keep the previous expiry, so re-align both entries.
+            e.storage().persistent().extend_ttl(
+                &slot_key,
+                FEE_ABSTRACTION_TTL_THRESHOLD,
+                FEE_ABSTRACTION_EXTEND_AMOUNT,
+            );
+            e.storage().persistent().extend_ttl(
+                &moved_index_key,
+                FEE_ABSTRACTION_TTL_THRESHOLD,
+                FEE_ABSTRACTION_EXTEND_AMOUNT,
+            );
         }
 
         // Remove last index entry.

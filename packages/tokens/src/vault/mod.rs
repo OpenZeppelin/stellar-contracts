@@ -4,9 +4,9 @@ pub mod storage;
 mod test;
 
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env};
-pub use storage::Vault;
+pub use storage::{CappedVault, Vault, VaultOverrides};
 
-use crate::fungible::FungibleToken;
+use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 
 /// Vault Trait for Fungible Token
 ///
@@ -17,6 +17,18 @@ use crate::fungible::FungibleToken;
 ///
 /// The vault maintains a conversion rate between shares and assets based on
 /// the total supply of shares and total assets held by the vault contract.
+/// The `Vault` contract type is therefore inherently supply-aware, and
+/// [`FungibleVault`] requires
+/// [`crate::fungible::total_supply::FungibleTotalSupply`] to be implemented
+/// alongside it (an empty `impl` block is enough), so that the supply of
+/// shares is exposed by the contract. `TotalSupply` has to be listed in the
+/// contract type as well, e.g. `Compose<(Vault, TotalSupply)>`.
+///
+/// For a maximum supply of shares, `Capped` is listed too:
+/// `Compose<(Vault, Capped, TotalSupply)>` resolves to [`CappedVault`], which
+/// enforces the cap on `deposit` and `mint` and reports it through
+/// `max_deposit` and `max_mint`. Each method delegates to the contract type
+/// through [`VaultOverrides`].
 ///
 /// # Design Overview
 ///
@@ -29,10 +41,13 @@ use crate::fungible::FungibleToken;
 ///
 /// # Security Considerations
 ///
-/// ⚠️ **IMPORTANT**: Most low-level functions for this trait bypass
-/// authorization checks by design. It is the implementer's responsibility to
-/// add appropriate access controls, typically by combining with Ownable or
-/// Access Control patterns.
+/// The trait methods that move assets or shares (`deposit`, `mint`,
+/// `withdraw`, `redeem`) require authorization from `operator` through the
+/// contract type. The low-level functions on [`Vault`] (e.g.
+/// `Vault::deposit_internal`) bypass authorization checks by design. A
+/// contract that calls them directly is responsible for adding the
+/// appropriate access controls, typically by combining with Ownable or Access
+/// Control patterns.
 ///
 /// # Compatibility
 ///
@@ -40,7 +55,7 @@ use crate::fungible::FungibleToken;
 /// providing familiar interfaces for Ethereum developers while leveraging
 /// Stellar's unique capabilities.
 #[contracttrait]
-pub trait FungibleVault: FungibleToken<ContractType = Vault> {
+pub trait FungibleVault: FungibleTotalSupply + FungibleToken<ContractType: VaultOverrides> {
     /// Returns the address of the underlying asset that the vault manages.
     ///
     /// # Arguments
@@ -109,12 +124,25 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     }
 
     /// Returns the maximum amount of underlying assets that can be deposited
-    /// for the given receiver address (currently `i128::MAX`).
+    /// for the given receiver address.
+    ///
+    /// This is the largest amount whose deposit mints at most `max_mint`
+    /// shares: depositing it never mints more shares than the vault accepts,
+    /// and when it is positive, depositing it mints at least one share.
+    /// Returns `0` exactly when no positive deposit would be accepted: when
+    /// `max_mint` is `0` (e.g. the cap is reached), when even a deposit of 1
+    /// asset would mint more than `max_mint` shares, or when the vault's
+    /// totals are too large.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that would receive the vault shares.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::vault::VaultTokenError::VaultAssetAddressNotSet`] - When the
+    ///   vault's underlying asset address has not been initialized.
     fn max_deposit(e: &Env, receiver: Address) -> i128 {
         Self::ContractType::max_deposit(e, receiver)
     }
@@ -153,6 +181,8 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// * [`crate::vault::VaultTokenError::VaultExceededMaxDeposit`] - When
     ///   attempting to deposit more assets than the maximum allowed for the
     ///   receiver.
+    /// * [`crate::vault::VaultTokenError::VaultZeroShares`] - When a positive
+    ///   amount of assets would mint zero shares.
     /// * [`crate::vault::VaultTokenError::VaultInvalidAssetsAmount`] - When
     ///   `assets < 0`.
     /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
@@ -164,22 +194,38 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
-    /// # Security Warning
+    /// # Notes
     ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// Authorization for the operator must be handled at a higher level.
+    /// Authorization from `operator` is required.
     fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128 {
         Self::ContractType::deposit(e, assets, receiver, from, operator)
     }
 
     /// Returns the maximum amount of vault shares that can be minted
-    /// for the given receiver address (currently `i128::MAX`).
+    /// for the given receiver address.
+    ///
+    /// Two limits apply, and the smaller one is returned:
+    ///
+    /// * The share supply must stay below `i128::MAX - 10^offset`, because
+    ///   every conversion computes `total_supply + 10^offset`. So at most
+    ///   `i128::MAX - 10^offset - total_supply` more shares can be minted.
+    /// * Minting has to be paid for in assets, and the payment cannot exceed
+    ///   `i128::MAX`. Once a share is worth more than one asset base unit, this
+    ///   caps the shares at what `i128::MAX` assets buy at the current price.
+    ///
+    /// Returns `0` when the share supply has reached its limit, or when the
+    /// vault holds `i128::MAX` assets (no mint can succeed then, because
+    /// `total_assets + 1` overflows).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that would receive the vault shares.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::vault::VaultTokenError::VaultAssetAddressNotSet`] - When the
+    ///   vault's underlying asset address has not been initialized.
     fn max_mint(e: &Env, receiver: Address) -> i128 {
         Self::ContractType::max_mint(e, receiver)
     }
@@ -230,11 +276,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
-    /// # Security Warning
+    /// # Notes
     ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// Authorization for the operator must be handled at a higher level.
+    /// Authorization from `operator` is required.
     fn mint(e: &Env, shares: i128, receiver: Address, from: Address, operator: Address) -> i128 {
         Self::ContractType::mint(e, shares, receiver, from, operator)
     }
@@ -299,11 +343,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
-    /// # Security Warning
+    /// # Notes
     ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// Authorization for the operator must be handled at a higher level.
+    /// Authorization from `operator` is required.
     fn withdraw(
         e: &Env,
         assets: i128,
@@ -315,12 +357,21 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     }
 
     /// Returns the maximum amount of vault shares that can be redeemed
-    /// by the given owner (equal to their vault share balance).
+    /// by the given owner.
+    ///
+    /// This is the owner's vault share balance, or `0` when that balance is
+    /// worth zero assets (see
+    /// [`crate::vault::VaultTokenError::VaultZeroAssets`]).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - The address that owns the vault shares.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
+    ///   operations result in overflow.
     fn max_redeem(e: &Env, owner: Address) -> i128 {
         Self::ContractType::max_redeem(e, owner)
     }
@@ -359,6 +410,11 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// * [`crate::vault::VaultTokenError::VaultExceededMaxRedeem`] - When
     ///   attempting to redeem more shares than the maximum allowed for the
     ///   owner.
+    /// * [`crate::vault::VaultTokenError::VaultZeroAssets`] - When a positive
+    ///   amount of shares would redeem zero assets while the owner's balance is
+    ///   worth at least one unit of the asset. When the whole balance is worth
+    ///   zero assets, `max_redeem` is `0` and the redemption fails with
+    ///   [`crate::vault::VaultTokenError::VaultExceededMaxRedeem`] instead.
     /// * [`crate::vault::VaultTokenError::VaultInvalidSharesAmount`] - When
     ///   `shares < 0`.
     /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
@@ -370,11 +426,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
-    /// # Security Warning
+    /// # Notes
     ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// Authorization for the operator must be handled at a higher level.
+    /// Authorization from `operator` is required.
     fn redeem(e: &Env, shares: i128, receiver: Address, owner: Address, operator: Address) -> i128 {
         Self::ContractType::redeem(e, shares, receiver, owner, operator)
     }
@@ -408,6 +462,12 @@ pub enum VaultTokenError {
     VaultMaxDecimalsOffsetExceeded = 409,
     /// Indicates overflow due to mathematical operations
     MathOverflow = 410,
+    /// Attempted to deposit a positive amount of assets that would mint zero
+    /// shares.
+    VaultZeroShares = 411,
+    /// Attempted to redeem a positive amount of shares that would return zero
+    /// assets.
+    VaultZeroAssets = 412,
 }
 
 // ################## CONSTANTS ##################

@@ -8,7 +8,7 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
 use stellar_tokens::non_fungible::{
     burnable::NonFungibleBurnable,
     enumerable::{Enumerable, NonFungibleEnumerable},
-    Base, NonFungibleToken,
+    Base, Compose, NonFungibleToken,
 };
 
 #[contracttype]
@@ -30,13 +30,15 @@ impl ExampleContract {
         let owner: Address =
             e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
         owner.require_auth();
-        Enumerable::sequential_mint(e, &to)
+        // Resolves to the `Enumerable` mint, which records the token in the
+        // enumeration lists.
+        <Self as NonFungibleToken>::ContractType::mint(e, &to)
     }
 }
 
 #[contractimpl(contracttrait)]
 impl NonFungibleToken for ExampleContract {
-    type ContractType = Enumerable;
+    type ContractType = Compose<(Enumerable,)>;
 }
 
 #[contractimpl(contracttrait)]

@@ -119,8 +119,13 @@
 /// - **Recovered accounts cannot have new identities added**: Once an account
 ///   has been recovered, it is permanently marked and cannot be reused for new
 ///   identities.
-/// - **Cannot recover to an already-recovered account**: An account that was
-///   previously used as a recovery target cannot be used again.
+/// - **Cannot recover to an already-recovered account**: A recovered (old)
+///   account cannot be used as the target of another recovery.
+/// - **The new account keeps its identity until the tokens arrive**:
+///   `recover_identity` and `recover_balance` are separate calls, and the
+///   tokens stay on the old account in between. Until they are moved, the new
+///   account cannot be removed or recovered to yet another account, so it still
+///   belongs to the same investor when `recover_balance` runs.
 /// - **Proper sequencing enforced**: The system enforces the correct recovery
 ///   sequence: `recover_identity` must be called before `recover_balance` to
 ///   ensure identity verification precedes asset transfer.
@@ -214,6 +219,10 @@ pub enum IRSStorageKey {
     IdentityProfile(Address),
     /// Maps old account to new account after recovery
     RecoveredTo(Address),
+    /// Maps new account back to old account after recovery (the reverse of
+    /// `RecoveredTo`). Deleted when the new account is removed or recovered
+    /// to another account.
+    RecoveredFrom(Address),
 }
 
 // ################## QUERY STATE ##################
@@ -387,6 +396,69 @@ pub fn add_identity(
     }
 }
 
+/// Stores several identities in one invocation, associating `accounts[i]` with
+/// `identities[i]` and `country_data_lists[i]`.
+///
+/// The batch is atomic: an item that fails reverts every item before it.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `accounts` - The account addresses to associate with the identities.
+/// * `identities` - The identity addresses to store.
+/// * `identity_type` - Whether the batch registers individuals or
+///   organizations.
+/// * `country_data_lists` - The initial country data entries for each account.
+///
+/// # Errors
+///
+/// * [`IRSError::BatchSizeMismatch`] - When the three arrays do not all have
+///   the same length.
+/// * refer to [`add_identity`] errors.
+///
+/// # Events
+///
+/// For each registration:
+/// * topics - `["identity_stored", account: Address, identity: Address]`
+/// * data - `[]`
+///
+/// And for each of its country data entries:
+/// * topics - `["country_data_added", account: Address]`
+/// * data - `[country_data: Val]`
+///
+/// # Notes
+///
+/// One `identity_type` applies to the whole batch, so a cohort that mixes
+/// individuals and organizations takes one call per type.
+///
+/// An account repeated across the batch fails on its second occurrence with
+/// [`IRSError::IdentityOverwrite`], which reverts the whole batch.
+///
+/// The caller is responsible for sizing the batch to fit the per-transaction
+/// network limits. Refer to the batch operations section of the
+/// [RWA module documentation](crate::rwa).
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
+pub fn batch_add_identity(
+    e: &Env,
+    accounts: &Vec<Address>,
+    identities: &Vec<Address>,
+    identity_type: IdentityType,
+    country_data_lists: &Vec<Vec<CountryData>>,
+) {
+    if accounts.len() != identities.len() || accounts.len() != country_data_lists.len() {
+        panic_with_error!(e, IRSError::BatchSizeMismatch);
+    }
+
+    for ((account, identity), countries) in
+        accounts.iter().zip(identities.iter()).zip(country_data_lists.iter())
+    {
+        add_identity(e, &account, &identity, identity_type.clone(), &countries);
+    }
+}
+
 /// Removes an identity and all associated country data.
 ///
 /// The account must not hold a balance in any linked token. Compliance
@@ -396,6 +468,12 @@ pub fn add_identity(
 /// another identity, would orphan that state. A funded account is expected
 /// to be emptied first, through regular or forced transfers, so that every
 /// token movement passes through the compliance hooks.
+///
+/// If `account` got its identity from a recovery (say from wallet A), A must
+/// not hold a balance in any linked token either. Otherwise A's tokens are
+/// still waiting for `recover_balance` to move them to `account`, and
+/// removing `account` would let it be registered to another investor, who
+/// would then receive A's tokens.
 ///
 /// # Arguments
 ///
@@ -407,7 +485,8 @@ pub fn add_identity(
 /// * [`IRSError::IdentityNotFound`] - If no identity is found for the
 ///   `account`.
 /// * [`IRSError::AccountHasBalance`] - If `account` holds a non-zero balance in
-///   any linked token.
+///   any linked token, or if `account` got its identity from a recovery and the
+///   old account of that recovery still holds one.
 ///
 /// # Events
 ///
@@ -420,11 +499,12 @@ pub fn add_identity(
 ///
 /// # Notes
 ///
-/// One cross-contract `balance` call is made per linked token; the token
-/// binder's `MAX_TOKENS` cap is sized so this sweep fits within a single
-/// transaction. The zero balance check is only as complete as the token
-/// binder registry: a token that resolves identities through this contract
-/// without being bound to it is not checked.
+/// One cross-contract `balance` call is made per linked token (two if
+/// `account` got its identity from a recovery); the token binder's `MAX_TOKENS`
+/// cap is sized so this sweep fits within a single transaction. The zero
+/// balance check is only as complete as the token binder registry: a token that
+/// resolves identities through this contract without being bound to it is not
+/// checked.
 ///
 /// The check covers balance-backed module state. Time-windowed transfer
 /// counters are flow-based and stay keyed to the old identity: a wallet
@@ -451,11 +531,8 @@ pub fn remove_identity(e: &Env, account: &Address) {
         .get(&identity_key)
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
 
-    for token in linked_tokens(e).iter() {
-        if TokenClient::new(e, &token).balance(account) != 0 {
-            panic_with_error!(e, IRSError::AccountHasBalance);
-        }
-    }
+    require_zero_balance(e, account);
+    clear_recovered_from(e, account);
 
     e.storage().persistent().remove(&identity_key);
 
@@ -494,6 +571,10 @@ pub fn remove_identity(e: &Env, account: &Address) {
 ///   recovered to another account.
 /// * [`IRSError::IdentityOverwrite`] - If the `new_account` is already linked
 ///   to an identity.
+/// * [`IRSError::AccountHasBalance`] - If `old_account` got its identity from
+///   an earlier recovery (say from wallet A), and A still holds a balance in
+///   any linked token, i.e. `recover_balance(A, old_account)` has not moved A's
+///   tokens yet.
 ///
 /// # Events
 ///
@@ -528,6 +609,13 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
         panic_with_error!(e, IRSError::IdentityOverwrite)
     }
 
+    // Say an earlier recovery moved the identity from wallet A to
+    // `old_account`, and A's tokens have not been moved yet. This call takes
+    // the identity away from `old_account`, after which
+    // `recover_balance(A, old_account)` fails and A's tokens are stuck, so
+    // reject it until A is empty.
+    clear_recovered_from(e, old_account);
+
     e.storage().persistent().set(&new_identity_key, &identity);
     e.storage().persistent().remove(&old_identity_key);
 
@@ -547,6 +635,12 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
 
     // Mark old account as recovered to new account
     e.storage().persistent().set(&IRSStorageKey::RecoveredTo(old_account.clone()), new_account);
+
+    // Record the reverse link. While `old_account` still has tokens, this link
+    // makes both removing `new_account` and recovering it to another account
+    // panic, so `new_account` keeps its identity until `recover_balance` has
+    // moved the tokens to it.
+    e.storage().persistent().set(&IRSStorageKey::RecoveredFrom(new_account.clone()), old_account);
 
     emit_identity_recovered(e, old_account, new_account);
 }
@@ -732,6 +826,53 @@ pub fn validate_country_data(e: &Env, country_data: &CountryData) {
                 panic_with_error!(e, IRSError::MetadataStringTooLong);
             }
         }
+    }
+}
+
+/// Panics if `account` holds a non-zero balance in any linked token.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address to check.
+///
+/// # Errors
+///
+/// * [`IRSError::AccountHasBalance`] - If `account` holds a non-zero balance in
+///   any linked token.
+fn require_zero_balance(e: &Env, account: &Address) {
+    for token in linked_tokens(e).iter() {
+        if TokenClient::new(e, &token).balance(account) != 0 {
+            panic_with_error!(e, IRSError::AccountHasBalance);
+        }
+    }
+}
+
+/// Deletes the `RecoveredFrom(account)` link, if there is one. Called right
+/// before `account` loses its identity.
+///
+/// If `account` got its identity from a recovery (say from wallet A), A must
+/// have no balance left in any linked token, i.e. `recover_balance` has
+/// already moved A's tokens to `account`. Otherwise this panics, because once
+/// `account` loses its identity A's tokens can no longer be recovered to it.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address about to lose its identity.
+///
+/// # Errors
+///
+/// * [`IRSError::AccountHasBalance`] - If `account` got its identity from a
+///   recovery and the old account of that recovery still holds a non-zero
+///   balance in any linked token.
+fn clear_recovered_from(e: &Env, account: &Address) {
+    let key = IRSStorageKey::RecoveredFrom(account.clone());
+    // No TTL extension: the entry is either removed right below, or the call
+    // panics and reverts.
+    if let Some(old_account) = e.storage().persistent().get::<_, Address>(&key) {
+        require_zero_balance(e, &old_account);
+        e.storage().persistent().remove(&key);
     }
 }
 

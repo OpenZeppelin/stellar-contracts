@@ -17,6 +17,7 @@ OpenZeppelin Stellar Contracts are published as separate crates on [crates.io](h
 
 - [stellar-access](https://crates.io/crates/stellar-access): Role-based access controls and ownable
 - [stellar-accounts](https://crates.io/crates/stellar-accounts): Smart accounts with custom authentication and authorization
+- [stellar-confidential](https://crates.io/crates/stellar-confidential): Confidential token with encrypted balances and zero-knowledge proofs
 - [stellar-contract-utils](https://crates.io/crates/stellar-contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
 - [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
 - [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
@@ -31,6 +32,7 @@ Refer to the [OpenZeppelin for Stellar Contracts](https://docs.openzeppelin.com/
 - `packages/`: Source code
   - [`access/`](packages/access): Role-based access controls and ownable
   - [`accounts/`](packages/accounts): Smart accounts with custom authentication and authorization
+  - [`confidential/`](packages/confidential): Confidential token with encrypted balances and zero-knowledge proofs
   - [`contract-utils/`](packages/contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
   - [`fee-abstraction/`](packages/fee-abstraction): Utilities for covering transaction fees with fungible tokens instead of XLM
   - [`governance/`](packages/governance): Governance utilities (governor, votes, timelock)
@@ -73,13 +75,14 @@ We recommend pinning to a specific version, because rapid iterations are expecte
 
 ```toml
 [dependencies]
-stellar-tokens = "=0.7.1"
-stellar-access = "=0.7.1"
-stellar-contract-utils = "=0.7.1"
-stellar-governance = "=0.7.1"
-stellar-accounts = "=0.7.1"
-stellar-fee-abstraction = "=0.7.1"
-stellar-macros = "=0.7.1"
+stellar-tokens = "=0.8.0"
+stellar-access = "=0.8.0"
+stellar-contract-utils = "=0.8.0"
+stellar-governance = "=0.8.0"
+stellar-accounts = "=0.8.0"
+stellar-fee-abstraction = "=0.8.0"
+stellar-confidential = "=0.8.0"
+stellar-macros = "=0.8.0"
 ```
 
 ## Notes

@@ -1,10 +1,19 @@
 extern crate std;
 
-use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env};
+use soroban_sdk::{
+    contract, contractimpl, testutils::Address as _, Address, Env, Error, MuxedAddress, String,
+};
 
 use crate::{
-    fungible::Base,
-    vault::{Vault, MAX_DECIMALS_OFFSET},
+    fungible::{
+        capped::{Capped, FungibleCapped},
+        total_supply::{total_supply, FungibleTotalSupply, TotalSupply, TotalSupplyStorageKey},
+        Base, Compose, ContractOverrides, FungibleToken, FungibleTokenError,
+    },
+    vault::{
+        storage::VaultStorageKey, CappedVault, FungibleVault, Vault, VaultOverrides,
+        MAX_DECIMALS_OFFSET,
+    },
 };
 
 // Simple mock contract for vault testing
@@ -190,8 +199,14 @@ fn max_functions() {
 
     e.as_contract(&vault_address, || {
         // Test max functions with empty vault
-        assert_eq!(Vault::max_deposit(&e, user.clone()), i128::MAX);
-        assert_eq!(Vault::max_mint(&e, user.clone()), i128::MAX);
+        // Empty vault: the only limit is the virtual bound, `i128::MAX -
+        // 10^offset` shares, worth that many assets divided by `10^offset`.
+        let virtual_shares = 10i128.pow(decimals_offset);
+        assert_eq!(Vault::max_mint(&e, user.clone()), i128::MAX - virtual_shares);
+        assert_eq!(
+            Vault::max_deposit(&e, user.clone()),
+            (i128::MAX - virtual_shares) / virtual_shares
+        );
         assert_eq!(Vault::max_withdraw(&e, user.clone()), 0); // No shares yet
         assert_eq!(Vault::max_redeem(&e, user.clone()), 0); // No shares yet
     });
@@ -219,7 +234,7 @@ fn deposit_functionality() {
 
         // Check results
         assert_eq!(Base::balance(&e, &user), shares_minted);
-        assert_eq!(Base::total_supply(&e), shares_minted);
+        assert_eq!(total_supply(&e), shares_minted);
         assert_eq!(Vault::total_assets(&e), deposit_amount);
 
         // For first deposit, shares should equal assets with offset
@@ -249,7 +264,7 @@ fn mint_functionality() {
             Vault::mint(&e, shares_to_mint, user.clone(), user.clone(), user.clone());
 
         assert_eq!(Base::balance(&e, &user), shares_to_mint);
-        assert_eq!(Base::total_supply(&e), shares_to_mint);
+        assert_eq!(total_supply(&e), shares_to_mint);
         assert_eq!(assets_deposited, required_assets);
     });
 }
@@ -312,7 +327,7 @@ fn redeem_functionality() {
 
         // Check results
         assert_eq!(Base::balance(&e, &user), shares_minted - shares_to_redeem);
-        assert_eq!(Base::total_supply(&e), shares_minted - shares_to_redeem);
+        assert_eq!(total_supply(&e), shares_minted - shares_to_redeem);
 
         // Should receive approximately half the original deposit
         let expected_assets = deposit_amount / 2;
@@ -414,6 +429,136 @@ fn redeem_exceeds_max() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #412)")]
+fn redeem_zero_assets() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 100, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, 6);
+
+    e.mock_all_auths();
+
+    let shares = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 100, user.clone(), user.clone(), user.clone())
+    });
+
+    e.as_contract(&vault_address, || {
+        assert_eq!(Vault::max_redeem(&e, user.clone()), shares);
+        // 1 share is worth 101 / (100 * 10^6 + 10^6) assets, which rounds to 0.
+        assert_eq!(Vault::preview_redeem(&e, 1), 0);
+
+        Vault::redeem(&e, 1, user.clone(), user.clone(), user.clone());
+    });
+}
+
+#[test]
+fn max_redeem_zero_after_clawback() {
+    let e = Env::default();
+    let issuer = Address::generate(&e);
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &user);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.mock_all_auths();
+
+    let shares = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 1_000, user.clone(), user.clone(), user.clone())
+    });
+    // Asset taken out of the vault without any vault function being called.
+    asset_client.transfer(&vault_address, &issuer, &1_000);
+
+    e.as_contract(&vault_address, || {
+        assert_eq!(Vault::total_assets(&e), 0);
+        assert_eq!(Base::balance(&e, &user), shares);
+        assert_eq!(Vault::preview_redeem(&e, shares), 0);
+        assert_eq!(Vault::max_redeem(&e, user.clone()), 0);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #408)")]
+fn redeem_after_clawback_is_rejected() {
+    let e = Env::default();
+    let issuer = Address::generate(&e);
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &user);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.mock_all_auths();
+
+    let shares = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 1_000, user.clone(), user.clone(), user.clone())
+    });
+    asset_client.transfer(&vault_address, &issuer, &1_000);
+
+    e.as_contract(&vault_address, || {
+        Vault::redeem(&e, shares, user.clone(), user.clone(), user.clone());
+    });
+}
+
+#[test]
+fn redeem_max_redeem_after_clawback_is_a_no_op() {
+    let e = Env::default();
+    let issuer = Address::generate(&e);
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &user);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.mock_all_auths();
+
+    let shares = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 1_000, user.clone(), user.clone(), user.clone())
+    });
+    asset_client.transfer(&vault_address, &issuer, &1_000);
+
+    e.as_contract(&vault_address, || {
+        // `redeem(max_redeem(owner))` must not revert (ERC-4626), even when
+        // `max_redeem` is 0 because the balance is worth zero assets.
+        let max_shares = Vault::max_redeem(&e, user.clone());
+        assert_eq!(max_shares, 0);
+        let assets = Vault::redeem(&e, max_shares, user.clone(), user.clone(), user.clone());
+
+        assert_eq!(assets, 0);
+        assert_eq!(Base::balance(&e, &user), shares);
+        assert_eq!(total_supply(&e), shares);
+    });
+}
+
+#[test]
+fn max_redeem_matches_redeem_for_dust_balance() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let dust_holder = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 100, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, 6);
+
+    e.mock_all_auths();
+
+    let shares = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 100, user.clone(), user.clone(), user.clone())
+    });
+    e.as_contract(&vault_address, || {
+        Base::transfer(&e, &user, &dust_holder.clone().into(), 1);
+    });
+
+    e.as_contract(&vault_address, || {
+        // A balance worth zero assets cannot be redeemed, and says so.
+        assert_eq!(Base::balance(&e, &dust_holder), 1);
+        assert_eq!(Vault::max_redeem(&e, dust_holder.clone()), 0);
+
+        // A balance worth assets can be redeemed in full.
+        let max_shares = Vault::max_redeem(&e, user.clone());
+        assert_eq!(max_shares, shares - 1);
+        let assets = Vault::redeem(&e, max_shares, user.clone(), user.clone(), user.clone());
+        assert!(assets > 0);
+        assert_eq!(Base::balance(&e, &user), 0);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #401)")]
 fn asset_address_already_set() {
     let e = Env::default();
@@ -482,6 +627,50 @@ fn convert_zero_assets() {
 }
 
 #[test]
+fn deposit_zero_assets() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        let shares = Vault::deposit(&e, 0, admin.clone(), admin.clone(), admin.clone());
+        assert_eq!(shares, 0);
+        assert_eq!(total_supply(&e), 0);
+        assert_eq!(Vault::total_assets(&e), 0);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #411)")]
+fn deposit_zero_shares_after_donation() {
+    let e = Env::default();
+    let attacker = Address::generate(&e);
+    let victim = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &attacker);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    asset_client.mint(&victim, &1_000);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Vault::deposit(&e, 1, attacker.clone(), attacker.clone(), attacker.clone());
+    });
+    asset_client.transfer(&attacker, &vault_address, &100);
+
+    e.as_contract(&vault_address, || {
+        assert_eq!(total_supply(&e), 1);
+        assert_eq!(Vault::total_assets(&e), 101);
+        assert_eq!(Vault::preview_deposit(&e, 50), 0);
+
+        Vault::deposit(&e, 50, victim.clone(), victim.clone(), victim.clone());
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #403)")]
 fn invalid_assets_amount() {
     let e = Env::default();
@@ -544,7 +733,7 @@ fn deposit_transfer_from() {
 
         // Check results
         assert_eq!(Base::balance(&e, &user), shares_minted);
-        assert_eq!(Base::total_supply(&e), shares_minted);
+        assert_eq!(total_supply(&e), shares_minted);
         assert_eq!(Vault::total_assets(&e), deposit_amount);
 
         // For first deposit, shares should equal assets with offset
@@ -611,7 +800,7 @@ fn mint_transfer_from() {
 
         // Check results
         assert_eq!(Base::balance(&e, &user), shares_to_mint);
-        assert_eq!(Base::total_supply(&e), shares_to_mint);
+        assert_eq!(total_supply(&e), shares_to_mint);
         assert_eq!(assets_deposited, required_assets);
     });
 }
@@ -646,4 +835,795 @@ fn mint_transfer_from_not_enough_allowance() {
         // Try to mint with insufficient allowance (should panic)
         Vault::mint(&e, shares_to_mint, user.clone(), admin.clone(), operator.clone());
     });
+}
+
+// With offset `MAX_DECIMALS_OFFSET`, every conversion computes
+// `total_supply + 10^offset`, so the vault reaches the `i128` ceiling once it
+// holds `i128::MAX / 10^offset` asset base units.
+fn virtual_shares() -> i128 {
+    10_i128.pow(MAX_DECIMALS_OFFSET)
+}
+
+fn assets_at_virtual_bound() -> i128 {
+    i128::MAX / virtual_shares()
+}
+
+#[test]
+fn deposit_one_below_virtual_bound_keeps_vault_operational() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let boundary = assets_at_virtual_bound();
+    let asset_address = create_asset_contract(&e, boundary, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, MAX_DECIMALS_OFFSET);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        let shares = Vault::deposit(&e, boundary - 1, user.clone(), user.clone(), user.clone());
+        assert_eq!(shares, (boundary - 1) * virtual_shares());
+
+        // `total_supply + 10^offset` is exactly representable here, so every
+        // conversion still works.
+        assert_eq!(Vault::preview_redeem(&e, virtual_shares()), 1);
+        assert_eq!(Vault::preview_deposit(&e, 1), virtual_shares());
+    });
+
+    // Separate frame: `deposit` and `redeem` both `require_auth` for `user`.
+    e.as_contract(&vault_address, || {
+        assert_eq!(
+            Vault::redeem(&e, virtual_shares(), user.clone(), user.clone(), user.clone()),
+            1
+        );
+    });
+}
+
+// `max_deposit` reports the room left under the virtual bound, so the deposit
+// is rejected by the entry point's limit check (`VaultExceededMaxDeposit`)
+// before reaching the guard in `deposit_internal`.
+#[test]
+#[should_panic(expected = "Error(Contract, #405)")]
+fn deposit_exceeding_virtual_bound_is_rejected() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let attacker = Address::generate(&e);
+    let boundary = assets_at_virtual_bound();
+    let asset_address = create_asset_contract(&e, boundary - 1, &user);
+    MockAssetContractClient::new(&e, &asset_address).mint(&attacker, &1);
+    let vault_address = create_vault_contract(&e, &asset_address, MAX_DECIMALS_OFFSET);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Vault::deposit(&e, boundary - 1, user.clone(), user.clone(), user.clone());
+
+        // The mint alone would fit (`total_supply` would land exactly on
+        // `boundary * 10^offset`), but `total_supply + 10^offset` would not,
+        // and every later conversion would fail. The deposit has to be
+        // rejected before the shares are minted.
+        Vault::deposit(&e, 1, attacker.clone(), attacker.clone(), attacker.clone());
+    });
+}
+
+// Same through `mint`: rejected by its limit check (`VaultExceededMaxMint`).
+#[test]
+#[should_panic(expected = "Error(Contract, #406)")]
+fn mint_exceeding_virtual_bound_is_rejected() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let attacker = Address::generate(&e);
+    let boundary = assets_at_virtual_bound();
+    let asset_address = create_asset_contract(&e, boundary - 1, &user);
+    MockAssetContractClient::new(&e, &asset_address).mint(&attacker, &1);
+    let vault_address = create_vault_contract(&e, &asset_address, MAX_DECIMALS_OFFSET);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Vault::deposit(&e, boundary - 1, user.clone(), user.clone(), user.clone());
+
+        // Same boundary through the `mint` entry point: `10^offset` shares
+        // cost exactly one asset here and would land on the same supply.
+        Vault::mint(&e, virtual_shares(), attacker.clone(), attacker.clone(), attacker.clone());
+    });
+}
+
+// The guard in `deposit_internal` stays as the second line of defense, for
+// contracts that call the low-level function directly and skip the entry
+// point's limit check.
+#[test]
+#[should_panic(expected = "Error(Contract, #410)")]
+fn deposit_internal_rejects_exceeding_virtual_bound() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let attacker = Address::generate(&e);
+    let boundary = assets_at_virtual_bound();
+    let asset_address = create_asset_contract(&e, boundary - 1, &user);
+    MockAssetContractClient::new(&e, &asset_address).mint(&attacker, &1);
+    let vault_address = create_vault_contract(&e, &asset_address, MAX_DECIMALS_OFFSET);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Vault::deposit(&e, boundary - 1, user.clone(), user.clone(), user.clone());
+        Vault::deposit_internal(&e, &attacker, 1, virtual_shares(), &attacker, &attacker);
+    });
+}
+
+// At the virtual bound, the limits the vault reports are exactly what its
+// entry points accept.
+#[test]
+fn limits_match_the_virtual_bound() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let boundary = assets_at_virtual_bound();
+    let asset_address = create_asset_contract(&e, boundary, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, MAX_DECIMALS_OFFSET);
+
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Vault::deposit(&e, boundary - 1, user.clone(), user.clone(), user.clone());
+        let room = i128::MAX - virtual_shares() - total_supply(&e);
+        assert_eq!(Vault::max_mint(&e, user.clone()), room);
+        // less than one asset's worth of shares is left
+        assert!(room < virtual_shares());
+        assert_eq!(Vault::max_deposit(&e, user.clone()), 0);
+    });
+    e.as_contract(&vault_address, || {
+        // minting exactly the reported room succeeds and fills the bound
+        Vault::mint(
+            &e,
+            Vault::max_mint(&e, user.clone()),
+            user.clone(),
+            user.clone(),
+            user.clone(),
+        );
+        assert_eq!(total_supply(&e), i128::MAX - virtual_shares());
+        assert_eq!(Vault::max_mint(&e, user.clone()), 0);
+        // and the vault keeps converting
+        assert_eq!(Vault::preview_redeem(&e, virtual_shares()), 1);
+    });
+}
+
+// `set_decimals_offset` caps the offset at `MAX_DECIMALS_OFFSET`, so
+// `10^offset` always fits in `i128`. The limits stay panic-free even if that
+// invariant were broken: with an offset written past the cap directly into
+// storage, they report no room instead of overflowing.
+#[test]
+fn limits_report_no_room_when_virtual_shares_overflow() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+
+    e.as_contract(&vault_address, || {
+        // 10^39 does not fit in `i128`
+        e.storage().instance().set(&VaultStorageKey::VirtualDecimalsOffset, &39_u32);
+        assert_eq!(Vault::max_mint(&e, user.clone()), 0);
+        assert_eq!(Vault::max_deposit(&e, user.clone()), 0);
+    });
+}
+
+// Once a share is worth more than one asset base unit, minting all the shares
+// the virtual bound allows would cost more than `i128::MAX` assets. `max_mint`
+// reports only the shares `i128::MAX` assets can pay for, so `preview_mint` of
+// it fits.
+fn vault_with_share_worth_two_assets(e: &Env, user: &Address) -> Address {
+    let asset_address = create_asset_contract(e, 100, user);
+    let vault_address = create_vault_contract(e, &asset_address, 0);
+    e.mock_all_auths();
+    e.as_contract(&vault_address, || {
+        Vault::deposit(e, 100, user.clone(), user.clone(), user.clone());
+    });
+    // donation: 200 assets back 100 shares
+    MockAssetContractClient::new(e, &asset_address).mint(&vault_address, &100);
+    vault_address
+}
+
+#[test]
+fn max_mint_is_limited_by_what_i128_max_assets_can_pay() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let vault_address = vault_with_share_worth_two_assets(&e, &user);
+
+    e.as_contract(&vault_address, || {
+        let max_shares = Vault::max_mint(&e, user.clone());
+        // fewer than the virtual bound allows, `i128::MAX - 1 - 100`
+        assert!(max_shares < i128::MAX - 1 - 100);
+        // paying for the reported shares fits in an `i128`
+        assert!(Vault::preview_mint(&e, max_shares) > i128::MAX - 201);
+        // the largest deposit minting at most those shares does not fit in an
+        // `i128`, so `max_deposit` is the most a deposit can pay, and
+        // depositing it mints exactly the reported shares
+        let max_assets = Vault::max_deposit(&e, user.clone());
+        assert_eq!(max_assets, i128::MAX);
+        assert_eq!(Vault::preview_deposit(&e, max_assets), max_shares);
+    });
+}
+
+// Pins that the limit above is tight: one more share costs more than
+// `i128::MAX` assets.
+#[test]
+#[should_panic(expected = "Error(Contract, #1500)")]
+fn preview_mint_overflows_one_share_above_max_mint() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let vault_address = vault_with_share_worth_two_assets(&e, &user);
+
+    e.as_contract(&vault_address, || {
+        Vault::preview_mint(&e, Vault::max_mint(&e, user.clone()) + 1);
+    });
+}
+
+// When the vault holds `i128::MAX` assets, every conversion overflows on
+// `total_assets + 1`, so both limits are `0`.
+#[test]
+fn limits_are_zero_when_total_assets_is_i128_max() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 0, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    MockAssetContractClient::new(&e, &asset_address).mint(&vault_address, &i128::MAX);
+
+    e.as_contract(&vault_address, || {
+        assert_eq!(Vault::max_mint(&e, user.clone()), 0);
+        assert_eq!(Vault::max_deposit(&e, user.clone()), 0);
+    });
+}
+
+// Pins the claim above: `mint` is now rejected by its limit check
+// (`VaultExceededMaxMint`) instead of overflowing in `preview_mint`.
+#[test]
+#[should_panic(expected = "Error(Contract, #406)")]
+fn mint_is_rejected_when_total_assets_is_i128_max() {
+    let e = Env::default();
+    let user = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1, &user);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    MockAssetContractClient::new(&e, &asset_address).mint(&vault_address, &i128::MAX);
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Vault::mint(&e, 1, user.clone(), user.clone(), user.clone());
+    });
+}
+
+// ################## CAPPED VAULT ##################
+
+// The finding that motivated `CappedVault`: a vault listing `Capped` must not
+// let a deposit mint shares past the cap.
+#[test]
+#[should_panic(expected = "Error(Contract, #106)")]
+fn capped_vault_deposit_rejects_exceeding_cap() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 100);
+        <CappedVault as VaultOverrides>::deposit(
+            &e,
+            150,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #106)")]
+fn capped_vault_mint_rejects_exceeding_cap() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 100);
+        <CappedVault as VaultOverrides>::mint(&e, 60, admin.clone(), admin.clone(), admin.clone());
+        <CappedVault as VaultOverrides>::mint(&e, 41, admin.clone(), admin.clone(), admin.clone());
+    });
+}
+
+#[test]
+fn capped_vault_reports_the_cap_in_its_limits() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 100);
+        // empty vault, offset 0: one share per asset
+        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), 100);
+        assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), 100);
+
+        // depositing exactly the reported maximum succeeds and fills the cap
+        let shares = <CappedVault as VaultOverrides>::deposit(
+            &e,
+            100,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+        assert_eq!(shares, 100);
+        assert_eq!(total_supply(&e), 100);
+        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), 0);
+        assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), 0);
+    });
+}
+
+// With a decimals offset, the cap counts shares, not assets.
+#[test]
+fn capped_vault_limits_follow_the_decimals_offset() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, 6);
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 100 * 10i128.pow(6));
+        assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), 100);
+
+        <CappedVault as VaultOverrides>::deposit(
+            &e,
+            100,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+        assert_eq!(total_supply(&e), 100 * 10i128.pow(6));
+    });
+}
+
+// A capped vault holding `supply` shares and `assets` assets, with no cap yet
+// (`i128::MAX`): the shares are minted into an empty vault, and the rest of
+// the assets is donated.
+fn capped_vault_with(e: &Env, admin: &Address, offset: u32, supply: i128, assets: i128) -> Address {
+    let asset_address = create_asset_contract(e, 1_000_000, admin);
+    let vault_address = create_vault_contract(e, &asset_address, offset);
+    e.mock_all_auths();
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(e, i128::MAX);
+        if supply > 0 {
+            <CappedVault as VaultOverrides>::mint(
+                e,
+                supply,
+                admin.clone(),
+                admin.clone(),
+                admin.clone(),
+            );
+        }
+    });
+    let held = e.as_contract(&vault_address, || Vault::total_assets(e));
+    MockAssetContractClient::new(e, &asset_address).mint(&vault_address, &(assets - held));
+    e.as_contract(&vault_address, || {
+        assert_eq!(total_supply(e), supply);
+        assert_eq!(Vault::total_assets(e), assets);
+    });
+    vault_address
+}
+
+// Price above one asset, not a whole number (1_334 / 1_001 ~ 1.333): the
+// largest deposit minting at most the 1_000 remaining shares is
+// `ceil(1_001 * 1_334 / 1_001) - 1 = 1_333`, and depositing it fills the cap.
+#[test]
+fn capped_vault_max_deposit_fills_the_cap() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let vault_address = capped_vault_with(&e, &admin, 0, 1_000, 1_333);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 2_000);
+        let max_assets = <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+        assert_eq!(max_assets, 1_333);
+        // rounding the cost down (1_332) would leave a share unminted
+        assert_eq!(Vault::preview_deposit(&e, 1_332), 999);
+        // one more asset mints past the cap
+        assert_eq!(Vault::preview_deposit(&e, max_assets + 1), 1_001);
+
+        let shares = <CappedVault as VaultOverrides>::deposit(
+            &e,
+            max_assets,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+        assert_eq!(shares, 1_000);
+        assert_eq!(total_supply(&e), 2_000);
+        assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), 0);
+    });
+}
+
+// One share left at a price above one asset (151 / 101 ~ 1.495): rounding the
+// cost of that share down gives 1, which mints zero shares and is rejected.
+// The largest accepted deposit is `ceil(2 * 151 / 101) - 1 = 2`.
+#[test]
+fn capped_vault_max_deposit_mints_the_last_share() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let vault_address = capped_vault_with(&e, &admin, 0, 100, 150);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 101);
+        assert_eq!(Vault::preview_deposit(&e, 1), 0);
+        let max_assets = <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+        assert_eq!(max_assets, 2);
+        assert_eq!(Vault::preview_deposit(&e, max_assets + 1), 2);
+
+        let shares = <CappedVault as VaultOverrides>::deposit(
+            &e,
+            max_assets,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+        assert_eq!(shares, 1);
+        assert_eq!(total_supply(&e), 101);
+    });
+}
+
+// Pins that the limit above is tight through `deposit` itself.
+#[test]
+#[should_panic(expected = "Error(Contract, #106)")]
+fn capped_vault_deposit_one_asset_above_max_deposit_exceeds_the_cap() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let vault_address = capped_vault_with(&e, &admin, 0, 100, 150);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 101);
+        let max_assets = <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+        <CappedVault as VaultOverrides>::deposit(
+            &e,
+            max_assets + 1,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+    });
+}
+
+// One share left at a price below one asset (61 / 110 ~ 0.55): rounding the
+// cost of that share down gives 0, although depositing 1 asset mints exactly
+// the last share. The largest accepted deposit is `ceil(2 * 61 / 110) - 1 = 1`.
+#[test]
+fn capped_vault_max_deposit_below_one_asset_per_share() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let vault_address = capped_vault_with(&e, &admin, 1, 100, 60);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 101);
+        let max_assets = <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+        assert_eq!(max_assets, 1);
+        assert_eq!(Vault::preview_deposit(&e, max_assets + 1), 3);
+
+        let shares = <CappedVault as VaultOverrides>::deposit(
+            &e,
+            max_assets,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+        assert_eq!(shares, 1);
+        assert_eq!(total_supply(&e), 101);
+    });
+}
+
+// Below one asset per share, the smallest deposit can already mint past the
+// cap: an empty vault with offset 1 mints 10 shares for 1 asset, and the cap
+// allows 2, so no deposit fits.
+#[test]
+fn capped_vault_max_deposit_is_zero_when_one_asset_mints_past_the_cap() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let vault_address = capped_vault_with(&e, &admin, 1, 0, 0);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 2);
+        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), 2);
+        assert_eq!(Vault::preview_deposit(&e, 1), 10);
+        assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), 0);
+    });
+}
+
+// At a whole price of 10 assets with one share left, every deposit from 10 to
+// 19 assets mints that share, so `max_deposit` is 19 (`2 * 10 - 1`), not the
+// cost of the share. The extra assets stay in the vault, as with any deposit.
+#[test]
+fn capped_vault_max_deposit_can_exceed_the_cost_of_the_remaining_shares() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    // empty supply, 9 assets: one share costs 10 / 1
+    let vault_address = capped_vault_with(&e, &admin, 0, 0, 9);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 1);
+        assert_eq!(Vault::preview_mint(&e, 1), 10);
+        let max_assets = <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+        assert_eq!(max_assets, 19);
+        assert_eq!(Vault::preview_deposit(&e, max_assets + 1), 2);
+
+        let shares = <CappedVault as VaultOverrides>::deposit(
+            &e,
+            max_assets,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+        assert_eq!(shares, 1);
+        assert_eq!(total_supply(&e), 1);
+    });
+}
+
+// Sweeps small vault states through the real conversion: in each one,
+// depositing `max_deposit` must mint at most the remaining shares and, when
+// positive, at least one, and one more asset must mint past the cap.
+#[test]
+fn capped_vault_max_deposit_is_the_largest_accepted_deposit() {
+    let e = Env::default();
+    e.cost_estimate().budget().reset_unlimited();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 0, &admin);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+
+    for offset in 0..=2u32 {
+        let vault_address = create_vault_contract(&e, &asset_address, offset);
+        for supply in 0..12i128 {
+            for assets in 0..20i128 {
+                let held = e.as_contract(&vault_address, || Vault::total_assets(&e));
+                asset_client.mint(&vault_address, &(assets - held));
+                e.as_contract(&vault_address, || {
+                    e.storage().persistent().set(&TotalSupplyStorageKey::TotalSupply, &supply);
+                    for left in 1..=6i128 {
+                        Capped::set_cap(&e, supply + left);
+                        let max_assets =
+                            <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+                        let minted = Vault::preview_deposit(&e, max_assets);
+                        let state = (offset, supply, assets, left, max_assets);
+                        assert!(minted <= left, "{state:?}");
+                        assert!(max_assets == 0 || minted >= 1, "{state:?}");
+                        assert!(Vault::preview_deposit(&e, max_assets + 1) > left, "{state:?}");
+                    }
+                });
+            }
+        }
+    }
+}
+
+// The cap may be lowered below the current supply (refer to `set_cap`); the
+// limits then report zero instead of a negative amount.
+#[test]
+fn capped_vault_limits_are_zero_above_the_cap() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 100);
+        <CappedVault as VaultOverrides>::deposit(
+            &e,
+            80,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+        Capped::set_cap(&e, 50);
+        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), 0);
+        assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), 0);
+    });
+}
+
+// A cap far above anything the vault can reach, with a share price high
+// enough that the remaining shares cost more than `i128::MAX` assets: the
+// views must not panic. `max_mint` reports the shares `i128::MAX` assets can
+// pay for, and `max_deposit` reports `i128::MAX`, which mints exactly those.
+#[test]
+fn capped_vault_max_deposit_does_not_overflow() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 0, &admin);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    let assets = 10i128.pow(30);
+    asset_client.mint(&vault_address, &assets);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, i128::MAX);
+        // offset 0, empty supply: floor(i128::MAX * 1 / (10^30 + 1))
+        let max_shares = i128::MAX / (assets + 1);
+        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), max_shares);
+        let max_assets = <CappedVault as VaultOverrides>::max_deposit(&e, admin.clone());
+        assert_eq!(max_assets, i128::MAX);
+        assert_eq!(Vault::preview_deposit(&e, max_assets), max_shares);
+    });
+}
+
+// When the vault's asset balance is `i128::MAX`, `deposit` and `mint` overflow
+// on `total_assets + 1` and cannot succeed, so the reported limits must be `0`
+// even when the cap still allows more shares.
+#[test]
+fn capped_vault_max_deposit_is_zero_when_deposits_cannot_succeed() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 0, &admin);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    asset_client.mint(&vault_address, &i128::MAX);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 100);
+        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), 0);
+        assert_eq!(<CappedVault as VaultOverrides>::max_deposit(&e, admin.clone()), 0);
+    });
+}
+
+// Pins the claim above: a deposit in that state panics.
+#[test]
+#[should_panic(expected = "Error(Contract, #410)")]
+fn capped_vault_deposit_panics_when_total_assets_overflow() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1, &admin);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    asset_client.mint(&vault_address, &i128::MAX);
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 100);
+        <CappedVault as VaultOverrides>::deposit(
+            &e,
+            1,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+    });
+}
+
+// The share token's decimals stay the vault's (underlying decimals plus the
+// offset) on the capped contract type.
+#[test]
+fn capped_vault_decimals_are_the_vault_decimals() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, 6);
+
+    e.as_contract(&vault_address, || {
+        assert_eq!(<CappedVault as ContractOverrides>::decimals(&e), Vault::decimals(&e));
+        assert_eq!(<CappedVault as ContractOverrides>::decimals(&e), 18 + 6);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #108)")]
+fn capped_vault_deposit_requires_a_cap() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        <CappedVault as VaultOverrides>::deposit(
+            &e,
+            10,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+    });
+}
+
+// Withdrawals and redemptions are not touched by the cap and keep the vault
+// defaults, freeing room under the cap again.
+#[test]
+fn capped_vault_redeem_frees_room_under_the_cap() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, 0);
+    e.mock_all_auths();
+
+    e.as_contract(&vault_address, || {
+        Capped::set_cap(&e, 100);
+        <CappedVault as VaultOverrides>::deposit(
+            &e,
+            100,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+    });
+    e.as_contract(&vault_address, || {
+        <CappedVault as VaultOverrides>::redeem(
+            &e,
+            40,
+            admin.clone(),
+            admin.clone(),
+            admin.clone(),
+        );
+        assert_eq!(total_supply(&e), 60);
+        assert_eq!(<CappedVault as VaultOverrides>::max_mint(&e, admin.clone()), 40);
+        assert_eq!(
+            <CappedVault as VaultOverrides>::max_withdraw(&e, admin.clone()),
+            Vault::max_withdraw(&e, admin.clone())
+        );
+    });
+}
+
+// A contract composing the capped vault: `FungibleVault` and `FungibleCapped`
+// both accept `CappedVault`, and the `FungibleVault` default bodies reach the
+// capped entry points through `VaultOverrides`.
+#[contract]
+struct CappedVaultContract;
+
+#[contractimpl]
+impl CappedVaultContract {
+    pub fn __constructor(e: &Env, asset: Address, cap: i128) {
+        Vault::set_asset(e, asset);
+        Vault::set_decimals_offset(e, 0);
+        Capped::set_cap(e, cap);
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl FungibleToken for CappedVaultContract {
+    type ContractType = Compose<(Vault, Capped, TotalSupply)>;
+
+    fn decimals(e: &Env) -> u32 {
+        Vault::decimals(e)
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl FungibleTotalSupply for CappedVaultContract {}
+
+#[contractimpl(contracttrait)]
+impl FungibleVault for CappedVaultContract {}
+
+#[contractimpl(contracttrait)]
+impl FungibleCapped for CappedVaultContract {}
+
+#[test]
+fn capped_vault_contract_enforces_the_cap_through_the_trait() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let asset_address = create_asset_contract(&e, 1_000, &admin);
+    let vault_address = e.register(CappedVaultContract, (asset_address, 100_i128));
+    let client = CappedVaultContractClient::new(&e, &vault_address);
+
+    assert_eq!(client.cap(), 100);
+    assert_eq!(client.max_deposit(&admin), 100);
+    assert_eq!(client.max_mint(&admin), 100);
+
+    client.deposit(&60, &admin, &admin, &admin);
+    assert_eq!(client.total_supply(), 60);
+    assert_eq!(client.max_mint(&admin), 40);
+
+    // past the cap, through both share-creating entry points
+    let exceeded_cap = Error::from_contract_error(FungibleTokenError::ExceededCap as u32);
+    assert_eq!(client.try_deposit(&41, &admin, &admin, &admin), Err(Ok(exceeded_cap)));
+    assert_eq!(client.try_mint(&41, &admin, &admin, &admin), Err(Ok(exceeded_cap)));
+
+    client.mint(&40, &admin, &admin, &admin);
+    assert_eq!(client.total_supply(), 100);
+
+    // transfers of shares are unaffected by the cap
+    let bob = Address::generate(&e);
+    client.transfer(&admin, MuxedAddress::from(bob.clone()), &10);
+    assert_eq!(client.balance(&bob), 10);
 }

@@ -4,7 +4,7 @@ pub mod storage;
 mod test;
 
 use soroban_sdk::{contractevent, contracttrait, Address, Env};
-pub use storage::AllowList;
+pub use storage::{AllowList, AllowListContractType};
 
 use crate::fungible::FungibleToken;
 
@@ -30,7 +30,7 @@ use crate::fungible::FungibleToken;
 /// "storage.rs", because the authorizations are to be handled in the access
 /// control helpers or directly implemented
 #[contracttrait]
-pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
+pub trait FungibleAllowList: FungibleToken<ContractType: AllowListContractType> {
     /// Returns the allowed status of an account.
     ///
     /// # Arguments

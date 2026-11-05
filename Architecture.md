@@ -12,18 +12,26 @@ The OpenZeppelin Stellar Contracts library follows a modular, trait-based archit
 stellar-contracts/
 ├── packages/                    # Core library packages
 │   ├── access/                  # Role-based access controls and ownable patterns
-│   ├── contract-utils/          # Utilities (pausable, upgradeable, cryptography)
-│   ├── macros/                  # Procedural and derive macros
-│   └── tokens/                  # Token implementations (fungible, non-fungible)
-│       ├── src/
-│       │   ├── fungible/        # Fungible token implementation
-│       │   │   ├── extensions/  # Optional token extensions
-│       │   │   ├── utils/       # Utility functions and helpers
-│       │   │   ├── mod.rs       # Core trait definitions, constants, errors, and events
-│       │   │   ├── storage.rs   # Storage management and state operations
-│       │   │   └── test.rs      # Comprehensive test suite
-│       │   └── non_fungible/    # Non-fungible token implementation
-│       └── lib.rs
+│   ├── accounts/                # Smart accounts (context rules, signers, verifiers, policies)
+│   ├── confidential/            # Confidential token (encrypted balances, ZK proofs, Noir circuits)
+│   ├── contract-utils/          # Utilities (pausable, upgradeable, cryptography, math, merkle distributor)
+│   ├── fee-abstraction/         # Fee forwarding (pay transaction fees in fungible tokens)
+│   ├── governance/              # Governor, votes, timelock
+│   ├── macros/                  # Procedural macros
+│   ├── tokens/                  # Token implementations (fungible, non-fungible, RWA, vault)
+│   │   └── src/
+│   │       ├── fungible/        # Fungible token implementation
+│   │       │   ├── extensions/  # Optional token extensions
+│   │       │   ├── utils/       # Utility functions and helpers
+│   │       │   ├── mod.rs       # Core trait definitions, constants, errors, and events
+│   │       │   ├── overrides.rs # Base contract type and override traits
+│   │       │   ├── storage.rs   # Storage management and state operations
+│   │       │   └── test.rs      # Comprehensive test suite
+│   │       ├── non_fungible/    # Non-fungible token implementation
+│   │       ├── rwa/             # Real-world asset token (T-REX) and its periphery
+│   │       ├── vault/           # Tokenized vault (ERC-4626)
+│   │       └── lib.rs
+│   └── zk-email/                # DKIM registry for zkEmail verification
 ├── examples/                    # Example contract implementations
 └── audits/                      # Security audit reports
 ```
@@ -60,18 +68,18 @@ pub struct Consecutive; // For batch minting optimization
 Extensions are constrained to specific contract types using associated type bounds:
 
 ```rust
-// Enumerable can only be used with Enumerable contract type
-trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
+// Enumerable requires a contract type that keeps the enumeration bookkeeping
+trait NonFungibleEnumerable: NonFungibleToken<ContractType: EnumerableContractType> {
     fn total_supply(e: &Env) -> u32;
     fn get_owner_token_id(e: &Env, owner: Address, index: u32) -> u32;
     // ...
 }
 
-// Consecutive can only be used with Consecutive contract type
-trait NonFungibleConsecutive: NonFungibleToken<ContractType = Consecutive> {
-    // Batch minting functionality
-}
+// Consecutive requires a contract type that follows the consecutive accounting model
+trait NonFungibleConsecutive: NonFungibleToken<ContractType: ConsecutiveContractType> {}
 ```
+
+`EnumerableContractType` and `ConsecutiveContractType` are marker traits implemented by `Enumerable` and `Consecutive` and by the curated combinations that include them (`EnumerableVotes`, `ConsecutiveVotes`).
 
 #### Mutual Exclusivity Enforcement
 
@@ -80,16 +88,20 @@ This design makes it **impossible** to implement conflicting extensions:
 ```rust
 // ✅ This works - using Enumerable
 impl NonFungibleToken for MyContract {
-    type ContractType = Enumerable;
+    type ContractType = Compose<(Enumerable,)>;
     // ... implementations
 }
 impl NonFungibleEnumerable for MyContract {
     // ... enumerable methods
 }
 
-// ❌ This CANNOT compile - Consecutive requires different ContractType
-// impl NonFungibleConsecutive for MyContract { ... }
-//     ^^^ Error: expected `Consecutive`, found `Enumerable`
+// ❌ This CANNOT compile - Consecutive requires a consecutive ContractType
+// impl NonFungibleConsecutive for MyContract {}
+//      ^^^ error[E0277]: the trait bound `Enumerable: ConsecutiveContractType` is not satisfied
+
+// ❌ Neither can listing both in `Compose`
+// type ContractType = Compose<(Enumerable, Consecutive)>;
+//      ^^^ error[E0277]: `Enumerable` cannot be combined with `Consecutive` in a `Compose` list
 ```
 
 #### Override Mechanism Through ContractOverrides
@@ -132,6 +144,51 @@ impl ContractOverrides for Consecutive {
 }
 ```
 
+#### Minting Through the Contract Type
+
+Minting is not part of any public trait, because no single `mint` signature
+fits every contract type. The contract type decides what the underlying primitive
+does: `TotalSupply` also increases the supply counter, `Capped` also checks the
+cap, `FungibleVotes` also moves voting units, `Enumerable` also records the token
+in its enumeration lists, and so on.
+
+The contract's own mint function reaches that primitive through the contract
+type:
+
+```rust
+#[only_owner]
+pub fn mint(e: &Env, to: Address, amount: i128) {
+    <Self as FungibleToken>::ContractType::mint(e, &to, amount);
+}
+```
+
+In the contract, `Self::ContractType` is the concrete type `Compose` resolved
+to (e.g. `CappedAllowList`), so this call is that type's own `mint`. Nothing
+has to be imported for it. Calling a specific primitive such as `Base::mint`
+instead would compile and skip the bookkeeping of the selected contract type
+(the supply counter, the cap, the voting units, the enumeration).
+
+The mint primitives each contract type provides follow its storage model:
+
+- fungible: `mint(to, amount)`, on every contract type except `Vault` and
+  `CappedVault`, which have no free mint (their shares are only created
+  against deposited assets);
+- non-fungible, one owner stored per token (`Base`, `Enumerable`, and their
+  votes variants): `mint(to) -> u32` mints the next id of the sequential
+  counter; `mint_with_id(to, token_id)` is also provided for ids chosen by the
+  caller;
+- non-fungible, ownership stored per batch (`Consecutive` and its votes
+  variant): `mint_range(to, amount) -> u32` mints `amount` consecutive ids.
+
+The non-fungible primitives have distinct names on purpose: switching a
+contract between the two storage models breaks the build at the mint call,
+instead of silently turning "mint one token" into "mint a range". Internally,
+the `MintOverrides` traits (`MintOverrides`, `MintWithIdOverrides` and
+`MintRangeOverrides` on the non-fungible side) are
+the checked promise that each contract type has these primitives with these
+exact signatures, and the path for library code that is generic over the
+contract type. Like `ContractOverrides`, contract authors never name them.
+
 #### Benefits of This Approach
 
 1. **Compile-Time Safety**: Incompatible extensions cannot be combined
@@ -163,10 +220,11 @@ The library provides two levels of abstraction:
 The architecture supports optional extensions that can be mixed and matched. Below is the list of the extensions for the Fungible Token:
 
 - **Burnable**: Token destruction capabilities
+- **TotalSupply**: Total supply tracking
 - **Capped**: Maximum supply limits
 - **Allowlist**: Whitelist-based access control
 - **Blocklist**: Blacklist-based access control
-- **Metadata**: Enhanced token information (name, symbol, decimals)
+- **Votes**: Voting power tracking for governance
 - **Vault**: Asset deposit/withdrawal with share tokenization
 
 ## Storage Architecture
@@ -177,8 +235,8 @@ The library uses a structured approach to storage keys:
 
 ```rust
 #[contracttype]
-pub enum StorageKey {
-    TotalSupply,
+pub enum FungibleStorageKey {
+    Meta,
     Balance(Address),
     Allowance(AllowanceKey),
 }
@@ -188,6 +246,64 @@ pub enum StorageKey {
 
 This library handles extension of storage entries to prevent expiration, except from `instance` storage entry.
 Extending the `instance` storage entries is the responsibility of the contract developer.
+
+## Error Codes
+
+A failed invocation reports `Error(Contract, #N)`, and the code alone does not say which contract in the call tree raised it. Every `#[contracterror]` code in `packages/` is therefore unique across the workspace, and each package owns a disjoint range:
+
+| Range     | Owner                              |
+| :-------- | :--------------------------------- |
+| 100–999   | `stellar-tokens`                   |
+| 1000–1999 | `stellar-contract-utils`           |
+| 2000–2999 | `stellar-access`                   |
+| 3000–3299 | `stellar-accounts`                 |
+| 3300–3699 | `stellar-confidential`             |
+| 3900–3999 | Third-party smart-account policies |
+| 4000–4999 | `stellar-governance`               |
+| 5000–5999 | `stellar-fee-abstraction`          |
+| 6000–6999 | `stellar-zk-email`                 |
+
+The library never allocates codes in 3900–3999; that block is reserved for smart-account policies built outside this repository. Codes below 100 are left to contract-specific errors, as in `examples/`.
+
+Within its package's range, each enum owns a block:
+
+| Block     | Enum                         | Module                                                                  |
+| :-------- | :--------------------------- | :---------------------------------------------------------------------- |
+| 100–199   | `FungibleTokenError`         | `stellar_tokens::fungible`                                              |
+| 200–299   | `NonFungibleTokenError`      | `stellar_tokens::non_fungible`                                          |
+| 300–319   | `RWAError`                   | `stellar_tokens::rwa`                                                   |
+| 320–329   | `IRSError`                   | `stellar_tokens::rwa::identity_verification::identity_registry_storage` |
+| 330–339   | `TokenBinderError`           | `stellar_tokens::rwa::utils::token_binder`                              |
+| 340–349   | `ClaimsError`                | `stellar_tokens::rwa::identity_verification::identity_claims`           |
+| 350–359   | `ClaimIssuerError`           | `stellar_tokens::rwa::identity_verification::claim_issuer`              |
+| 360–369   | `ComplianceError`            | `stellar_tokens::rwa::compliance`                                       |
+| 370–379   | `ClaimTopicsAndIssuersError` | `stellar_tokens::rwa::identity_verification::claim_topics_and_issuers`  |
+| 380–382   | `DocumentError`              | `stellar_tokens::rwa::extensions::doc_manager`                          |
+| 383–399   | `ComplianceModuleError`      | `stellar_tokens::rwa::compliance::modules`                              |
+| 400–499   | `VaultTokenError`            | `stellar_tokens::vault`                                                 |
+| 1000–1099 | `PausableError`              | `stellar_contract_utils::pausable`                                      |
+| 1300–1399 | `MerkleDistributorError`     | `stellar_contract_utils::merkle_distributor`                            |
+| 1400–1499 | `CryptoError`                | `stellar_contract_utils::crypto::error`                                 |
+| 1500–1599 | `SorobanFixedPointError`     | `stellar_contract_utils::math`                                          |
+| 2000–2099 | `AccessControlError`         | `stellar_access::access_control`                                        |
+| 2100–2199 | `OwnableError`               | `stellar_access::ownable`                                               |
+| 2200–2299 | `RoleTransferError`          | `stellar_access::role_transfer`                                         |
+| 3000–3099 | `SmartAccountError`          | `stellar_accounts::smart_account`                                       |
+| 3110–3119 | `WebAuthnError`              | `stellar_accounts::verifiers::webauthn`                                 |
+| 3200–3209 | `SimpleThresholdError`       | `stellar_accounts::policies::simple_threshold`                          |
+| 3210–3219 | `WeightedThresholdError`     | `stellar_accounts::policies::weighted_threshold`                        |
+| 3220–3229 | `SpendingLimitError`         | `stellar_accounts::policies::spending_limit`                            |
+| 3300–3399 | `AuditorError`               | `stellar_confidential::auditor`                                         |
+| 3400–3499 | `VerifierError`              | `stellar_confidential::verifier`                                        |
+| 3500–3599 | `ConfidentialTokenError`     | `stellar_confidential`                                                  |
+| 3600–3699 | `ComplianceError`            | `stellar_confidential::compliance`                                      |
+| 4000–4099 | `TimelockError`              | `stellar_governance::timelock`                                          |
+| 4100–4199 | `VotesError`                 | `stellar_governance::votes`                                             |
+| 4200–4299 | `GovernorError`              | `stellar_governance::governor`                                          |
+| 5000–5099 | `FeeAbstractionError`        | `stellar_fee_abstraction`                                               |
+| 6000–6099 | `DKIMRegistryError`          | `stellar_zk_email::dkim_registry`                                       |
+
+A new variant takes the next free code in its enum's block, and a new enum takes the next free block in its package's range. An enum whose block is full continues in the next free block of its package's range, and that block is added to the enum's row above. `.github/scripts/check_error_codes.py` runs in CI and fails when two enums share a code.
 
 ## Contract Implementation Patterns
 
@@ -199,7 +315,17 @@ pub struct MyToken;
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for MyToken {
-    type ContractType = Base;
+    // From a type-safety perspective there are two kinds of extensions:
+    // *overriding* ones change the base behavior and compete for the single
+    // `ContractType` slot, so `Compose` must resolve them; *additive* ones
+    // (e.g. `Burnable`) change nothing and override nothing. Listing an
+    // additive extension in `Compose` serves no type-safety purpose: the
+    // entry is ignored by the resolution, and the extension is enabled by
+    // implementing its trait, listed or not. Listing them is made optional
+    // purely to unify the developer experience: developers can list every
+    // extension they use and never have to figure out which ones are
+    // additive and which ones are overriding.
+    type ContractType = Compose<(Base,)>;
     // The macro fills in every method body, no manual overrides needed.
     // Alternatively, custom overrides can be provided here (optional)
 }
@@ -274,7 +400,6 @@ The non-fungible token implementation is designed to be compatible with existing
 - **Unit Tests**: Individual function testing
 - **Integration Tests**: Cross-module interaction testing
 - **Property-Based Testing**: Invariant verification
-- **Fuzzing**: Edge case discovery
 
 ## Deployment Architecture
 
@@ -286,7 +411,7 @@ The non-fungible token implementation is designed to be compatible with existing
 
 ## Noir Circuits
 
-Token kinds that require zero-knowledge proofs (currently `confidential/`) ship Noir circuits alongside the Soroban contract. Noir is compiled by `nargo`, not `cargo`, and its packages are described by `Nargo.toml`, so the Noir tree forms its own workspace independent of the Cargo workspace — nothing in `Cargo.toml` references it and nothing inside the Noir tree references `Cargo.toml`.
+Packages that require zero-knowledge proofs (currently `confidential/`) ship Noir circuits alongside the Soroban contract. Noir is compiled by `nargo`, not `cargo`, and its packages are described by `Nargo.toml`, so the Noir tree forms its own workspace independent of the Cargo workspace — nothing in `Cargo.toml` references it and nothing inside the Noir tree references `Cargo.toml`.
 
 ### Noir package model
 
@@ -297,35 +422,38 @@ Noir has two package types, declared by `type =` in each `Nargo.toml`:
 
 ### Layout
 
-Noir artifacts for a token kind live under `packages/tokens/src/<kind>/circuits/`:
+Noir artifacts for a package live under `packages/<package>/circuits/`:
 
 ```text
-packages/tokens/src/<kind>/circuits/
+packages/<package>/circuits/
 ├── Nargo.toml               # Nargo workspace manifest
+├── constraints.baseline     # normalized `nargo info` output
 ├── lib/                     # Shared primitives (type = "lib", no `main`)
 │   ├── src/lib.nr
 │   └── testdata/*.json      # cross-language test vectors
 ├── gadgets/<primitive>/     # one tiny `bin` crate per primitive
 │   └── src/main.nr          # measurement-only: wraps one lib call
-└── <operation>/             # full circuits (planned -- one per proof type,
-    └── src/main.nr          # e.g. register / withdraw / transfer)
+├── <operation>/             # full circuits, one per proof type
+│   └── src/main.nr          # (e.g. register / withdraw / transfer)
+├── scripts/                 # VK extraction and CI checks
+└── vks/                     # pinned verification keys
 ```
 
 The `main.nr` files in `gadgets/` and `<operation>/` are both Noir circuit entry points, but they serve very different purposes:
 
 - **Gadget `main`s** are measurement-only. Each one wraps a single lib primitive in the smallest circuit that exercises it, so `nargo info` can report per-primitive constraint costs. A Noir `bin` package has exactly one `fn main`, and `nargo info` only measures `main`. Per-primitive constraint counts therefore require one `bin` package per primitive. The alternative (one gadget that calls every primitive in sequence) collapses everything into a single combined number and loses the per-primitive breakdown the constraint baseline depends on.
-- **Operation `main`s** *are* the production circuits — one per proof type listed in the design doc's §7. They consume on-chain state as public inputs and enforce the constraint set that the wrapper contract relies on.
+- **Operation `main`s** *are* the production circuits — one per proof type (in `confidential/`: register, withdraw, transfer, set_spender, spender_transfer, clawback). They consume on-chain state as public inputs and enforce the constraint set that the wrapper contract relies on.
 
 ### Commands
 
-| Task                            | Command (run from `packages/tokens/src/<kind>/circuits/`) |
-| :------------------------------ | :-------------------------------------------------------- |
-| Type-check the workspace        | `nargo check`                                             |
-| Run all tests                   | `nargo test`                                              |
-| Per-primitive constraint counts | `nargo info`                                              |
-| Compile a single circuit        | `nargo compile --package <name>`                          |
+| Task                            | Command (run from `packages/<package>/circuits/`) |
+| :------------------------------ | :------------------------------------------------ |
+| Type-check the workspace        | `nargo check`                                     |
+| Run all tests                   | `nargo test`                                      |
+| Per-primitive constraint counts | `nargo info`                                      |
+| Compile a single circuit        | `nargo compile --package circuit_<name>`          |
 
-Compiled ACIR and proving artifacts are gitignored; `testdata/*.json` is the only Noir-side artifact committed to the repo.
+Build output (`target/`) and `Prover.toml` are gitignored. Four kinds of generated file are committed: `constraints.baseline`, `vks/*.vk.json`, `vks/*.vk.bin`, and `lib/testdata/*.json`. CI regenerates the baseline and the verification keys and fails when they differ from the committed ones; `nargo test` checks the test vectors against the primitives.
 
 ## Code Conventions
 

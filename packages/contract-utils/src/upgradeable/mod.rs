@@ -59,25 +59,39 @@
 //!
 //! The patterns below are therefore guidelines rather than enforced interfaces.
 //!
-//! ## The Problem: Host-Level Type Validation
+//! ## The Problem: Changing a Stored Type
 //!
-//! Soroban validates types at the host level when reading from storage. If a
-//! data structure's shape changes between versions, the host traps before the
-//! SDK can handle the mismatch:
+//! A `#[contracttype]` struct with named fields is stored as a map keyed by
+//! the field names. Since `soroban-sdk` 28, reading such a map back into a
+//! struct is tolerant of differences between the two:
+//!
+//! - A field missing from the stored map is read as void. An `Option` field
+//!   becomes `None`; a field of any other type fails to unpack, and the read
+//!   traps.
+//! - A key in the stored map that the struct does not have is ignored. It is
+//!   not kept anywhere, so writing the value back drops it from storage.
 //!
 //! ```rust,ignore
 //! // V1 stored this type:
 //! #[contracttype]
 //! pub struct Config { pub rate: u32 }
 //!
-//! // V2 adds a field. Reading old storage with the new type traps, because
-//! // the host validates field count before the SDK sees the value.
+//! // V2 adds a field. Stored v1 data has no `active` key, which reads as
+//! // void, and void does not unpack into a `bool`.
 //! #[contracttype]
 //! pub struct Config { pub rate: u32, pub active: bool }
 //!
-//! // Traps with Error(Object, UnexpectedSize)
+//! // Traps: the stored v1 value cannot be unpacked into the v2 type.
 //! let config: Config = e.storage().instance().get(&key).unwrap();
 //! ```
+//!
+//! Adding the field as an `Option` (`pub active: Option<bool>`) avoids the
+//! migration altogether: v1 data then reads with `active` set to `None`.
+//! Removing a field needs no migration to read the data, but the removed
+//! field's value is lost on the next write. The patterns below cover the
+//! changes that do need one, such as adding a field that is not an `Option`
+//! or changing a field's type. Tuple structs and enums are stored as vectors,
+//! not maps, and are still unpacked strictly.
 //!
 //! ## Pattern 1: Eager Migration (Bounded Data)
 //!
@@ -86,8 +100,8 @@
 //! converts it. Use [`set_schema_version`] / [`get_schema_version`] to guard
 //! against double invocation.
 //!
-//! The old type must be defined in the new contract code so the host
-//! can deserialize it correctly.
+//! The old type must be defined in the new contract code so the stored
+//! data can be read.
 //!
 //! ```rust,ignore
 //! // Old type (matches what v1 stored, field names and types must match)
@@ -219,9 +233,11 @@
 //! where the rollback-specific logic is defined and performed as a migration.
 //!
 //! See the `examples/upgradeable/` directory for full examples:
-//! - `v1` / `v2` — eager migration of bounded instance storage, with an
+//! - `v1` / `v2`: eager migration of a single entry, upgrading a fungible token
+//!   built with `stellar-tokens` v0.7.x (total supply in `instance` storage) to
+//!   the current library (total supply in a `persistent` entry), with an
 //!   `Upgrader` helper that atomically combines upgrade+migrate.
-//! - `lazy-v1` / `lazy-v2` — lazy per-entry migration of unbounded persistent
+//! - `lazy-v1` / `lazy-v2`: lazy per-entry migration of unbounded persistent
 //!   storage, where entries are converted on first read after the upgrade.
 
 mod storage;
