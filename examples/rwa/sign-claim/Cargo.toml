@@ -4,7 +4,7 @@ edition = "2021"
 license = "MIT"
 repository = "https://github.com/OpenZeppelin/stellar-contracts"
 publish = false
-authors.workspace = true
+authors = ["OpenZeppelin"]
 version = "0.8.0"
 
 [[bin]]
