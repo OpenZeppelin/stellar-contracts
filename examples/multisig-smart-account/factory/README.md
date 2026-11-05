@@ -86,7 +86,7 @@ stellar contract invoke --id account_factory -- pinned_account_wasm_hash
 Compute the address for a 2-of-2 account with the two Ed25519 keys from the
 account example and the threshold policy. Set `NAME`, `SIGNERS` and `POLICIES` once
 (replace the sample values with your own deployed addresses and keys), then
-pass them to both `predict_address` and `deploy`. `NAME` becomes the name of the account's default context rule and must be at most 20 bytes.
+pass them to both `predict_address` and `deploy`. `NAME` becomes the name of the account's default context rule.
 
 In the example below, `CDLDYJWEZSM6IAI4HHPEZTTV65WX4OVN3RZD3U6LQKYAVIZTEK7XYAYT`
 is the Ed25519 verifier contract address, the two 32-byte hex strings are the
@@ -118,6 +118,10 @@ stellar contract invoke --id account_factory -- predict_address \
     --policies "$POLICIES" \
     --salt 0
 ```
+
+`predict_address` rejects any tuple the account constructor would reject on its own: a name longer than 20 bytes, an external key longer than 256 bytes, more than 15 signers, more than 5 policies, duplicate signers, or neither signers nor policies.
+
+It cannot check that each policy accepts its install parameters, so a predicted address is not proof that `deploy` will succeed. Before sending funds to a predicted address, simulate the deployment by running the `deploy` command from the next step with `--send=no` added before the `--`.
 
 ## 5. Deploy the Account
 

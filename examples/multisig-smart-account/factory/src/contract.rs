@@ -6,11 +6,12 @@
 //! contract can create in that namespace, and the chain salt hashes the
 //! constructor arguments.
 use soroban_sdk::{
-    contract, contractimpl, contracttype, xdr::ToXdr, Address, BytesN, ContractExecutable, Env,
-    IntoVal, Map, String, Val, Vec,
+    contract, contractimpl, contracttype, panic_with_error, xdr::ToXdr, Address, BytesN,
+    ContractExecutable, Env, IntoVal, Map, String, Val, Vec,
 };
 use stellar_accounts::smart_account::{
-    validate_context_rule_name, validate_no_canonical_duplicates, Signer,
+    validate_context_rule_name, validate_no_canonical_duplicates, validate_signer_key_size, Signer,
+    SmartAccountError, MAX_POLICIES, MAX_SIGNERS,
 };
 
 #[contracttype]
@@ -45,17 +46,31 @@ impl AccountFactoryContract {
     /// Returns the address `deploy` creates for this tuple, whether or
     /// not the account exists yet.
     ///
+    /// Rejects every tuple the account constructor rejects before it installs
+    /// policies. A policy that rejects its install parameters still makes
+    /// `deploy` fail for a tuple this function accepts.
+    ///
     /// # Arguments
     ///
-    /// * `name` - Name of the account's default context rule. Names longer than
-    ///   [`MAX_NAME_SIZE`](stellar_accounts::smart_account::MAX_NAME_SIZE)
-    ///   bytes are rejected.
+    /// * `name` - Name of the account's default context rule.
     /// * `signers` - Signers of the account's default context rule, in any
-    ///   order. Duplicate identities are rejected.
+    ///   order.
     /// * `policies` - Policy contract addresses mapped to their install
     ///   parameters.
     /// * `salt` - Caller-chosen value that lets one configuration have several
     ///   accounts.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::TooManySigners`] - When there are more than
+    ///   [`MAX_SIGNERS`] signers.
+    /// * [`SmartAccountError::TooManyPolicies`] - When there are more than
+    ///   [`MAX_POLICIES`] policies.
+    /// * [`SmartAccountError::NoSignersAndPolicies`] - When `signers` and
+    ///   `policies` are both empty.
+    /// * refer to [`validate_context_rule_name`] errors.
+    /// * refer to [`validate_signer_key_size`] errors.
+    /// * refer to [`validate_no_canonical_duplicates`] errors.
     pub fn predict_address(
         e: &Env,
         name: String,
@@ -63,7 +78,7 @@ impl AccountFactoryContract {
         policies: Map<Address, Val>,
         salt: u32,
     ) -> Address {
-        validate_context_rule_name(e, &name);
+        validate_default_rule(e, &name, &signers, &policies);
         let signers = canonical_signers(e, &signers);
         let chain_salt = chain_salt(e, &name, &signers, &policies, salt);
 
@@ -75,15 +90,25 @@ impl AccountFactoryContract {
     ///
     /// # Arguments
     ///
-    /// * `name` - Name of the account's default context rule. Names longer than
-    ///   [`MAX_NAME_SIZE`](stellar_accounts::smart_account::MAX_NAME_SIZE)
-    ///   bytes are rejected.
+    /// * `name` - Name of the account's default context rule.
     /// * `signers` - Signers of the account's default context rule, in any
-    ///   order. Duplicate identities are rejected.
+    ///   order.
     /// * `policies` - Policy contract addresses mapped to their install
     ///   parameters.
     /// * `salt` - Caller-chosen value that lets one configuration have several
     ///   accounts.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::TooManySigners`] - When there are more than
+    ///   [`MAX_SIGNERS`] signers.
+    /// * [`SmartAccountError::TooManyPolicies`] - When there are more than
+    ///   [`MAX_POLICIES`] policies.
+    /// * [`SmartAccountError::NoSignersAndPolicies`] - When `signers` and
+    ///   `policies` are both empty.
+    /// * refer to [`validate_context_rule_name`] errors.
+    /// * refer to [`validate_signer_key_size`] errors.
+    /// * refer to [`validate_no_canonical_duplicates`] errors.
     pub fn deploy(
         e: &Env,
         name: String,
@@ -91,7 +116,7 @@ impl AccountFactoryContract {
         policies: Map<Address, Val>,
         salt: u32,
     ) -> Address {
-        validate_context_rule_name(e, &name);
+        validate_default_rule(e, &name, &signers, &policies);
         let wasm_hash = Self::pinned_account_wasm_hash(e);
         let signers = canonical_signers(e, &signers);
         let chain_salt = chain_salt(e, &name, &signers, &policies, salt);
@@ -102,10 +127,33 @@ impl AccountFactoryContract {
     }
 }
 
-/// Rejects duplicate signer identities, then sorts through a host `Map`.
-fn canonical_signers(e: &Env, signers: &Vec<Signer>) -> Vec<Signer> {
+/// Rejects every tuple the account constructor rejects before it installs
+/// policies. The cheap checks run first, so the verifiers are only called for
+/// tuples within the limits.
+fn validate_default_rule(
+    e: &Env,
+    name: &String,
+    signers: &Vec<Signer>,
+    policies: &Map<Address, Val>,
+) {
+    validate_context_rule_name(e, name);
+    for signer in signers.iter() {
+        validate_signer_key_size(e, &signer);
+    }
+    if signers.len() > MAX_SIGNERS {
+        panic_with_error!(e, SmartAccountError::TooManySigners);
+    }
+    if policies.len() > MAX_POLICIES {
+        panic_with_error!(e, SmartAccountError::TooManyPolicies);
+    }
+    if signers.is_empty() && policies.is_empty() {
+        panic_with_error!(e, SmartAccountError::NoSignersAndPolicies);
+    }
     validate_no_canonical_duplicates(e, signers);
+}
 
+/// Sorts signers through a host `Map`.
+fn canonical_signers(e: &Env, signers: &Vec<Signer>) -> Vec<Signer> {
     let mut set: Map<Signer, ()> = Map::new(e);
     for signer in signers.iter() {
         set.set(signer, ());

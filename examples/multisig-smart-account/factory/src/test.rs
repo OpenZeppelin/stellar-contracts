@@ -10,7 +10,10 @@ use soroban_sdk::{
 };
 use stellar_accounts::{
     policies::Policy,
-    smart_account::{ContextRule, Signer, SmartAccountError, MAX_NAME_SIZE},
+    smart_account::{
+        ContextRule, Signer, SmartAccountError, MAX_EXTERNAL_KEY_SIZE, MAX_NAME_SIZE, MAX_POLICIES,
+        MAX_SIGNERS,
+    },
 };
 
 use crate::contract::{AccountFactoryContract, AccountFactoryContractClient};
@@ -100,6 +103,29 @@ impl MockPolicyContract {
     }
 }
 
+#[contract]
+struct MockRejectingPolicyContract;
+
+#[contractimpl]
+impl Policy for MockRejectingPolicyContract {
+    type AccountParams = Val;
+
+    fn enforce(
+        _e: &Env,
+        _context: Context,
+        _authenticated_signers: Vec<Signer>,
+        _rule: ContextRule,
+        _smart_account: Address,
+    ) {
+    }
+
+    fn install(_e: &Env, _install_params: Val, _rule: ContextRule, _smart_account: Address) {
+        panic!("install parameters rejected");
+    }
+
+    fn uninstall(_e: &Env, _rule: ContextRule, _smart_account: Address) {}
+}
+
 fn setup(e: &Env) -> (Address, Address, Address) {
     let wasm_hash = e.deployer().upload_contract_wasm(account::WASM);
     let factory = e.register(AccountFactoryContract, (wasm_hash,));
@@ -118,6 +144,14 @@ fn external(e: &Env, verifier: &Address, key: u8) -> Signer {
 
 fn no_policies(e: &Env) -> Map<Address, Val> {
     Map::new(e)
+}
+
+fn mock_policies(e: &Env, count: u32) -> Map<Address, Val> {
+    let mut policies = Map::new(e);
+    for _ in 0..count {
+        policies.set(e.register(MockPolicyContract, ()), 1u32.into_val(e));
+    }
+    policies
 }
 
 fn deployed_signers(e: &Env, account: &Address) -> Vec<Signer> {
@@ -139,6 +173,18 @@ fn assert_duplicate_signer(
         result,
         Err(Ok(Error::from_contract_error(SmartAccountError::DuplicateSigner as u32)))
     );
+}
+
+fn assert_predict_and_deploy_reject(
+    client: &AccountFactoryContractClient,
+    name: &String,
+    signers: &Vec<Signer>,
+    policies: &Map<Address, Val>,
+    error: SmartAccountError,
+) {
+    let expected = Err(Ok(Error::from_contract_error(error as u32)));
+    assert_eq!(client.try_predict_address(name, signers, policies, &0), expected);
+    assert_eq!(client.try_deploy(name, signers, policies, &0), expected);
 }
 
 #[test]
@@ -266,23 +312,100 @@ fn names_longer_than_max_size_are_rejected() {
     let e = Env::default();
     let (factory, verifier, _) = setup(&e);
     let client = AccountFactoryContractClient::new(&e, &factory);
-    let signers = vec![&e, external(&e, &verifier, 1)];
     let name_too_long = String::from_bytes(&e, &[b'a'; MAX_NAME_SIZE as usize + 1]);
-    let name_too_long_err =
-        Err(Ok(Error::from_contract_error(SmartAccountError::NameTooLong as u32)));
 
-    assert_eq!(
-        client.try_predict_address(&name_too_long, &signers, &no_policies(&e), &0),
-        name_too_long_err
+    assert_predict_and_deploy_reject(
+        &client,
+        &name_too_long,
+        &vec![&e, external(&e, &verifier, 1)],
+        &no_policies(&e),
+        SmartAccountError::NameTooLong,
     );
-    assert_eq!(
-        client.try_deploy(&name_too_long, &signers, &no_policies(&e), &0),
-        name_too_long_err
-    );
+}
 
+#[test]
+fn external_keys_larger_than_max_size_are_rejected() {
+    let e = Env::default();
+    let (factory, verifier, _) = setup(&e);
+    let client = AccountFactoryContractClient::new(&e, &factory);
+    let key_too_large = Bytes::from_array(&e, &[1u8; MAX_EXTERNAL_KEY_SIZE as usize + 1]);
+
+    assert_predict_and_deploy_reject(
+        &client,
+        &name(&e),
+        &vec![&e, Signer::External(verifier, key_too_large)],
+        &no_policies(&e),
+        SmartAccountError::KeyDataTooLarge,
+    );
+}
+
+#[test]
+fn more_than_max_signers_are_rejected() {
+    let e = Env::default();
+    let (factory, verifier, _) = setup(&e);
+    let client = AccountFactoryContractClient::new(&e, &factory);
+    let signers =
+        Vec::from_iter(&e, (0..=MAX_SIGNERS as u8).map(|key| external(&e, &verifier, key)));
+
+    assert_predict_and_deploy_reject(
+        &client,
+        &name(&e),
+        &signers,
+        &no_policies(&e),
+        SmartAccountError::TooManySigners,
+    );
+}
+
+#[test]
+fn more_than_max_policies_are_rejected() {
+    let e = Env::default();
+    let (factory, verifier, _) = setup(&e);
+    let client = AccountFactoryContractClient::new(&e, &factory);
+
+    assert_predict_and_deploy_reject(
+        &client,
+        &name(&e),
+        &vec![&e, external(&e, &verifier, 1)],
+        &mock_policies(&e, MAX_POLICIES + 1),
+        SmartAccountError::TooManyPolicies,
+    );
+}
+
+#[test]
+fn rule_without_signers_or_policies_is_rejected() {
+    let e = Env::default();
+    let (factory, _, _) = setup(&e);
+    let client = AccountFactoryContractClient::new(&e, &factory);
+
+    assert_predict_and_deploy_reject(
+        &client,
+        &name(&e),
+        &Vec::new(&e),
+        &no_policies(&e),
+        SmartAccountError::NoSignersAndPolicies,
+    );
+}
+
+#[test]
+fn tuple_at_every_limit_deploys_at_its_predicted_address() {
+    let e = Env::default();
+    let (factory, verifier, _) = setup(&e);
+    let client = AccountFactoryContractClient::new(&e, &factory);
     let longest_name = String::from_bytes(&e, &[b'a'; MAX_NAME_SIZE as usize]);
-    let predicted = client.predict_address(&longest_name, &signers, &no_policies(&e), &0);
-    assert_eq!(client.deploy(&longest_name, &signers, &no_policies(&e), &0), predicted);
+    let mut signers =
+        Vec::from_iter(&e, (1..MAX_SIGNERS as u8).map(|key| external(&e, &verifier, key)));
+    signers.push_back(Signer::External(
+        verifier.clone(),
+        Bytes::from_array(&e, &[0u8; MAX_EXTERNAL_KEY_SIZE as usize]),
+    ));
+    let policies = mock_policies(&e, MAX_POLICIES);
+
+    let predicted = client.predict_address(&longest_name, &signers, &policies, &0);
+    let deployed = client.deploy(&longest_name, &signers, &policies, &0);
+
+    assert_eq!(deployed, predicted);
+    assert_eq!(deployed_signers(&e, &deployed).len(), MAX_SIGNERS);
+    assert_eq!(deployed_policies(&e, &deployed).len(), MAX_POLICIES);
 }
 
 #[test]
@@ -378,15 +501,16 @@ fn deploying_the_same_tuple_twice_traps() {
 }
 
 #[test]
-fn account_constructor_errors_fail_deployment() {
+fn policy_install_rejection_fails_deployment_but_not_prediction() {
     let e = Env::default();
-    let (factory, _, _) = setup(&e);
+    let (factory, verifier, _) = setup(&e);
     let client = AccountFactoryContractClient::new(&e, &factory);
+    let signers = vec![&e, external(&e, &verifier, 1)];
+    let policies = map![&e, (e.register(MockRejectingPolicyContract, ()), 1u32.into_val(&e))];
 
-    // Empty signers and policies fails account construction
-    let res = client.try_deploy(&name(&e), &Vec::new(&e), &no_policies(&e), &0);
+    assert!(client.try_predict_address(&name(&e), &signers, &policies, &0).is_ok());
     assert_eq!(
-        res,
+        client.try_deploy(&name(&e), &signers, &policies, &0),
         Err(Ok(Error::from_type_and_code(ScErrorType::Context, ScErrorCode::InvalidAction)))
     );
 }
