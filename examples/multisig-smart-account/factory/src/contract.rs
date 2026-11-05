@@ -9,7 +9,9 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, xdr::ToXdr, Address, BytesN, ContractExecutable, Env,
     IntoVal, Map, String, Val, Vec,
 };
-use stellar_accounts::smart_account::{validate_no_canonical_duplicates, Signer};
+use stellar_accounts::smart_account::{
+    validate_context_rule_name, validate_no_canonical_duplicates, Signer,
+};
 
 #[contracttype]
 enum DataKey {
@@ -45,7 +47,9 @@ impl AccountFactoryContract {
     ///
     /// # Arguments
     ///
-    /// * `name` - Name of the account's default context rule.
+    /// * `name` - Name of the account's default context rule. Names longer than
+    ///   [`MAX_NAME_SIZE`](stellar_accounts::smart_account::MAX_NAME_SIZE)
+    ///   bytes are rejected.
     /// * `signers` - Signers of the account's default context rule, in any
     ///   order. Duplicate identities are rejected.
     /// * `policies` - Policy contract addresses mapped to their install
@@ -59,6 +63,7 @@ impl AccountFactoryContract {
         policies: Map<Address, Val>,
         salt: u32,
     ) -> Address {
+        validate_context_rule_name(e, &name);
         let signers = canonical_signers(e, &signers);
         let chain_salt = chain_salt(e, &name, &signers, &policies, salt);
 
@@ -70,7 +75,9 @@ impl AccountFactoryContract {
     ///
     /// # Arguments
     ///
-    /// * `name` - Name of the account's default context rule.
+    /// * `name` - Name of the account's default context rule. Names longer than
+    ///   [`MAX_NAME_SIZE`](stellar_accounts::smart_account::MAX_NAME_SIZE)
+    ///   bytes are rejected.
     /// * `signers` - Signers of the account's default context rule, in any
     ///   order. Duplicate identities are rejected.
     /// * `policies` - Policy contract addresses mapped to their install
@@ -84,6 +91,7 @@ impl AccountFactoryContract {
         policies: Map<Address, Val>,
         salt: u32,
     ) -> Address {
+        validate_context_rule_name(e, &name);
         let wasm_hash = Self::pinned_account_wasm_hash(e);
         let signers = canonical_signers(e, &signers);
         let chain_salt = chain_salt(e, &name, &signers, &policies, salt);

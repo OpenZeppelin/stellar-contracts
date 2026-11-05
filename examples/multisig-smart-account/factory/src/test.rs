@@ -10,7 +10,7 @@ use soroban_sdk::{
 };
 use stellar_accounts::{
     policies::Policy,
-    smart_account::{ContextRule, Signer, SmartAccountError},
+    smart_account::{ContextRule, Signer, SmartAccountError, MAX_NAME_SIZE},
 };
 
 use crate::contract::{AccountFactoryContract, AccountFactoryContractClient};
@@ -259,6 +259,30 @@ fn canonical_duplicate_external_signers_are_rejected() {
 
     assert_duplicate_signer(client.try_predict_address(&name(&e), &signers, &no_policies(&e), &0));
     assert_duplicate_signer(client.try_deploy(&name(&e), &signers, &no_policies(&e), &0));
+}
+
+#[test]
+fn names_longer_than_max_size_are_rejected() {
+    let e = Env::default();
+    let (factory, verifier, _) = setup(&e);
+    let client = AccountFactoryContractClient::new(&e, &factory);
+    let signers = vec![&e, external(&e, &verifier, 1)];
+    let name_too_long = String::from_bytes(&e, &[b'a'; MAX_NAME_SIZE as usize + 1]);
+    let name_too_long_err =
+        Err(Ok(Error::from_contract_error(SmartAccountError::NameTooLong as u32)));
+
+    assert_eq!(
+        client.try_predict_address(&name_too_long, &signers, &no_policies(&e), &0),
+        name_too_long_err
+    );
+    assert_eq!(
+        client.try_deploy(&name_too_long, &signers, &no_policies(&e), &0),
+        name_too_long_err
+    );
+
+    let longest_name = String::from_bytes(&e, &[b'a'; MAX_NAME_SIZE as usize]);
+    let predicted = client.predict_address(&longest_name, &signers, &no_policies(&e), &0);
+    assert_eq!(client.deploy(&longest_name, &signers, &no_policies(&e), &0), predicted);
 }
 
 #[test]
