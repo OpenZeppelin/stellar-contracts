@@ -155,7 +155,9 @@ pub fn collect_fee_and_invoke(
 /// * `fee_token` - The token address to pay the fee with.
 /// * `fee_amount` - The actual fee amount to charge.
 /// * `max_fee_amount` - The maximum fee amount the user approved.
-/// * `expiration_ledger` - The ledger sequence at which the approval expires.
+/// * `expiration_ledger` - The ledger sequence at which a new approval expires.
+///   Rejected if in the past, including when `Lazy` reuses the existing
+///   allowance without approving.
 /// * `user` - The address of the user paying the fee.
 /// * `fee_recipient` - The address that receives the collected fee.
 /// * `approval` - The approval strategy to use (`Lazy` or `Eager`).
@@ -170,6 +172,7 @@ pub fn collect_fee_and_invoke(
 /// * [`FeeAbstractionError::FeeTokenNotAllowed`] - If the token is not allowed.
 /// * [`FeeAbstractionError::InvalidUser`] - If user is current contract.
 /// * refer to [`validate_fee_bounds`] errors.
+/// * refer to [`validate_expiration_ledger`] errors.
 ///
 /// # Security Warning
 ///
