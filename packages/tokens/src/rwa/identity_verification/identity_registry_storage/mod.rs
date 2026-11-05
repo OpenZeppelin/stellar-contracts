@@ -16,7 +16,7 @@
 //!
 //! ## What Is Stored, and For Whom
 //!
-//! Three families of entries are kept, all keyed by the wallet (account)
+//! Four families of entries are kept, all keyed by the wallet (account)
 //! address:
 //!
 //! - `Identity(wallet) -> Address`: the pointer to the wallet's identity
@@ -29,6 +29,11 @@
 //!   so two wallets of the same investor each carry their own copy.
 //! - `RecoveredTo(old_wallet) -> new_wallet`: a permanent tombstone written by
 //!   account recovery; recovered wallets can never be registered again.
+//! - `RecoveredFrom(new_wallet) -> old_wallet`: the reverse of `RecoveredTo`.
+//!   While the old wallet still has tokens, it prevents removing the new wallet
+//!   or recovering it to another wallet, so `recover_balance` can still move
+//!   the tokens to it. It is deleted when the new wallet is removed or
+//!   recovered to another wallet.
 //!
 //! ## Lifecycle Operations
 //!
@@ -37,6 +42,19 @@
 //!   rejected while the wallet still holds a balance in any linked token.
 //! - `recover_identity` handles wallet loss: the same identity moves to a new
 //!   wallet, and the old wallet is tombstoned.
+//!
+//! ## Account Recovery Takes Two Calls
+//!
+//! Recovery moves the identity here, through `recover_identity`, and the
+//! tokens on each linked token contract, through `RWA::recover_balance`. The
+//! token side only checks that its destination is the wallet recorded in
+//! `RecoveredTo`, so the recorded wallet must keep belonging to the same
+//! investor until every token has moved. The registry enforces this: while
+//! the old wallet still holds a balance in any linked token, the new wallet
+//! cannot be removed (it could then be registered to another investor, who
+//! would receive the tokens) and cannot be recovered to another wallet
+//! (`recover_balance` would then have no valid destination and the tokens
+//! would be stuck). Both are rejected with [`IRSError::AccountHasBalance`].
 //!
 //! ## Replacing an Identity
 //!
@@ -356,10 +374,10 @@ mod test;
 
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, IntoVal, Val, Vec};
 pub use storage::{
-    add_country_data_entries, add_identity, delete_country_data, get_country_data,
-    get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
-    recover_identity, remove_identity, stored_identity, validate_country_data, CountryData,
-    CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
+    add_country_data_entries, add_identity, batch_add_identity, delete_country_data,
+    get_country_data, get_country_data_entries, get_identity_profile, get_recovered_to,
+    modify_country_data, recover_identity, remove_identity, stored_identity, validate_country_data,
+    CountryData, CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
     OrganizationCountryRelation,
 };
 
@@ -402,6 +420,57 @@ pub trait IdentityRegistryStorage: TokenBinder {
         operator: Address,
     );
 
+    /// Stores several identities in one invocation, associating `accounts[i]`
+    /// with `identities[i]` and `country_data_lists[i]`. The batched form of
+    /// [`IdentityRegistryStorage::add_identity`], and the counterpart of
+    /// ERC-3643's `batchRegisterIdentity`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `accounts` - The account addresses to associate with the identities.
+    /// * `identities` - The identity addresses to store.
+    /// * `country_data_lists` - The initial country data entries for each
+    ///   account.
+    /// * `operator` - The address authorizing the invocation.
+    ///
+    /// # Errors
+    ///
+    /// * [`IRSError::BatchSizeMismatch`] - When the three arrays do not all
+    ///   have the same length.
+    /// * refer to [`batch_add_identity`] errors.
+    ///
+    /// # Events
+    ///
+    /// For each registration:
+    /// * topics - `["identity_stored", account: Address, identity: Address]`
+    /// * data - `[]`
+    ///
+    /// And for each of its country data entries:
+    /// * topics - `["country_data_added", account: Address]`
+    /// * data - `[country_data: Val]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`batch_add_identity`] for the
+    /// implementation, which validates that the three arrays line up.
+    ///
+    /// The identity type is not part of the interface, exactly as in
+    /// [`IdentityRegistryStorage::add_identity`]: the implementation decides
+    /// it.
+    ///
+    /// Refer to the batch operations section of the
+    /// [RWA module documentation](crate::rwa) for how to size a batch.
+    fn batch_add_identity(
+        e: &Env,
+        accounts: Vec<Address>,
+        identities: Vec<Address>,
+        country_data_lists: Vec<Vec<Val>>,
+        operator: Address,
+    );
+
     /// Removes an identity and all associated country data entries.
     ///
     /// # Arguments
@@ -428,8 +497,10 @@ pub trait IdentityRegistryStorage: TokenBinder {
     ///
     /// The library-provided [`remove_identity`] rejects removal while
     /// `account` holds a non-zero balance in any linked token, so that
-    /// identity-keyed compliance state is never orphaned; refer to its
-    /// documentation.
+    /// identity-keyed compliance state is never orphaned. If `account`
+    /// is in the process of identity recovery, it also rejects removal
+    /// while the old account of that recovery still holds a balance. Refer to
+    /// its documentation.
     fn remove_identity(e: &Env, account: Address, operator: Address);
 
     /// Recovers an identity by transferring it from an old account to a new
@@ -456,6 +527,11 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling [`recover_identity`] for the
     /// implementation.
+    ///
+    /// After the library-provided [`recover_identity`], `new_account` cannot
+    /// be removed or recovered to another account until `RWA::recover_balance`
+    /// has moved the tokens of `old_account` on every linked token; refer to
+    /// its documentation.
     fn recover_identity(e: &Env, old_account: Address, new_account: Address, operator: Address);
 
     /// Retrieves the stored identity for a given account.
@@ -617,8 +693,11 @@ pub enum IRSError {
     MetadataTooManyEntries = 326,
     /// Metadata string value is too long (exceeds MAX_METADATA_STRING_LEN).
     MetadataStringTooLong = 327,
-    /// The account still holds a balance in a linked token.
+    /// The account still holds a balance in a linked token, or it got its
+    /// identity from a recovery and the old account still holds one.
     AccountHasBalance = 328,
+    /// The parallel arrays of a batch call have different lengths.
+    BatchSizeMismatch = 329,
 }
 
 // ################## CONSTANTS ##################

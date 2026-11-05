@@ -1,0 +1,109 @@
+# Confidential Token
+
+A Soroban contract suite that provides SEP-41 tokens with **private balances and transfers**. Balances are stored as unchunked Pedersen commitments on the Grumpkin curve; every state-changing operation that consumes private state is accompanied by an UltraHonk zero-knowledge proof that the contract verifies cross-contract. Recipients and auditors recover plaintext via per-transfer ephemeral ECDH.
+
+The protocol provides **confidentiality, not anonymity** — sender and recipient addresses remain visible on-chain; amounts and balances do not.
+
+This crate is part of the [OpenZeppelin Stellar Contracts](https://github.com/OpenZeppelin/stellar-contracts) library, which is published as separate crates on [crates.io](https://crates.io):
+
+- [stellar-access](https://crates.io/crates/stellar-access): Role-based access controls and ownable
+- [stellar-accounts](https://crates.io/crates/stellar-accounts): Smart accounts with custom authentication and authorization
+- **[stellar-confidential](https://crates.io/crates/stellar-confidential)**: Confidential token with encrypted balances and zero-knowledge proofs
+- [stellar-contract-utils](https://crates.io/crates/stellar-contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
+- [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
+- [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
+- [stellar-macros](https://crates.io/crates/stellar-macros): Proc macros (`#[only_owner]`, `#[when_not_paused]`, etc.)
+- [stellar-tokens](https://crates.io/crates/stellar-tokens): Token types (fungible, non-fungible, real-world assets, vaults)
+
+Refer to the [OpenZeppelin for Stellar Contracts](https://docs.openzeppelin.com/stellar-contracts) page for additional information.
+
+## Layout
+
+```text
+confidential/
+├── src/
+│   ├── lib.rs      # ConfidentialToken trait + Hooks + events
+│   ├── storage.rs  # operation-level orchestration, public-input assembly
+│   ├── auditor/    # Grumpkin auditor-key registry (separate contract)
+│   ├── verifier/   # UltraHonk VK registry (separate contract)
+│   └── compliance/ # turnkey ComplianceHooks: freeze, SAC passthrough, external policy
+├── circuits/       # Noir/UltraHonk circuits + pinned VKs
+└── docs/
+    ├── README.md                  # documentation index: where to start, map, citation rules
+    ├── protocol/                  # normative protocol specification, one topic per file
+    │   └── operations/            # one file per entry point
+    ├── compliance.md              # compliance-extension specification
+    ├── selective-disclosure/      # off-chain selective-disclosure layer
+    ├── indexer.md                 # durable event archive specification
+    ├── sdk/                       # client SDK specification
+    └── overview.md                # non-normative user-flows overview
+```
+
+A single deployment is **three contracts** wired together, each with a deployable example under [`examples/confidential/`](../../examples/confidential/):
+
+1. A `ConfidentialToken` contract.
+2. A `ConfidentialAuditor` registry (Grumpkin public keys, indexed by
+   `auditor_id`; reusable across multiple tokens).
+3. A `ConfidentialVerifier` registry (one UltraHonk VK per
+   [`CircuitType`]; reusable across tokens that share the protocol
+   version).
+
+## Modules
+
+### `confidential_token`
+
+The core module holds the per-account `ConfidentialAccount` and per-`(owner, spender)` `SpenderDelegation` entries, and exposes the entry points that drive them. Every state-changing entry point:
+
+1. Calls `require_auth()` on the appropriate account.
+2. XDR-decodes the `data: Bytes` envelope into a typed `…Payload`.
+3. Runs the matching [`Hooks`] callback.
+4. Delegates to a function in [`storage`] that loads trusted public
+   inputs, assembles the public-input blob, calls
+   [`ConfidentialVerifier::verify_proof`] cross-contract, applies the
+   state mutation, and emits the event.
+
+The `Hooks` associated type is the extension point — wire `NoHooks` for a plain deployment, or [`ComplianceHooks`](./src/compliance/) for a gated one.
+
+### `auditor`
+
+Stores Grumpkin public keys used to produce per-transfer auditor ciphertexts. Each key is indexed by a `u32` `auditor_id`. Writes (register / rotate) are privileged and require the implementor to wire access control.
+
+### `verifier`
+
+Stores one UltraHonk verification key per [`CircuitType`]. Updating a VK is **soundness-critical** and should be treated as a break-glass operation — see the module docstring for the rationale and the recommended governance posture.
+
+### `compliance`
+
+A turnkey [`Hooks`] implementation layering deployer-configurable controls on top of the token: per-account freezing, SAC `authorized()` passthrough, and an optional external authorization policy. Wire as `type Hooks = ComplianceHooks;`. See [`docs/compliance.md`](./docs/compliance.md) for the specification.
+
+### `circuits`
+
+Noir sources, build scripts, and the pinned UltraHonk VKs that the verifier registry serves. Regeneration is gated on a CI diff against the committed `circuits/vks/*.vk.json` files; see [`circuits/vks/README.md`](./circuits/vks/README.md) for the toolchain pin and re-extraction procedure.
+
+## Installation
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+# We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
+stellar-confidential = "=0.8.0"
+```
+
+## Documentation
+
+Start with [`docs/overview.md`](./docs/overview.md) for the design without mathematics, then read the protocol specification from [`docs/protocol/README.md`](./docs/protocol/README.md) onward; each file links to the next. [`docs/README.md`](./docs/README.md) maps the whole set: reading paths per role, the compliance, selective-disclosure, indexer, and SDK companions, and the citation rules that CI enforces with lychee.
+
+## Verifier backend
+
+[`ConfidentialVerifier::verify_proof`] delegates to Nethermind's UltraHonk verifier, `ultrahonk_soroban_verifier` from [rs-soroban-ultrahonk](https://github.com/NethermindEth/rs-soroban-ultrahonk). It verifies Barretenberg 0.87.0 UltraHonk proofs over a Keccak transcript; [`circuits/vks/README.md`](./circuits/vks/README.md) gives the exact proving recipe.
+
+### Zero-knowledge setting
+
+The verifier implements only the non-zk UltraHonk flavour, so proofs are generated without `bb prove --zk`. This does not affect soundness. The zk flavour masks every committed witness polynomial with fresh randomness, so a proof reveals nothing about the witness by construction; the non-zk flavour commits to the witness as it is, so a proof is a deterministic function of the witness and carries no such guarantee.
+
+The circuits close one known leak. When a base point is a constant equal to one of Barretenberg's precomputed generators, as the Pedersen generators `G` and `H` are, Barretenberg performs the scalar multiplication with fixed-base plookup tables, and the read counts of those tables would expose windows of the secret scalars. `commit` and `scalar_mul` therefore pass the generators as witnesses, so Barretenberg uses its variable-base path, which reads ROM tables instead. `circuits/scripts/check_witness_lookups.sh` checks in CI that no `multi_scalar_mul` takes a constant base point and that every blackbox is on an allowlist of those Barretenberg 0.87.0 lowers without plookup.
+
+This removes the plookup channel only and does not make proofs private. Whether other parts of a non-zk proof, such as the wire commitments or the opened evaluations, leak private values has not been established, beyond one known case: the commitment to the lookup inverses and its opened evaluation determine two BN254 points whose discrete logarithm is the prover's long-term key. Recovering the key from them is a discrete-logarithm problem in BN254, estimated at about 100 bits of security, the level the proof system's soundness already relies on.
+
+Zero knowledge requires the zk flavour of the verifier. Nethermind has [zk verification in progress](https://github.com/NethermindEth/rs-soroban-ultrahonk/pull/38); adopting it changes the proving recipe and the verifier dependency, not the circuits or the verification keys.

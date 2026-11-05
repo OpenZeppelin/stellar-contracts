@@ -128,7 +128,7 @@ fn counting_mode_returns_simple() {
 // ################## QUORUM MANAGEMENT TESTS ##################
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5018)")]
+#[should_panic(expected = "Error(Contract, #4218)")]
 fn get_quorum_fails_when_not_set() {
     let (e, contract_address) = setup_env();
 
@@ -242,7 +242,7 @@ fn quorum_checkpoint_same_ledger_updates_in_place() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5018)")]
+#[should_panic(expected = "Error(Contract, #4218)")]
 fn quorum_checkpoint_before_first_checkpoint_panics() {
     let (e, contract_address) = setup_env();
 
@@ -672,7 +672,7 @@ fn quorum_not_reached_for_nonexistent_proposal() {
 // ################## ERROR TESTS ##################
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5016)")]
+#[should_panic(expected = "Error(Contract, #4216)")]
 fn count_vote_fails_on_double_vote() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
@@ -685,7 +685,7 @@ fn count_vote_fails_on_double_vote() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5016)")]
+#[should_panic(expected = "Error(Contract, #4216)")]
 fn count_vote_fails_on_double_vote_different_type() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
@@ -699,7 +699,7 @@ fn count_vote_fails_on_double_vote_different_type() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5017)")]
+#[should_panic(expected = "Error(Contract, #4217)")]
 fn count_vote_fails_on_invalid_vote_type() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
@@ -711,7 +711,7 @@ fn count_vote_fails_on_invalid_vote_type() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5017)")]
+#[should_panic(expected = "Error(Contract, #4217)")]
 fn count_vote_fails_on_large_invalid_vote_type() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
@@ -723,7 +723,7 @@ fn count_vote_fails_on_large_invalid_vote_type() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5015)")]
+#[should_panic(expected = "Error(Contract, #4215)")]
 fn count_vote_overflow_for_votes() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
@@ -737,7 +737,7 @@ fn count_vote_overflow_for_votes() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5015)")]
+#[should_panic(expected = "Error(Contract, #4215)")]
 fn count_vote_overflow_against_votes() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
@@ -751,7 +751,7 @@ fn count_vote_overflow_against_votes() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5015)")]
+#[should_panic(expected = "Error(Contract, #4215)")]
 fn count_vote_overflow_abstain_votes() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
@@ -923,7 +923,7 @@ fn set_and_get_name() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5013)")]
+#[should_panic(expected = "Error(Contract, #4213)")]
 fn get_name_fails_when_not_set() {
     let (e, contract_address) = setup_env();
 
@@ -943,7 +943,7 @@ fn set_and_get_version() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5014)")]
+#[should_panic(expected = "Error(Contract, #4214)")]
 fn get_version_fails_when_not_set() {
     let (e, contract_address) = setup_env();
 
@@ -963,7 +963,7 @@ fn set_and_get_proposal_threshold() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5012)")]
+#[should_panic(expected = "Error(Contract, #4212)")]
 fn get_proposal_threshold_fails_when_not_set() {
     let (e, contract_address) = setup_env();
 
@@ -983,7 +983,7 @@ fn set_and_get_voting_delay() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5010)")]
+#[should_panic(expected = "Error(Contract, #4210)")]
 fn get_voting_delay_fails_when_not_set() {
     let (e, contract_address) = setup_env();
 
@@ -1003,7 +1003,7 @@ fn set_and_get_voting_period() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5011)")]
+#[should_panic(expected = "Error(Contract, #4211)")]
 fn get_voting_period_fails_when_not_set() {
     let (e, contract_address) = setup_env();
 
@@ -1013,7 +1013,7 @@ fn get_voting_period_fails_when_not_set() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5023)")]
+#[should_panic(expected = "Error(Contract, #4223)")]
 fn set_voting_period_rejects_zero() {
     let (e, contract_address) = setup_env();
 
@@ -1065,7 +1065,7 @@ fn set_and_get_token_contract() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5020)")]
+#[should_panic(expected = "Error(Contract, #4220)")]
 fn get_token_contract_fails_when_not_set() {
     let (e, contract_address) = setup_env();
 
@@ -1075,7 +1075,7 @@ fn get_token_contract_fails_when_not_set() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5019)")]
+#[should_panic(expected = "Error(Contract, #4219)")]
 fn set_token_contract_fails_when_already_set() {
     let (e, contract_address) = setup_env();
     let token1 = Address::generate(&e);
@@ -1088,7 +1088,7 @@ fn set_token_contract_fails_when_already_set() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5019)")]
+#[should_panic(expected = "Error(Contract, #4219)")]
 fn set_token_contract_fails_on_same_address() {
     let (e, contract_address) = setup_env();
     let token = Address::generate(&e);
@@ -1208,7 +1208,7 @@ fn propose_emits_proposal_created_event() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5003)")]
+#[should_panic(expected = "Error(Contract, #4203)")]
 fn propose_fails_with_empty_proposal() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -1226,7 +1226,7 @@ fn propose_fails_with_empty_proposal() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5004)")]
+#[should_panic(expected = "Error(Contract, #4204)")]
 fn propose_fails_with_mismatched_lengths() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -1244,7 +1244,7 @@ fn propose_fails_with_mismatched_lengths() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5021)")]
+#[should_panic(expected = "Error(Contract, #4221)")]
 fn propose_fails_with_description_too_long() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -1261,7 +1261,7 @@ fn propose_fails_with_description_too_long() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5002)")]
+#[should_panic(expected = "Error(Contract, #4202)")]
 fn propose_fails_with_insufficient_voting_power() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -1277,7 +1277,7 @@ fn propose_fails_with_insufficient_voting_power() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5001)")]
+#[should_panic(expected = "Error(Contract, #4201)")]
 fn propose_fails_with_duplicate_proposal() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -1319,7 +1319,7 @@ fn propose_with_exact_threshold() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5015)")]
+#[should_panic(expected = "Error(Contract, #4215)")]
 fn propose_fails_on_voting_schedule_overflow() {
     let (e, contract_address, token_address) = setup_env_with_token();
     set_mock_voting_power(&e, &token_address, 1000);
@@ -1343,7 +1343,7 @@ fn propose_fails_on_voting_schedule_overflow() {
 // ################## PROPOSAL QUERY TESTS ##################
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5000)")]
+#[should_panic(expected = "Error(Contract, #4200)")]
 fn get_proposal_state_fails_for_nonexistent() {
     let (e, contract_address) = setup_env();
     let pid = proposal_id(&e, 99);
@@ -1354,7 +1354,7 @@ fn get_proposal_state_fails_for_nonexistent() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5000)")]
+#[should_panic(expected = "Error(Contract, #4200)")]
 fn get_proposal_snapshot_fails_for_nonexistent() {
     let (e, contract_address) = setup_env();
     let pid = proposal_id(&e, 99);
@@ -1365,7 +1365,7 @@ fn get_proposal_snapshot_fails_for_nonexistent() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5000)")]
+#[should_panic(expected = "Error(Contract, #4200)")]
 fn get_proposal_deadline_fails_for_nonexistent() {
     let (e, contract_address) = setup_env();
     let pid = proposal_id(&e, 99);
@@ -1376,7 +1376,7 @@ fn get_proposal_deadline_fails_for_nonexistent() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5000)")]
+#[should_panic(expected = "Error(Contract, #4200)")]
 fn get_proposal_proposer_fails_for_nonexistent() {
     let (e, contract_address) = setup_env();
     let pid = proposal_id(&e, 99);
@@ -1484,7 +1484,7 @@ fn check_proposal_state_returns_snapshot_when_active() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5005)")]
+#[should_panic(expected = "Error(Contract, #4205)")]
 fn check_proposal_state_fails_when_pending() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -1503,7 +1503,7 @@ fn check_proposal_state_fails_when_pending() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5005)")]
+#[should_panic(expected = "Error(Contract, #4205)")]
 fn check_proposal_state_fails_when_defeated() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -1656,7 +1656,7 @@ fn cast_vote_emits_event() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5005)")]
+#[should_panic(expected = "Error(Contract, #4205)")]
 fn cast_vote_fails_when_proposal_not_active() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -1678,7 +1678,7 @@ fn cast_vote_fails_when_proposal_not_active() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5016)")]
+#[should_panic(expected = "Error(Contract, #4216)")]
 fn cast_vote_fails_on_double_vote() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -1825,7 +1825,7 @@ fn cancel_defeated_proposal() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5009)")]
+#[should_panic(expected = "Error(Contract, #4209)")]
 fn cancel_fails_when_already_canceled() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -1844,7 +1844,7 @@ fn cancel_fails_when_already_canceled() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5000)")]
+#[should_panic(expected = "Error(Contract, #4200)")]
 fn cancel_fails_for_nonexistent_proposal() {
     let (e, contract_address) = setup_env();
     let desc_hash = BytesN::from_array(&e, &[0u8; 32]);
@@ -1959,7 +1959,7 @@ fn execute_succeeded_proposal() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5006)")]
+#[should_panic(expected = "Error(Contract, #4206)")]
 fn execute_fails_when_not_succeeded() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -1985,7 +1985,7 @@ fn execute_fails_when_not_succeeded() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5008)")]
+#[should_panic(expected = "Error(Contract, #4208)")]
 fn execute_fails_when_already_executed() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -2052,7 +2052,7 @@ fn execute_emits_event() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5009)")]
+#[should_panic(expected = "Error(Contract, #4209)")]
 fn cancel_fails_when_already_executed() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -2077,7 +2077,7 @@ fn cancel_fails_when_already_executed() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5000)")]
+#[should_panic(expected = "Error(Contract, #4200)")]
 fn execute_fails_for_nonexistent_proposal() {
     let (e, contract_address) = setup_env();
     let desc_hash = BytesN::from_array(&e, &[0u8; 32]);
@@ -2236,7 +2236,7 @@ fn queue_succeeded_proposal() {
 // at the integration level in the example contracts.
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5006)")]
+#[should_panic(expected = "Error(Contract, #4206)")]
 fn queue_fails_when_not_succeeded() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);

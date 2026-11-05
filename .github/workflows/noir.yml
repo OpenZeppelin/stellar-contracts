@@ -5,11 +5,11 @@ on:
     branches:
       - main
     paths:
-      - "packages/tokens/src/confidential/circuits/**"
+      - "packages/confidential/circuits/**"
       - ".github/workflows/noir.yml"
   pull_request:
     paths:
-      - "packages/tokens/src/confidential/circuits/**"
+      - "packages/confidential/circuits/**"
       - ".github/workflows/noir.yml"
   workflow_dispatch:
 
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: packages/tokens/src/confidential/circuits
+        working-directory: packages/confidential/circuits
 
     steps:
       - name: git checkout
@@ -79,21 +79,28 @@ jobs:
       - name: nargo test
         run: nargo test
 
+      - name: Check that no witness reaches a lookup table
+        # Proofs are non-zk, so lookup read counts are committed in the
+        # clear; the script header explains the leak this rules out.
+        run: ./scripts/check_witness_lookups.sh
+
       - name: Diff extracted VKs against committed artifacts
-        # Re-extracts the VK for each per-operation circuit using the pinned
-        # bb version and compares against the committed `vks/*.vk.json`.
-        # Mirrors the constraint-baseline diff: drift means either the
-        # circuit changed (regenerate and commit in this PR) or the
-        # toolchain drifted (don't regenerate -- investigate).
+        # Re-extracts both VK forms for each per-operation circuit using the
+        # pinned bb version and compares against the committed `vks/*.vk.json`
+        # and `vks/*.vk.bin`. Mirrors the constraint-baseline diff: drift
+        # means either the circuit changed (regenerate and commit in this PR)
+        # or the toolchain drifted (don't regenerate -- investigate).
         run: |
           mkdir -p /tmp/vks-current
-          cp vks/*.vk.json /tmp/vks-current/ 2>/dev/null || true
-          rm -f vks/*.vk.json
+          cp vks/*.vk.json vks/*.vk.bin /tmp/vks-current/ 2>/dev/null || true
+          rm -f vks/*.vk.json vks/*.vk.bin
           ./scripts/extract_vks.sh
+          ./scripts/build_vk_bins.sh
 
-          # Exclude README.md from the diff; only `.vk.json` artifacts
-          # should be compared.
+          # Exclude README.md from the diff; only the `.vk.json` and `.vk.bin`
+          # artifacts should be compared.
           if ! diff -q --exclude='*.md' /tmp/vks-current vks > /tmp/vks-diff 2>&1; then
+            cat /tmp/vks-diff
             {
               echo ""
               echo "### ❌ VK artifact drift detected"
@@ -103,8 +110,9 @@ jobs:
               echo "If this is intentional, regenerate VKs in this PR:"
               echo ""
               echo '```'
-              echo "cd packages/tokens/src/confidential/circuits"
+              echo "cd packages/confidential/circuits"
               echo "./scripts/extract_vks.sh"
+              echo "./scripts/build_vk_bins.sh"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
@@ -142,7 +150,7 @@ jobs:
               echo "If this is intentional, regenerate the baseline in this PR:"
               echo ""
               echo '```'
-              echo "cd packages/tokens/src/confidential/circuits"
+              echo "cd packages/confidential/circuits"
               echo "LC_ALL=C nargo info | grep '^|' | LC_ALL=C sort > constraints.baseline"
               echo '```'
               echo ""

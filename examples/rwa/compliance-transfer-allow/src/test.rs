@@ -77,7 +77,7 @@ fn on_transfer_checks_sender_then_recipient() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #406)")]
+#[should_panic(expected = "Error(Contract, #388)")]
 fn on_transfer_panics_when_neither_party_allowlisted() {
     let e = Env::default();
     e.mock_all_auths();

@@ -6,6 +6,7 @@ This crate is part of the [OpenZeppelin Stellar Contracts](https://github.com/Op
 
 - [stellar-access](https://crates.io/crates/stellar-access): Role-based access controls and ownable
 - [stellar-accounts](https://crates.io/crates/stellar-accounts): Smart accounts with custom authentication and authorization
+- [stellar-confidential](https://crates.io/crates/stellar-confidential): Confidential token with encrypted balances and zero-knowledge proofs
 - [stellar-contract-utils](https://crates.io/crates/stellar-contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
 - [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
 - [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
@@ -18,13 +19,13 @@ Refer to the [OpenZeppelin for Stellar Contracts](https://docs.openzeppelin.com/
 
 ### Fungible
 
-The `fungible` module provides functionalities for fungible tokens: balance management, transfer operations, allowance delegation, total supply tracking.
+The `fungible` module provides functionalities for fungible tokens: balance management, transfer operations and allowance delegation. Total supply tracking is available as an opt-in extension.
 
 #### Usage Examples
 
 ```rust
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, FungibleToken};
+use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, Compose, FungibleToken};
 use stellar_access::ownable::{self as ownable, Ownable};
 use stellar_macros::{only_owner};
 
@@ -56,22 +57,23 @@ impl MyContract {
 
     #[only_owner]
     pub fn mint_tokens(e: &Env, to: Address, amount: i128) {
-        // Mint tokens to the recipient
-        Base::mint(e, &to, amount);
+        // Mint tokens to the recipient, through the selected contract type
+        <Self as FungibleToken>::ContractType::mint(e, &to, amount);
     }
 }
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for MyContract {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 }
 
 #[contractimpl(contracttrait)]
 impl FungibleBurnable for MyContract {}
 ```
 
-Notice the empty trait bodies. Only a `ContractType` has to be picked (here
-`Base`, but it could be `AllowList`, `BlockList`, `RWA`, ...) and the
+Notice the empty trait bodies. Only a `ContractType` has to be picked with
+`Compose` (here `Base`, but it could be `AllowList`, `BlockList`, `RWA`, ...)
+and the
 `#[contractimpl(contracttrait)]` macro fills in every method, routing it to the
 behavior that matches that `ContractType`. The override machinery that makes
 this work (`ContractOverrides`, `BurnableOverrides`) operates in the
@@ -80,7 +82,8 @@ background. There is no need to implement or import it.
 #### Extensions
 
 - **Burnable**: Allow token holders to destroy their tokens
-- **Capped**: Set maximum supply limits
+- **TotalSupply**: Track and expose the total supply (opt-in; `RWA`, `Vault` and `Capped` require it). Tokens upgraded from v0.7.x or earlier have to migrate the stored supply with `migrate_total_supply` (see `examples/upgradeable/v2`)
+- **Capped**: Set maximum supply limits (requires the TotalSupply extension)
 - **Allowlist**: Restrict transfers to approved addresses
 - **Blocklist**: Prevent transfers from/to blocked addresses
 - **Votes**: Track voting power for governance integration
@@ -101,7 +104,7 @@ The `non_fungible` module implements non-fungible token functionality:
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_tokens::non_fungible::{
     burnable::NonFungibleBurnable,
-    Base, NonFungibleToken,
+    Base, Compose, NonFungibleToken,
 };
 
 #[contract]
@@ -123,13 +126,13 @@ impl MyNFTContract {
 
     pub fn award_item(e: &Env, to: Address) -> u32 {
         // access control might be needed
-        Base::sequential_mint(e, &to)
+        <Self as NonFungibleToken>::ContractType::mint(e, &to)
     }
 }
 
 #[contractimpl(contracttrait)]
 impl NonFungibleToken for MyNFTContract {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 }
 
 #[contractimpl(contracttrait)]
@@ -161,9 +164,9 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-tokens = "=0.7.1"
+stellar-tokens = "=0.8.0"
 # Add this if you want to use macros
-stellar-macros = "=0.7.1"
+stellar-macros = "=0.8.0"
 ```
 
 ## Examples
@@ -172,7 +175,7 @@ See the following examples in the repository:
 - [`examples/fungible-pausable/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-pausable) - Pausable fungible token
 - [`examples/nft-sequential-minting/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/nft-sequential-minting) - Basic non-fungible token
 - [`examples/fungible-merkle-airdrop/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-merkle-airdrop) - Airdrop with merkle proofs
-- [`examples/rwa/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/rwa) - A complete RWA contract suite and a step-by-step deployment guide.
+- [`examples/rwa/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/rwa) - A complete RWA contract suite, ready-made compliance modules, and a step-by-step deployment guide.
 
 ## License
 

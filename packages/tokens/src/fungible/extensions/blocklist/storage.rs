@@ -2,11 +2,21 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, MuxedAddress};
 
 use crate::fungible::{
     extensions::blocklist::{emit_user_blocked, emit_user_unblocked},
-    overrides::{Base, BurnableOverrides, ContractOverrides},
+    overrides::{Base, BurnableOverrides, ContractOverrides, MintOverrides},
     FungibleTokenError, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
 
 pub struct BlockList;
+
+/// Marker for the contract types backing the
+/// [`crate::fungible::blocklist::FungibleBlockList`] trait: [`BlockList`]
+/// itself and the curated combinations that include it (e.g.
+/// `Compose<(AllowList, BlockList)>`). Contract authors never interact with
+/// this trait; it only appears as the bound enforcing that the selected
+/// `ContractType` enforces the blocklist transfer policy.
+pub trait BlockListContractType {}
+
+impl BlockListContractType for BlockList {}
 
 impl ContractOverrides for BlockList {
     fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
@@ -29,6 +39,12 @@ impl BurnableOverrides for BlockList {
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         BlockList::burn_from(e, spender, from, amount);
+    }
+}
+
+impl MintOverrides for BlockList {
+    fn mint(e: &Env, to: &Address, amount: i128) {
+        BlockList::mint(e, to, amount);
     }
 }
 
@@ -209,6 +225,18 @@ impl BlockList {
         }
 
         Base::approve(e, owner, spender, amount, live_until_ledger);
+    }
+
+    /// Creates `amount` of tokens and assigns them to `to`.
+    ///
+    /// The blocklist policy is not checked on mint: the recipient is chosen by
+    /// the contract's own (authorized) mint entry point. This function
+    /// exists so that `Self::ContractType::mint` resolves on every
+    /// fungible contract type, refer to [`MintOverrides`].
+    ///
+    /// Please refer to [`Base::mint`] for the inline documentation.
+    pub fn mint(e: &Env, to: &Address, amount: i128) {
+        Base::mint(e, to, amount);
     }
 
     /// This is a wrapper around [`Base::burn()`] to enable

@@ -7,7 +7,10 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::{only_admin, only_role};
-use stellar_tokens::non_fungible::{royalties::NonFungibleRoyalties, Base, NonFungibleToken};
+use stellar_tokens::non_fungible::{
+    royalties::{NonFungibleRoyalties, Royalties, RoyaltySupport},
+    Base, Compose, NonFungibleToken,
+};
 
 #[contract]
 pub struct ExampleContract;
@@ -36,16 +39,22 @@ impl ExampleContract {
     #[only_admin]
     pub fn mint(e: &Env, to: Address) -> u32 {
         // Mint token with sequential ID
-        Base::sequential_mint(e, &to)
+        <Self as NonFungibleToken>::ContractType::mint(e, &to)
     }
 
     #[only_admin]
     pub fn mint_with_royalty(e: &Env, to: Address, receiver: Address, basis_points: u32) -> u32 {
         // Mint token with sequential ID
-        let token_id = Base::sequential_mint(e, &to);
+        let token_id = <Self as NonFungibleToken>::ContractType::mint(e, &to);
 
-        // Set token-specific royalty
-        Base::set_token_royalty(e, token_id, &receiver, basis_points);
+        // Set token-specific royalty, routed through the contract type so
+        // the token existence check matches its ownership model.
+        <Self as NonFungibleToken>::ContractType::set_token_royalty(
+            e,
+            token_id,
+            &receiver,
+            basis_points,
+        );
 
         token_id
     }
@@ -53,7 +62,7 @@ impl ExampleContract {
 
 #[contractimpl(contracttrait)]
 impl NonFungibleToken for ExampleContract {
-    type ContractType = Base;
+    type ContractType = Compose<(Base, Royalties)>;
 }
 
 #[contractimpl(contracttrait)]
@@ -71,12 +80,12 @@ impl NonFungibleRoyalties for ExampleContract {
         basis_points: u32,
         operator: Address,
     ) {
-        Base::set_token_royalty(e, token_id, &receiver, basis_points);
+        Self::ContractType::set_token_royalty(e, token_id, &receiver, basis_points);
     }
 
     #[only_role(operator, "manager")]
     fn remove_token_royalty(e: &Env, token_id: u32, operator: Address) {
-        Base::remove_token_royalty(e, token_id);
+        Self::ContractType::remove_token_royalty(e, token_id);
     }
 }
 

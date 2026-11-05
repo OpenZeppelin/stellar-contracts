@@ -7,7 +7,7 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
 use stellar_tokens::non_fungible::{
     burnable::NonFungibleBurnable,
     consecutive::{Consecutive, NonFungibleConsecutive},
-    Base, ContractOverrides, NonFungibleToken,
+    Base, Compose, ContractOverrides, NonFungibleToken,
 };
 
 #[contracttype]
@@ -25,11 +25,11 @@ impl ExampleContract {
         Base::set_metadata(e, uri, name, symbol);
     }
 
-    pub fn batch_mint(e: &Env, to: Address, amount: u32) -> u32 {
+    pub fn mint_range(e: &Env, to: Address, amount: u32) -> u32 {
         let owner: Address =
             e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
         owner.require_auth();
-        Consecutive::batch_mint(e, &to, amount)
+        <Self as NonFungibleToken>::ContractType::mint_range(e, &to, amount)
     }
 }
 
@@ -39,7 +39,7 @@ impl ExampleContract {
 // `#[contractimpl(contracttrait)]` macro.
 #[contractimpl(contracttrait)]
 impl NonFungibleToken for ExampleContract {
-    type ContractType = Consecutive;
+    type ContractType = Compose<(Consecutive,)>;
 
     fn balance(e: &Env, owner: Address) -> u32 {
         Self::ContractType::balance(e, &owner)

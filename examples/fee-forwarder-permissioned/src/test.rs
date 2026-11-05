@@ -5,7 +5,7 @@ use soroban_sdk::{
     testutils::{Address as _, MockAuth, MockAuthInvoke},
     vec, Address, Env, IntoVal, MuxedAddress, String, Symbol, TryIntoVal, Val, Vec,
 };
-use stellar_tokens::fungible::{Base, FungibleToken};
+use stellar_tokens::fungible::{Base, Compose, FungibleToken};
 
 use crate::contract::{FeeForwarder, FeeForwarderClient};
 
@@ -22,7 +22,7 @@ impl MockToken {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for MockToken {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 }
 
 #[contract]

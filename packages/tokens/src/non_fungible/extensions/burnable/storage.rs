@@ -2,6 +2,16 @@ use soroban_sdk::{Address, Env};
 
 use crate::non_fungible::{burnable::emit_burn, Base};
 
+/// Type-level name of the burnable extension, for use in a
+/// [`crate::non_fungible::combinations::Compose`] list.
+///
+/// Burnable is additive: it does not override the base behavior, so listing
+/// it is purely declarative and does not affect the resolved contract type.
+/// Burning is enabled by implementing
+/// [`crate::non_fungible::burnable::NonFungibleBurnable`], whether or not
+/// `Burnable` is listed.
+pub enum Burnable {}
+
 impl Base {
     /// Destroys the token with `token_id` from `from`, ensuring ownership
     /// checks, and emits a `burn` event.

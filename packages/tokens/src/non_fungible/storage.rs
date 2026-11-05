@@ -83,7 +83,31 @@ impl Base {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `token_id` - The identifier of the token to check approval for.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`Base::owner_of`] errors.
     pub fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
+        // used to panic if non-existent token_id
+        let _ = Base::owner_of(e, token_id);
+
+        Base::get_approval_entry(e, token_id)
+    }
+
+    /// Returns the address approved for the specified token, without checking
+    /// that the token exists. Contract types with their own ownership model
+    /// (e.g. `Consecutive`) check existence themselves and then call this
+    /// function.
+    ///
+    /// * `Some(Address)` - The approved address if there is a valid,
+    ///   non-expired approval
+    /// * `None` - If there is no approval or if the approval has expired
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `token_id` - The identifier of the token to check approval for.
+    pub fn get_approval_entry(e: &Env, token_id: u32) -> Option<Address> {
         let key = NFTStorageKey::Approval(token_id);
 
         if let Some(approval_data) = e.storage().temporary().get::<_, ApprovalData>(&key) {
@@ -509,6 +533,7 @@ impl Base {
     /// # Errors
     /// * [`NonFungibleTokenError::InsufficientApproval`] - If the `spender`
     ///   doesn't have enough approval.
+    /// * refer to [`Base::get_approved`] errors.
     pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: u32) {
         // If `spender` is not the owner, they must have explicit approval.
         let is_spender_owner = spender == owner;
@@ -667,7 +692,7 @@ impl Base {
     /// determine the next `token_id`, but it does NOT check if that
     /// `token_id` is already in use. If other minting paths or `token_id`
     /// generation strategies exist, uniqueness should be enforced before use.
-    pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
+    pub fn mint(e: &Env, to: &Address) -> u32 {
         let token_id = increment_token_id(e, 1);
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
@@ -714,7 +739,7 @@ impl Base {
     /// `token_id` already exists. `token_id` uniqueness should be ensured
     /// before passing it to this function. The strategy for generating
     /// `token_id`s varies by project and must be implemented accordingly.
-    pub fn mint(e: &Env, to: &Address, token_id: u32) {
+    pub fn mint_with_id(e: &Env, to: &Address, token_id: u32) {
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
     }

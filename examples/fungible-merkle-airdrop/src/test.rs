@@ -3,7 +3,7 @@ use soroban_sdk::{
     contract, contractimpl, testutils::Address as _, vec, Address, BytesN, Env, MuxedAddress,
     String,
 };
-use stellar_tokens::fungible::{Base, FungibleToken};
+use stellar_tokens::fungible::{Base, Compose, FungibleToken};
 
 use crate::contract::{AirdropContract, AirdropContractClient};
 
@@ -23,7 +23,7 @@ impl TokenContract {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for TokenContract {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 }
 
 fn create_token_contract<'a>(e: &Env, owner: &Address) -> TokenContractClient<'a> {

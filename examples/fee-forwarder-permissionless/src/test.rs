@@ -5,7 +5,7 @@ use soroban_sdk::{
     testutils::{Address as _, MockAuth, MockAuthInvoke},
     vec, Address, Env, IntoVal, MuxedAddress, String, Symbol, TryIntoVal, Val, Vec,
 };
-use stellar_tokens::fungible::{Base, FungibleToken};
+use stellar_tokens::fungible::{Base, Compose, FungibleToken};
 
 use crate::contract::{FeeForwarder, FeeForwarderClient};
 
@@ -22,7 +22,7 @@ impl MockToken {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for MockToken {
-    type ContractType = Base;
+    type ContractType = Compose<(Base,)>;
 }
 
 #[contract]
@@ -143,6 +143,8 @@ fn forward_basic() {
 
     assert_eq!(token.balance(&user), initial_user_balance - fee_amount);
     assert_eq!(token.balance(&relayer), initial_relayer_balance + fee_amount);
+    assert_eq!(token.balance(&fee_forwarder.address), 0);
+    assert_eq!(token.allowance(&user, &fee_forwarder.address), 0);
 }
 
 #[test]

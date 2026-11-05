@@ -24,9 +24,10 @@ fn test_upgrade_with_upgrader() {
     let admin = Address::generate(&e);
     let manager = Address::generate(&e);
     let migrator = Address::generate(&e);
-    let contract_id = e.register(contract_v1::WASM, (&admin, &100u32));
+    let contract_id = e.register(contract_v1::WASM, (&admin, &1000i128));
 
     let client_v1 = contract_v1::Client::new(&e, &contract_id);
+    assert_eq!(client_v1.total_supply(), 1000);
     client_v1.grant_role(&manager, &Symbol::new(&e, "manager"), &admin);
     client_v1.grant_role(&migrator, &Symbol::new(&e, "migrator"), &admin);
 
@@ -44,9 +45,9 @@ fn test_upgrade_with_upgrader() {
 
     let client_v2 = contract_v2::Client::new(&e, &contract_id);
 
-    // verify migration happened: data preserved and new field set
-    assert_eq!(client_v2.get_rate(), 100);
-    assert!(client_v2.is_active());
+    // verify migration happened: the supply is read from its new entry
+    assert_eq!(client_v2.total_supply(), 1000);
+    assert_eq!(client_v2.balance(&admin), 1000);
 
     // ensure migrate can't be invoked again
     assert!(client_v2.try_migrate(&admin).is_err());

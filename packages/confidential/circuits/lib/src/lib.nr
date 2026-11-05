@@ -1,0 +1,399 @@
+//! # Confidential Token -- Noir Primitives
+//!
+//! Shared cryptographic primitives consumed by the five circuits described in
+//! docs/protocol/operations/ (Register, Withdraw, Transfer,
+//! SpenderTransfer, SetSpender).
+//!
+//! Every constraint that involves a Pedersen commitment, a Poseidon2 hash with
+//! domain separation, an ECDH derivation, or a 128-bit range check funnels
+//! through one of the helpers exported here. Circuits never hash raw --
+//! `poseidon_with_domain` is the only Poseidon entry point.
+//!
+//! ## Background: BN254, Grumpkin, and why this works in-circuit
+//!
+//! An elliptic curve is defined over a *base field* and has a *scalar field*
+//! of the same size as its prime-order subgroup. Noir circuits, when targeting
+//! the Barretenberg backend (UltraHonk), operate natively over the **BN254
+//! scalar field**, written `F_r` (Noir's built-in `Field` type *is* `F_r`).
+//!
+//! **Grumpkin** is a curve specifically constructed so that its *base field*
+//! equals BN254's *scalar field*. That means Grumpkin point coordinates are
+//! `F_r` elements -- the same field the circuit is already working over. So
+//! Grumpkin point arithmetic inside a Noir circuit is native field
+//! arithmetic. This is what makes ! Pedersen commitments and ECDH cheap in
+//! this design.
+//!
+//! Grumpkin's equation is `y^2 = x^3 - 17`. For a longer write-up, see
+//! Aztec's primer:
+//! <https://aztecprotocol.github.io/aztec-connect/primitives.html#2-grumpkin---a-curve-on-top-of-bn-254-for-snark-efficient-group-operations>
+//!
+//! ## Generators
+//!
+//! Both generators below come from Barretenberg's standard Pedersen domain
+//! ("DEFAULT_DOMAIN_SEPARATOR") via `std::hash::derive_generators`, so
+//! `commit(v, r)` is point-for-point identical to
+//! `std::hash::pedersen_commitment([v, r])`. The numeric values are extracted
+//! via the `print_generators` test (run
+//! `nargo test print_generators --show-output`) so they are reproducible by
+//! anyone with a Noir toolchain -- no off-chain trust required.
+
+mod tests;
+
+use std::embedded_curve_ops::{EmbeddedCurvePoint, EmbeddedCurveScalar, multi_scalar_mul};
+use std::hash::poseidon2_permutation;
+
+// ################## GENERATORS ##################
+
+/// Barretenberg's Pedersen generator at index 0 of the "DEFAULT_DOMAIN_SEPARATOR"
+/// domain. Equivalent to `derive_generators("DEFAULT_DOMAIN_SEPARATOR", 0)[0]`.
+pub global G: EmbeddedCurvePoint = EmbeddedCurvePoint {
+    x: 0x083e7911d835097629f0067531fc15cafd79a89beecb39903f69572c636f4a5a,
+    y: 0x1a7f5efaad7f315c25a918f30cc8d7333fccab7ad7c90f14de81bcc528f9935d,
+    is_infinite: false,
+};
+
+/// Barretenberg's Pedersen generator at index 1 of the "DEFAULT_DOMAIN_SEPARATOR"
+/// domain. Equivalent to `derive_generators("DEFAULT_DOMAIN_SEPARATOR", 0)[1]`.
+/// No known discrete-log relation to G (each is the output of Barretenberg's
+/// hash-to-curve on the domain separator + index).
+pub global H: EmbeddedCurvePoint = EmbeddedCurvePoint {
+    x: 0x054aa86a73cb8a34525e5bbed6e43ba1198e860f5f3950268f71df4591bde402,
+    y: 0x209dcfbf2cfb57f9f6046f44d71ac6faf87254afc7407c04eb621a6287cac126,
+    is_infinite: false,
+};
+
+// ################## CONSTANTS ##################
+
+/// Poseidon2 sponge Initialization Vector (IV) multiplier:
+/// `iv = (input_length as Field) * 2^64`. Matches Noir stdlib's
+/// `Poseidon2Hasher` and Barretenberg's Poseidon2 sponge.
+global POSEIDON2_IV_BASE: Field = 18446744073709551616; // 2^64
+
+/// Domain separation tags (docs/protocol/domain-separators.md). The integer
+/// values are the cross-language contract -- they appear as the first absorbed
+/// element in every Poseidon2 call and the SDK must use the exact same numbers.
+/// The names spell out what the design doc abbreviates; the table below maps
+/// design-doc notation to the constant defined here.
+///
+/// | Design doc        | Value | Constant                          |
+/// |:------------------|:------|:----------------------------------|
+/// | `delta_addr`      | 1     | `ADDRESS`                         |
+/// | `delta_vk`        | 2     | `VIEWING_KEY`                     |
+/// | `delta_dvk`       | 3     | `DELEGATION_VIEWING_KEY`          |
+/// | `delta_spend_r`   | 4     | `SPEND_RANDOMNESS`                |
+/// | `delta_transfer_blind`  | 5     | `TRANSFER_BLINDING`                     |
+/// | `delta_transfer_amount` | 6     | `TRANSFER_AMOUNT`                       |
+/// | `delta_enc_bal`   | 7     | `ENCRYPTED_BALANCE`               |
+/// | `delta_enc_allow` | 8     | `ENCRYPTED_ALLOWANCE`             |
+/// | `delta_allow_r`   | 9     | `ALLOWANCE_RANDOMNESS`            |
+/// | `delta_esc_dvk`   | 10    | `ESCROWED_DELEGATION_VIEWING_KEY` |
+/// | `delta_aud_s`     | 11    | `AUDITOR_SENDER`                  |
+/// | `delta_aud_r`     | 12    | `AUDITOR_RECIPIENT`               |
+/// | `delta_ecdh`      | 13    | `ECDH_SHARED_SECRET`              |
+/// | `delta_esc_allow_r_aud` | 17 | `ESCROWED_ALLOWANCE_BLINDING_AUDITOR` |
+///
+/// Tags 14-16 are not implemented here (docs/protocol/domain-separators.md).
+pub mod domain {
+    /// Soroban Address compression into a single `F_r` Field:
+    /// `address_to_field(a) = Poseidon2(ADDRESS, lo(a), hi(a))`.
+    /// docs/protocol/primitives.md#address-to-field-encoding (`delta_addr`). The contract computes `addr_f` and `op_i`
+    /// off-circuit via this tag; circuits consume the resulting Field directly.
+    pub global ADDRESS: Field = 1;
+    /// Viewing-key derivation: `vk = Poseidon2(VIEWING_KEY, sk, addr_f)`.
+    /// docs/protocol/keys-and-commitments.md#viewing-key (`delta_vk`).
+    pub global VIEWING_KEY: Field = 2;
+    /// Delegation viewing-key derivation:
+    /// `dvk = Poseidon2(DELEGATION_VIEWING_KEY, vk, op_i)`. docs/protocol/keys-and-commitments.md#delegation-viewing-key (`delta_dvk`).
+    pub global DELEGATION_VIEWING_KEY: Field = 3;
+    /// Deterministic randomness for the new spendable balance:
+    /// `r' = Poseidon2(SPEND_RANDOMNESS, vk, sigma)`. Constraints W5/T10/S9 (`delta_spend_r`).
+    pub global SPEND_RANDOMNESS: Field = 4;
+    /// ECDH-derived blinding for the transfer commitment:
+    /// `r_transfer = Poseidon2(TRANSFER_BLINDING, s, sigma)`. Constraints T7/O7 (`delta_transfer_blind`).
+    pub global TRANSFER_BLINDING: Field = 5;
+    /// Mask for the encrypted transfer amount:
+    /// `v_tilde = v_transfer + Poseidon2(TRANSFER_AMOUNT, s, sigma)`. Constraints T9/O9 (`delta_transfer_amount`).
+    pub global TRANSFER_AMOUNT: Field = 6;
+    /// Mask for the encrypted balance scalar:
+    /// `b_tilde = v_new + Poseidon2(ENCRYPTED_BALANCE, vk, sigma)`.
+    /// Constraints W7/T12/S11 (`delta_enc_bal`).
+    pub global ENCRYPTED_BALANCE: Field = 7;
+    /// Mask for the encrypted allowance scalar:
+    /// `a_tilde = v_a + Poseidon2(ENCRYPTED_ALLOWANCE, dvk, sigma_a)`.
+    /// Constraints S8/O12 (`delta_enc_allow`).
+    pub global ENCRYPTED_ALLOWANCE: Field = 8;
+    /// Deterministic randomness for the spender allowance:
+    /// `r_a = Poseidon2(ALLOWANCE_RANDOMNESS, dvk, sigma_a)`.
+    /// Constraints S6/O3/O10 (`delta_allow_r`).
+    pub global ALLOWANCE_RANDOMNESS: Field = 9;
+    /// Delegation-key escrow mask (spender ECDH):
+    /// `Poseidon2(ESCROWED_DELEGATION_VIEWING_KEY, s, op_i)`.
+    /// Constraint S12, docs/protocol/operations/set-spender.md#delegation-key-escrow (`delta_esc_dvk`).
+    pub global ESCROWED_DELEGATION_VIEWING_KEY: Field = 10;
+    /// Sender or owner-auditor channel tag for Poseidon2 sponge masks
+    /// (docs/protocol/primitives.md#poseidon2-hash, docs/protocol/auditing.md#per-transfer-auditor-ciphertexts). **Three lanes**, and the only tag squeezed
+    /// three-wide: lane[0] is the amount mask (where applicable), lane[1] the
+    /// balance/allowance checkpoint mask, lane[2] the commitment-blinding
+    /// escrow slot -- the new spendable blinding on checkpoints, the new
+    /// allowance blinding on spender transfers. Constraints W_a3 / T_a6 /
+    /// S_a3 / O_a6 (`delta_aud_s`).
+    pub global AUDITOR_SENDER: Field = 11;
+    /// Recipient-auditor channel tag for Poseidon2 sponge masks
+    /// (docs/protocol/primitives.md#poseidon2-hash, docs/protocol/auditing.md#per-transfer-auditor-ciphertexts). Squeeze 1 yields the amount mask; squeeze
+    /// 2 yields the per-transfer Pedersen randomness mask.
+    /// Constraints T_a2 / O_a2 (`delta_aud_r`).
+    pub global AUDITOR_RECIPIENT: Field = 12;
+    /// ECDH shared-secret scalar extraction:
+    /// `s = Poseidon2(ECDH_SHARED_SECRET, S.x, S.y)`.
+    /// docs/protocol/primitives.md#elliptic-curve-diffie-hellman (`delta_ecdh`). See [`ecdh`].
+    pub global ECDH_SHARED_SECRET: Field = 13;
+    /// Auditor-side allowance-blinding escrow mask (owner-auditor ECDH):
+    /// `Poseidon2(ESCROWED_ALLOWANCE_BLINDING_AUDITOR, s_a_s, op_i)`.
+    /// Constraint S14, docs/protocol/auditing.md#spender-allowance-auditing (`delta_esc_allow_r_aud`).
+    pub global ESCROWED_ALLOWANCE_BLINDING_AUDITOR: Field = 17;
+}
+
+// ################## CORE PRIMITIVES ##################
+
+unconstrained fn point_hint(p: EmbeddedCurvePoint, _anchor: Field) -> EmbeddedCurvePoint {
+    p
+}
+
+/// Returns `p` as a witness. Barretenberg routes a multi_scalar_mul through its
+/// fixed-base lookup tables when a base point is an ACIR constant equal to one of
+/// its precomputed generators (G and H are) and the scalar is a witness; the
+/// non-ZK proof's read-count and read-tag commitments then depend on which table
+/// rows the scalars' 9-bit windows hit, and how often. The hint takes a witness
+/// `anchor` so the compiler does not fold it back to a constant, and `assert_is`
+/// must run after the multiplication: an equality asserted before it lets the
+/// compiler substitute the constant back. `scripts/check_witness_lookups.sh`
+/// guards both.
+fn as_witness(p: EmbeddedCurvePoint, anchor: Field) -> EmbeddedCurvePoint {
+    // Safety: every caller constrains the result equal to `p` via `assert_is`.
+    unsafe { point_hint(p, anchor) }
+}
+
+fn assert_is(w: EmbeddedCurvePoint, p: EmbeddedCurvePoint) {
+    assert(w.x == p.x);
+    assert(w.y == p.y);
+    assert(w.is_infinite == p.is_infinite);
+}
+
+/// Pedersen commitment `v*G + r*H` on Grumpkin. docs/protocol/primitives.md#pedersen-commitments.
+pub fn commit(value: Field, randomness: Field) -> EmbeddedCurvePoint {
+    let g = as_witness(G, value);
+    let h = as_witness(H, randomness);
+    let out = multi_scalar_mul(
+        [g, h],
+        [EmbeddedCurveScalar::from_field(value), EmbeddedCurveScalar::from_field(randomness)],
+    );
+    assert_is(g, G);
+    assert_is(h, H);
+    out
+}
+
+/// Scalar multiplication `s*P` on Grumpkin. Used for `Y = sk*H`, `PVK = vk*H`,
+/// `R_e = r_e*H`, and as the building block under `ecdh`.
+pub fn scalar_mul(scalar: Field, point: EmbeddedCurvePoint) -> EmbeddedCurvePoint {
+    let p = as_witness(point, scalar);
+    let out = multi_scalar_mul([p], [EmbeddedCurveScalar::from_field(scalar)]);
+    assert_is(p, point);
+    out
+}
+
+/// ECDH shared-secret scalar extraction per docs/protocol/primitives.md#elliptic-curve-diffie-hellman: computes
+/// `S = scalar * P` and binds both coordinates into the output via the
+/// Poseidon funnel, `s = Poseidon2(ECDH_SHARED_SECRET, S.x, S.y)`.
+///
+/// Absorbing `S.y` removes the negation invariance of an x-only extraction:
+/// `P` and `-P = (P.x, -P.y)` share an x-coordinate, so `(scalar * P).x`
+/// alone maps a key and its negation (`-PVK = (-vk) * H`, itself a valid,
+/// canonical registration) to the same shared secret for every scalar.
+/// The absorb `[tag, S.x, S.y]` fills exactly one rate-3 block, so the
+/// binding costs a single Poseidon2 permutation.
+///
+/// Use this whenever the *scalar* shared secret is what downstream Poseidon
+/// helpers expect (every `derive_transfer_blind` / `encrypt_amount` /
+/// `encrypt_auditor_*` call). When the full shared-secret *point* is needed,
+/// reach for `scalar_mul` directly.
+pub fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> Field {
+    let s = scalar_mul(scalar, point);
+    poseidon_with_domain(domain::ECDH_SHARED_SECRET, [s.x, s.y])
+}
+
+/// Asserts `p` is on Grumpkin AND not the identity. Use this for every
+/// public-input *key* (docs/protocol/operations/README.md#public-input-sources point 4: `R_e`, `Y`, `PVK`, `K_aud` must all
+/// satisfy `P != O`). The identity element collapses ECDH (`S = O` regardless
+/// of the secret scalar), so accepting it would let an adversary publish a key
+/// for which every shared secret is known.
+pub fn assert_on_curve_non_identity(p: EmbeddedCurvePoint) {
+    assert(!p.is_infinite);
+    assert(p.y * p.y == p.x * p.x * p.x - 17);
+}
+
+// ################## POSEIDON2 FUNNEL ##################
+
+/// Poseidon2 sponge with rate=3, capacity=1, matching Noir stdlib's hasher and
+/// Barretenberg's Poseidon2 sponge. IV = `len * 2^64` placed at the capacity
+/// position; absorb `RATE` field elements per permutation; squeeze `state[0]`.
+/// The empty input still applies the squeeze permutation, returning
+/// `poseidon2_permutation([0, 0, 0, 0], 4)[0]` -- the same convention as the
+/// on-chain sponge, which always permutes before squeezing. That branch is
+/// comptime-dead for every `M >= 1` instantiation, and `poseidon_with_domain`
+/// guarantees `M >= 1` on every reachable path.
+fn sponge<let M: u32>(inputs: [Field; M]) -> Field {
+    let iv: Field = (M as Field) * POSEIDON2_IV_BASE;
+    let mut state: [Field; 4] = [0, 0, 0, iv];
+
+    let full: u32 = M / 3;
+    for i in 0..full {
+        state[0] += inputs[i * 3];
+        state[1] += inputs[i * 3 + 1];
+        state[2] += inputs[i * 3 + 2];
+        state = poseidon2_permutation(state, 4);
+    }
+
+    let remainder: u32 = M - full * 3;
+    if (remainder != 0) | (M == 0) {
+        for i in 0..remainder {
+            state[i] += inputs[full * 3 + i];
+        }
+        state = poseidon2_permutation(state, 4);
+    }
+
+    state[0]
+}
+
+/// Single Poseidon2 entry point. Every higher-level helper in this crate
+/// (`vk_from_sk`, `dvk_from_vk_op`, all `derive_*` / `encrypt_*`) routes through
+/// this funnel so that the domain tag is always the *first* absorbed element.
+///
+/// Hashing raw -- bypassing this -- is a violation of the library contract.
+pub fn poseidon_with_domain<let N: u32>(d: Field, inputs: [Field; N]) -> Field {
+    let mut buf: [Field; N + 1] = [0; N + 1];
+    buf[0] = d;
+    for i in 0..N {
+        buf[i + 1] = inputs[i];
+    }
+    sponge(buf)
+}
+
+// ################## KEY DERIVATION ##################
+
+/// Viewing key. docs/protocol/keys-and-commitments.md#viewing-key. `vk = Poseidon2(VK, sk, addr_f)`.
+///
+/// The `addr_f` parameter (the contract's address as a `Field`) binds the
+/// viewing key -- and therefore every proof that constrains `vk` (R2/W2/T2/S2)
+/// -- to a specific deployed contract. Dropping `addr_f` here would let a proof for
+/// one contract verify against another's verifier.
+pub fn vk_from_sk(sk: Field, addr_f: Field) -> Field {
+    poseidon_with_domain(domain::VIEWING_KEY, [sk, addr_f])
+}
+
+/// Public viewing key `PVK = vk*H`. docs/protocol/keys-and-commitments.md#public-viewing-key. The recipient's ECDH long-term key
+/// for incoming transfers.
+pub fn pvk_from_vk(vk: Field) -> EmbeddedCurvePoint {
+    scalar_mul(vk, H)
+}
+
+/// Delegation viewing key. docs/protocol/keys-and-commitments.md#delegation-viewing-key. `dvk_i = Poseidon2(DVK, vk, op_i)`.
+pub fn dvk_from_vk_op(vk: Field, op_i: Field) -> Field {
+    poseidon_with_domain(domain::DELEGATION_VIEWING_KEY, [vk, op_i])
+}
+
+/// Deterministic randomness for the new spendable balance after an
+/// owner-initiated proof operation. Constraints W5 / T10 / S9.
+pub fn derive_spend_r(vk: Field, sigma: Field) -> Field {
+    poseidon_with_domain(domain::SPEND_RANDOMNESS, [vk, sigma])
+}
+
+/// Deterministic randomness for the spender allowance commitment.
+/// Constraints S6 / O3 / O10.
+pub fn derive_allow_r(dvk: Field, sigma_a: Field) -> Field {
+    poseidon_with_domain(domain::ALLOWANCE_RANDOMNESS, [dvk, sigma_a])
+}
+
+/// ECDH-derived blinding for the transfer commitment `C_transfer`.
+/// Constraints T7 / O7. `s` is the recipient-ECDH shared-secret scalar
+/// produced by [`ecdh`].
+pub fn derive_transfer_blind(s: Field, sigma: Field) -> Field {
+    poseidon_with_domain(domain::TRANSFER_BLINDING, [s, sigma])
+}
+
+// ################## ENCRYPTED SCALARS ##################
+
+/// Encrypts the transfer amount under the recipient's ECDH shared secret.
+/// Constraints T9 / O9. `v_tilde = v_transfer + Poseidon2(TRANSFER_AMOUNT, s, sigma)`.
+pub fn encrypt_amount(v_transfer: Field, s: Field, sigma: Field) -> Field {
+    v_transfer + poseidon_with_domain(domain::TRANSFER_AMOUNT, [s, sigma])
+}
+
+/// Encrypts the new spendable balance under the owner's viewing key.
+/// Constraints W7 / T12 / S11. `b_tilde = v_new + Poseidon2(ENC_BAL, vk, sigma)`.
+pub fn encrypt_balance(v_new: Field, vk: Field, sigma: Field) -> Field {
+    v_new + poseidon_with_domain(domain::ENCRYPTED_BALANCE, [vk, sigma])
+}
+
+/// Encrypts the spender allowance under the delegation viewing key.
+/// Constraints S8 / O12. `a_tilde = v_a + Poseidon2(ENC_ALLOW, dvk, sigma_a)`.
+pub fn encrypt_allowance(v_a: Field, dvk: Field, sigma_a: Field) -> Field {
+    v_a + poseidon_with_domain(domain::ENCRYPTED_ALLOWANCE, [dvk, sigma_a])
+}
+
+/// Delegation-key escrow mask for the spender handoff at `set_spender`. docs/protocol/operations/set-spender.md#delegation-key-escrow.
+/// `escrowed_dvk = dvk + Poseidon2(ESC_DVK, s, op_i)` where `s = ecdh(r_e, Y_op)`.
+pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
+    dvk + poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, op_i])
+}
+
+/// Auditor-side allowance-blinding escrow at `set_spender`. Constraint S14.
+/// `r_a_tilde_aud_s = r_a + Poseidon2(ESC_ALLOW_R_AUD, s_a_s, op_i)` where
+/// `s_a_s = ecdh(r_e, K_aud_s)` is the *owner-auditor* shared scalar.
+/// docs/protocol/auditing.md#spender-allowance-auditing specifies the construction.
+pub fn encrypt_esc_allow_r_auditor(r_a: Field, s_a_s: Field, op_i: Field) -> Field {
+    r_a + poseidon_with_domain(domain::ESCROWED_ALLOWANCE_BLINDING_AUDITOR, [s_a_s, op_i])
+}
+
+// ################## AUDITOR-CHANNEL SPONGE ##################
+
+/// Poseidon2 sponge with two squeezes. Absorbs `(d, s, sigma)` -- where
+/// `s` is the ECDH shared-secret scalar produced by [`ecdh`] -- and returns
+/// the first two rate-elements of the post-permutation state in order.
+///
+/// Implements `SpongeSqueeze_2(delta, s, sigma)` from docs/protocol/primitives.md#poseidon2-hash. The canonical
+/// squeeze order is: index 0 = amount mask, index 1 = balance / randomness
+/// mask, fixed by docs/protocol/operations/ and docs/protocol/auditing.md. With rate = 3 the absorb fits one block
+/// and both outputs are served from the same permutation, so the constraint
+/// cost is exactly one Poseidon2 permutation per call.
+///
+/// Used by the recipient-auditor channel of Transfer (T_a2) and
+/// SpenderTransfer (O_a2). Every sender-auditor channel reads
+/// [`sponge_squeeze_3`].
+///
+/// Defined as the two-lane prefix of [`sponge_squeeze_3`].
+pub fn sponge_squeeze_2(d: Field, s: Field, sigma: Field) -> [Field; 2] {
+    let state = sponge_squeeze_3(d, s, sigma);
+    [state[0], state[1]]
+}
+
+/// Poseidon2 sponge with three squeezes. Absorbs `(d, s, sigma)` and returns
+/// the first three rate-elements of the post-permutation state in order.
+///
+/// Implements `SpongeSqueeze_3(delta, s, sigma)` from docs/protocol/primitives.md#poseidon2-hash. As in
+/// [`sponge_squeeze_2`], lane[0] is the amount mask and lane[1] the balance /
+/// allowance / randomness mask. **The lane[2] slot is the sender-auditor
+/// blinding escrow**: it carries the blinding of a commitment the operation
+/// writes -- the new spendable blinding on the three checkpoint operations
+/// (W_a5 / T_a9 / S_a6), the new allowance blinding on spender transfers
+/// (O_a9).
+///
+/// `sponge_squeeze_3(d, s, sigma)[0..2] == sponge_squeeze_2(d, s, sigma)`, by
+/// construction: the absorb fits one rate-3 block, so all three outputs are
+/// served from the same permutation and the two functions differ only in how
+/// much of the state they expose. The capacity lane at `state[3]` stays
+/// untouched.
+pub fn sponge_squeeze_3(d: Field, s: Field, sigma: Field) -> [Field; 3] {
+    let iv: Field = 3 * POSEIDON2_IV_BASE;
+    let state = poseidon2_permutation([d, s, sigma, iv], 4);
+    [state[0], state[1], state[2]]
+}

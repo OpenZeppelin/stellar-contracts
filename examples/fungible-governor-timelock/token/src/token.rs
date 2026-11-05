@@ -2,7 +2,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, MuxedAddress, String};
 use stellar_access::ownable::{set_owner, Ownable};
 use stellar_governance::votes::Votes;
 use stellar_macros::only_owner;
-use stellar_tokens::fungible::{votes::FungibleVotes, Base, FungibleToken};
+use stellar_tokens::fungible::{votes::FungibleVotes, Base, Compose, FungibleToken};
 
 #[contract]
 pub struct TokenContract;
@@ -21,13 +21,13 @@ impl TokenContract {
 
     #[only_owner]
     pub fn mint(e: &Env, to: &Address, amount: i128) {
-        FungibleVotes::mint(e, to, amount);
+        <Self as FungibleToken>::ContractType::mint(e, to, amount);
     }
 }
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for TokenContract {
-    type ContractType = FungibleVotes;
+    type ContractType = Compose<(FungibleVotes,)>;
 }
 
 #[contractimpl(contracttrait)]

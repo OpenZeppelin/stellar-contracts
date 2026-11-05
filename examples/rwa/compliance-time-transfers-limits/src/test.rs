@@ -66,6 +66,16 @@ impl IdentityRegistryStorage for MockIRSContract {
         unreachable!("add_identity is not used in these tests");
     }
 
+    fn batch_add_identity(
+        _e: &Env,
+        _accounts: Vec<Address>,
+        _identities: Vec<Address>,
+        _country_data_lists: Vec<Vec<Val>>,
+        _operator: Address,
+    ) {
+        unreachable!("batch_add_identity is not used in these tests");
+    }
+
     fn remove_identity(_e: &Env, _account: Address, _operator: Address) {
         unreachable!("remove_identity is not used in these tests");
     }
@@ -178,7 +188,7 @@ fn batch_set_and_remove_time_transfer_limits_work() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #403)")]
+#[should_panic(expected = "Error(Contract, #385)")]
 fn remove_time_transfer_limit_panics_when_missing() {
     let e = Env::default();
     e.mock_all_auths();
@@ -191,7 +201,7 @@ fn remove_time_transfer_limit_panics_when_missing() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #402)")]
+#[should_panic(expected = "Error(Contract, #384)")]
 fn set_time_transfer_limit_panics_at_bound() {
     let e = Env::default();
     e.mock_all_auths();
@@ -288,7 +298,7 @@ fn window_elapses_and_counting_restarts() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #401)")]
+#[should_panic(expected = "Error(Contract, #383)")]
 fn on_transfer_panics_when_limit_exceeded() {
     let e = Env::default();
     e.mock_all_auths();

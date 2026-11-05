@@ -35,12 +35,12 @@ fn mint_updates_voting_units() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &alice, 1);
+        NonFungibleVotes::mint_with_id(&e, &alice, 1);
 
         assert_eq!(Base::balance(&e, &alice), 1);
         assert_eq!(get_voting_units(&e, &alice), 1);
 
-        NonFungibleVotes::mint(&e, &alice, 2);
+        NonFungibleVotes::mint_with_id(&e, &alice, 2);
 
         assert_eq!(Base::balance(&e, &alice), 2);
         assert_eq!(get_voting_units(&e, &alice), 2);
@@ -55,7 +55,7 @@ fn mint_with_delegation_updates_votes() {
 
     e.as_contract(&contract_address, || {
         delegate(&e, &alice, &bob);
-        NonFungibleVotes::mint(&e, &alice, 1);
+        NonFungibleVotes::mint_with_id(&e, &alice, 1);
 
         assert_eq!(Base::balance(&e, &alice), 1);
         assert_eq!(get_voting_units(&e, &alice), 1);
@@ -69,7 +69,7 @@ fn sequential_mint_updates_voting_units() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        let token_id = NonFungibleVotes::sequential_mint(&e, &alice);
+        let token_id = NonFungibleVotes::mint(&e, &alice);
 
         assert_eq!(token_id, 0);
         assert_eq!(Base::balance(&e, &alice), 1);
@@ -83,8 +83,8 @@ fn burn_updates_voting_units() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &alice, 1);
-        NonFungibleVotes::mint(&e, &alice, 2);
+        NonFungibleVotes::mint_with_id(&e, &alice, 1);
+        NonFungibleVotes::mint_with_id(&e, &alice, 2);
         assert_eq!(get_voting_units(&e, &alice), 2);
     });
 
@@ -103,8 +103,8 @@ fn burn_with_delegation_updates_votes() {
 
     e.as_contract(&contract_address, || {
         delegate(&e, &alice, &bob);
-        NonFungibleVotes::mint(&e, &alice, 1);
-        NonFungibleVotes::mint(&e, &alice, 2);
+        NonFungibleVotes::mint_with_id(&e, &alice, 1);
+        NonFungibleVotes::mint_with_id(&e, &alice, 2);
         assert_eq!(get_votes(&e, &bob), 2);
     });
 
@@ -121,7 +121,7 @@ fn burn_from_updates_voting_units() {
     let spender = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &owner, 1);
+        NonFungibleVotes::mint_with_id(&e, &owner, 1);
         Base::approve(&e, &owner, &spender, 1, 1000);
     });
 
@@ -140,7 +140,7 @@ fn transfer_updates_voting_units() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &alice, 1);
+        NonFungibleVotes::mint_with_id(&e, &alice, 1);
         assert_eq!(get_voting_units(&e, &alice), 1);
     });
 
@@ -163,8 +163,8 @@ fn transfer_with_delegation_updates_votes() {
     let delegate_b = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &alice, 1);
-        NonFungibleVotes::mint(&e, &alice, 2);
+        NonFungibleVotes::mint_with_id(&e, &alice, 1);
+        NonFungibleVotes::mint_with_id(&e, &alice, 2);
         delegate(&e, &alice, &delegate_a);
         assert_eq!(get_votes(&e, &delegate_a), 2);
     });
@@ -189,7 +189,7 @@ fn transfer_from_updates_voting_units() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &owner, 1);
+        NonFungibleVotes::mint_with_id(&e, &owner, 1);
         Base::approve(&e, &owner, &spender, 1, 1000);
     });
 
@@ -213,7 +213,7 @@ fn transfer_from_with_delegation_updates_votes() {
     let delegate_recipient = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &owner, 1);
+        NonFungibleVotes::mint_with_id(&e, &owner, 1);
         delegate(&e, &owner, &delegate_owner);
     });
 
@@ -236,7 +236,7 @@ fn self_delegation() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &alice, 1);
+        NonFungibleVotes::mint_with_id(&e, &alice, 1);
         delegate(&e, &alice, &alice);
 
         assert_eq!(get_delegate(&e, &alice), Some(alice.clone()));
@@ -252,9 +252,9 @@ fn multiple_holders_with_same_delegate() {
     let charlie = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &alice, 1);
-        NonFungibleVotes::mint(&e, &alice, 2);
-        NonFungibleVotes::mint(&e, &bob, 3);
+        NonFungibleVotes::mint_with_id(&e, &alice, 1);
+        NonFungibleVotes::mint_with_id(&e, &alice, 2);
+        NonFungibleVotes::mint_with_id(&e, &bob, 3);
 
         delegate(&e, &alice, &charlie);
     });
@@ -273,7 +273,7 @@ fn contract_overrides_transfer() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &alice, 1);
+        NonFungibleVotes::mint_with_id(&e, &alice, 1);
         assert_eq!(get_voting_units(&e, &alice), 1);
     });
 
@@ -295,7 +295,7 @@ fn contract_overrides_transfer_from() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &owner, 1);
+        NonFungibleVotes::mint_with_id(&e, &owner, 1);
         Base::approve(&e, &owner, &spender, 1, 1000);
     });
 
@@ -315,8 +315,8 @@ fn burnable_overrides_burn() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &alice, 1);
-        NonFungibleVotes::mint(&e, &alice, 2);
+        NonFungibleVotes::mint_with_id(&e, &alice, 1);
+        NonFungibleVotes::mint_with_id(&e, &alice, 2);
         assert_eq!(get_voting_units(&e, &alice), 2);
     });
 
@@ -335,7 +335,7 @@ fn burnable_overrides_burn_from() {
     let spender = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &owner, 1);
+        NonFungibleVotes::mint_with_id(&e, &owner, 1);
         Base::approve(&e, &owner, &spender, 1, 1000);
     });
 
@@ -354,9 +354,9 @@ fn transfer_between_delegated_accounts() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        NonFungibleVotes::mint(&e, &alice, 1);
-        NonFungibleVotes::mint(&e, &alice, 2);
-        NonFungibleVotes::mint(&e, &bob, 3);
+        NonFungibleVotes::mint_with_id(&e, &alice, 1);
+        NonFungibleVotes::mint_with_id(&e, &alice, 2);
+        NonFungibleVotes::mint_with_id(&e, &bob, 3);
         delegate(&e, &alice, &alice);
     });
 

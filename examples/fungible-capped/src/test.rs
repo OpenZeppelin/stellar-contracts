@@ -20,6 +20,7 @@ fn mint_under_cap() {
 
     assert_eq!(client.balance(&user), 500);
     assert_eq!(client.total_supply(), 500);
+    assert_eq!(client.cap(), cap);
 }
 
 #[test]
