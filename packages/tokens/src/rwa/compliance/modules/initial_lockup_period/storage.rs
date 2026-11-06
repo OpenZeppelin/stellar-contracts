@@ -234,10 +234,11 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 ///   rejected: the moved amount is covered by consuming locks oldest-first,
 ///   expired or not. The consumed entries leave the books with the seized
 ///   tokens; the recipient gains nothing.
-/// * Recovery transfers migrate instead of consuming: the lock entries covering
-///   the moved amount leave `from` and are re-created on `to` with their
-///   release times preserved, so the investor's remaining lockup follows the
-///   balance onto the new wallet.
+/// * Recovery transfers migrate instead of consuming: `from`'s expired entries
+///   are dropped, and the active locks covering the moved amount leave `from`
+///   and are re-created on `to` with their release times preserved, so the
+///   investor's remaining lockup follows the balance onto the new wallet. See
+///   [`migrate_locks`].
 ///
 /// # Arguments
 ///

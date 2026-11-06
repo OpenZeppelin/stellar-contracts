@@ -96,10 +96,10 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// in step with what the wallet actually holds. Missing a hook leaves stale
 /// locks on the books. Privileged transfers are not rejected: a forced
 /// transfer (seizure) consumes locks oldest-first, expired or not, so the
-/// schedule shrinks with the seized tokens, while a recovery migrates the
-/// consumed entries to the destination wallet with their release times
-/// preserved, so the investor's remaining lockup follows the balance onto
-/// the new wallet.
+/// schedule shrinks with the seized tokens. A recovery drops the lost
+/// wallet's expired entries and migrates only its active locks to the
+/// destination wallet, with their release times preserved, so the
+/// investor's remaining lockup follows the balance onto the new wallet.
 ///
 /// Burns have no such privileged variant: the `Destroyed` hook does not
 /// distinguish who issued the burn, so a burn that dips into still-locked
