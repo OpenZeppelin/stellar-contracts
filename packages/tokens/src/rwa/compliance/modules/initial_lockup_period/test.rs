@@ -846,8 +846,10 @@ fn on_transfer_recovery_succeeds_when_full_wallets_have_expired() {
     e.ledger().with_mut(|li| li.sequence_number = 500);
     e.as_contract(&module_id, || on_created(&e, &from, 1, &token));
 
-    // Only the single active entry is carried over, so the write fits.
+    // Only the single active entry is carried over, so the write fits. The
+    // recovery itself runs under the default budget.
     e.ledger().with_mut(|li| li.sequence_number = 1_000);
+    e.cost_estimate().budget().reset_default();
     e.as_contract(&module_id, || {
         let balance = MAX_LOCKS as i128;
         on_transfer(&e, &from, &to, balance, balance, &TransferKind::Recovery, &token);

@@ -448,12 +448,13 @@ pub fn debit_forced(e: &Env, token: &Address, wallet: &Address, balance: i128, a
 }
 
 /// Migrates the lock entries covering `amount` from `from` to `to` for a
-/// recovery transfer. Expired entries are first pruned from both wallets'
-/// lists, since they no longer restrict anything. The portion of the moved
-/// amount not covered by `from`'s free balance is then consumed from its
-/// remaining (active) entries oldest-first, and the consumed pieces are
-/// re-created on `to` with their release times preserved, merging with the
-/// active entries `to` already holds.
+/// recovery transfer. Expired entries are first pruned from `from`'s list,
+/// since they no longer restrict anything. The portion of the moved amount
+/// not covered by `from`'s free balance is then consumed from its remaining
+/// (active) entries oldest-first, and the consumed pieces are re-created on
+/// `to` with their release times preserved. When any active lock moves,
+/// `to`'s list is pruned the same way before the merge; otherwise `to` is
+/// left untouched.
 ///
 /// The merge does not enforce [`MAX_LOCKS`], because rejecting it would
 /// block the recovery itself. When the two wallets together hold more than
