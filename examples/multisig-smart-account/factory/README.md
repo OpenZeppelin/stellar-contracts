@@ -1,7 +1,7 @@
 # Smart Account Factory Example
 
 Use this factory if you want to deploy accounts to deterministic addresses
-derived from their initial signers and policies, or predict an address before
+derived from their initial name, signers and policies, or predict an address before
 deployment.
 
 This guide deploys the multisig smart account from the
@@ -84,9 +84,9 @@ stellar contract invoke --id account_factory -- pinned_account_wasm_hash
 ## 4. Predict the Account Address
 
 Compute the address for a 2-of-2 account with the two Ed25519 keys from the
-account example and the threshold policy. Set `SIGNERS` and `POLICIES` once
+account example and the threshold policy. Set `NAME`, `SIGNERS` and `POLICIES` once
 (replace the sample values with your own deployed addresses and keys), then
-pass them to both `predict_address` and `deploy`.
+pass them to both `predict_address` and `deploy`. `NAME` becomes the name of the account's default context rule.
 
 In the example below, `CDLDYJWEZSM6IAI4HHPEZTTV65WX4OVN3RZD3U6LQKYAVIZTEK7XYAYT`
 is the Ed25519 verifier contract address, the two 32-byte hex strings are the
@@ -95,6 +95,7 @@ is the threshold policy contract address. The `salt` argument is `0` for the
 first account with this configuration:
 
 ```bash
+NAME='multisig'
 SIGNERS='[
     {
         "External": [
@@ -112,10 +113,15 @@ SIGNERS='[
 POLICIES='{"CA7IJLIHDBTE5S5EIMTIWRKKTSJP6KPH2VOU255CB2RNTWXQGYJRKKC3": {"map": [{"key": {"symbol": "threshold"}, "val": {"u32": 2}}]}}'
 
 stellar contract invoke --id account_factory -- predict_address \
+    --name "$NAME" \
     --signers "$SIGNERS" \
     --policies "$POLICIES" \
     --salt 0
 ```
+
+`predict_address` rejects any tuple the account constructor would reject on its own: a name longer than 20 bytes, an external key longer than 256 bytes, more than 15 signers, more than 5 policies, duplicate signers, or neither signers nor policies.
+
+It cannot check that each policy accepts its install parameters, so a predicted address is not proof that `deploy` will succeed. Before sending funds to a predicted address, simulate the deployment by running the `deploy` command from the next step with `--send=no` added before the `--`.
 
 ## 5. Deploy the Account
 
@@ -123,6 +129,7 @@ Deploy with the same tuple. The returned address is the one `predict_address` ga
 
 ```bash
 stellar contract invoke --id account_factory -- deploy \
+    --name "$NAME" \
     --signers "$SIGNERS" \
     --policies "$POLICIES" \
     --salt 0
@@ -130,5 +137,5 @@ stellar contract invoke --id account_factory -- deploy \
 
 Anyone may call `deploy`. The transaction requires only the fee payer's signature.
 
-To create another account using the same initial signers and policies, use a
+To create another account using the same initial name, signers and policies, use a
 different `salt`.

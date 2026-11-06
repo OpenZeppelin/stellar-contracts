@@ -1,4 +1,6 @@
-use soroban_sdk::{contract, contractimpl, map, vec, Address, Bytes, Env, TryFromVal, Val, Vec};
+use soroban_sdk::{
+    contract, contractimpl, map, vec, Address, Bytes, Env, String, TryFromVal, Val, Vec,
+};
 use stellar_accounts::{
     policies::{simple_threshold::SimpleThresholdAccountParams, Policy},
     smart_account::{ContextRule, Signer},
@@ -74,7 +76,7 @@ fn create_account() {
         ),
     ];
     let policies = map![&e, (policy, SimpleThresholdAccountParams { threshold: 2 })];
-    e.register(MultisigContract, (signers, policies));
+    e.register(MultisigContract, (String::from_str(&e, "multisig"), signers, policies));
 }
 
 #[test]
@@ -89,7 +91,11 @@ fn batch_add_signer_adds_all_signers() {
     );
     let account = e.register(
         MultisigContract,
-        (vec![&e, initial_signer.clone()], soroban_sdk::Map::<Address, Val>::new(&e)),
+        (
+            String::from_str(&e, "multisig"),
+            vec![&e, initial_signer.clone()],
+            soroban_sdk::Map::<Address, Val>::new(&e),
+        ),
     );
 
     let new_signer_1 = Signer::External(
