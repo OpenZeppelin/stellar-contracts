@@ -420,8 +420,8 @@ pub fn debit_unlocked(e: &Env, token: &Address, wallet: &Address, balance: i128,
 /// released. The lockup policy is an investor-facing rule the admin is
 /// consciously overriding, but the lock schedule must still shrink with
 /// the departing tokens or it would exceed the wallet's remaining balance.
-/// For recovery transfers, which migrate the consumed entries to the new
-/// wallet instead of dropping them, see [`migrate_locks`].
+/// For recovery transfers, which drop expired entries and migrate the
+/// active ones to the new wallet, see [`migrate_locks`].
 ///
 /// # Arguments
 ///
@@ -448,7 +448,7 @@ pub fn debit_forced(e: &Env, token: &Address, wallet: &Address, balance: i128, a
     }
 }
 
-/// Migrates the lock entries covering `amount` from `from` to `to` for a
+/// Migrates the active lock entries covering `amount` from `from` to `to` for a
 /// recovery transfer. Expired entries are first pruned from `from`'s list,
 /// since they no longer restrict anything. The portion of the moved amount
 /// not covered by `from`'s free balance is then consumed from its remaining
