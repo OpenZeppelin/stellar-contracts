@@ -448,14 +448,22 @@ pub fn debit_forced(e: &Env, token: &Address, wallet: &Address, balance: i128, a
 }
 
 /// Migrates the lock entries covering `amount` from `from` to `to` for a
-/// recovery transfer: the portion of the moved amount not covered by
-/// `from`'s never-locked free balance is consumed from its entries
-/// oldest-first, expired or not, and the consumed pieces are re-created on
-/// `to` with their release times preserved, merging with any entries `to`
-/// already holds. A recovery moves the investor's balance to a new wallet,
-/// so the remaining lockup follows the tokens instead of being released
-/// early. Consumption stops when the entries are exhausted; it never
-/// panics on shortfall.
+/// recovery transfer. Expired entries are first pruned from both wallets'
+/// lists, since they no longer restrict anything. The portion of the moved
+/// amount not covered by `from`'s free balance is then consumed from its
+/// remaining (active) entries oldest-first, and the consumed pieces are
+/// re-created on `to` with their release times preserved, merging with the
+/// active entries `to` already holds.
+///
+/// The merge does not enforce [`MAX_LOCKS`], because rejecting it would
+/// block the recovery itself. When the two wallets together hold more than
+/// [`MAX_LOCKS`] active entries, `to` ends up above the cap and further
+/// mints to it are rejected until enough of its locks expire. When they
+/// hold more active entries than fit in a single contract-data entry
+/// (roughly 800, see [`MAX_LOCKS`]), the write fails and the recovery
+/// reverts. Waiting resolves it: once enough locks expire, the pruning
+/// shrinks the merged list below the limit and the recovery can be
+/// retried.
 ///
 /// # Arguments
 ///
@@ -485,6 +493,7 @@ pub fn migrate_locks(
     amount: i128,
 ) {
     let mut src = get_locked_details(e, token, from);
+    prune_expired_locks(e, &mut src);
     if src.total_locked == 0 {
         return;
     }
@@ -509,6 +518,7 @@ pub fn migrate_locks(
     // the same wallet observes the already-debited entries and reduces to a
     // no-op instead of duplicating them.
     let mut dst = get_locked_details(e, token, to);
+    prune_expired_locks(e, &mut dst);
     for lock in moved.iter() {
         dst.total_locked = add_i128_or_panic(e, dst.total_locked, lock.amount);
         dst.locks.push_back(lock);

@@ -743,6 +743,89 @@ fn on_transfer_recovery_merges_with_destination_locks() {
 }
 
 #[test]
+fn on_transfer_recovery_drops_expired_entries_on_both_wallets() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // Each wallet holds one expired entry (t=100) and one active entry.
+        preset_locks(
+            &e,
+            &token,
+            &from,
+            &vec![
+                &e,
+                LockedTokens { amount: 40, release_ledger: 100 },
+                LockedTokens { amount: 60, release_ledger: 1_000 },
+            ],
+        );
+        preset_locks(
+            &e,
+            &token,
+            &to,
+            &vec![
+                &e,
+                LockedTokens { amount: 10, release_ledger: 100 },
+                LockedTokens { amount: 30, release_ledger: 500 },
+            ],
+        );
+        e.ledger().with_mut(|li| li.sequence_number = 200);
+
+        on_transfer(&e, &from, &to, 100, 100, &TransferKind::Recovery, &token);
+
+        // Only the active entries survive: `to`'s own and the migrated one.
+        let destination = get_locked_details(&e, &token, &to);
+        assert_eq!(destination.total_locked, 90);
+        assert_eq!(
+            destination.locks,
+            vec![
+                &e,
+                LockedTokens { amount: 30, release_ledger: 500 },
+                LockedTokens { amount: 60, release_ledger: 1_000 },
+            ]
+        );
+        assert_eq!(get_locked_details(&e, &token, &from).total_locked, 0);
+    });
+}
+
+#[test]
+fn on_transfer_recovery_succeeds_when_full_wallets_have_expired() {
+    let e = Env::default();
+    e.cost_estimate().budget().reset_unlimited();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    // Both wallets at the cap: 1024 entries merged would not fit in one
+    // contract-data entry. Each mint runs as its own invocation, as on-chain.
+    // All locks release at t=1000, except the source's last one (t=1500).
+    e.as_contract(&module_id, || set_lockup_period(&e, &token, 1_000));
+    for _ in 0..MAX_LOCKS {
+        e.as_contract(&module_id, || on_created(&e, &to, 1, &token));
+    }
+    for _ in 0..MAX_LOCKS - 1 {
+        e.as_contract(&module_id, || on_created(&e, &from, 1, &token));
+    }
+    e.ledger().with_mut(|li| li.sequence_number = 500);
+    e.as_contract(&module_id, || on_created(&e, &from, 1, &token));
+
+    // Only the single active entry is carried over, so the write fits.
+    e.ledger().with_mut(|li| li.sequence_number = 1_000);
+    e.as_contract(&module_id, || {
+        let balance = MAX_LOCKS as i128;
+        on_transfer(&e, &from, &to, balance, balance, &TransferKind::Recovery, &token);
+
+        let destination = get_locked_details(&e, &token, &to);
+        assert_eq!(destination.total_locked, 1);
+        assert_eq!(destination.locks, vec![&e, LockedTokens { amount: 1, release_ledger: 1_500 }]);
+    });
+}
+
+#[test]
 fn on_transfer_recovery_without_locks_touches_nothing() {
     let e = Env::default();
     let module_id = e.register(TestInitialLockupPeriodContract, ());
