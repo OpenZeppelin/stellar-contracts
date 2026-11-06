@@ -25,11 +25,6 @@ pub struct AccountFactoryContract;
 #[contractimpl]
 impl AccountFactoryContract {
     /// Pins the hash of the account wasm that every deployment instantiates.
-    ///
-    /// # Arguments
-    ///
-    /// * `account_wasm_hash` - Hash of an account wasm that is already uploaded
-    ///   on this network.
     pub fn __constructor(e: &Env, account_wasm_hash: BytesN<32>) {
         e.storage().instance().set(&DataKey::AccountWasmHash, &account_wasm_hash);
     }
@@ -45,32 +40,6 @@ impl AccountFactoryContract {
 
     /// Returns the address `deploy` creates for this tuple, whether or
     /// not the account exists yet.
-    ///
-    /// Rejects every tuple the account constructor rejects before it installs
-    /// policies. A policy that rejects its install parameters still makes
-    /// `deploy` fail for a tuple this function accepts.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Name of the account's default context rule.
-    /// * `signers` - Signers of the account's default context rule, in any
-    ///   order.
-    /// * `policies` - Policy contract addresses mapped to their install
-    ///   parameters.
-    /// * `salt` - Caller-chosen value that lets one configuration have several
-    ///   accounts.
-    ///
-    /// # Errors
-    ///
-    /// * [`SmartAccountError::TooManySigners`] - When there are more than
-    ///   [`MAX_SIGNERS`] signers.
-    /// * [`SmartAccountError::TooManyPolicies`] - When there are more than
-    ///   [`MAX_POLICIES`] policies.
-    /// * [`SmartAccountError::NoSignersAndPolicies`] - When `signers` and
-    ///   `policies` are both empty.
-    /// * refer to [`validate_context_rule_name`] errors.
-    /// * refer to [`validate_signer_key_size`] errors.
-    /// * refer to [`validate_no_canonical_duplicates`] errors.
     pub fn predict_address(
         e: &Env,
         name: String,
@@ -87,28 +56,6 @@ impl AccountFactoryContract {
 
     /// Deploys the account for this tuple and returns its address, which is
     /// the address `predict_address` returns for the same tuple.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Name of the account's default context rule.
-    /// * `signers` - Signers of the account's default context rule, in any
-    ///   order.
-    /// * `policies` - Policy contract addresses mapped to their install
-    ///   parameters.
-    /// * `salt` - Caller-chosen value that lets one configuration have several
-    ///   accounts.
-    ///
-    /// # Errors
-    ///
-    /// * [`SmartAccountError::TooManySigners`] - When there are more than
-    ///   [`MAX_SIGNERS`] signers.
-    /// * [`SmartAccountError::TooManyPolicies`] - When there are more than
-    ///   [`MAX_POLICIES`] policies.
-    /// * [`SmartAccountError::NoSignersAndPolicies`] - When `signers` and
-    ///   `policies` are both empty.
-    /// * refer to [`validate_context_rule_name`] errors.
-    /// * refer to [`validate_signer_key_size`] errors.
-    /// * refer to [`validate_no_canonical_duplicates`] errors.
     pub fn deploy(
         e: &Env,
         name: String,
