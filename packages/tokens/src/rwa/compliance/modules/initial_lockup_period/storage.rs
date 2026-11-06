@@ -493,21 +493,23 @@ pub fn migrate_locks(
     amount: i128,
 ) {
     let mut src = get_locked_details(e, token, from);
-    prune_expired_locks(e, &mut src);
     if src.total_locked == 0 {
         return;
     }
+    prune_expired_locks(e, &mut src);
 
     let free = (balance - src.total_locked).max(0);
-    if amount <= free {
-        // should be unreachable if called via `recover_balance`, this is just a
-        // security belt for the case that the caller is not `recover_balance`
-        // and does not check the free balance for example, maybe useful for
-        // partial recovery in the future
-        return;
-    }
+    let moved = if amount > free {
+        consume_locks_forced(e, &mut src, sub_i128_or_panic(e, amount, free))
+    } else {
+        // The free (never-locked or expired) portion covers the whole amount,
+        // so no lock moves. Via `recover_balance`, which moves the whole
+        // balance, this happens only when pruning left no active locks. A
+        // partial recovery covered by the free portion also lands here.
+        Vec::new(e)
+    };
 
-    let moved = consume_locks_forced(e, &mut src, sub_i128_or_panic(e, amount, free));
+    // Written even when nothing moved: pruning may have emptied the list.
     set_locked_details(e, token, from, &src);
 
     if moved.is_empty() {

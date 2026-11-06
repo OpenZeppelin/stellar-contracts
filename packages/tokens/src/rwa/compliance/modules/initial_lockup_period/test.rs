@@ -792,6 +792,39 @@ fn on_transfer_recovery_drops_expired_entries_on_both_wallets() {
 }
 
 #[test]
+fn on_transfer_recovery_clears_fully_expired_source() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        preset_locks(
+            &e,
+            &token,
+            &from,
+            &vec![
+                &e,
+                LockedTokens { amount: 40, release_ledger: 100 },
+                LockedTokens { amount: 60, release_ledger: 150 },
+            ],
+        );
+        e.ledger().with_mut(|li| li.sequence_number = 200);
+
+        // Every lock on the lost wallet has expired: nothing migrates, and
+        // the lost wallet's stored entry is written back empty rather than
+        // left holding the expired list.
+        on_transfer(&e, &from, &to, 100, 100, &TransferKind::Recovery, &token);
+
+        let source = get_locked_details(&e, &token, &from);
+        assert_eq!(source.total_locked, 0);
+        assert_eq!(source.locks.len(), 0);
+        assert_eq!(get_locked_details(&e, &token, &to).locks.len(), 0);
+    });
+}
+
+#[test]
 fn on_transfer_recovery_succeeds_when_full_wallets_have_expired() {
     let e = Env::default();
     e.cost_estimate().budget().reset_unlimited();

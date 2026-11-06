@@ -50,8 +50,8 @@
 //! enough of its locks expire. When the merged list would not fit in a
 //! single contract-data entry (roughly 800 entries), the recovery itself
 //! reverts. In both cases, waiting resolves it: expired locks are pruned
-//! on the next mint or recovery attempt, so the recovery succeeds once
-//! enough locks have expired, and in the worst case after one lockup period.
+//! on the next mint or recovery attempt, so mints and the recovery succeed
+//! again once enough locks reach their release ledgers.
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/develop/contracts/compliance/modular/modules/InitialLockupPeriodModule.sol
 
