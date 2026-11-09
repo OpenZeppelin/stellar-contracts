@@ -41,6 +41,20 @@
 //! must not use this module as-is; such schedules call for fewer, batched
 //! distributions or a shorter lockup period.
 //!
+//! Account recovery is an edge case to the per-wallet cap. Locks are tracked
+//! per wallet, not per investor, so the cap bounds each wallet on its own.
+//! A recovery merges the lost wallet's active locks into the new wallet's
+//! list (expired entries are dropped on both sides), and the merged list can
+//! exceed [`MAX_LOCKS`] when the investor received many mints on both wallets
+//! within one lockup window. The recovery does not check [`MAX_LOCKS`], so it
+//! still succeeds, but mints to the new wallet are then rejected until enough
+//! of its locks expire. The ledger's own size limit for a single
+//! contract-data entry (64 KiB, roughly 800 entries) cannot be skipped, so
+//! when the merged list would not fit in it, the recovery itself reverts. In
+//! both cases, waiting resolves it: expired locks are pruned on the next mint
+//! or recovery attempt, so mints and the recovery succeed again once enough
+//! locks reach their release ledgers.
+//!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/develop/contracts/compliance/modular/modules/InitialLockupPeriodModule.sol
 
 pub mod storage;
@@ -84,10 +98,10 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// in step with what the wallet actually holds. Missing a hook leaves stale
 /// locks on the books. Privileged transfers are not rejected: a forced
 /// transfer (seizure) consumes locks oldest-first, expired or not, so the
-/// schedule shrinks with the seized tokens, while a recovery migrates the
-/// consumed entries to the destination wallet with their release times
-/// preserved, so the investor's remaining lockup follows the balance onto
-/// the new wallet.
+/// schedule shrinks with the seized tokens. A recovery drops the lost
+/// wallet's expired entries and migrates only its active locks to the
+/// destination wallet, with their release times preserved, so the
+/// investor's remaining lockup follows the balance onto the new wallet.
 ///
 /// Burns have no such privileged variant: the `Destroyed` hook does not
 /// distinguish who issued the burn, so a burn that dips into still-locked

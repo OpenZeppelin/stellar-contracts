@@ -234,10 +234,11 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 ///   rejected: the moved amount is covered by consuming locks oldest-first,
 ///   expired or not. The consumed entries leave the books with the seized
 ///   tokens; the recipient gains nothing.
-/// * Recovery transfers migrate instead of consuming: the lock entries covering
-///   the moved amount leave `from` and are re-created on `to` with their
-///   release times preserved, so the investor's remaining lockup follows the
-///   balance onto the new wallet.
+/// * Recovery transfers migrate instead of consuming: `from`'s expired entries
+///   are dropped, and the active locks covering the moved amount leave `from`
+///   and are re-created on `to` with their release times preserved, so the
+///   investor's remaining lockup follows the balance onto the new wallet. See
+///   [`migrate_locks`].
 ///
 /// # Arguments
 ///
@@ -419,8 +420,8 @@ pub fn debit_unlocked(e: &Env, token: &Address, wallet: &Address, balance: i128,
 /// released. The lockup policy is an investor-facing rule the admin is
 /// consciously overriding, but the lock schedule must still shrink with
 /// the departing tokens or it would exceed the wallet's remaining balance.
-/// For recovery transfers, which migrate the consumed entries to the new
-/// wallet instead of dropping them, see [`migrate_locks`].
+/// For recovery transfers, which drop expired entries and migrate the
+/// active ones to the new wallet, see [`migrate_locks`].
 ///
 /// # Arguments
 ///
@@ -447,15 +448,29 @@ pub fn debit_forced(e: &Env, token: &Address, wallet: &Address, balance: i128, a
     }
 }
 
-/// Migrates the lock entries covering `amount` from `from` to `to` for a
-/// recovery transfer: the portion of the moved amount not covered by
-/// `from`'s never-locked free balance is consumed from its entries
-/// oldest-first, expired or not, and the consumed pieces are re-created on
-/// `to` with their release times preserved, merging with any entries `to`
-/// already holds. A recovery moves the investor's balance to a new wallet,
-/// so the remaining lockup follows the tokens instead of being released
-/// early. Consumption stops when the entries are exhausted; it never
-/// panics on shortfall.
+/// Migrates the active lock entries covering `amount` from `from` to `to` for a
+/// recovery transfer. Expired entries are first pruned from `from`'s list,
+/// since they no longer restrict anything. The portion of the moved amount
+/// not covered by `from`'s free balance is then consumed from its remaining
+/// (active) entries oldest-first, and the consumed pieces are re-created on
+/// `to` with their release times preserved. When any active lock moves,
+/// `to`'s list is pruned the same way before the merge; otherwise `to` is
+/// left untouched.
+///
+/// Two separate limits apply to the merged list:
+///
+/// * [`MAX_LOCKS`] (512) is this module's own cap, checked only when a mint
+///   appends a lock. The merge does not check it, because rejecting the merge
+///   would block the recovery itself. When the two wallets together hold more
+///   than [`MAX_LOCKS`] active entries, the recovery succeeds, `to` ends up
+///   above the cap, and further mints to it are rejected until enough of its
+///   locks expire.
+/// * The ledger's size limit for a single contract-data entry (64 KiB, roughly
+///   800 entries) is enforced by the network on every write, and the module
+///   cannot skip it. When the two wallets together hold more active entries
+///   than fit in one entry, the write fails and the recovery reverts. Waiting
+///   resolves it: once enough locks expire, the pruning shrinks the merged list
+///   below the limit and the recovery can be retried.
 ///
 /// # Arguments
 ///
@@ -488,17 +503,20 @@ pub fn migrate_locks(
     if src.total_locked == 0 {
         return;
     }
+    prune_expired_locks(e, &mut src);
 
     let free = (balance - src.total_locked).max(0);
-    if amount <= free {
-        // should be unreachable if called via `recover_balance`, this is just a
-        // security belt for the case that the caller is not `recover_balance`
-        // and does not check the free balance for example, maybe useful for
-        // partial recovery in the future
-        return;
-    }
+    let moved = if amount > free {
+        consume_locks_forced(e, &mut src, sub_i128_or_panic(e, amount, free))
+    } else {
+        // The free (never-locked or expired) portion covers the whole amount,
+        // so no lock moves. Via `recover_balance`, which moves the whole
+        // balance, this happens only when pruning left no active locks. A
+        // partial recovery covered by the free portion also lands here.
+        Vec::new(e)
+    };
 
-    let moved = consume_locks_forced(e, &mut src, sub_i128_or_panic(e, amount, free));
+    // Written even when nothing moved: pruning may have emptied the list.
     set_locked_details(e, token, from, &src);
 
     if moved.is_empty() {
@@ -509,6 +527,7 @@ pub fn migrate_locks(
     // the same wallet observes the already-debited entries and reduces to a
     // no-op instead of duplicating them.
     let mut dst = get_locked_details(e, token, to);
+    prune_expired_locks(e, &mut dst);
     for lock in moved.iter() {
         dst.total_locked = add_i128_or_panic(e, dst.total_locked, lock.amount);
         dst.locks.push_back(lock);
