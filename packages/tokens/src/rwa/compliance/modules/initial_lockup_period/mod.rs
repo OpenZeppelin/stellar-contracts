@@ -46,12 +46,14 @@
 //! A recovery merges the lost wallet's active locks into the new wallet's
 //! list (expired entries are dropped on both sides), and the merged list can
 //! exceed [`MAX_LOCKS`] when the investor received many mints on both wallets
-//! within one lockup window. Mints to the new wallet are then rejected until
-//! enough of its locks expire. When the merged list would not fit in a
-//! single contract-data entry (roughly 800 entries), the recovery itself
-//! reverts. In both cases, waiting resolves it: expired locks are pruned
-//! on the next mint or recovery attempt, so mints and the recovery succeed
-//! again once enough locks reach their release ledgers.
+//! within one lockup window. The recovery does not check [`MAX_LOCKS`], so it
+//! still succeeds, but mints to the new wallet are then rejected until enough
+//! of its locks expire. The ledger's own size limit for a single
+//! contract-data entry (64 KiB, roughly 800 entries) cannot be skipped, so
+//! when the merged list would not fit in it, the recovery itself reverts. In
+//! both cases, waiting resolves it: expired locks are pruned on the next mint
+//! or recovery attempt, so mints and the recovery succeed again once enough
+//! locks reach their release ledgers.
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/develop/contracts/compliance/modular/modules/InitialLockupPeriodModule.sol
 

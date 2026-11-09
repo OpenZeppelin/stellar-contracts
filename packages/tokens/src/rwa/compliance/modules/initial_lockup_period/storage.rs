@@ -457,15 +457,20 @@ pub fn debit_forced(e: &Env, token: &Address, wallet: &Address, balance: i128, a
 /// `to`'s list is pruned the same way before the merge; otherwise `to` is
 /// left untouched.
 ///
-/// The merge does not enforce [`MAX_LOCKS`], because rejecting it would
-/// block the recovery itself. When the two wallets together hold more than
-/// [`MAX_LOCKS`] active entries, `to` ends up above the cap and further
-/// mints to it are rejected until enough of its locks expire. When they
-/// hold more active entries than fit in a single contract-data entry
-/// (roughly 800, see [`MAX_LOCKS`]), the write fails and the recovery
-/// reverts. Waiting resolves it: once enough locks expire, the pruning
-/// shrinks the merged list below the limit and the recovery can be
-/// retried.
+/// Two separate limits apply to the merged list:
+///
+/// * [`MAX_LOCKS`] (512) is this module's own cap, checked only when a mint
+///   appends a lock. The merge does not check it, because rejecting the merge
+///   would block the recovery itself. When the two wallets together hold more
+///   than [`MAX_LOCKS`] active entries, the recovery succeeds, `to` ends up
+///   above the cap, and further mints to it are rejected until enough of its
+///   locks expire.
+/// * The ledger's size limit for a single contract-data entry (64 KiB, roughly
+///   800 entries) is enforced by the network on every write, and the module
+///   cannot skip it. When the two wallets together hold more active entries
+///   than fit in one entry, the write fails and the recovery reverts. Waiting
+///   resolves it: once enough locks expire, the pruning shrinks the merged list
+///   below the limit and the recovery can be retried.
 ///
 /// # Arguments
 ///
