@@ -133,9 +133,9 @@
 //!
 //! ### Mitigation
 //!
-//! The **proposal threshold** ([`get_proposal_threshold()`]) requires
-//! proposers to hold a minimum amount of voting power to create proposals.
-//! This makes spam attacks economically costly.
+//! The **proposal threshold** ([`GovernorSettings::proposal_threshold`])
+//! requires proposers to hold a minimum amount of voting power to create
+//! proposals. This makes spam attacks economically costly.
 //!
 //! ## Governance Capture
 //!
@@ -148,8 +148,8 @@
 //!
 //! - **Quorum requirements** ensure a minimum percentage of total voting supply
 //!   participates in each proposal
-//! - **Voting delay** ([`get_voting_delay()`]) gives token holders time to
-//!   acquire more tokens or delegate before voting starts
+//! - **Voting delay** ([`GovernorSettings::voting_delay`]) gives token holders
+//!   time to acquire more tokens or delegate before voting starts
 
 pub mod queries;
 pub mod settings;
@@ -566,59 +566,61 @@ pub trait Governor: GovernorSettings + GovernorQueries {
 ///
 /// States are divided into two categories:
 ///
-/// ## Time-based states (derived, never stored explicitly)
+/// ## Derived states (never stored)
 ///
-/// These are computed by [`get_proposal_state()`] from the current ledger
-/// relative to the proposal's voting schedule. They are only returned when
-/// no explicit state has been set.
+/// These are computed by [`get_proposal_state()`] from the current ledger,
+/// relative to the proposal's voting schedule, and, once voting has ended,
+/// from the vote outcome. They are only returned when no stored state has
+/// been set.
 ///
 /// - [`Pending`](ProposalState::Pending) — voting has not started yet.
 /// - [`Active`](ProposalState::Active) — voting is ongoing.
-/// - [`Defeated`](ProposalState::Defeated) — voting ended **without** the
-///   counting logic marking the proposal as `Succeeded`.
+/// - [`Succeeded`](ProposalState::Succeeded) — voting ended and
+///   [`GovernorQueries::proposal_succeeded`] returned `true`.
+/// - [`Defeated`](ProposalState::Defeated) — voting ended and
+///   [`GovernorQueries::proposal_succeeded`] returned `false`.
 ///
-/// ## Explicit states
+/// No transaction runs when voting ends, so there is no point at which
+/// `Succeeded` or `Defeated` could be written. They don't need to be either:
+/// once voting has ended, the vote counts no longer change and the quorum is
+/// read at the snapshot ledger, so every read computes the same outcome.
 ///
-/// Set explicitly by the Governor or its extensions and persisted in
-/// storage. Once set, they take precedence over any time-based derivation.
+/// ## Stored states
 ///
-/// - [`Canceled`](ProposalState::Canceled) — set by the Governor.
-/// - [`Succeeded`](ProposalState::Succeeded) — set by the counting logic.
-/// - [`Queued`](ProposalState::Queued) / [`Expired`](ProposalState::Expired) —
-///   set by extensions like `TimelockControl`.
-/// - [`Executed`](ProposalState::Executed) — set by the Governor.
+/// Written to storage by the Governor or its extensions. Once set, they take
+/// precedence over the derived states.
+///
+/// - [`Canceled`](ProposalState::Canceled) — set by [`Governor::cancel`].
+/// - [`Queued`](ProposalState::Queued) — set by [`Governor::queue`].
+/// - [`Executed`](ProposalState::Executed) — set by [`Governor::execute`].
+/// - [`Expired`](ProposalState::Expired) — set by extensions like
+///   `TimelockControl`.
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum ProposalState {
-    // ==================== Time-based states ====================
-    // Derived from the current ledger.
-    /// The proposal is pending and voting has not started yet.
+    /// The proposal is pending and voting has not started yet. Derived. This
+    /// is also the value `propose` stores, meaning no state has been stored
+    /// yet.
     Pending = 0,
-    /// The proposal is active and voting is ongoing.
+    /// The proposal is active and voting is ongoing. Derived.
     Active = 1,
-    /// The proposal was defeated (did not meet quorum or majority). This is
-    /// the default outcome when voting ends and the counting logic has
-    /// not marked the proposal as [`Succeeded`](ProposalState::Succeeded).
+    /// The proposal was defeated (it did not meet the quorum or the vote
+    /// threshold). Derived once voting has ended.
     Defeated = 2,
-
-    // ==================== Explicit states ====================
-    // Set by the Governor or extensions. Once set, these take precedence
-    // over time-based derivation.
-    /// The proposal has been cancelled. Set by the Governor.
+    /// The proposal has been cancelled. Stored by the Governor.
     Canceled = 3,
-    /// The proposal succeeded and can be executed. Set by the counting
-    /// logic when the proposal meets the required quorum and vote
-    /// thresholds. If a queuing extension is enabled, this state means the
-    /// proposal is ready to be queued.
+    /// The proposal succeeded (it met the quorum and the vote threshold) and
+    /// can be executed. Derived once voting has ended. If queuing is enabled,
+    /// this state means the proposal is ready to be queued.
     Succeeded = 4,
-    /// The proposal is queued for execution. Set by extensions like
-    /// `TimelockControl`.
+    /// The proposal is queued for execution. Stored by the Governor when
+    /// queuing is enabled.
     Queued = 5,
-    /// The proposal has expired and can no longer be executed. Set by
+    /// The proposal has expired and can no longer be executed. Stored by
     /// extensions like `TimelockControl`.
     Expired = 6,
-    /// The proposal has been executed. Set by the Governor.
+    /// The proposal has been executed. Stored by the Governor.
     Executed = 7,
 }
 

@@ -47,7 +47,7 @@ It is split into three traits, each building on the previous ones:
 
 - Snapshot-based voting power prevents flash loan attacks
 - Proposal threshold prevents governance spam
-- Dynamic configuration: overriding a setting (e.g. `quorum()` or `proposal_threshold()` for supply-relative values) changes what is enforced, not only what is reported
+- Dynamic configuration: overriding a setting (e.g. `quorum()` or `proposal_threshold()` for supply-relative values) changes what is enforced, not only what is reported. The exception is `get_token_contract()`: proposal creation and vote weighting always use the stored token, so overriding it only changes the reported address
 - Queue logic is built into the base trait but disabled by default — a single `proposals_need_queuing()` override activates the full flow
 - `execute` and `cancel` have no default implementation, requiring explicit access control decisions
 

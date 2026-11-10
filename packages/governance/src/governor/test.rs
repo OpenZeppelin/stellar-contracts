@@ -1998,3 +1998,97 @@ fn succeeded_hook_can_count_against_votes_toward_quorum() {
         assert!(!quorum_reached(&s.e, &s.pid, quorum));
     });
 }
+
+// ################## STORAGE KEY COMPATIBILITY TESTS ##################
+
+/// `GovernorStorageKey` was split into `GovernorSettingsStorageKey` and
+/// `ProposalStorageKey`. The enum name is not part of the encoded key, only
+/// the variant name and its fields are, so a governor upgraded across the
+/// split keeps reading its existing entries. This module writes every entry
+/// with a copy of the old enum and reads it back through the current getters.
+/// Renaming a variant (or changing its fields) makes this test fail instead of
+/// silently orphaning live proposals and settings.
+mod storage_key_compatibility {
+    use soroban_sdk::{contracttype, testutils::Address as _, Address, BytesN, String};
+
+    use crate::governor::{
+        get_name, get_proposal_core, get_proposal_threshold, get_proposal_vote_counts, get_quorum,
+        get_token_contract, get_version, get_voting_delay, get_voting_period, has_voted,
+        test::setup_env, ProposalCore, ProposalState, ProposalVoteCounts, QuorumCheckpoint,
+    };
+
+    /// Copy of the storage key enum from before the split.
+    #[derive(Clone)]
+    #[contracttype]
+    enum GovernorStorageKey {
+        Name,
+        Version,
+        VotingDelay,
+        VotingPeriod,
+        ProposalThreshold,
+        Proposal(BytesN<32>),
+        NumQuorumCheckpoints,
+        QuorumCheckpoint(u32),
+        ProposalVote(BytesN<32>),
+        HasVoted(BytesN<32>, Address),
+        TokenContract,
+    }
+
+    #[test]
+    fn entries_written_with_old_keys_are_read_by_new_getters() {
+        let (e, contract_address) = setup_env();
+        let pid = BytesN::from_array(&e, &[7; 32]);
+        let proposer = Address::generate(&e);
+        let voter = Address::generate(&e);
+        let token = Address::generate(&e);
+
+        e.as_contract(&contract_address, || {
+            let instance = e.storage().instance();
+            instance.set(&GovernorStorageKey::Name, &String::from_str(&e, "Old Governor"));
+            instance.set(&GovernorStorageKey::Version, &String::from_str(&e, "1.0.0"));
+            instance.set(&GovernorStorageKey::VotingDelay, &11u32);
+            instance.set(&GovernorStorageKey::VotingPeriod, &22u32);
+            instance.set(&GovernorStorageKey::ProposalThreshold, &33u128);
+            instance.set(&GovernorStorageKey::NumQuorumCheckpoints, &1u32);
+            instance.set(&GovernorStorageKey::TokenContract, &token);
+
+            let persistent = e.storage().persistent();
+            persistent.set(
+                &GovernorStorageKey::Proposal(pid.clone()),
+                &ProposalCore {
+                    proposer: proposer.clone(),
+                    vote_snapshot: 5,
+                    vote_end: 6,
+                    state: ProposalState::Queued,
+                },
+            );
+            persistent.set(
+                &GovernorStorageKey::ProposalVote(pid.clone()),
+                &ProposalVoteCounts { against_votes: 1, for_votes: 2, abstain_votes: 3 },
+            );
+            persistent.set(&GovernorStorageKey::HasVoted(pid.clone(), voter.clone()), &true);
+            persistent.set(
+                &GovernorStorageKey::QuorumCheckpoint(0),
+                &QuorumCheckpoint { ledger: 0, quorum: 44 },
+            );
+
+            assert_eq!(get_name(&e), String::from_str(&e, "Old Governor"));
+            assert_eq!(get_version(&e), String::from_str(&e, "1.0.0"));
+            assert_eq!(get_voting_delay(&e), 11);
+            assert_eq!(get_voting_period(&e), 22);
+            assert_eq!(get_proposal_threshold(&e), 33);
+            assert_eq!(get_quorum(&e, 0), 44);
+            assert_eq!(get_token_contract(&e), token);
+
+            let core = get_proposal_core(&e, &pid);
+            assert_eq!(core.proposer, proposer);
+            assert_eq!(core.vote_snapshot, 5);
+            assert_eq!(core.vote_end, 6);
+            assert_eq!(core.state, ProposalState::Queued);
+
+            let counts = get_proposal_vote_counts(&e, &pid);
+            assert_eq!((counts.against_votes, counts.for_votes, counts.abstain_votes), (1, 2, 3));
+            assert!(has_voted(&e, &pid, &voter));
+        });
+    }
+}

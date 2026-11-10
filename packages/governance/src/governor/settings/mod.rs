@@ -20,6 +20,11 @@ use soroban_sdk::{contractevent, contracttrait, Address, Env, String, Symbol};
 /// threshold relative to the token supply).
 /// [`crate::governor::GovernorQueries`] and [`crate::governor::Governor`] read
 /// these values through this trait, so an override is what gets enforced.
+///
+/// The one exception is [`GovernorSettings::get_token_contract`]: proposal
+/// creation and vote weighting read the token from storage, so overriding it
+/// only changes the reported address. See its documentation for how to switch
+/// the token.
 #[contracttrait]
 pub trait GovernorSettings {
     /// Returns the name of the governor.
@@ -56,7 +61,8 @@ pub trait GovernorSettings {
     /// Proposal creation and vote weighting always read the token from storage.
     /// Overriding this method changes only the address reported to callers, not
     /// the token used for enforcement. To switch the voting token, the stored
-    /// value itself has to be updated.
+    /// value itself has to be updated. This method is therefore not designed
+    /// to be overridden.
     ///
     /// By design, the library's [`crate::governor::set_token_contract`] can be
     /// called only once, and no function for updating the token afterwards is
@@ -120,6 +126,11 @@ pub trait GovernorSettings {
     ///
     /// The voting period is the number of ledgers during which voting is open.
     ///
+    /// An override must return a non-zero value. The zero check in
+    /// [`crate::governor::set_voting_period`] does not apply to an override,
+    /// and a zero period ends voting at the snapshot ledger, so no vote could
+    /// ever be cast on a new proposal.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
@@ -177,13 +188,15 @@ pub trait GovernorSettings {
     /// historical `ledger` — otherwise, later parameter updates would
     /// retroactively change the outcome of existing proposals.
     ///
-    /// This method is called with the proposal's `vote_snapshot` ledger, which
-    /// may be in the future during the `Pending` state. The override **must not
-    /// panic** on future ledger values — if a checkpoint does not yet exist,
-    /// return `u128::MAX` so that quorum is unreachable until the real value
-    /// becomes available. Quorum is only meaningful after voting ends; during
-    /// `Pending` and `Active` states the returned value is unused, so the
-    /// `u128::MAX` fallback has no effect on normal operation.
+    /// This method is called with the proposal's `vote_snapshot` ledger. The
+    /// default [`crate::governor::GovernorQueries::proposal_state`] calls it
+    /// (through [`crate::governor::GovernorQueries::proposal_succeeded`]) only
+    /// after voting has ended, when that ledger is already in the past. A
+    /// custom `proposal_state` or `proposal_succeeded` that calls it earlier
+    /// may pass a future ledger during the `Pending` state. In that case the
+    /// override should not panic: if a checkpoint does not exist yet, returning
+    /// `u128::MAX` keeps the quorum unreachable until the real value is
+    /// available.
     ///
     /// # Arguments
     ///
