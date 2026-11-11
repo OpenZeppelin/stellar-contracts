@@ -1564,9 +1564,11 @@ fn propose_with_overrides_needs_no_stored_config() {
 
 /// At least two thirds of the `for` and `against` votes must be `for`, i.e.
 /// `for / (for + against) >= 2 / 3`, multiplied out to avoid integer division.
+/// At least one `for` vote is required: with no `for` and no `against` votes
+/// the ratio check alone would read `0 >= 0` and pass.
 fn two_thirds_in_favor(e: &Env, proposal_id: &BytesN<32>) -> bool {
     let counts = get_proposal_vote_counts(e, proposal_id);
-    counts.for_votes * 3 >= (counts.for_votes + counts.against_votes) * 2
+    counts.for_votes > 0 && counts.for_votes * 3 >= (counts.for_votes + counts.against_votes) * 2
 }
 
 /// Executes through the storage helper, passing the state reported by
@@ -1740,6 +1742,21 @@ fn succeeded_hook_defeated_proposal_cannot_be_queued() {
     assert_eq!(governor.proposal_state(&s.pid), ProposalState::Defeated);
     let operator = Address::generate(&s.e);
     governor.queue(&s.targets, &s.functions, &s.args, &s.desc_hash, &500, &operator);
+}
+
+/// With only `abstain` votes, `for` and `against` are both 0, so the
+/// two-thirds ratio is `0 >= 0`. The quorum is reached (it counts `abstain`),
+/// but a proposal nobody voted `for` must not pass.
+#[test]
+fn succeeded_hook_only_abstain_votes_is_defeated() {
+    let s = setup_outcome(|e| e.register(SucceededHookGovernor, ()), 0, 0);
+    s.e.as_contract(&s.governor, || {
+        count_vote(&s.e, &s.pid, &Address::generate(&s.e), VOTE_ABSTAIN, 100);
+        assert!(quorum_reached(&s.e, &s.pid, 50));
+    });
+    let governor = SucceededHookGovernorClient::new(&s.e, &s.governor);
+
+    assert_eq!(governor.proposal_state(&s.pid), ProposalState::Defeated);
 }
 
 #[test]

@@ -86,7 +86,11 @@ pub trait GovernorQueries: GovernorSettings {
     ///     ) else {
     ///         panic_with_error!(e, GovernorError::MathOverflow);
     ///     };
-    ///     governor::quorum_reached(e, &proposal_id, quorum) && for_share >= required_share
+    ///     // `counts.for_votes > 0` rejects a proposal with only `abstain` votes,
+    ///     // where `for_share` and `required_share` are both 0.
+    ///     governor::quorum_reached(e, &proposal_id, quorum)
+    ///         && counts.for_votes > 0
+    ///         && for_share >= required_share
     /// }
     /// ```
     ///
@@ -94,6 +98,13 @@ pub trait GovernorQueries: GovernorSettings {
     /// once voting has ended and no state has been recorded (see
     /// [`crate::governor::outcome_pending`]). When the rule is overridden,
     /// [`GovernorSettings::counting_mode`] should be updated to describe it.
+    ///
+    /// The result only means something in that same situation. This method
+    /// checks the votes alone: it does not look at the voting window or at a
+    /// recorded state. While voting is still open it reflects the current
+    /// tally, and it can return `true` for a `Canceled` proposal that had
+    /// enough votes. [`GovernorQueries::proposal_state`] gives the actual
+    /// status of a proposal.
     ///
     /// # Arguments
     ///

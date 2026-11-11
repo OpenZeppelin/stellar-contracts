@@ -14,9 +14,7 @@ use soroban_sdk::{contractevent, contracttrait, Address, Env, String, Symbol};
 /// The configuration of a governor: the values that proposal creation, voting
 /// and execution are checked against.
 ///
-/// Every method has a default implementation that returns the value stored with
-/// the matching setter (e.g. [`crate::governor::set_voting_delay`]). A method
-/// can be overridden to compute its value differently (e.g. a proposal
+/// A method can be overridden to compute its value differently (e.g. a proposal
 /// threshold relative to the token supply).
 /// [`crate::governor::GovernorQueries`] and [`crate::governor::Governor`] read
 /// these values through this trait, so an override is what gets enforced.
