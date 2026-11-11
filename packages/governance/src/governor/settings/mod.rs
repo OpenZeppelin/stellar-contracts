@@ -70,21 +70,27 @@ pub trait GovernorSettings {
     /// sensitive operation, so keeping the token fixed spares users from
     /// unexpected changes to how their votes are counted. For the rare
     /// deployment that does need to switch tokens, a custom setter without the
-    /// one-time check can be added to the contract. Gating it behind the
-    /// governor's own authorization means a switch can only happen through a
-    /// passed proposal:
+    /// one-time check can be added to the contract, restricted to a role
+    /// (e.g. held by an admin account or a multisig):
     ///
     /// ```ignore
     /// use stellar_governance::governor::GovernorSettingsStorageKey;
+    /// use stellar_macros::only_role;
     ///
     /// #[contractimpl]
     /// impl MyGovernor {
-    ///     pub fn update_token_contract(e: &Env, token: Address) {
-    ///         e.current_contract_address().require_auth();
+    ///     #[only_role(caller, "token_manager")]
+    ///     pub fn update_token_contract(e: &Env, token: Address, caller: Address) {
     ///         e.storage().instance().set(&GovernorSettingsStorageKey::TokenContract, &token);
     ///     }
     /// }
     /// ```
+    ///
+    /// Restricting the setter to the governor's own address instead
+    /// (`e.current_contract_address().require_auth()`) makes it impossible to
+    /// call. A passed proposal runs inside the governor's own `execute`, and
+    /// Soroban rejects a contract calling itself. A direct call cannot be
+    /// authorized either, because the governor has no `__check_auth`.
     ///
     /// Switching the token affects proposals that are still live. Their
     /// proposers were checked against the old token, while their remaining
