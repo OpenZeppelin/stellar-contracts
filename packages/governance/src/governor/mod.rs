@@ -194,7 +194,10 @@ pub use crate::governor::{
 /// by each contract. Every other method has a default implementation that
 /// reads the configuration from [`GovernorSettings`] and the proposal state
 /// from [`GovernorQueries::proposal_state`], so overrides of either are
-/// respected.
+/// respected. The one exception is
+/// [`GovernorSettings::get_token_contract`]: proposal creation and vote
+/// weighting read the token from storage, so overriding it only changes the
+/// reported address.
 #[contracttrait]
 pub trait Governor: GovernorSettings + GovernorQueries {
     /// Creates a new proposal and returns its unique identifier (hash).
