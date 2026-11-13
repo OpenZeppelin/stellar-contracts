@@ -419,6 +419,12 @@ fn print_fixtures() {
     // poseidon_with_domain(VK, [sk, addr_f]) -- direct funnel access, equals vk_from_sk
     let pwd = poseidon_with_domain(domain::VIEWING_KEY, [sk, addr_f]);
     println(f"poseidon_with_domain_VK_2 = {pwd}");
+
+    // forced_destination_to_field over the two `address_to_field.json` outputs
+    let fd_g = poseidon_with_domain(domain::FORCED_DESTINATION, [ADDRESS_TO_FIELD_G]);
+    let fd_c = poseidon_with_domain(domain::FORCED_DESTINATION, [ADDRESS_TO_FIELD_C]);
+    println(f"forced_destination_to_field_G = {fd_g}");
+    println(f"forced_destination_to_field_C = {fd_c}");
 }
 
 /// Pins every primitive's output to the exact bytes published in
@@ -529,7 +535,27 @@ fn fixtures_match_testdata() {
 
     // poseidon_with_domain funnel is the same operation that backs vk_from_sk.
     assert(poseidon_with_domain(domain::VIEWING_KEY, [sk, addr_f]) == vk);
+
+    // forced_destination_to_field: the Poseidon2 step of the contract-side
+    // derivation, reproduced here from the `address_to_field.json` outputs and
+    // mirrored in `testdata/forced_destination_to_field.json`.
+    assert(
+        poseidon_with_domain(domain::FORCED_DESTINATION, [ADDRESS_TO_FIELD_G])
+            == 0x2b07bfd7c614007acad5b1d37a3fdc64a915b44dd0dafc5d5cf0bd2d2ef3ab7a,
+    );
+    assert(
+        poseidon_with_domain(domain::FORCED_DESTINATION, [ADDRESS_TO_FIELD_C])
+            == 0x2bbf4aadf66599f9f9a99357f94b9c3c2657aa890e277ed9fe366ac4c8f6b5be,
+    );
 }
+
+// `address_to_field` outputs for the all-zero account and contract strkeys,
+// from `testdata/address_to_field.json`. That derivation has no Noir
+// implementation; these are inputs here, not checked values.
+global ADDRESS_TO_FIELD_G: Field =
+    0x1d3b0901201ea22ad61ed4600b49dee57bb73369bf07bdeab17cbf0e54debd4f;
+global ADDRESS_TO_FIELD_C: Field =
+    0x1997b0390a25f684e91575771f4c3ca72ac8f20f45a462838ea918bbe8c4e19c;
 
 // Sponge fixture outputs -- pinned by `print_fixtures` and mirrored in
 // `testdata/sponge_squeeze_2.json`. Update both sides together if the lib's

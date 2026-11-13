@@ -1,7 +1,7 @@
 {
   "primitive": "forced_destination_to_field",
   "design_doc_refs": ["docs/compliance.md (Forced Transfer)", "docs/protocol/domain-separators.md (delta_forced_dest = 18)"],
-  "description": "Destination public input of a forced transfer: forced_destination_to_field(a) = Poseidon2(FORCED_DEST, address_to_field(a)). Like address_to_field it is not implemented in Noir: the clawback circuit receives it as an opaque public input, so the derivation exists only in the contract (storage.rs::forced_destination_to_field) and in each auditor client that builds the proof. The vectors use the two addresses of address_to_field.json. They were produced by the contract implementation and pin it against regressions; an independent client implementation should reproduce them before it is relied on.",
+  "description": "Destination public input of a forced transfer: forced_destination_to_field(a) = Poseidon2(FORCED_DEST, address_to_field(a)). The clawback circuit receives it as an opaque public input, so the full derivation exists in the contract (storage.rs::forced_destination_to_field) and in each auditor client that builds the proof. The vectors use the two addresses of address_to_field.json. Their Poseidon2 step has two independent implementations: the contract (soroban-poseidon), guarded by the Rust test forced_destination_to_field_matches_testdata_vectors, and this library, where fixtures_match_testdata recomputes poseidon_with_domain(FORCED_DESTINATION, [address_to_field output]) and print_fixtures emits it. The address_to_field step is covered by address_to_field.json.",
   "vectors": [
     {
       "inputs": { "strkey": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" },

@@ -3371,3 +3371,25 @@ fn set_compliance_config_under_rwa_accepts_sac_passthrough_alone() {
     assert_eq!(client.compliance_config(), Some(sac_only));
     assert_eq!(ConfidentialRwaClient::new(&h.e, &h.host).approval_epoch(), 2);
 }
+
+#[test]
+fn contract_poseidon2_matches_the_noir_library_fixture() {
+    // `circuits/lib/testdata/poseidon_with_domain.json`: domain 2 over
+    // [0xdead, 0xbeef]. The contract's Poseidon2 and the Noir library's
+    // `poseidon_with_domain` are the same function, which is what lets
+    // `fixtures_match_testdata` (Noir) stand as an independent check of
+    // `forced_destination_to_field`.
+    use soroban_poseidon::poseidon2_hash;
+    use soroban_sdk::{crypto::bn254::Bn254Fr, U256};
+
+    let e = Env::default();
+    let inputs = soroban_sdk::vec![
+        &e,
+        U256::from_u32(&e, 2),
+        U256::from_u32(&e, 0xdead),
+        U256::from_u32(&e, 0xbeef)
+    ];
+    let hash: U256 = poseidon2_hash::<4, Bn254Fr>(&e, &inputs);
+    let expected = hex32("208fbdb70d2faacf04f987b54f12aeeaeb432acc29d650c86ce0f6275b958eb8");
+    assert_eq!(hash.to_be_bytes(), Bytes::from_array(&e, &expected));
+}
