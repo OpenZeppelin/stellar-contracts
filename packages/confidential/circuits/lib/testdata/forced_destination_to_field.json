@@ -1,0 +1,15 @@
+{
+  "primitive": "forced_destination_to_field",
+  "design_doc_refs": ["docs/compliance.md (Forced Transfer)", "docs/protocol/domain-separators.md (delta_forced_dest = 18)"],
+  "description": "Destination public input of a forced transfer: forced_destination_to_field(a) = Poseidon2(FORCED_DEST, address_to_field(a)). Like address_to_field it is not implemented in Noir: the clawback circuit receives it as an opaque public input, so the derivation exists only in the contract (storage.rs::forced_destination_to_field) and in each auditor client that builds the proof. The vectors use the two addresses of address_to_field.json. They were produced by the contract implementation and pin it against regressions; an independent client implementation should reproduce them before it is relied on.",
+  "vectors": [
+    {
+      "inputs": { "strkey": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" },
+      "output": "0x2b07bfd7c614007acad5b1d37a3fdc64a915b44dd0dafc5d5cf0bd2d2ef3ab7a"
+    },
+    {
+      "inputs": { "strkey": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4" },
+      "output": "0x2bbf4aadf66599f9f9a99357f94b9c3c2657aa890e277ed9fe366ac4c8f6b5be"
+    }
+  ]
+}

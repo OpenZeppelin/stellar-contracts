@@ -52,6 +52,7 @@ All events emitted by the confidential token ([Event Schema](protocol/interface.
 | `SpenderTransfer` (recipient side) | Receiving-side replay, as above. |
 | `Merge` | Anchor: folds the receiving opening into the spendable opening; resets the receiving side. |
 | `Clawback` | Anchor, as `Merge`, less the public `amount` on the spendable side; not a checkpoint. Emitted only by deployments that enable the compliance extension ([Wallet and Auditor Consequences](compliance.md#wallet-and-auditor-consequences)). |
+| `ForcedTransfer` | For `from`, an anchor exactly as `Clawback`; for `to`, receiving-side replay exactly as `Deposit`. Emitted only by deployments that enable the forced transfer of the compliance extension ([Forced Transfer](compliance.md#forced-transfer)). |
 | `Withdraw`, `Transfer` (sender side), `SetSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the owner's spendable balance. `SetSpender` is in scope as an owner checkpoint only — a spender recovers allowance state from the on-chain delegation entry (`allowance_commitment`, `a_tilde`, `escrowed_dvk`, `allowance_salt`), not from the archive. |
 | `RevokeSpender` | Spendable-side fold, not a checkpoint: the owner adds the reclaimed allowance opening to the spendable opening, deriving it from the event's `a_tilde` and `allowance_salt` ([Revoke Spender](protocol/operations/revoke-spender.md)). May be emitted by the compliance extension's `force_revoke_spender` without an owner-signed transaction; the fold is the same ([Forced Revocation](compliance.md#forced-revocation)). |
 
@@ -63,7 +64,7 @@ Configuration events (`UnderlyingAssetSet`, `VerifierSet`, `AuditorSet`, `Addres
 
 ### Account attribution
 
-Recovery is per-account, and an event belongs to **each** account address appearing in its topics — a `Transfer` to both the sender's and the recipient's history, a `SpenderTransfer` to the owner's, recipient's, and spender's, a `RevokeSpender` to the owner's and the spender's alone, a `Clawback` to the target's alone. Attribution MUST come from the event topics, never from the transaction source account.
+Recovery is per-account, and an event belongs to **each** account address appearing in its topics — a `Transfer` to both the sender's and the recipient's history, a `SpenderTransfer` to the owner's, recipient's, and spender's, a `RevokeSpender` to the owner's and the spender's alone, a `Clawback` to the target's alone, a `ForcedTransfer` to both `from`'s and `to`'s. Attribution MUST come from the event topics, never from the transaction source account.
 
 The indexer MAY apply this attribution server-side (per-account queries, [API Surface](#api-surface) C2) or serve the whole per-contract stream and leave the client to select the events touching its account; both conform, since attribution is a pure function of the topics. Server-side per-account filtering is RECOMMENDED for high-volume contracts, where downloading the full contract history to every wallet does not scale.
 
@@ -84,7 +85,7 @@ The indexer MUST preserve and expose the total order `(ledger_seq, tx_applicatio
 The indexer MUST retain the full per-account history of every in-scope event **indefinitely**. No pruning horizon is safe in general:
 
 - The spendable opening is taken from the account's latest checkpoint, which is arbitrarily old for a dormant account.
-- The receiving side is replayed from the last `Merge` or `Clawback` at or before that checkpoint, which for an account that receives but never merges is its registration.
+- The receiving side is replayed from the last `Merge`, `Clawback`, or `ForcedTransfer` naming the account as `from`, at or before that checkpoint, which for an account that receives but never merges is its registration.
 - A `RevokeSpender` after the latest checkpoint is the only surviving record of the addend it folded: the delegation entry carrying `a_tilde` and `allowance_salt` is deleted in the same invocation ([Revoke Spender](protocol/operations/revoke-spender.md)).
 
 ## API Surface

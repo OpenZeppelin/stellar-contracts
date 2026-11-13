@@ -75,7 +75,7 @@ The requirement is unpredictability and uniform distribution, not confidentialit
 
 ## Domain separators
 
-The seventeen tag values, the layer that absorbs each, and the sponge mode each is confined to are fixed in [Domain Separation Constants](../protocol/domain-separators.md). An implementation MUST hardcode those values and MUST NOT read any tag at a second arity ([Mode exclusivity](../protocol/primitives.md#mode-exclusivity)).
+The eighteen tag values, the layer that absorbs each, and the sponge mode each is confined to are fixed in [Domain Separation Constants](../protocol/domain-separators.md). An implementation MUST hardcode those values and MUST NOT read any tag at a second arity ([Mode exclusivity](../protocol/primitives.md#mode-exclusivity)).
 
 ## Address compression
 

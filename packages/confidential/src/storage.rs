@@ -12,7 +12,7 @@ use crate::{
     emit_underlying_asset_set, emit_verifier_set, emit_withdraw,
     verifier::{CircuitType, ConfidentialVerifierClient},
     ConfidentialTokenError, ACCOUNT_EXTEND_AMOUNT, ACCOUNT_TTL_THRESHOLD, DELEGATION_EXTEND_AMOUNT,
-    DELEGATION_TTL_THRESHOLD, DELTA_ADDR,
+    DELEGATION_TTL_THRESHOLD, DELTA_ADDR, DELTA_FORCED_DEST,
 };
 
 /// Storage keys for the confidential token.
@@ -1200,7 +1200,7 @@ fn set_spendable(e: &Env, account: &Address, c_spend_new: &Point) {
 ///
 /// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` is not
 ///   registered.
-fn add_to_receiving(e: &Env, account: &Address, c_transfer: &Point) {
+pub(crate) fn add_to_receiving(e: &Env, account: &Address, c_transfer: &Point) {
     let mut data = get_account(e, account);
     data.receiving_commitment = Grumpkin::add(e, &data.receiving_commitment, c_transfer);
     e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &data);
@@ -1348,6 +1348,27 @@ pub(crate) fn address_to_field(e: &Env, addr: &Address) -> BytesN<32> {
     let hi = le_bytes_to_u256(e, &buf[STRKEY_LIMB_LEN..]);
 
     let inputs = soroban_sdk::vec![e, U256::from_u32(e, DELTA_ADDR), lo, hi,];
+    let hash: U256 = poseidon2_hash::<4, Bn254Fr>(e, &inputs);
+    u256_to_bytes_n_32(e, &hash)
+}
+
+/// Derives the destination public input of a forced transfer:
+/// `Poseidon2(δ_forced_dest, address_to_field(addr))`, as a canonical 32-byte
+/// big-endian `Bn254Fr` representative.
+///
+/// The clawback circuit treats its destination input as an opaque binding.
+/// Clawback supplies `address_to_field(destination)` (or zero for `None`);
+/// a forced transfer supplies this value instead, so one proof authorizes
+/// exactly one settlement mode
+/// (`docs/compliance.md#forced-transfer`).
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `addr` - The confidential account credited by the forced transfer.
+pub(crate) fn forced_destination_to_field(e: &Env, addr: &Address) -> BytesN<32> {
+    let addr_f = U256::from_be_bytes(e, &Bytes::from(address_to_field(e, addr)));
+    let inputs = soroban_sdk::vec![e, U256::from_u32(e, DELTA_FORCED_DEST), addr_f];
     let hash: U256 = poseidon2_hash::<4, Bn254Fr>(e, &inputs);
     u256_to_bytes_n_32(e, &hash)
 }

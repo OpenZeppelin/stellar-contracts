@@ -11,7 +11,7 @@ The crate ships one token contract at its root (`src/lib.rs` / `src/storage.rs` 
 | `src/lib.rs`, `src/storage.rs` | The `ConfidentialToken` trait — eleven entry points, of which `revoke_spender` is proofless — and the storage/orchestration layer |
 | `src/verifier/` | Separate contract holding per-circuit UltraHonk verification keys |
 | `src/auditor/` | Separate contract holding the auditor key registry |
-| `src/compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract — plus the opt-in `ConfidentialClawback` trait (`clawback`, `force_revoke_spender`) |
+| `src/compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract — plus the opt-in `ConfidentialClawback` trait (`clawback`, `force_revoke_spender`); and the RWA profile: `RwaHooks`, `ConfidentialRwa`, and the opt-in `ConfidentialForcedTransfer` (tests in `test_rwa.rs`) |
 | `circuits/` | Noir workspace, compiled by `nargo`, not `cargo` |
 | `docs/` | The specification set; `docs/README.md` is its map (see below) |
 
@@ -56,6 +56,7 @@ Each change below spans several files and lands in one PR with all of its sites:
 - **Adding a circuit.** The package, the `members` list in `circuits/Nargo.toml`, and the hardcoded `CIRCUITS` arrays in both `circuits/scripts/extract_vks.sh` and `circuits/scripts/build_vk_bins.sh`; then regenerate `constraints.baseline` and both VK formats.
 - **Renaming a package.** Directory `transfer/` is package `circuit_transfer`. Both VK scripts derive `circuit_${name}` and `target/${pkg}.json` from the directory name, and every row of `constraints.baseline` is keyed on the package name.
 - **Bumping the toolchain.** `NARGO_VERSION` and `BB_VERSION` in `noir.yml` are the source of truth and move together; the VKs are byte-sensitive to bb. Both versions are restated in the comment above `compiler_version` in every package `Nargo.toml` and in `circuits/vks/README.md`; the nargo version in the `constraints.baseline` header; the bb version in `circuits/scripts/check_witness_lookups.sh`, whose blackbox allowlist must be re-confirmed against the new bb, and in `README.md`, which names the bb version the on-chain verifier accepts. The CI installers are pinned by commit with SHA256 verification; bump URL and hash together, then regenerate the baseline and both VK formats.
+- **`forced_destination_to_field` vectors.** Same situation as the next item: `circuits/lib/testdata/forced_destination_to_field.json` is guarded only by `forced_destination_to_field_matches_testdata_vectors` in the compliance RWA tests, which transcribes the hex values. Update both together.
 - **`address_to_field` vectors.** The derivation has no Noir implementation (circuits take `addr_f` as an opaque public input), so `circuits/lib/testdata/address_to_field.json` is guarded only by `address_to_field_matches_testdata_vectors` in `src/test.rs`, which transcribes the hex values as literals rather than reading the JSON. Update both together.
 
 Regenerating `constraints.baseline` with the command in its header overwrites that header, and CI strips comments before diffing, so nothing flags the loss. Restore the header by hand.

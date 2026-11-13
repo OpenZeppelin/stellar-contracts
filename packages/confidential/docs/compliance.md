@@ -2,9 +2,9 @@
 
 ## Abstract
 
-This document specifies optional, deployer-configurable controls layered on top of the core Confidential Token (see [the protocol specification](protocol/README.md)). It covers account freezing, SAC authorization passthrough, pluggable authorization policies, customization patterns for the `Hooks` extension surface, and the pooled-custody clawback flow.
+This document specifies optional, deployer-configurable controls layered on top of the core Confidential Token (see [the protocol specification](protocol/README.md)). It covers account freezing, SAC authorization passthrough, pluggable authorization policies, customization patterns for the `Hooks` extension surface, the pooled-custody clawback flow, and the RWA profile for regulated assets.
 
-All controls are configured at construction time through a single `compliance: Option<ComplianceConfig>` entry. A vanilla deployment leaves the entry empty and pays no compliance overhead. Regulated deployments populate the entry once; subsequent state changes (freeze toggles, admin rotation, policy swap) flow through admin-gated entry points.
+All controls are configured at construction time through a single `compliance: Option<ComplianceConfig>` entry. A vanilla deployment leaves the entry empty and pays no compliance overhead. Regulated deployments populate the entry once; subsequent state changes (freeze toggles, admin rotation, policy swap) flow through admin-gated entry points. The RWA profile keeps a second entry, `RwaConfig` ([RWA Profile](#rwa-profile)).
 
 ---
 
@@ -265,6 +265,86 @@ Commitment equality is not freshness. A seizure of `alpha` from `(C, O)` leaves 
 
 ---
 
+## RWA Profile
+
+The RWA profile is the configuration for regulated assets whose issuer must see every balance and may have to enforce rules on them. It is delivered as `RwaHooks`, a `Hooks` implementation a deployment wires instead of `ComplianceHooks`, plus the `ConfidentialRwa` trait and the opt-in `ConfidentialForcedTransfer` trait. It adds no circuit and changes no core entry point. [rwa.md](rwa.md) is the integrator guide: deployment models, the approver service, and the mapping to ERC-7984, ERC-8424 and ERC-3643.
+
+The profile splits compliance by what the chain can see. Rules over public addresses (eligibility, freeze) run on-chain. Rules over hidden balances and amounts are evaluated off-chain by the issuer's compliance service, which holds the designated auditor key and therefore decrypts every operation; it either monitors and remediates, or, when configured as the approver, authorizes each value-moving operation before it settles.
+
+```rust
+struct RwaConfig {
+    auditor_id: u32,           // Designated Auditor
+    approver: Option<Address>, // Approval Gate
+}
+```
+
+`RwaConfig` is stored under its own key; `ComplianceConfig` is unchanged. `RwaHooks` differs from `ComplianceHooks` as follows:
+
+- **Fails closed.** Every callback reverts with `RwaNotConfigured` without an `RwaConfig`, with `NotConfigured` without a `ComplianceConfig`, and with `EligibilityRequired` when the `ComplianceConfig` has neither a policy nor SAC passthrough. While an `RwaConfig` exists, `set_compliance_config` rejects a configuration with neither.
+- **Spender.** The spender of a delegated flow passes the freeze, policy and SAC gates, not the policy gate alone; under SAC passthrough it must therefore be an authorized holder of the base asset, which registration already requires. `revoke_spender` still gates only the owner.
+- **Deposits.** The recipient must be a registered account.
+
+### Designated Auditor
+
+The compliance service can monitor, approve and seize only what it can decrypt, so every account of an RWA deployment is bound to one auditor. `RwaConfig.auditor_id` is fixed by the first `set_rwa_config` call, which requires the id to resolve in the auditor registry; a later call with another id reverts with `AuditorAlreadySet`. Auditor keys under that id still rotate ([Auditor Key Management and Rotation](protocol/auditing.md#auditor-key-management-and-rotation)).
+
+`register` reverts with `AuditorNotAllowed` for any other id. The confidential accounts named by `deposit` (`to`), `confidential_transfer` and `confidential_transfer_from` (`from`, `to`), `set_spender` (`account`) and `forced_transfer` (`to`) must be bound to the designated auditor, else `AuditorMismatch`. The spender's binding is not checked.
+
+`merge`, `revoke_spender` and `withdraw` carry no such check. An account bound to another auditor, which can exist only where a deployment adopted the profile after accounts had registered, can therefore fold its balances and leave publicly, and can be seized against a proof from the auditor it is bound to; it cannot send, receive or delegate. Such deployments should drain those accounts before adopting the profile.
+
+### Approval Gate
+
+When `RwaConfig.approver` is set, `deposit`, `withdraw`, `confidential_transfer` and `confidential_transfer_from` additionally require the approver's authorization. The hook calls `approver.require_auth_for_args(args)` inside the token's own invocation, so the host binds the authorization to the network, to this contract and to the entry point being executed; `args` bind the rest:
+
+| Entry point | `args` |
+|:---|:---|
+| `deposit` | `(epoch, from, to, amount)` |
+| `withdraw` | `(epoch, from, to, amount, payload)` |
+| `confidential_transfer` | `(epoch, from, to, payload)` |
+| `confidential_transfer_from` | `(epoch, spender, from, to, payload)` |
+
+`payload` is the operation's decoded payload ([Interface](protocol/interface.md)), so an authorization covers one statement: any valid proof of it is acceptable, and no other payload is. The approver obtains the amount of a transfer from the recipient-auditor ciphertexts in that payload ([Per-Transfer Auditor Ciphertexts](protocol/auditing.md#per-transfer-auditor-ciphertexts)).
+
+The approval is additional. The operation's own authorizer, its proof and every other gate are still required, and an approver cannot move, create or destroy value. `set_spender`, `merge` and `revoke_spender` change no ownership and require no approval. `clawback` and `forced_transfer` are administrative overrides and require none either.
+
+**Epoch.** `epoch` is a contract-managed `u32` that only increases: `set_rwa_config`, `bump_approval_epoch`, and `set_compliance_config` while an `RwaConfig` exists each advance it, and it reverts with `ApprovalEpochOverflow` instead of wrapping. An authorization names the epoch it was issued for, so removing or replacing the approver, swapping the policy, or an explicit bump voids every outstanding one; disabling and re-enabling the approver does not return to an earlier epoch.
+
+**Who the approver may be.** The approver must not be a party to the operation it approves (`from`, `to`, or `spender` for a delegated transfer): the hook reverts with `ApproverIsParty`. A party approving its own operation gives no independent check, and an approver that also authorized the invocation would authorize it twice. `set_rwa_config` rejects this contract's own address with `InvalidApprover`. Three host behaviours bound the guarantee above:
+
+- A detached address credential binds `args`, a nonce and an expiry ledger. This is the form an approver service should issue.
+- A transaction whose source account is the approver satisfies the gate through that account's signature on the envelope. The entry still carries `args`, but has no expiry of its own; such envelopes need time bounds.
+- A contract approver that itself invokes the token is authorized without `args` being matched and without its `__check_auth` running. Any path through which that contract calls the token must itself check the token address, the expected epoch, the entry point and the full `args`; a generic forwarding function, even one gated by the contract's own authorization, carries no epoch and is not voided by a bump.
+
+### Forced Transfer
+
+`forced_transfer(from, to, amount, data, operator)` moves a public `amount` from a frozen account to another registered account inside the pool. It is `clawback` with a confidential destination: the same proof statement, verified against the same key, with no underlying moved. Recovery of a lost account is a forced transfer of its full balance to a fresh account.
+
+The proof is a clawback proof ([Circuit](#circuit)) built by the auditor `from` is bound to. Its public inputs are those of [Contract Flow](#contract-flow) step 2, in the same order and from the same sources, except the destination input:
+
+| Entry point | `dest_f` |
+|:---|:---|
+| `clawback`, `Some(d)` | `address_to_field(d)` |
+| `clawback`, `None` | the zero field |
+| `forced_transfer` | `Poseidon2(18, address_to_field(to))` ([Domain Separation Constants](protocol/domain-separators.md)) |
+
+The circuit references `dest_f` in no gate, so the tag is what assigns a proof to one settlement mode: a proof built for a forced transfer verifies in neither clawback branch, and a clawback proof does not verify as a forced transfer. A `to` whose `dest_f` is zero is rejected, keeping the third row disjoint from the second. Both entry points read and advance the same `ClawbackNonce(from)` ([Anti-Replay and the Freeze](#anti-replay-and-the-freeze)), so a proof executes at most once across both.
+
+`forced_transfer` runs, after the deployment's access-control check on `operator`:
+
+1. **Preconditions**, in this order. Both configurations valid, as for `RwaHooks`. `is_frozen(from)`, else `AccountNotFrozen`. `amount > 0`, else `InvalidForcedTransferAmount`. `to` is neither `from` nor this contract and its `dest_f` is non-zero, else `InvalidForcedTransferDestination`. `from` is registered. `to` passes the freeze, policy and SAC gates. `to` is registered and bound to the designated auditor, else `AuditorMismatch`. `from` passes no eligibility gate and may be bound to any auditor.
+2. **Verification** against `CircuitType::Clawback`.
+3. **State update.** `from.C_spend <- C_spend + C_receive - amount·G`, `from.C_receive <- O`, then `to.C_receive <- to.C_receive + amount·G`. The sum of all commitments is unchanged and the pool's balance is untouched.
+4. **Nonce.** `ClawbackNonce(from) <- nonce + 1`, reverting with `NonceOverflow` instead of wrapping.
+5. **Event.** `ForcedTransfer { from, to, amount, nonce }`, where `nonce` is the value step 4 consumed.
+
+No `Hooks` callback is invoked. For `from`, a `ForcedTransfer` is what a `Clawback` is: a receiving-side reset and a `T_0` anchor, not a checkpoint, and the source owner and its auditor apply the rule of [Wallet and Auditor Consequences](#wallet-and-auditor-consequences); the destination owner and its auditor apply the `Deposit` rule, the credit carrying zero blinding ([Wallet State and Recovery](protocol/wallet-state.md)).
+
+**Recovery procedure.** Freeze the lost account; `force_revoke_spender` each of its delegations, including expired ones, which the contract cannot enumerate and the operator takes from the event archive; then force-transfer the full balance. The circuit proves `amount <= v_spend + v_receive`, so a smaller amount leaves a remainder a further forced transfer can move.
+
+**Restrictions.** A deployment that implements `ConfidentialForcedTransfer` MUST wire `RwaHooks`, for the reason given in [Anti-Replay and the Freeze](#anti-replay-and-the-freeze). An issued proof stays executable by the operator until the source's commitments, its nonce or the auditor key change. The amount is public. The proof's witness includes the auditor's secret key, and the verifier accepts only non-zero-knowledge proofs today (see the package `README.md`): neither `forced_transfer` nor `clawback` should be used on a public network until it accepts zero-knowledge ones, and nothing on-chain enforces that.
+
+---
+
 ## Interface Summary
 
 ```rust
@@ -290,8 +370,22 @@ impl Token {
                 data: Bytes /* XDR ClawbackData { proof } */, operator: Address);
     fn force_revoke_spender(e: Env, account: Address, spender: Address, operator: Address);
     fn clawback_nonce(e: Env, account: Address) -> u32;
+
+    // RWA profile, via ConfidentialRwa (admin auth per Admin Authority)
+    fn set_rwa_config(e: Env, auditor_id: u32, approver: Option<Address>, operator: Address);
+    fn bump_approval_epoch(e: Env, operator: Address);
+    fn rwa_config(e: Env) -> Option<RwaConfig>;
+    fn approval_epoch(e: Env) -> u32;
+    fn can_send(e: Env, account: Address) -> bool;
+    fn can_receive(e: Env, account: Address) -> bool;
+
+    // Forced transfer, opt-in via ConfidentialForcedTransfer
+    fn forced_transfer(e: Env, from: Address, to: Address, amount: i128,
+                       data: Bytes /* XDR ClawbackData { proof } */, operator: Address);
 }
 ```
+
+`can_send` and `can_receive` are the same predicate: both configurations are set with an eligibility gate, and `account` is registered, bound to the designated auditor, not frozen, and passes the policy and SAC gates. They describe public eligibility of a confidential account, not whether an operation will settle, and they return `false` instead of raising a contract error, including when the policy or SAC call fails recoverably.
 
 `operator` is the address whose authorization the deployment's access-control module checks ([Admin Authority](#admin-authority)).
 
@@ -303,6 +397,9 @@ impl Token {
 | `ComplianceConfigChanged` | `policy`, `sac_passthrough` |
 | `Clawback` | `account` (topic), `amount`, `destination` |
 | `RevokeSpender` | as [Event Schema](protocol/interface.md#event-schema), when emitted by `force_revoke_spender` |
+| `RwaConfigChanged` | `auditor_id`, `approver`, `epoch` |
+| `ApprovalEpochBumped` | `epoch`; also emitted after `ComplianceConfigChanged` while an `RwaConfig` exists |
+| `ForcedTransfer` | `from` (topic), `to` (topic), `amount`, `nonce` |
 
 ### Errors
 
@@ -313,6 +410,22 @@ The seizure entry points add three variants to `ComplianceError`:
 | `AccountNotFrozen` | 3604 | the target of `clawback` or `force_revoke_spender` is not frozen |
 | `InvalidClawbackAmount` | 3605 | `amount <= 0` |
 | `InvalidClawbackDestination` | 3606 | `destination` is `Some` naming the contract's own address |
+
+The RWA profile adds:
+
+| Error | Code | Raised when |
+|:---|:--|:---|
+| `RwaNotConfigured` | 3607 | `RwaHooks` or an RWA entry point runs without an `RwaConfig` |
+| `AuditorNotAllowed` | 3608 | `register` names an auditor other than the designated one |
+| `AuditorMismatch` | 3609 | an operation names a confidential account bound to another auditor |
+| `AuditorAlreadySet` | 3610 | `set_rwa_config` names an auditor other than the stored one |
+| `InvalidApprover` | 3611 | the approver is the contract's own address |
+| `ApproverIsParty` | 3612 | the approver is `from`, `to` or `spender` of the operation |
+| `InvalidForcedTransferAmount` | 3613 | `amount <= 0` |
+| `InvalidForcedTransferDestination` | 3614 | `to` is `from` or the contract's own address, or its `dest_f` is zero |
+| `EligibilityRequired` | 3615 | the compliance configuration of an RWA deployment has neither a policy nor SAC passthrough |
+| `ApprovalEpochOverflow` | 3616 | the approval epoch is `u32::MAX` |
+| `NonceOverflow` | 3617 | the clawback nonce is `u32::MAX` in `forced_transfer` |
 
 ---
 
