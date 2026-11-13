@@ -72,8 +72,8 @@ pub enum ComplianceStorageKey {
     /// Per-account frozen flag. Persistent storage; only set when an account
     /// is frozen and removed on unfreeze.
     Frozen(Address),
-    /// Number of seizures executed against the account. Persistent storage;
-    /// absent until the first seizure.
+    /// Number of seizures and forced transfers executed against the account.
+    /// Persistent storage; absent until the first one.
     ClawbackNonce(Address),
     /// Singleton [`RwaConfig`]. Instance storage.
     RwaConfig,
@@ -116,9 +116,9 @@ pub fn is_frozen(e: &Env, account: &Address) -> bool {
     }
 }
 
-/// Returns the number of seizures executed against `account`, or `0` when it
-/// has never been seized from. The value is a public input of the next
-/// clawback proof (`docs/compliance.md#circuit`).
+/// Returns the number of seizures and forced transfers executed against
+/// `account`, or `0` when there has been none. The value is a public input of
+/// the next clawback proof (`docs/compliance.md#circuit`).
 ///
 /// # Arguments
 ///

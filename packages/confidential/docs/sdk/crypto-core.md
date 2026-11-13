@@ -57,7 +57,7 @@ $$\text{Com}(v\_1, r\_1) + \text{Com}(v\_2, r\_2) = \text{Com}(v\_1 + v\_2, \\, 
 
 Reducing modulo $$r$$ instead yields an opening that is off and no longer matches the on-chain point, and for two full-size blindings the integer sum crosses $$q$$ roughly half the time. Implementations MUST provide distinct, clearly named reduction operations for the two moduli.
 
-**One reduction point.** An implementation MUST fold blindings with unbounded integer addition and MUST NOT reduce by either modulus as folds compose. This governs merge ([Merge](../protocol/operations/merge.md)), the `RevokeSpender` and `Clawback` folds, and receiving-balance credit ([Update rules](../protocol/wallet-state.md#update-rules)) alike.
+**One reduction point.** An implementation MUST fold blindings with unbounded integer addition and MUST NOT reduce by either modulus as folds compose. This governs merge ([Merge](../protocol/operations/merge.md)), the `RevokeSpender`, `Clawback` and source-side `ForcedTransfer` folds, and receiving-balance credit ([Update rules](../protocol/wallet-state.md#update-rules)) alike.
 
 An implementation MUST reduce modulo $$q$$ to the canonical representative only where a blinding leaves an accumulator for the curve: a proof witness, or the recommit of the [Consistency checking](wallet.md#consistency-checking) consistency check. [The unspendable-blinding case](wallet.md#the-unspendable-blinding-case) tests for encodability at that same point.
 

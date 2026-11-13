@@ -88,15 +88,16 @@ Each state-modifying operation emits a structured event. Events carry the data n
 | `SetSpender` | `account`, `spender`, `live_until_ledger`, $$R\_e$$, $$\sigma$$, $$\tilde{b}$$, $$\tilde{v}\_{\text{aud,s}}$$, $$\tilde{b}\_{\text{aud,s}}$$, $$\tilde{r}\_{\text{aud,s}}$$, $$\tilde{r}\_{a,\text{aud,s}}$$ |
 | `RevokeSpender` | `account`, `spender`, $$\tilde{a}$$, $$\sigma\_a$$ |
 | `Clawback` | `account`, `amount`, `destination` |
+| `ForcedTransfer` | `from`, `to`, `amount`, `nonce` |
 
-Amount fields in `Deposit`, `Withdraw`, and `Clawback` are typed `i128`, matching SEP-41.
+Amount fields in `Deposit`, `Withdraw`, `Clawback`, and `ForcedTransfer` are typed `i128`, matching SEP-41.
 
-`Clawback` is emitted only by deployments that enable the optional compliance extension ([Clawback](../compliance.md#clawback)).
+`Clawback` and `ForcedTransfer` are emitted only by deployments that enable the corresponding parts of the optional compliance extension ([Clawback](../compliance.md#clawback), [Forced Transfer](../compliance.md#forced-transfer)).
 
 **Usage by consumers:**
 
 - **Recipient wallet**: processes `Transfer` and `SpenderTransfer` events using $$(R\_e, \tilde{v}, \sigma)$$ -- with $$\sigma\_a'$$ in place of $$\sigma$$ for `SpenderTransfer` -- to derive $$v\_{\text{transfer}}$$ and $$r\_{\text{transfer}}$$ ([ECDH-Derived Blinding](keys-and-commitments.md#ecdh-derived-blinding)).
-- **Owner wallet**: processes all events for recovery ([Wallet State and Recovery](wallet-state.md)). The $$(\tilde{b}, \sigma)$$ pair from the most recent checkpoint event (`Withdraw`, `Transfer` as sender, `SetSpender`) anchors $$W\_{\text{spend}}$$; `Merge`, `RevokeSpender`, and `Clawback` are folded into it during replay.
+- **Owner wallet**: processes all events for recovery ([Wallet State and Recovery](wallet-state.md)). The $$(\tilde{b}, \sigma)$$ pair from the most recent checkpoint event (`Withdraw`, `Transfer` as sender, `SetSpender`) anchors $$W\_{\text{spend}}$$; `Merge`, `RevokeSpender`, `Clawback`, and a `ForcedTransfer` naming the account as `from` are folded into it during replay.
 - **Auditor**: processes events containing $$R\_e$$ to compute ECDH shared secrets and decrypt amounts, balance checkpoints, and the escrowed blindings ([Per-Transfer Auditor Ciphertexts](auditing.md#per-transfer-auditor-ciphertexts), [Auditor Visibility Properties](auditing.md#auditor-visibility-properties), [Spender Allowance Auditing](auditing.md#spender-allowance-auditing)); folds `Merge`, `RevokeSpender`, and `Clawback` into its accumulators as [Per-Transfer Auditor Ciphertexts](auditing.md#per-transfer-auditor-ciphertexts) and [Wallet and Auditor Consequences](../compliance.md#wallet-and-auditor-consequences) specify.
 - **Indexer**: reconciles the pooled balance against the sum of claims ([Balance Conservation](security.md#balance-conservation), [Indexing and Off-Chain State Recovery](../indexer.md)).
 
