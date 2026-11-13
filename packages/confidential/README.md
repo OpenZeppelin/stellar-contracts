@@ -76,6 +76,8 @@ Stores one UltraHonk verification key per [`CircuitType`]. Updating a VK is **so
 
 A turnkey [`Hooks`] implementation layering deployer-configurable controls on top of the token: per-account freezing, SAC `authorized()` passthrough, and an optional external authorization policy. Wire as `type Hooks = ComplianceHooks;`. See [`docs/compliance.md`](./docs/compliance.md) for the specification.
 
+For regulated assets the module also provides the RWA profile: `RwaHooks`, which binds every account to a designated auditor and can require an approver's authorization for every value-moving operation, and the opt-in `ConfidentialForcedTransfer`. See [RWA Profile](./docs/compliance.md#rwa-profile) and the integrator guide [`docs/rwa.md`](./docs/rwa.md).
+
 ### `circuits`
 
 Noir sources, build scripts, and the pinned UltraHonk VKs that the verifier registry serves. Regeneration is gated on a CI diff against the committed `circuits/vks/*.vk.json` files; see [`circuits/vks/README.md`](./circuits/vks/README.md) for the toolchain pin and re-extraction procedure.

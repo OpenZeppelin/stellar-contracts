@@ -61,6 +61,9 @@ mod tests;
 //                                    per-call.
 //   9    _dest_f       dest_f      `address_to_field(destination)` under
 //                                    `Some`, the zero field under `None`;
+//                                    `Poseidon2(18, address_to_field(to))` for
+//                                    a forced transfer
+//                                    (docs/compliance.md#forced-transfer);
 //                                    computed per-call.
 //   10   _nonce        nonce       The target's clawback nonce, loaded from
 //                                    storage; the contract increments it on

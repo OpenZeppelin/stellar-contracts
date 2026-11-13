@@ -20,6 +20,16 @@
 //!    denylist / KYC / sanctions registry.
 //! 5. Storage helpers in [`storage`].
 //!
+//! ## RWA profile
+//!
+//! A regulated deployment wires [`RwaHooks`] instead of [`ComplianceHooks`]
+//! and implements [`ConfidentialRwa`]. The profile adds a designated auditor
+//! every account must bind to, an optional approver whose authorization
+//! every value-moving operation additionally requires, and — through the
+//! opt-in [`ConfidentialForcedTransfer`] — a forced transfer between
+//! confidential accounts. See `docs/compliance.md#rwa-profile` and
+//! `docs/rwa.md`.
+//!
 //! Deployments that never write a configuration pay one instance-storage read
 //! per operation: [`ComplianceHooks`] returns early when
 //! [`storage::compliance_config`] is `None`.
@@ -30,13 +40,14 @@ pub mod storage;
 mod test;
 
 use soroban_sdk::{
-    contractclient, contracterror, contractevent, contracttrait, Address, Bytes, Env,
+    contractclient, contracterror, contractevent, contracttrait, panic_with_error, Address, Bytes,
+    Env,
 };
-pub use storage::{ClawbackData, ComplianceConfig, ComplianceStorageKey};
+pub use storage::{ClawbackData, ComplianceConfig, ComplianceStorageKey, RwaConfig};
 
 use crate::{
-    ConfidentialToken, Hooks, RegisterPayload, SetSpenderPayload, SpenderTransferPayload,
-    TransferPayload, WithdrawPayload,
+    storage::get_account, ConfidentialToken, Hooks, RegisterPayload, SetSpenderPayload,
+    SpenderTransferPayload, TransferPayload, WithdrawPayload,
 };
 
 // ################## POLICY ##################
@@ -303,6 +314,179 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     }
 }
 
+// ################## RWA TRAITS ##################
+
+/// Admin and read surface of the RWA profile
+/// (`docs/compliance.md#rwa-profile`).
+///
+/// A contract that implements this trait MUST wire `type Hooks = RwaHooks;`
+/// on its [`ConfidentialToken`] impl: the configuration written here is
+/// enforced only by [`RwaHooks`].
+///
+/// The implementor supplies the bodies of the two admin entry points and
+/// thereby the access-control model, as for [`ConfidentialCompliance`].
+#[contracttrait]
+pub trait ConfidentialRwa: ConfidentialCompliance {
+    /// Sets the designated auditor and the approver, and advances the
+    /// approval epoch. The designated auditor is fixed by the first call.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `auditor_id` - The only auditor id accounts may be bound to.
+    /// * `approver` - The address whose authorization every value-moving
+    ///   operation additionally requires, or `None` to disable the approval
+    ///   gate.
+    /// * `operator` - The address authorizing this call.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::set_rwa_config`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["rwa_config_changed"]`
+    /// * data - `[auditor_id: u32, approver: Option<Address>, epoch: u32]`
+    ///
+    /// # Notes
+    ///
+    /// A contract approver is authorized automatically whenever it invokes
+    /// the token itself, without its `__check_auth` running. It must expose
+    /// no path through which a third party can make it call the token, and
+    /// any such path of its own must check the approval epoch
+    /// (`docs/compliance.md#approval-gate`).
+    ///
+    /// # Security Warning
+    ///
+    /// Implementations MUST authorize `operator` before calling
+    /// [`storage::set_rwa_config`]. The method has no default body because
+    /// the trait does not prescribe an access-control model.
+    fn set_rwa_config(e: &Env, auditor_id: u32, approver: Option<Address>, operator: Address);
+
+    /// Advances the approval epoch, voiding every outstanding approver
+    /// authorization.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `operator` - The address authorizing this call.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::bump_approval_epoch`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["approval_epoch_bumped"]`
+    /// * data - `[epoch: u32]`
+    ///
+    /// # Security Warning
+    ///
+    /// Implementations MUST authorize `operator` before calling
+    /// [`storage::bump_approval_epoch`].
+    fn bump_approval_epoch(e: &Env, operator: Address);
+
+    /// Returns the active [`RwaConfig`], or `None` when the profile has not
+    /// been configured.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn rwa_config(e: &Env) -> Option<RwaConfig> {
+        storage::rwa_config(e)
+    }
+
+    /// Returns the current approval epoch.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn approval_epoch(e: &Env) -> u32 {
+        storage::approval_epoch(e)
+    }
+
+    /// Returns whether `account` is publicly eligible to send. Mirrors
+    /// ERC-8424 `canSend`: an eligibility predicate that encodes no
+    /// quantitative rule and raises no contract error. See
+    /// [`storage::can_transact`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The confidential account to query.
+    fn can_send(e: &Env, account: Address) -> bool {
+        storage::can_transact(e, &account)
+    }
+
+    /// Returns whether `account` is publicly eligible to receive. Mirrors
+    /// ERC-8424 `canReceive`. See [`storage::can_transact`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The confidential account to query.
+    fn can_receive(e: &Env, account: Address) -> bool {
+        storage::can_transact(e, &account)
+    }
+}
+
+/// Opt-in forced transfer between confidential accounts
+/// (`docs/compliance.md#forced-transfer`). Recovery of a lost account is a
+/// forced transfer of its full balance.
+///
+/// # Deployment obligation
+///
+/// As for [`ConfidentialClawback`], the source must be frozen and the freeze
+/// must actually gate it: a contract implementing this trait MUST wire
+/// [`RwaHooks`].
+///
+/// # Proof-system restriction
+///
+/// The proof carries the auditor's secret key as a witness. Until the
+/// verifier accepts zero-knowledge proofs
+/// (`packages/confidential/README.md`), each proof may leak bits of that
+/// key; do not use this entry point, or [`ConfidentialClawback::clawback`],
+/// on a public network before then.
+#[contracttrait]
+pub trait ConfidentialForcedTransfer: ConfidentialClawback + ConfidentialRwa {
+    /// Moves the public `amount` from the frozen account `from` to the
+    /// registered account `to` inside the pool, against a clawback proof
+    /// built by the auditor `from` is bound to.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The frozen confidential account being debited.
+    /// * `to` - The confidential account being credited.
+    /// * `amount` - The strictly positive amount.
+    /// * `data` - XDR-encoded [`ClawbackData`].
+    /// * `operator` - The address authorizing this call.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`crate::storage::decode_data`] errors.
+    /// * refer to [`storage::forced_transfer`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["forced_transfer", from: Address, to: Address]`
+    /// * data - `[amount: i128, nonce: u32]`
+    ///
+    /// # Security Warning
+    ///
+    /// Implementations MUST authorize `operator` before decoding `data` into
+    /// [`ClawbackData`] and calling [`storage::forced_transfer`]. The call
+    /// moves funds without the owner's authorization.
+    fn forced_transfer(
+        e: &Env,
+        from: Address,
+        to: Address,
+        amount: i128,
+        data: Bytes,
+        operator: Address,
+    );
+}
+
 // ################## HOOKS IMPL ##################
 
 /// [`Hooks`] implementation that checks every token callback against the
@@ -433,6 +617,129 @@ impl Hooks for ComplianceHooks {
     }
 }
 
+/// [`Hooks`] implementation of the RWA profile
+/// (`docs/compliance.md#rwa-profile`). Wire it as `type Hooks = RwaHooks;`
+/// on a contract that implements [`ConfidentialToken`] and
+/// [`ConfidentialRwa`].
+///
+/// It differs from [`ComplianceHooks`] in five ways:
+///
+/// 1. **Fails closed.** Every callback reverts unless both the
+///    [`ComplianceConfig`] and the [`RwaConfig`] are set and the former keeps
+///    an eligibility gate (a policy or SAC passthrough).
+/// 2. **Designated auditor.** `on_register` accepts only the designated auditor
+///    id. Sending, receiving and delegating require the confidential accounts
+///    involved to be bound to it. `on_merge`, `on_revoke_spender` and
+///    `on_withdraw` do not, so an account bound to another auditor (registered
+///    before the profile was adopted) can still exit.
+/// 3. **Approval gate.** When an approver is configured, `on_deposit`,
+///    `on_withdraw`, `on_transfer` and `on_spender_transfer` additionally
+///    require its authorization over the approval epoch, the parties and the
+///    operation's payload (see [`storage::require_approval`]).
+/// 4. **Spender.** The spender of a delegated flow passes the freeze, policy
+///    and SAC gates, not the policy gate alone: a frozen or unauthorized party
+///    must not direct regulated value. `on_revoke_spender` still gates only the
+///    owner.
+/// 5. **Deposits.** The recipient of a deposit must be a registered account.
+///
+/// The hooks enforce no balance or volume rule themselves; such rules are the
+/// approver's (`docs/rwa.md`).
+pub struct RwaHooks;
+
+impl Hooks for RwaHooks {
+    fn on_register(e: &Env, account: &Address, auditor_id: u32, _payload: &RegisterPayload) {
+        let (config, rwa) = storage::rwa_context(e);
+        if auditor_id != rwa.auditor_id {
+            panic_with_error!(e, ComplianceError::AuditorNotAllowed);
+        }
+        storage::check_policy(e, account, &config);
+        storage::check_sac(e, account, &config);
+    }
+
+    fn on_deposit(e: &Env, from: &Address, to: &Address, amount: i128) {
+        let (config, rwa) = storage::rwa_context(e);
+        storage::gate_account(e, from, &config);
+        storage::gate_account(e, to, &config);
+        storage::check_auditor(e, &get_account(e, to), &rwa);
+        storage::require_approval(
+            e,
+            &rwa,
+            &[from, to],
+            storage::deposit_approval_args(e, from, to, amount),
+        );
+    }
+
+    fn on_merge(e: &Env, account: &Address) {
+        let (config, _) = storage::rwa_context(e);
+        storage::gate_account(e, account, &config);
+    }
+
+    fn on_withdraw(e: &Env, from: &Address, to: &Address, amount: i128, payload: &WithdrawPayload) {
+        let (config, rwa) = storage::rwa_context(e);
+        storage::gate_account(e, from, &config);
+        storage::gate_account(e, to, &config);
+        storage::require_approval(
+            e,
+            &rwa,
+            &[from, to],
+            storage::withdraw_approval_args(e, from, to, amount, payload),
+        );
+    }
+
+    fn on_transfer(e: &Env, from: &Address, to: &Address, payload: &TransferPayload) {
+        let (config, rwa) = storage::rwa_context(e);
+        storage::gate_account(e, from, &config);
+        storage::gate_account(e, to, &config);
+        storage::check_auditor(e, &get_account(e, from), &rwa);
+        storage::check_auditor(e, &get_account(e, to), &rwa);
+        storage::require_approval(
+            e,
+            &rwa,
+            &[from, to],
+            storage::transfer_approval_args(e, from, to, payload),
+        );
+    }
+
+    fn on_spender_transfer(
+        e: &Env,
+        spender: &Address,
+        from: &Address,
+        to: &Address,
+        payload: &SpenderTransferPayload,
+    ) {
+        let (config, rwa) = storage::rwa_context(e);
+        storage::gate_account(e, from, &config);
+        storage::gate_account(e, to, &config);
+        storage::gate_account(e, spender, &config);
+        storage::check_auditor(e, &get_account(e, from), &rwa);
+        storage::check_auditor(e, &get_account(e, to), &rwa);
+        storage::require_approval(
+            e,
+            &rwa,
+            &[spender, from, to],
+            storage::spender_transfer_approval_args(e, spender, from, to, payload),
+        );
+    }
+
+    fn on_set_spender(
+        e: &Env,
+        account: &Address,
+        spender: &Address,
+        _live_until_ledger: u32,
+        _payload: &SetSpenderPayload,
+    ) {
+        let (config, rwa) = storage::rwa_context(e);
+        storage::gate_account(e, account, &config);
+        storage::gate_account(e, spender, &config);
+        storage::check_auditor(e, &get_account(e, account), &rwa);
+    }
+
+    fn on_revoke_spender(e: &Env, account: &Address, _spender: &Address) {
+        let (config, _) = storage::rwa_context(e);
+        storage::gate_account(e, account, &config);
+    }
+}
+
 // ################## ERRORS ##################
 
 #[contracterror]
@@ -457,6 +764,33 @@ pub enum ComplianceError {
     InvalidClawbackAmount = 3605,
     /// Indicates `destination` names this contract's own address.
     InvalidClawbackDestination = 3606,
+    /// Indicates an RWA operation was invoked before
+    /// [`storage::set_rwa_config`] established an [`RwaConfig`].
+    RwaNotConfigured = 3607,
+    /// Indicates a registration named an auditor other than the designated
+    /// one.
+    AuditorNotAllowed = 3608,
+    /// Indicates an operation named a confidential account bound to an
+    /// auditor other than the designated one.
+    AuditorMismatch = 3609,
+    /// Indicates an attempt to change the designated auditor.
+    AuditorAlreadySet = 3610,
+    /// Indicates the approver is this contract's own address.
+    InvalidApprover = 3611,
+    /// Indicates the approver is a party to the operation it would approve.
+    ApproverIsParty = 3612,
+    /// Indicates the forced-transfer amount is not strictly positive.
+    InvalidForcedTransferAmount = 3613,
+    /// Indicates the forced-transfer destination is the source, this
+    /// contract's own address, or maps to the zero field.
+    InvalidForcedTransferDestination = 3614,
+    /// Indicates a compliance configuration of an RWA deployment has neither
+    /// a policy nor SAC passthrough.
+    EligibilityRequired = 3615,
+    /// Indicates the approval epoch cannot advance past `u32::MAX`.
+    ApprovalEpochOverflow = 3616,
+    /// Indicates the account's clawback nonce cannot advance past `u32::MAX`.
+    NonceOverflow = 3617,
 }
 
 // ################## CONSTANTS ##################
@@ -523,4 +857,52 @@ pub struct ComplianceConfigChanged {
 /// Emits a [`ComplianceConfigChanged`] event.
 pub fn emit_compliance_config_changed(e: &Env, policy: &Option<Address>, sac_passthrough: bool) {
     ComplianceConfigChanged { policy: policy.clone(), sac_passthrough }.publish(e);
+}
+
+/// Event emitted when the RWA profile configuration is set or changed.
+/// `approver` is `None` when the approval gate is disabled. `epoch` is the
+/// approval epoch in force after the change.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RwaConfigChanged {
+    pub auditor_id: u32,
+    pub approver: Option<Address>,
+    pub epoch: u32,
+}
+
+/// Emits an [`RwaConfigChanged`] event.
+pub fn emit_rwa_config_changed(e: &Env, auditor_id: u32, approver: &Option<Address>, epoch: u32) {
+    RwaConfigChanged { auditor_id, approver: approver.clone(), epoch }.publish(e);
+}
+
+/// Event emitted when the approval epoch advances without a change of the
+/// [`RwaConfig`]. Authorizations issued for an earlier epoch are void.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ApprovalEpochBumped {
+    pub epoch: u32,
+}
+
+/// Emits an [`ApprovalEpochBumped`] event.
+pub fn emit_approval_epoch_bumped(e: &Env, epoch: u32) {
+    ApprovalEpochBumped { epoch }.publish(e);
+}
+
+/// Event emitted when a public amount is moved between two confidential
+/// accounts by a forced transfer. `nonce` is the source's clawback nonce
+/// consumed by the call.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ForcedTransfer {
+    #[topic]
+    pub from: Address,
+    #[topic]
+    pub to: Address,
+    pub amount: i128,
+    pub nonce: u32,
+}
+
+/// Emits a [`ForcedTransfer`] event.
+pub fn emit_forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128, nonce: u32) {
+    ForcedTransfer { from: from.clone(), to: to.clone(), amount, nonce }.publish(e);
 }

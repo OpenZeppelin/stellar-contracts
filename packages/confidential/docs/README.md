@@ -31,13 +31,14 @@ Table order is reading order.
 | [protocol/security.md](protocol/security.md) | Griefing resistance, merge safety, balance conservation, privacy properties, revert safety, replay protection |
 | [protocol/proof-system.md](protocol/proof-system.md) | Circuit set and costs, Noir primitives, verification flow, structured reference string, CAP-80, on-chain point arithmetic |
 | [protocol/interface.md](protocol/interface.md) | Entry points, payload encoding, authorization model, event schema, read methods |
-| [protocol/domain-separators.md](protocol/domain-separators.md) | The seventeen Poseidon2 domain tags |
+| [protocol/domain-separators.md](protocol/domain-separators.md) | The eighteen Poseidon2 domain tags |
 
 ### Companions
 
 | File | Owns |
 |:---|:---|
-| [compliance.md](compliance.md) | Freeze, SAC passthrough, policy contract, `Hooks` customisation, clawback and forced revocation |
+| [compliance.md](compliance.md) | Freeze, SAC passthrough, policy contract, `Hooks` customisation, clawback and forced revocation, the RWA profile (designated auditor, approval gate, forced transfer) |
+| [rwa.md](rwa.md) | Integrator guide to the RWA profile: deployment models, the approver service, standards mapping (non-normative) |
 | [selective-disclosure/README.md](selective-disclosure/README.md) | Motivation, goals, preliminaries, threat model of the disclosure layer |
 | [selective-disclosure/protocol.md](selective-disclosure/protocol.md) | Disclosure ciphertext, proof bundle, verifier protocol, on-chain read surface, end-to-end flow |
 | [selective-disclosure/circuits/](selective-disclosure/circuits/) | D-recipient, D-sender, D-auditor, D-balance, aggregate disclosures |

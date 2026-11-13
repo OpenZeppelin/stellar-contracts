@@ -614,6 +614,12 @@ pub const DELEGATION_TTL_THRESHOLD: u32 = DELEGATION_EXTEND_AMOUNT - DAY_IN_LEDG
 /// Domain-separation tag for `address_to_field`.
 pub const DELTA_ADDR: u32 = 1;
 
+/// Domain-separation tag for the destination public input of a forced
+/// transfer (`docs/compliance.md#forced-transfer`). Distinct from
+/// [`DELTA_ADDR`], so a proof built for a forced transfer does not verify
+/// as a clawback and vice versa.
+pub const DELTA_FORCED_DEST: u32 = 18;
+
 // ################## EVENTS ##################
 
 /// Event emitted when a confidential account is registered.
