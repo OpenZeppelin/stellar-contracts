@@ -605,3 +605,161 @@ fn admin_is_not_the_approver() {
         .try_confidential_transfer(&h.treasury, &alice, &data);
     assert!(res.is_err());
 }
+
+// ################## BRANCH COVERAGE ##################
+
+/// Asserts that `f` aborts on the host's authorization check. A `try_`
+/// client call reports every host error as `Error(Context, InvalidAction)`,
+/// so the panic message is inspected instead.
+fn assert_auth_failure(case: &str, f: impl FnOnce()) {
+    let payload = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f))
+        .expect_err(&std::format!("{case}: the call succeeded"));
+    let message = payload
+        .downcast_ref::<std::string::String>()
+        .cloned()
+        .or_else(|| payload.downcast_ref::<&str>().map(|s| std::string::String::from(*s)))
+        .unwrap_or_default();
+    assert!(message.contains("Error(Auth, InvalidAction)"), "{case}: {message}");
+}
+
+// Pins branch: #[only_role] entry points / the operator holds the role but
+//   did not sign / Error(Auth, InvalidAction); nothing changes
+// Verifies: INV-21
+#[test]
+fn role_holders_must_authorize() {
+    let h = setup(None);
+    let a = h.investor();
+    let b = h.investor();
+    h.token.freeze(&a, &h.freezer);
+    let config =
+        ComplianceConfig { policy: Some(h.allowlist.address.clone()), sac_passthrough: true };
+    let unsigned = h.token.mock_auths(&[]);
+
+    assert_auth_failure("freeze", || unsigned.freeze(&b, &h.freezer));
+    assert_auth_failure("unfreeze", || unsigned.unfreeze(&a, &h.freezer));
+    assert_auth_failure("set_compliance_config", || {
+        unsigned.set_compliance_config(&config, &h.config_manager)
+    });
+    assert_auth_failure("set_rwa_config", || {
+        unsigned.set_rwa_config(&AUDITOR_ID, &None, &h.config_manager)
+    });
+    assert_auth_failure("bump_approval_epoch", || unsigned.bump_approval_epoch(&h.config_manager));
+    assert_auth_failure("clawback", || {
+        unsigned.clawback(&a, &1, &None, &proof_data(&h.e), &h.clawback)
+    });
+    assert_auth_failure("force_revoke_spender", || {
+        unsigned.force_revoke_spender(&a, &b, &h.clawback)
+    });
+    assert_auth_failure("forced_transfer", || {
+        unsigned.forced_transfer(&a, &b, &1, &proof_data(&h.e), &h.forced_transfer)
+    });
+
+    h.e.mock_all_auths();
+    assert!(h.token.is_frozen(&a));
+    assert!(!h.token.is_frozen(&b));
+    assert_eq!(h.token.approval_epoch(), 1);
+}
+
+// Pins branch: ConfidentialToken entry points of the example / the
+//   account is frozen / AccountFrozen #3601 until the freezer unfreezes it
+// Verifies: INV-16, the deployment obligation stated in contract.rs
+#[test]
+fn frozen_investor_is_immobile_until_unfrozen() {
+    let h = setup(None);
+    h.issue_to_treasury(1_000);
+    let alice = h.investor();
+    let frozen = contract_error(ComplianceError::AccountFrozen as u32);
+
+    h.token.freeze(&h.treasury, &h.freezer);
+    assert!(h.token.is_frozen(&h.treasury));
+    assert!(!h.token.can_send(&h.treasury));
+    assert_eq!(
+        h.token
+            .try_confidential_transfer(&h.treasury, &alice, &transfer_data(&h.e))
+            .unwrap_err()
+            .unwrap(),
+        frozen
+    );
+    assert_eq!(h.token.try_merge(&h.treasury).unwrap_err().unwrap(), frozen);
+    // A frozen account cannot be credited either.
+    h.sac.mint(&alice, &10);
+    assert_eq!(h.token.try_deposit(&alice, &h.treasury, &10).unwrap_err().unwrap(), frozen);
+
+    h.token.unfreeze(&h.treasury, &h.freezer);
+    assert!(!h.token.is_frozen(&h.treasury));
+    h.token.confidential_transfer(&h.treasury, &alice, &transfer_data(&h.e));
+    assert_eq!(
+        h.token.confidential_balance(&alice).receiving_commitment,
+        Grumpkin::generator(&h.e)
+    );
+}
+
+// Pins branch: force_revoke_spender / operator holds `clawback` / the role
+//   guard passes and the library is reached (DelegationNotFound #3504)
+// Verifies: INV-21
+#[test]
+fn clawback_role_reaches_force_revoke_spender() {
+    let h = setup(None);
+    let target = h.investor();
+    let spender = h.investor();
+    h.token.freeze(&target, &h.freezer);
+    assert_eq!(
+        h.token.try_force_revoke_spender(&target, &spender, &h.clawback).unwrap_err().unwrap(),
+        contract_error(3504) // ConfidentialTokenError::DelegationNotFound
+    );
+}
+
+// Pins branch: __constructor / auditor_id not in the registry /
+//   AuditorNotRegistered #3301
+// Verifies: INV-2
+#[test]
+#[should_panic(expected = "Error(Contract, #3301)")] // AuditorError::AuditorNotRegistered
+fn constructor_rejects_unregistered_auditor() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let sac = e.register_stellar_asset_contract_v2(Address::generate(&e));
+    let allowlist = e.register(MockAllowlist, ());
+    e.register(
+        RwaTokenContract,
+        (
+            Address::generate(&e),
+            sac.address(),
+            e.register(MockVerifier, ()),
+            e.register(MockAuditor, ()),
+            ComplianceConfig { policy: Some(allowlist), sac_passthrough: false },
+            AUDITOR_ID,
+            None::<Address>,
+        ),
+    );
+}
+
+// Pins branch: __constructor / approver Some / both configurations are
+//   stored exactly, the admin is set, holds none of the four roles and
+//   cannot call a guarded entry point
+// Verifies: INV-21
+#[test]
+fn constructor_stores_the_approver_and_grants_no_role() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let approver = Address::generate(&e);
+    let h = deploy(e, Some(approver.clone()));
+    let unauthorized = Error::from_contract_error(AccessControlError::Unauthorized as u32);
+
+    assert_eq!(
+        h.token.rwa_config(),
+        Some(RwaConfig { auditor_id: AUDITOR_ID, approver: Some(approver) })
+    );
+    assert_eq!(
+        h.token.compliance_config(),
+        Some(ComplianceConfig {
+            policy: Some(h.allowlist.address.clone()),
+            sac_passthrough: false
+        })
+    );
+    assert_eq!(h.token.get_admin(), Some(h.admin.clone()));
+    for role in ["freezer", "config_manager", "clawback", "forced_transfer"] {
+        assert_eq!(h.token.has_role(&h.admin, &Symbol::new(&h.e, role)), None, "{role}");
+    }
+    assert_eq!(h.token.try_freeze(&h.treasury, &h.admin).unwrap_err().unwrap(), unauthorized);
+    assert_eq!(h.token.try_bump_approval_epoch(&h.admin).unwrap_err().unwrap(), unauthorized);
+}

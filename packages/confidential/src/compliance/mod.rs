@@ -38,8 +38,6 @@ pub mod storage;
 
 #[cfg(test)]
 mod test;
-#[cfg(test)]
-mod test_rwa;
 
 use soroban_sdk::{
     contractclient, contracterror, contractevent, contracttrait, panic_with_error, Address, Bytes,

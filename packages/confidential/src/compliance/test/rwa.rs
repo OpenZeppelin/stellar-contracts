@@ -5,7 +5,7 @@ use soroban_sdk::{
     testutils::{Address as _, Events, MockAuth, MockAuthInvoke},
     token::StellarAssetClient,
     xdr::{AccountFlags, ToXdr},
-    Address, Bytes, BytesN, Env, Event, IntoVal, Val, Vec,
+    Address, Bytes, BytesN, Env, Error, Event, IntoVal, Val, Vec,
 };
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
@@ -18,20 +18,21 @@ use crate::{
             transfer_approval_args, unfreeze, withdraw_approval_args,
         },
         ApprovalEpochBumped, ClawbackData, ComplianceConfig, ComplianceConfigChanged,
-        ComplianceStorageKey, ConfidentialClawback, ConfidentialClawbackClient,
+        ComplianceError, ComplianceStorageKey, ConfidentialClawback, ConfidentialClawbackClient,
         ConfidentialCompliance, ConfidentialComplianceClient, ConfidentialForcedTransfer,
         ConfidentialForcedTransferClient, ConfidentialRwa, ConfidentialRwaClient, ForcedTransfer,
         Policy, RwaConfig, RwaConfigChanged, RwaHooks,
     },
     storage::{
         address_to_field, decode_data, forced_destination_to_field, get_account,
-        set_address_as_field_element, set_auditor, set_underlying_asset, set_verifier,
+        get_address_as_field_element, get_auditor, set_address_as_field_element, set_auditor,
+        set_underlying_asset, set_verifier,
     },
     verifier::CircuitType,
-    ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, ConfidentialTokenStorageKey,
-    Hooks, RegisterData, RegisterPayload, SetSpenderData, SetSpenderPayload, SpenderDelegation,
-    SpenderTransferData, SpenderTransferPayload, TransferData, TransferPayload, WithdrawData,
-    WithdrawPayload,
+    ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, ConfidentialTokenError,
+    ConfidentialTokenStorageKey, Hooks, RegisterData, RegisterPayload, SetSpenderData,
+    SetSpenderPayload, SpenderDelegation, SpenderTransferData, SpenderTransferPayload,
+    TransferData, TransferPayload, WithdrawData, WithdrawPayload,
 };
 
 // ################## MOCK CONTRACTS ##################
@@ -1740,7 +1741,9 @@ fn approver_cannot_be_the_withdrawer() {
     let alice = Address::generate(&h.e);
     configure(&h, Some(alice.clone()));
     store_account(&h, &alice, AUDITOR, 1_000, 0);
-    run_hook(&h, 3, &alice, &alice);
+    // A distinct recipient, so the rule is triggered by `from` alone.
+    let other = Address::generate(&h.e);
+    run_hook(&h, 3, &alice, &other);
 }
 
 #[test]
@@ -2062,7 +2065,10 @@ fn forced_transfer_public_inputs_differ_from_clawback_only_in_destination() {
         // Fields 4-5: the designated auditor's key.
         let (kx, ky) = coordinates(e, &Grumpkin::generator(e));
         assert_eq!([&forced_pi[4], &forced_pi[5]], [&kx, &ky]);
-        // Field 8: the source account. Field 9: the destination binding.
+        // Field 6: the public amount. Field 7: this token. Field 8: the
+        // source account. Field 9: the destination binding.
+        assert_eq!(forced_pi[6], field(e, 40));
+        assert_eq!(forced_pi[7], address_to_field(e, &f.h.host));
         assert_eq!(forced_pi[8], address_to_field(e, &f.from));
         assert_eq!(forced_pi[9], forced_destination_to_field(e, &f.to));
         assert_eq!(clawback_pi[9], address_to_field(e, &f.to));
@@ -2368,4 +2374,1000 @@ fn forced_destination_to_field_matches_testdata_vectors() {
         let got = e.as_contract(&h.host, || forced_destination_to_field(e, &addr));
         assert_eq!(got, BytesN::from_array(e, &expected), "forced_destination_to_field({strkey})");
     }
+}
+
+/// Runs `withdraw(alice, recipient, 100, data)` with the sender's
+/// authorization and an approver authorization over `approver_args`.
+fn withdraw_to_with(f: &Flow, recipient: &Address, approver_args: Vec<Val>) {
+    let e = &f.h.e;
+    let data = withdraw_data(e);
+    let sender = invoke(
+        &f.h.host,
+        "withdraw",
+        (f.alice.clone(), recipient.clone(), 100i128, data.clone()).into_val(e),
+        &[],
+    );
+    let approval = invoke(&f.h.host, "withdraw", approver_args, &[]);
+    ConfidentialTokenClient::new(e, &f.h.host)
+        .mock_auths(&[
+            MockAuth { address: &f.alice, invoke: &sender },
+            MockAuth { address: &f.approver, invoke: &approval },
+        ])
+        .withdraw(&f.alice, recipient, &100, &data);
+}
+
+#[test]
+fn withdraw_to_another_address_binds_from_then_to() {
+    let f = approval_flow();
+    let e = &f.h.e;
+    let carol = Address::generate(e);
+    let args: Vec<Val> =
+        (epoch(&f), f.alice.clone(), carol.clone(), 100i128, withdraw_payload(e)).into_val(e);
+    withdraw_to_with(&f, &carol, args);
+    assert_eq!(StellarAssetClient::new(e, &f.h.sac_addr).balance(&carol), 100);
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn withdraw_approval_with_from_and_to_swapped_fails() {
+    let f = approval_flow();
+    let e = &f.h.e;
+    let carol = Address::generate(e);
+    let args: Vec<Val> =
+        (epoch(&f), carol.clone(), f.alice.clone(), 100i128, withdraw_payload(e)).into_val(e);
+    withdraw_to_with(&f, &carol, args);
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn deposit_approval_with_from_and_to_swapped_fails() {
+    let f = approval_flow();
+    let e = &f.h.e;
+    let args: Vec<Val> = (epoch(&f), f.bob.clone(), f.alice.clone(), 100i128).into_val(e);
+    deposit_with(&f, 100, Some(args));
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn transfer_approval_with_from_and_to_swapped_fails() {
+    let f = approval_flow();
+    let e = &f.h.e;
+    let args: Vec<Val> =
+        (epoch(&f), f.bob.clone(), f.alice.clone(), transfer_payload(e)).into_val(e);
+    transfer_with(&f, Some(args));
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn spender_transfer_approval_with_spender_and_owner_swapped_fails() {
+    let (f, spender) = delegated_flow();
+    let e = &f.h.e;
+    let args: Vec<Val> =
+        (epoch(&f), f.alice.clone(), spender.clone(), f.bob.clone(), spender_transfer_payload(e))
+            .into_val(e);
+    spender_transfer_with(&f, &spender, args);
+}
+
+// ################## BRANCH COVERAGE ##################
+//
+// Tests derived from a branching-tree pass over the RWA profile: one test
+// per branch the tests above leave uncovered.
+
+// ################## BRANCH COVERAGE HELPERS ##################
+
+fn err(code: ComplianceError) -> Result<(), Error> {
+    Err(Error::from_contract_error(code as u32))
+}
+
+fn token_err(code: ConfidentialTokenError) -> Result<(), Error> {
+    Err(Error::from_contract_error(code as u32))
+}
+
+/// Runs `f` inside the token's frame and returns the error it aborts with.
+/// Unlike `hook_panic`, the result is a typed `Error`, and a contract error
+/// is told apart from a host trap.
+fn try_in_host(h: &Harness, f: impl FnOnce()) -> Result<(), Error> {
+    h.e.try_as_contract::<(), Error>(&h.host, f).map_err(|r| r.unwrap())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Op {
+    Register,
+    Deposit,
+    Merge,
+    Withdraw,
+    Transfer,
+    SpenderTransfer,
+    SetSpender,
+    Revoke,
+}
+
+const OPS: [Op; 8] = [
+    Op::Register,
+    Op::Deposit,
+    Op::Merge,
+    Op::Withdraw,
+    Op::Transfer,
+    Op::SpenderTransfer,
+    Op::SetSpender,
+    Op::Revoke,
+];
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Role {
+    From,
+    Spender,
+}
+
+/// Three distinct parties, so the spender never doubles as the recipient
+/// (as it does in `run_hook`).
+struct Parties {
+    from: Address,
+    to: Address,
+    spender: Address,
+}
+
+fn parties(h: &Harness) -> Parties {
+    Parties { from: account(h, AUDITOR), to: account(h, AUDITOR), spender: account(h, AUDITOR) }
+}
+
+impl Parties {
+    fn get(&self, role: Role) -> &Address {
+        match role {
+            Role::From => &self.from,
+            Role::Spender => &self.spender,
+        }
+    }
+}
+
+fn try_hook(h: &Harness, op: Op, p: &Parties) -> Result<(), Error> {
+    let e = &h.e;
+    try_in_host(h, || match op {
+        Op::Register => RwaHooks::on_register(e, &p.from, AUDITOR, &register_payload(e)),
+        Op::Deposit => RwaHooks::on_deposit(e, &p.from, &p.to, 1),
+        Op::Merge => RwaHooks::on_merge(e, &p.from),
+        Op::Withdraw => RwaHooks::on_withdraw(e, &p.from, &p.to, 1, &withdraw_payload(e)),
+        Op::Transfer => RwaHooks::on_transfer(e, &p.from, &p.to, &transfer_payload(e)),
+        Op::SpenderTransfer => RwaHooks::on_spender_transfer(
+            e,
+            &p.spender,
+            &p.from,
+            &p.to,
+            &spender_transfer_payload(e),
+        ),
+        Op::SetSpender => {
+            RwaHooks::on_set_spender(e, &p.from, &p.spender, 100, &set_spender_payload(e))
+        }
+        Op::Revoke => RwaHooks::on_revoke_spender(e, &p.from, &p.spender),
+    })
+}
+
+fn try_force(f: &Forced, from: &Address, to: &Address, amount: i128) -> Result<(), Error> {
+    ConfidentialForcedTransferClient::new(&f.h.e, &f.h.host)
+        .try_forced_transfer(from, to, &amount, &proof_data(&f.h.e), &f.h.admin)
+        .map(|r| r.unwrap())
+        .map_err(|r| r.unwrap())
+}
+
+// ################## P1: APPROVAL GATE ##################
+
+/// `withdraw(alice, alice, 100, data)` with the sender's entry and, when
+/// given, `approval` (entry point name, arguments) signed by `signer`.
+fn gate_withdraw(f: &Flow, signer: &Address, approval: Option<(&str, Vec<Val>)>) {
+    let e = &f.h.e;
+    let data = withdraw_data(e);
+    let sender = invoke(
+        &f.h.host,
+        "withdraw",
+        (f.alice.clone(), f.alice.clone(), 100i128, data.clone()).into_val(e),
+        &[],
+    );
+    let token = ConfidentialTokenClient::new(e, &f.h.host);
+    match approval {
+        None => token
+            .mock_auths(&[MockAuth { address: &f.alice, invoke: &sender }])
+            .withdraw(&f.alice, &f.alice, &100, &data),
+        Some((fn_name, args)) => {
+            let approval = invoke(&f.h.host, fn_name, args, &[]);
+            token
+                .mock_auths(&[
+                    MockAuth { address: &f.alice, invoke: &sender },
+                    MockAuth { address: signer, invoke: &approval },
+                ])
+                .withdraw(&f.alice, &f.alice, &100, &data)
+        }
+    }
+}
+
+fn exact_withdraw_args(f: &Flow) -> Vec<Val> {
+    let e = &f.h.e;
+    e.as_contract(&f.h.host, || {
+        withdraw_approval_args(e, &f.alice, &f.alice, 100, &withdraw_payload(e))
+    })
+}
+
+// Pins branch: on_withdraw -> require_approval / approver configured, no
+//   approver entry / Error(Auth, InvalidAction)
+// Verifies: INV-14
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn withdraw_without_approval_fails() {
+    let f = approval_flow();
+    gate_withdraw(&f, &f.approver, None);
+}
+
+// Pins branch: on_withdraw -> require_approval / the exact tuple signed by
+//   an address that is not the approver / Error(Auth, InvalidAction)
+// Verifies: INV-14
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn withdraw_approval_signed_by_another_address_fails() {
+    let f = approval_flow();
+    let outsider = Address::generate(&f.h.e);
+    gate_withdraw(&f, &outsider, Some(("withdraw", exact_withdraw_args(&f))));
+}
+
+/// `confidential_transfer_from(spender, alice, bob, data)` with the
+/// spender's entry and, when given, `approval` signed by `signer`.
+fn gate_spend(f: &Flow, spender: &Address, signer: &Address, approval: Option<(&str, Vec<Val>)>) {
+    let e = &f.h.e;
+    let data = spender_transfer_data(e);
+    let sender = invoke(
+        &f.h.host,
+        "confidential_transfer_from",
+        (spender.clone(), f.alice.clone(), f.bob.clone(), data.clone()).into_val(e),
+        &[],
+    );
+    let token = ConfidentialTokenClient::new(e, &f.h.host);
+    match approval {
+        None => token
+            .mock_auths(&[MockAuth { address: spender, invoke: &sender }])
+            .confidential_transfer_from(spender, &f.alice, &f.bob, &data),
+        Some((fn_name, args)) => {
+            let approval = invoke(&f.h.host, fn_name, args, &[]);
+            token
+                .mock_auths(&[
+                    MockAuth { address: spender, invoke: &sender },
+                    MockAuth { address: signer, invoke: &approval },
+                ])
+                .confidential_transfer_from(spender, &f.alice, &f.bob, &data)
+        }
+    }
+}
+
+// Pins branch: on_spender_transfer -> require_approval / approver
+//   configured, no approver entry / Error(Auth, InvalidAction)
+// Verifies: INV-14
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn spender_transfer_without_approval_fails() {
+    let (f, spender) = delegated_flow();
+    gate_spend(&f, &spender, &f.approver, None);
+}
+
+// Pins branch: on_spender_transfer -> require_approval / the exact tuple
+//   signed by an address that is not the approver / Error(Auth, InvalidAction)
+// Verifies: INV-14
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn spender_transfer_approval_signed_by_another_address_fails() {
+    let (f, spender) = delegated_flow();
+    let e = &f.h.e;
+    let outsider = Address::generate(e);
+    let args = e.as_contract(&f.h.host, || {
+        spender_transfer_approval_args(e, &spender, &f.alice, &f.bob, &spender_transfer_payload(e))
+    });
+    gate_spend(&f, &spender, &outsider, Some(("confidential_transfer_from", args)));
+}
+
+/// `deposit(alice, bob, 100)` with the sender's entry and `approval` signed
+/// by `signer`.
+fn deposit_with_entry(f: &Flow, signer: &Address, approval: &MockAuthInvoke) {
+    let e = &f.h.e;
+    let sac_transfer = [invoke(
+        &f.h.sac_addr,
+        "transfer",
+        (f.alice.clone(), f.h.host.clone(), 100i128).into_val(e),
+        &[],
+    )];
+    let sender = invoke(
+        &f.h.host,
+        "deposit",
+        (f.alice.clone(), f.bob.clone(), 100i128).into_val(e),
+        &sac_transfer,
+    );
+    ConfidentialTokenClient::new(e, &f.h.host)
+        .mock_auths(&[
+            MockAuth { address: &f.alice, invoke: &sender },
+            MockAuth { address: signer, invoke: approval },
+        ])
+        .deposit(&f.alice, &f.bob, &100);
+}
+
+// Pins branch: on_deposit -> require_approval / the exact tuple signed by
+//   an address that is not the approver / Error(Auth, InvalidAction)
+// Verifies: INV-14
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn deposit_approval_signed_by_another_address_fails() {
+    let f = approval_flow();
+    let outsider = Address::generate(&f.h.e);
+    let approval = invoke(&f.h.host, "deposit", current_deposit_args(&f, 100), &[]);
+    deposit_with_entry(&f, &outsider, &approval);
+}
+
+// Pins branch: on_deposit -> require_approval / the exact tuple authorized
+//   for another entry point of the token / Error(Auth, InvalidAction)
+// Verifies: INV-18
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn deposit_approval_under_another_function_name_fails() {
+    let f = approval_flow();
+    let approval = invoke(&f.h.host, "withdraw", current_deposit_args(&f, 100), &[]);
+    deposit_with_entry(&f, &f.approver, &approval);
+}
+
+// Pins branch: on_deposit -> require_approval / the exact tuple authorized
+//   for another token contract / Error(Auth, InvalidAction)
+// Verifies: INV-18
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn deposit_approval_for_another_token_fails() {
+    let f = approval_flow();
+    let e = &f.h.e;
+    let registry = e.as_contract(&f.h.host, || get_auditor(e));
+    let other_token = e.register(RwaHost, (f.h.sac_addr.clone(), f.h.verifier.clone(), registry));
+    let approval = invoke(&other_token, "deposit", current_deposit_args(&f, 100), &[]);
+    deposit_with_entry(&f, &f.approver, &approval);
+}
+
+// Pins branch: on_transfer -> require_approval / the exact tuple
+//   authorized for another entry point / Error(Auth, InvalidAction)
+// Verifies: INV-18
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn transfer_approval_under_another_function_name_fails() {
+    let f = approval_flow();
+    let e = &f.h.e;
+    let data = transfer_data(e);
+    let sender = invoke(
+        &f.h.host,
+        "confidential_transfer",
+        (f.alice.clone(), f.bob.clone(), data.clone()).into_val(e),
+        &[],
+    );
+    let args = e.as_contract(&f.h.host, || {
+        transfer_approval_args(e, &f.alice, &f.bob, &transfer_payload(e))
+    });
+    let approval = invoke(&f.h.host, "confidential_transfer_from", args, &[]);
+    ConfidentialTokenClient::new(e, &f.h.host)
+        .mock_auths(&[
+            MockAuth { address: &f.alice, invoke: &sender },
+            MockAuth { address: &f.approver, invoke: &approval },
+        ])
+        .confidential_transfer(&f.alice, &f.bob, &data);
+}
+
+// Pins branch: require_approval / approver None (disabled after having
+//   been set) / deposit and transfer settle with the sender's entry alone
+// Verifies: INV-14
+#[test]
+fn without_an_approver_only_the_sender_authorizes() {
+    let f = approval_flow();
+    let e = &f.h.e;
+    ConfidentialRwaClient::new(e, &f.h.host).set_rwa_config(&AUDITOR, &None, &f.h.admin);
+
+    deposit_with(&f, 100, None);
+    assert_eq!(e.auths().len(), 1);
+    assert_eq!(e.auths()[0].0, f.alice);
+
+    transfer_with(&f, None);
+    assert_eq!(e.auths().len(), 1);
+    assert_eq!(e.auths()[0].0, f.alice);
+}
+
+// Pins branch: on_register / approver configured / registration needs the
+//   account's authorization only
+// Verifies: INV-14
+#[test]
+fn register_needs_no_approval() {
+    let h = setup();
+    let approver = Address::generate(&h.e);
+    configure(&h, Some(approver));
+    let a = Address::generate(&h.e);
+    let data =
+        RegisterData { payload: register_payload(&h.e), proof: Bytes::new(&h.e) }.to_xdr(&h.e);
+    let call = invoke(&h.host, "register", (a.clone(), AUDITOR, data.clone()).into_val(&h.e), &[]);
+    ConfidentialTokenClient::new(&h.e, &h.host)
+        .mock_auths(&[MockAuth { address: &a, invoke: &call }])
+        .register(&a, &AUDITOR, &data);
+    assert_eq!(h.e.auths().len(), 1);
+    h.e.as_contract(&h.host, || assert_eq!(get_account(&h.e, &a).auditor_id, AUDITOR));
+}
+
+// ################## P2: SAC GATE AND FAIL-CLOSED EXTERNAL CALLS
+// ##################
+
+// Pins branch: gate_account -> check_sac / the sender, the owner, the
+//   delegating account or the spender is SAC-deauthorized /
+//   NotAuthorizedBySac #3603
+// Verifies: INV-16
+#[test]
+fn sac_gate_covers_the_source_and_the_spender() {
+    let h = setup();
+    h.e.as_contract(&h.host, || {
+        set_compliance_config(&h.e, &ComplianceConfig { policy: None, sac_passthrough: true });
+        set_rwa_config(&h.e, AUDITOR, &None);
+    });
+    for (op, role) in [
+        (Op::Deposit, Role::From),
+        (Op::Withdraw, Role::From),
+        (Op::Transfer, Role::From),
+        (Op::SpenderTransfer, Role::From),
+        (Op::SpenderTransfer, Role::Spender),
+        (Op::SetSpender, Role::From),
+    ] {
+        let p = parties(&h);
+        h.sac.set_authorized(p.get(role), &false);
+        assert_eq!(
+            try_hook(&h, op, &p),
+            err(ComplianceError::NotAuthorizedBySac),
+            "{op:?} {role:?}"
+        );
+    }
+}
+
+// Pins branch: check_policy / the policy call fails / every hook traps
+// Verifies: INV-20
+#[test]
+fn hooks_trap_when_the_policy_call_fails() {
+    let h = setup();
+    let failing = h.e.register(PanicPolicy, ());
+    h.e.as_contract(&h.host, || {
+        set_compliance_config(
+            &h.e,
+            &ComplianceConfig { policy: Some(failing.clone()), sac_passthrough: false },
+        );
+        set_rwa_config(&h.e, AUDITOR, &None);
+    });
+    for op in OPS {
+        let p = parties(&h);
+        assert!(try_hook(&h, op, &p).is_err(), "{op:?} passed with an unavailable policy");
+    }
+}
+
+/// A token without the SAC admin interface.
+#[contract]
+struct PlainToken;
+
+#[contractimpl]
+impl PlainToken {
+    pub fn decimals(_e: &Env) -> u32 {
+        7
+    }
+}
+
+// Pins branch: can_transact, check_sac / sac_passthrough over a token with
+//   no `authorized` / the views return false and every hook traps
+// Verifies: INV-16, INV-20
+#[test]
+fn sac_passthrough_over_a_non_sac_underlying_fails_closed() {
+    let h = setup();
+    let plain = h.e.register(PlainToken, ());
+    h.e.as_contract(&h.host, || {
+        h.e.storage().instance().set(&ConfidentialTokenStorageKey::UnderlyingAsset, &plain);
+        set_compliance_config(&h.e, &ComplianceConfig { policy: None, sac_passthrough: true });
+        set_rwa_config(&h.e, AUDITOR, &None);
+    });
+    let a = account(&h, AUDITOR);
+    let client = ConfidentialRwaClient::new(&h.e, &h.host);
+    assert!(!client.can_send(&a));
+    assert!(!client.can_receive(&a));
+    for op in OPS {
+        let p = parties(&h);
+        assert!(try_hook(&h, op, &p).is_err(), "{op:?} passed over a non-SAC underlying");
+    }
+}
+
+// ################## P3: FORCED TRANSFER ##################
+
+// Pins branch: forced_transfer / two preconditions fail at once / the
+//   order is freeze, amount, destination identity, source registration,
+//   destination gates, destination registration and auditor; state unchanged
+// Verifies: INV-6
+#[test]
+fn forced_transfer_checks_run_in_documented_order() {
+    let f = forced_flow(None);
+    let h = &f.h;
+    let e = &h.e;
+
+    // 1. Freeze before amount, destination and registration.
+    let unfrozen = account(h, AUDITOR);
+    assert_eq!(try_force(&f, &unfrozen, &unfrozen, 0), err(ComplianceError::AccountNotFrozen));
+    let nobody = Address::generate(e);
+    assert_eq!(try_force(&f, &nobody, &f.to, 1), err(ComplianceError::AccountNotFrozen));
+
+    // 2. Amount before destination.
+    assert_eq!(
+        try_force(&f, &f.from, &f.from, 0),
+        err(ComplianceError::InvalidForcedTransferAmount)
+    );
+
+    // 3. Destination identity before the source's registration.
+    let ghost = Address::generate(e);
+    freeze_account(h, &ghost);
+    assert_eq!(
+        try_force(&f, &ghost, &ghost, 1),
+        err(ComplianceError::InvalidForcedTransferDestination)
+    );
+    assert_eq!(
+        try_force(&f, &ghost, &h.host, 1),
+        err(ComplianceError::InvalidForcedTransferDestination)
+    );
+
+    // 4. Source registration before the destination's gates.
+    let frozen_to = account(h, AUDITOR);
+    freeze_account(h, &frozen_to);
+    assert_eq!(
+        try_force(&f, &ghost, &frozen_to, 1),
+        token_err(ConfidentialTokenError::AccountNotRegistered)
+    );
+
+    // 5. Destination gates before its registration and auditor binding.
+    let legacy_frozen = account(h, LEGACY_AUDITOR);
+    freeze_account(h, &legacy_frozen);
+    assert_eq!(try_force(&f, &f.from, &legacy_frozen, 1), err(ComplianceError::AccountFrozen));
+    let denied_unregistered = Address::generate(e);
+    ListPolicyClient::new(e, &h.policy).block(&denied_unregistered);
+    assert_eq!(
+        try_force(&f, &f.from, &denied_unregistered, 1),
+        err(ComplianceError::NotAuthorizedByPolicy)
+    );
+
+    // Nothing moved and the nonce did not advance.
+    e.as_contract(&h.host, || {
+        assert_eq!(get_account(e, &f.from).spendable_commitment, g_times(e, 70));
+        assert_eq!(get_account(e, &f.from).receiving_commitment, g_times(e, 30));
+        assert_eq!(get_account(e, &f.to).receiving_commitment, g_times(e, 7));
+    });
+    assert_eq!(ConfidentialClawbackClient::new(e, &h.host).clawback_nonce(&f.from), 0);
+}
+
+// Pins branch: forced_transfer -> gate_account(to) / SAC passthrough, `to`
+//   deauthorized / NotAuthorizedBySac #3603; `from` passes no gate
+// Verifies: INV-6
+#[test]
+fn forced_transfer_gates_the_destination_on_the_sac_and_not_the_source() {
+    let f = forced_flow(None);
+    let e = &f.h.e;
+    ConfidentialComplianceClient::new(e, &f.h.host).set_compliance_config(
+        &ComplianceConfig { policy: Some(f.h.policy.clone()), sac_passthrough: true },
+        &f.h.admin,
+    );
+    f.h.sac.set_authorized(&f.to, &false);
+    assert_eq!(try_force(&f, &f.from, &f.to, 40), err(ComplianceError::NotAuthorizedBySac));
+
+    // The source is not gated: denying it does not block the override.
+    f.h.sac.set_authorized(&f.to, &true);
+    f.h.sac.set_authorized(&f.from, &false);
+    ListPolicyClient::new(e, &f.h.policy).block(&f.from);
+    assert_eq!(try_force(&f, &f.from, &f.to, 40), Ok(()));
+}
+
+// Pins branch: forced_transfer -> verify / the statement of an executed
+//   proof replayed against another account in the same state / InvalidProof
+// Verifies: INV-12
+#[test]
+fn forced_transfer_proof_is_bound_to_the_source_account() {
+    let f = forced_flow_with(None, |e| e.register(BoundProofVerifier, ()));
+    force(&f, 40);
+    // A second frozen account in the state the proof was built against.
+    let twin = Address::generate(&f.h.e);
+    store_account(&f.h, &twin, AUDITOR, 70, 30);
+    freeze_account(&f.h, &twin);
+    assert_eq!(try_force(&f, &twin, &f.to, 40), token_err(ConfidentialTokenError::InvalidProof));
+}
+
+// Pins branch: forced_transfer -> verify / the statement replayed with
+//   another amount / InvalidProof
+// Verifies: INV-12
+#[test]
+fn forced_transfer_proof_is_bound_to_the_amount() {
+    let f = forced_flow_with(None, |e| e.register(BoundProofVerifier, ()));
+    force(&f, 40);
+    store_account(&f.h, &f.from, AUDITOR, 70, 30);
+    f.h.e.as_contract(&f.h.host, || {
+        f.h.e.storage().persistent().remove(&ComplianceStorageKey::ClawbackNonce(f.from.clone()));
+    });
+    assert_eq!(try_force(&f, &f.from, &f.to, 41), token_err(ConfidentialTokenError::InvalidProof));
+}
+
+// Pins branch: forced_transfer / success / the amount, token and nonce
+//   public inputs carry the call's amount, this contract's field element
+//   and the stored nonce
+// Verifies: INV-11, INV-12
+#[test]
+fn forced_transfer_public_inputs_carry_amount_token_and_nonce() {
+    let f = forced_flow(None);
+    let e = &f.h.e;
+    e.as_contract(&f.h.host, || {
+        e.storage().persistent().set(&ComplianceStorageKey::ClawbackNonce(f.from.clone()), &5u32);
+    });
+    force(&f, 40);
+
+    let pi = last_public_inputs(&f.h);
+    assert_eq!(pi[6], field(e, 40));
+    e.as_contract(&f.h.host, || assert_eq!(pi[7], get_address_as_field_element(e)));
+    assert_eq!(pi[10], field(e, 5));
+}
+
+// Pins branch: forced_transfer -> auditor.get_key / `from` bound to an id
+//   the registry does not hold / AuditorNotRegistered #3301
+// Verifies: INV-6
+#[test]
+fn forced_transfer_from_source_with_unregistered_auditor_fails() {
+    let f = forced_flow(None);
+    let orphan = Address::generate(&f.h.e);
+    store_account(&f.h, &orphan, 7, 50, 0);
+    freeze_account(&f.h, &orphan);
+    // AuditorError::AuditorNotRegistered
+    assert_eq!(try_force(&f, &orphan, &f.to, 10), Err(Error::from_contract_error(3301)));
+}
+
+// Pins branch: forced_transfer / stored configuration invalid / it reverts
+//   with EligibilityRequired #3615 or NotConfigured #3600
+// Verifies: INV-1, INV-6
+#[test]
+fn forced_transfer_fails_closed_on_an_invalid_stored_configuration() {
+    let f = forced_flow(None);
+    let e = &f.h.e;
+    e.as_contract(&f.h.host, || {
+        e.storage().instance().set(
+            &ComplianceStorageKey::Config,
+            &ComplianceConfig { policy: None, sac_passthrough: false },
+        );
+    });
+    assert_eq!(try_force(&f, &f.from, &f.to, 40), err(ComplianceError::EligibilityRequired));
+    e.as_contract(&f.h.host, || e.storage().instance().remove(&ComplianceStorageKey::Config));
+    assert_eq!(try_force(&f, &f.from, &f.to, 40), err(ComplianceError::NotConfigured));
+}
+
+// Pins branch: forced_transfer entry point / `data` is not a ClawbackData /
+//   InvalidData #3507
+// Verifies: INV-6
+#[test]
+fn forced_transfer_rejects_malformed_data() {
+    let f = forced_flow(None);
+    let e = &f.h.e;
+    let res = ConfidentialForcedTransferClient::new(e, &f.h.host).try_forced_transfer(
+        &f.from,
+        &f.to,
+        &40,
+        &42u32.to_xdr(e),
+        &f.h.admin,
+    );
+    assert_eq!(
+        res.unwrap_err().unwrap(),
+        Error::from_contract_error(ConfidentialTokenError::InvalidData as u32)
+    );
+}
+
+// ################## P4: ORDER OF CHECKS IN THE HOOKS ##################
+
+// Pins branch: rwa_context / both configurations absent / every hook
+//   reports RwaNotConfigured #3607, not NotConfigured #3600
+// Verifies: INV-1
+#[test]
+fn rwa_config_is_checked_before_compliance_config() {
+    let h = setup();
+    for op in OPS {
+        let p = parties(&h);
+        assert_eq!(try_hook(&h, op, &p), err(ComplianceError::RwaNotConfigured), "{op:?}");
+    }
+}
+
+// Pins branch: RwaHooks::on_* / two conditions fail at once / the earlier
+//   check's error is reported
+// Verifies: INV-4, INV-5, INV-16
+#[test]
+fn hook_checks_run_in_documented_order() {
+    let h = configured(None);
+    let policy = ListPolicyClient::new(&h.e, &h.policy);
+
+    // on_register: auditor id before the policy.
+    let a = Address::generate(&h.e);
+    policy.block(&a);
+    assert_eq!(
+        try_in_host(&h, || RwaHooks::on_register(
+            &h.e,
+            &a,
+            LEGACY_AUDITOR,
+            &register_payload(&h.e)
+        )),
+        err(ComplianceError::AuditorNotAllowed)
+    );
+
+    // on_transfer: `from` gates before `to` gates.
+    let p = parties(&h);
+    freeze_account(&h, &p.from);
+    policy.block(&p.to);
+    assert_eq!(try_hook(&h, Op::Transfer, &p), err(ComplianceError::AccountFrozen));
+
+    // on_transfer: eligibility gates before the auditor binding.
+    let p = Parties {
+        from: account(&h, LEGACY_AUDITOR),
+        to: account(&h, AUDITOR),
+        spender: account(&h, AUDITOR),
+    };
+    freeze_account(&h, &p.to);
+    assert_eq!(try_hook(&h, Op::Transfer, &p), err(ComplianceError::AccountFrozen));
+
+    // on_deposit: policy on `to` before its registration and auditor checks.
+    let p = Parties {
+        from: Address::generate(&h.e),
+        to: Address::generate(&h.e),
+        spender: Address::generate(&h.e),
+    };
+    policy.block(&p.to);
+    assert_eq!(try_hook(&h, Op::Deposit, &p), err(ComplianceError::NotAuthorizedByPolicy));
+
+    // on_spender_transfer: `to` gates before `spender` gates.
+    let p = parties(&h);
+    policy.block(&p.to);
+    freeze_account(&h, &p.spender);
+    assert_eq!(try_hook(&h, Op::SpenderTransfer, &p), err(ComplianceError::NotAuthorizedByPolicy));
+}
+
+// Pins branch: on_transfer / approver == from and from bound to another
+//   auditor / AuditorMismatch #3609 wins over ApproverIsParty #3612
+// Verifies: INV-3, INV-5
+#[test]
+fn auditor_binding_is_checked_before_the_approver_is_party_rule() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    configure(&h, Some(alice.clone()));
+    store_account(&h, &alice, LEGACY_AUDITOR, 0, 0);
+    let p = Parties { from: alice, to: account(&h, AUDITOR), spender: account(&h, AUDITOR) };
+    assert_eq!(try_hook(&h, Op::Transfer, &p), err(ComplianceError::AuditorMismatch));
+}
+
+// ################## P5: HOOK VARIANTS ##################
+
+// Pins branch: on_spender_transfer / the spender is bound to another
+//   auditor or not registered / the hook passes
+// Verifies: INV-5
+#[test]
+fn spender_binding_and_registration_are_not_checked_on_spend() {
+    let h = configured(None);
+    for spender in [account(&h, LEGACY_AUDITOR), Address::generate(&h.e)] {
+        let p = Parties { from: account(&h, AUDITOR), to: account(&h, AUDITOR), spender };
+        assert_eq!(try_hook(&h, Op::SpenderTransfer, &p), Ok(()));
+    }
+}
+
+// Pins branch: on_transfer, on_spender_transfer, on_set_spender / a
+//   confidential party is not registered / AccountNotRegistered #3501;
+//   on_withdraw accepts an unregistered recipient
+// Verifies: INV-5, INV-16
+#[test]
+fn hooks_reject_unregistered_confidential_parties() {
+    let h = configured(None);
+    let not_registered = token_err(ConfidentialTokenError::AccountNotRegistered);
+    let p = Parties {
+        from: Address::generate(&h.e),
+        to: account(&h, AUDITOR),
+        spender: account(&h, AUDITOR),
+    };
+    assert_eq!(try_hook(&h, Op::Transfer, &p), not_registered);
+    assert_eq!(try_hook(&h, Op::SpenderTransfer, &p), not_registered);
+    assert_eq!(try_hook(&h, Op::SetSpender, &p), not_registered);
+    let p = Parties {
+        from: account(&h, AUDITOR),
+        to: Address::generate(&h.e),
+        spender: account(&h, AUDITOR),
+    };
+    assert_eq!(try_hook(&h, Op::Transfer, &p), not_registered);
+    assert_eq!(try_hook(&h, Op::SpenderTransfer, &p), not_registered);
+    // A withdrawal pays out to a public address.
+    assert_eq!(try_hook(&h, Op::Withdraw, &p), Ok(()));
+}
+
+// Pins branch: on_register / the address carries a frozen flag / it
+//   registers; can_receive is false afterwards
+// Verifies: INV-16
+#[test]
+fn frozen_address_can_register_but_not_transact() {
+    let h = configured(None);
+    let a = Address::generate(&h.e);
+    freeze_account(&h, &a);
+    assert_eq!(
+        try_in_host(&h, || RwaHooks::on_register(&h.e, &a, AUDITOR, &register_payload(&h.e))),
+        Ok(())
+    );
+    store_account(&h, &a, AUDITOR, 0, 0);
+    assert!(!ConfidentialRwaClient::new(&h.e, &h.host).can_receive(&a));
+}
+
+// ################## P6: can_transact ##################
+
+// Pins branch: can_transact / the policy address is not a contract / false
+// Verifies: INV-20
+#[test]
+fn can_transact_is_false_when_the_policy_is_not_a_contract() {
+    let h = setup();
+    let missing = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        set_compliance_config(
+            &h.e,
+            &ComplianceConfig { policy: Some(missing.clone()), sac_passthrough: false },
+        );
+        set_rwa_config(&h.e, AUDITOR, &None);
+    });
+    let a = account(&h, AUDITOR);
+    assert!(!ConfidentialRwaClient::new(&h.e, &h.host).can_send(&a));
+}
+
+// Pins branch: can_transact / policy and SAC both configured / true only
+//   when both authorize
+// Verifies: INV-16
+#[test]
+fn can_transact_requires_both_gates_when_both_are_configured() {
+    let h = setup();
+    h.e.as_contract(&h.host, || {
+        set_compliance_config(
+            &h.e,
+            &ComplianceConfig { policy: Some(h.policy.clone()), sac_passthrough: true },
+        );
+        set_rwa_config(&h.e, AUDITOR, &None);
+    });
+    let client = ConfidentialRwaClient::new(&h.e, &h.host);
+    let ok = account(&h, AUDITOR);
+    let denied_by_policy = account(&h, AUDITOR);
+    ListPolicyClient::new(&h.e, &h.policy).block(&denied_by_policy);
+    let denied_by_sac = account(&h, AUDITOR);
+    h.sac.set_authorized(&denied_by_sac, &false);
+
+    assert!(client.can_send(&ok));
+    assert!(!client.can_send(&denied_by_policy));
+    assert!(!client.can_send(&denied_by_sac));
+}
+
+// Pins branch: can_transact / RwaConfig set, ComplianceConfig without a
+//   gate or absent / false
+// Verifies: INV-16
+#[test]
+fn can_transact_is_false_for_an_invalid_stored_configuration() {
+    let h = configured(None);
+    let a = account(&h, AUDITOR);
+    let client = ConfidentialRwaClient::new(&h.e, &h.host);
+    assert!(client.can_send(&a));
+
+    // An eligibility-free configuration, which no setter can write.
+    h.e.as_contract(&h.host, || {
+        h.e.storage().instance().set(
+            &ComplianceStorageKey::Config,
+            &ComplianceConfig { policy: None, sac_passthrough: false },
+        );
+    });
+    assert!(!client.can_send(&a));
+
+    h.e.as_contract(&h.host, || h.e.storage().instance().remove(&ComplianceStorageKey::Config));
+    assert!(!client.can_send(&a));
+}
+
+// ################## P7: CONFIGURATION ##################
+
+// Pins branch: set_rwa_config / auditor and approver both invalid / the
+//   auditor check wins; the token is rejected as approver on a later call
+//   too; a rejected call writes nothing
+// Verifies: INV-2, INV-3, INV-8
+#[test]
+fn set_rwa_config_checks_the_auditor_before_the_approver() {
+    let h = setup();
+    h.e.as_contract(&h.host, || set_compliance_config(&h.e, &policy_config(&h)));
+    let client = ConfidentialRwaClient::new(&h.e, &h.host);
+    let this = Some(h.host.clone());
+
+    // First call: registry lookup first.
+    assert_eq!(
+        client.try_set_rwa_config(&7, &this, &h.admin).unwrap_err().unwrap(),
+        Error::from_contract_error(3301) // AuditorError::AuditorNotRegistered
+    );
+    client.set_rwa_config(&AUDITOR, &None, &h.admin);
+    // Later calls: the immutable auditor first, then the approver.
+    assert_eq!(
+        client.try_set_rwa_config(&LEGACY_AUDITOR, &this, &h.admin).unwrap_err().unwrap(),
+        Error::from_contract_error(ComplianceError::AuditorAlreadySet as u32)
+    );
+    assert_eq!(
+        client.try_set_rwa_config(&AUDITOR, &this, &h.admin).unwrap_err().unwrap(),
+        Error::from_contract_error(ComplianceError::InvalidApprover as u32)
+    );
+    assert_eq!(client.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR, approver: None }));
+    assert_eq!(client.approval_epoch(), 1);
+}
+
+// Pins branch: set_rwa_config / later call, approver None / exactly one
+//   RwaConfigChanged without an approver, carrying the new epoch
+// Verifies: INV-22
+#[test]
+fn disabling_the_approver_emits_rwa_config_changed_without_approver() {
+    let h = setup();
+    let approver = Address::generate(&h.e);
+    configure(&h, Some(approver));
+    let client = ConfidentialRwaClient::new(&h.e, &h.host);
+    client.set_rwa_config(&AUDITOR, &None, &h.admin);
+
+    let events = h.e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &RwaConfigChanged { auditor_id: AUDITOR, approver: None, epoch: 2 }.to_xdr(&h.e, &h.host),
+    );
+    assert_eq!(client.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR, approver: None }));
+}
+
+// Pins branch: set_compliance_config, set_rwa_config / rejected with
+//   EligibilityRequired #3615 or ApprovalEpochOverflow #3616 / the stored
+//   configurations and the epoch are unchanged
+// Verifies: INV-7, INV-8, INV-9
+#[test]
+fn rejected_setters_leave_configuration_and_epoch_unchanged() {
+    let h = configured(None);
+    let rwa = ConfidentialRwaClient::new(&h.e, &h.host);
+    let compliance = ConfidentialComplianceClient::new(&h.e, &h.host);
+    let open = ComplianceConfig { policy: None, sac_passthrough: false };
+
+    assert_eq!(
+        compliance.try_set_compliance_config(&open, &h.admin).unwrap_err().unwrap(),
+        Error::from_contract_error(ComplianceError::EligibilityRequired as u32)
+    );
+    assert_eq!(compliance.compliance_config(), Some(policy_config(&h)));
+    assert_eq!(rwa.approval_epoch(), 1);
+
+    // At the last epoch every setter is rejected and nothing is written.
+    h.e.as_contract(&h.host, || {
+        h.e.storage().instance().set(&ComplianceStorageKey::ApprovalEpoch, &u32::MAX);
+    });
+    let overflow = Error::from_contract_error(ComplianceError::ApprovalEpochOverflow as u32);
+    let rotated = ComplianceConfig { policy: Some(h.policy.clone()), sac_passthrough: true };
+    assert_eq!(
+        compliance.try_set_compliance_config(&rotated, &h.admin).unwrap_err().unwrap(),
+        overflow
+    );
+    assert_eq!(compliance.compliance_config(), Some(policy_config(&h)));
+    let approver = Address::generate(&h.e);
+    assert_eq!(
+        rwa.try_set_rwa_config(&AUDITOR, &Some(approver), &h.admin).unwrap_err().unwrap(),
+        overflow
+    );
+    assert_eq!(rwa.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR, approver: None }));
+    assert_eq!(rwa.approval_epoch(), u32::MAX);
+}
+
+// Pins branch: advance_approval_epoch / epoch == u32::MAX - 1 / the bump
+//   succeeds and the epoch reads u32::MAX
+// Verifies: INV-7
+#[test]
+fn approval_epoch_reaches_u32_max() {
+    let h = configured(None);
+    h.e.as_contract(&h.host, || {
+        h.e.storage().instance().set(&ComplianceStorageKey::ApprovalEpoch, &(u32::MAX - 1));
+    });
+    let client = ConfidentialRwaClient::new(&h.e, &h.host);
+    client.bump_approval_epoch(&h.admin);
+    assert_eq!(client.approval_epoch(), u32::MAX);
+}
+
+// Pins branch: set_compliance_config / RwaConfig set, SAC passthrough as
+//   the only gate / stored; epoch advances
+// Verifies: INV-8, INV-9
+#[test]
+fn set_compliance_config_under_rwa_accepts_sac_passthrough_alone() {
+    let h = configured(None);
+    let client = ConfidentialComplianceClient::new(&h.e, &h.host);
+    let sac_only = ComplianceConfig { policy: None, sac_passthrough: true };
+    client.set_compliance_config(&sac_only, &h.admin);
+    assert_eq!(client.compliance_config(), Some(sac_only));
+    assert_eq!(ConfidentialRwaClient::new(&h.e, &h.host).approval_epoch(), 2);
 }
