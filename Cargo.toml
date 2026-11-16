@@ -36,6 +36,7 @@ members = [
     "packages/macros",
     "packages/tokens",
     "packages/zk-email",
+    "test-utils",
 ]
 exclude = [
     "examples/upgradeable/testdata",
@@ -56,6 +57,7 @@ version = "0.8.0"
 [workspace.dependencies]
 soroban-sdk = "28.0.0"
 soroban-poseidon = "28.0.0"
+soroban-env-host = { version = "28.0.0", features = ["testutils"] }
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
@@ -82,6 +84,7 @@ stellar-governance = { path = "packages/governance", version = "0.8.0" }
 stellar-tokens = { path = "packages/tokens", version = "0.8.0" }
 stellar-macros = { path = "packages/macros", version = "0.8.0" }
 stellar-zk-email = { path = "packages/zk-email", version = "0.8.0" }
+stellar-test-utils = { path = "test-utils" }
 
 [profile.release]
 opt-level = "z"

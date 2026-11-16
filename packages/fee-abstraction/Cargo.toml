@@ -21,3 +21,4 @@ soroban-sdk = { workspace = true }
 soroban-sdk = { workspace = true, features = ["testutils"] }
 stellar-tokens = { workspace = true }
 stellar-macros = { workspace = true }
+stellar-test-utils = { workspace = true }
