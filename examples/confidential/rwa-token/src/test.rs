@@ -5,14 +5,15 @@ use soroban_sdk::{
     testutils::{Address as _, Events, MockAuth, MockAuthInvoke},
     token::StellarAssetClient,
     xdr::ToXdr,
-    Address, Bytes, BytesN, Env, Error, Event, IntoVal, Symbol,
+    Address, Bytes, BytesN, Env, Error, Event, IntoVal, String, Symbol,
 };
 use stellar_access::access_control::AccessControlError;
 use stellar_confidential::{
     auditor::{storage as auditor_storage, ConfidentialAuditor, ConfidentialAuditorClient},
     compliance::{
-        storage::transfer_approval_args, ClawbackData, ComplianceConfig, ComplianceError,
-        ForcedTransfer, Policy, RwaConfig,
+        storage::transfer_approval_args, ApprovalEpochBumped, ClawbackData, ComplianceConfig,
+        ComplianceError, DistributorChanged, ForcedTransfer, HomeDomainChanged, HubModeChanged,
+        Policy, RwaConfig,
     },
     verifier::{CircuitType, ConfidentialVerifier},
     RegisterData, RegisterPayload, TransferData, TransferPayload,
@@ -97,6 +98,10 @@ fn setup<'a>(approver: Option<Address>) -> Harness<'a> {
 }
 
 fn deploy<'a>(e: Env, approver: Option<Address>) -> Harness<'a> {
+    deploy_with(e, approver, None)
+}
+
+fn deploy_with<'a>(e: Env, approver: Option<Address>, distributor: Option<Address>) -> Harness<'a> {
     let sac = e.register_stellar_asset_contract_v2(Address::generate(&e));
     let sac = StellarAssetClient::new(&e, &sac.address());
 
@@ -120,6 +125,7 @@ fn deploy<'a>(e: Env, approver: Option<Address>) -> Harness<'a> {
             ComplianceConfig { policy: Some(allowlist.address.clone()), sac_passthrough: false },
             AUDITOR_ID,
             approver,
+            distributor,
         ),
     );
     let token = RwaTokenContractClient::new(&e, &address);
@@ -244,6 +250,7 @@ fn constructor_rejects_missing_eligibility_gate() {
             auditor,
             ComplianceConfig { policy: None, sac_passthrough: false },
             AUDITOR_ID,
+            None::<Address>,
             None::<Address>,
         ),
     );
@@ -729,6 +736,7 @@ fn constructor_rejects_unregistered_auditor() {
             ComplianceConfig { policy: Some(allowlist), sac_passthrough: false },
             AUDITOR_ID,
             None::<Address>,
+            None::<Address>,
         ),
     );
 }
@@ -762,4 +770,259 @@ fn constructor_stores_the_approver_and_grants_no_role() {
     }
     assert_eq!(h.token.try_freeze(&h.treasury, &h.admin).unwrap_err().unwrap(), unauthorized);
     assert_eq!(h.token.try_bump_approval_epoch(&h.admin).unwrap_err().unwrap(), unauthorized);
+}
+
+// ################## HUB MODE ##################
+
+/// A deployment constructed with a distributor, which holds 1 000 merged
+/// confidential units.
+fn hub_deployment<'a>() -> (Harness<'a>, Address) {
+    let e = Env::default();
+    e.mock_all_auths();
+    let distributor = Address::generate(&e);
+    let h = deploy_with(e, None, Some(distributor.clone()));
+    h.onboard(&distributor);
+    h.sac.mint(&distributor, &1_000);
+    h.token.deposit(&distributor, &distributor, &1_000);
+    h.token.merge(&distributor);
+    (h, distributor)
+}
+
+#[test]
+fn constructor_without_a_distributor_leaves_hub_mode_off() {
+    let h = setup(None);
+    assert!(!h.token.hub_mode());
+    assert!(!h.token.is_distributor(&h.treasury));
+    assert_eq!(h.token.home_domain(), None);
+    assert_eq!(h.token.approval_epoch(), 1);
+}
+
+#[test]
+fn constructor_with_a_distributor_starts_in_hub_mode() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let distributor = Address::generate(&e);
+    let h = deploy_with(e, None, Some(distributor.clone()));
+
+    assert!(h.token.hub_mode());
+    assert!(h.token.is_distributor(&distributor));
+    assert!(!h.token.is_distributor(&h.admin));
+    // `set_rwa_config`, the flag and the mode each advanced the epoch.
+    assert_eq!(h.token.approval_epoch(), 3);
+    assert_eq!(h.token.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR_ID, approver: None }));
+
+    // Direct transfers are closed from the first ledger.
+    let alice = h.investor();
+    let bob = h.investor();
+    h.sac.mint(&alice, &100);
+    assert_eq!(
+        h.token.try_deposit(&alice, &bob, &100).unwrap_err().unwrap(),
+        contract_error(ComplianceError::DistributorRequired as u32)
+    );
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3621)")]
+fn constructor_rejects_the_approver_as_distributor() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let both = Address::generate(&e);
+    deploy_with(e, Some(both.clone()), Some(both));
+}
+
+#[test]
+fn hub_setters_require_the_config_manager_role() {
+    let h = setup(None);
+    let outsider = Address::generate(&h.e);
+    let account = Address::generate(&h.e);
+    let name = Some(String::from_str(&h.e, "issuer.example"));
+    let unauthorized = Error::from_contract_error(AccessControlError::Unauthorized as u32);
+
+    // Without a role, with another role, and as the admin.
+    for operator in [&outsider, &h.freezer, &h.clawback, &h.forced_transfer, &h.admin] {
+        assert_eq!(
+            h.token.try_set_home_domain(&name, operator).unwrap_err().unwrap(),
+            unauthorized
+        );
+        assert_eq!(h.token.try_set_hub_mode(&true, operator).unwrap_err().unwrap(), unauthorized);
+        assert_eq!(
+            h.token.try_set_distributor(&account, &true, operator).unwrap_err().unwrap(),
+            unauthorized
+        );
+    }
+    assert_eq!(h.token.home_domain(), None);
+    assert!(!h.token.hub_mode());
+    assert!(!h.token.is_distributor(&account));
+    assert_eq!(h.token.approval_epoch(), 1);
+}
+
+#[test]
+fn hub_setters_require_the_config_manager_authorization() {
+    let h = setup(None);
+    let e = &h.e;
+    let account = Address::generate(e);
+    let name = Some(String::from_str(e, "issuer.example"));
+
+    // The role holder is named as operator but did not sign.
+    let unsigned = h.token.mock_auths(&[]);
+    assert_auth_failure("set_home_domain", || unsigned.set_home_domain(&name, &h.config_manager));
+    assert_auth_failure("set_hub_mode", || unsigned.set_hub_mode(&true, &h.config_manager));
+    assert_auth_failure("set_distributor", || {
+        unsigned.set_distributor(&account, &true, &h.config_manager)
+    });
+
+    // An authorization for one setter does not carry over to another.
+    let hub_call = MockAuthInvoke {
+        contract: &h.token.address,
+        fn_name: "set_hub_mode",
+        args: (true, h.config_manager.clone()).into_val(e),
+        sub_invokes: &[],
+    };
+    let hub_entry = [MockAuth { address: &h.config_manager, invoke: &hub_call }];
+    let hub_only = h.token.mock_auths(&hub_entry);
+    assert_auth_failure("set_distributor with a set_hub_mode entry", || {
+        hub_only.set_distributor(&account, &true, &h.config_manager)
+    });
+    // Nor does another address's signature over the right call.
+    let admin_entry = [MockAuth { address: &h.admin, invoke: &hub_call }];
+    let forged = h.token.mock_auths(&admin_entry);
+    assert_auth_failure("set_hub_mode signed by the admin", || {
+        forged.set_hub_mode(&true, &h.config_manager)
+    });
+
+    assert_eq!(h.token.home_domain(), None);
+    assert!(!h.token.hub_mode());
+    assert!(!h.token.is_distributor(&account));
+    assert_eq!(h.token.approval_epoch(), 1);
+}
+
+#[test]
+fn config_manager_sets_the_home_domain_the_distributor_and_hub_mode() {
+    let h = setup(None);
+    let e = &h.e;
+    let account = Address::generate(e);
+    let name = Some(String::from_str(e, "issuer.example"));
+
+    // Each call carries exactly the config manager's authorization.
+    let domain_call = MockAuthInvoke {
+        contract: &h.token.address,
+        fn_name: "set_home_domain",
+        args: (name.clone(), h.config_manager.clone()).into_val(e),
+        sub_invokes: &[],
+    };
+    h.token
+        .mock_auths(&[MockAuth { address: &h.config_manager, invoke: &domain_call }])
+        .set_home_domain(&name, &h.config_manager);
+    let events = e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &HomeDomainChanged { home_domain: name.clone() }.to_xdr(e, &h.token.address),
+    );
+    assert_eq!(h.token.home_domain(), name);
+    assert_eq!(h.token.approval_epoch(), 1);
+
+    let flag_call = MockAuthInvoke {
+        contract: &h.token.address,
+        fn_name: "set_distributor",
+        args: (account.clone(), true, h.config_manager.clone()).into_val(e),
+        sub_invokes: &[],
+    };
+    h.token
+        .mock_auths(&[MockAuth { address: &h.config_manager, invoke: &flag_call }])
+        .set_distributor(&account, &true, &h.config_manager);
+    let events = e.events().all();
+    assert_eq!(events.events().len(), 2);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &DistributorChanged { account: account.clone(), enabled: true }.to_xdr(e, &h.token.address),
+    );
+    assert_eq!(
+        events.events().get(1).unwrap(),
+        &ApprovalEpochBumped { epoch: 2 }.to_xdr(e, &h.token.address),
+    );
+    assert!(h.token.is_distributor(&account));
+
+    let hub_call = MockAuthInvoke {
+        contract: &h.token.address,
+        fn_name: "set_hub_mode",
+        args: (true, h.config_manager.clone()).into_val(e),
+        sub_invokes: &[],
+    };
+    h.token
+        .mock_auths(&[MockAuth { address: &h.config_manager, invoke: &hub_call }])
+        .set_hub_mode(&true, &h.config_manager);
+    let events = e.events().all();
+    assert_eq!(events.events().len(), 2);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &HubModeChanged { enabled: true }.to_xdr(e, &h.token.address),
+    );
+    assert_eq!(
+        events.events().get(1).unwrap(),
+        &ApprovalEpochBumped { epoch: 3 }.to_xdr(e, &h.token.address),
+    );
+    assert!(h.token.hub_mode());
+    assert_eq!(h.token.approval_epoch(), 3);
+}
+
+#[test]
+fn config_manager_cannot_flag_the_token_or_set_an_invalid_home_domain() {
+    let h = setup(None);
+    assert_eq!(
+        h.token
+            .try_set_distributor(&h.token.address, &true, &h.config_manager)
+            .unwrap_err()
+            .unwrap(),
+        contract_error(ComplianceError::InvalidDistributor as u32)
+    );
+    assert_eq!(
+        h.token
+            .try_set_home_domain(
+                &Some(String::from_str(&h.e, "https://issuer.example")),
+                &h.config_manager
+            )
+            .unwrap_err()
+            .unwrap(),
+        contract_error(ComplianceError::InvalidHomeDomain as u32)
+    );
+}
+
+#[test]
+fn hub_flow_subscription_and_redemption_through_the_distributor() {
+    let (h, distributor) = hub_deployment();
+    let e = &h.e;
+    let alice = h.investor();
+    let bob = h.investor();
+    let required = contract_error(ComplianceError::DistributorRequired as u32);
+    assert_eq!(h.token.delegation_count(&alice), Some(0));
+
+    // Subscription: distributor to investor.
+    h.token.confidential_transfer(&distributor, &alice, &transfer_data(e));
+    assert_eq!(h.token.confidential_balance(&alice).receiving_commitment, Grumpkin::generator(e));
+    h.token.merge(&alice);
+
+    // Investor to investor is closed.
+    assert_eq!(
+        h.token.try_confidential_transfer(&alice, &bob, &transfer_data(e)).unwrap_err().unwrap(),
+        required
+    );
+    assert_eq!(h.token.confidential_balance(&bob).receiving_commitment, Grumpkin::identity(e));
+    // So are an investor's own deposit and a deposit to another investor.
+    h.sac.mint(&alice, &100);
+    assert_eq!(h.token.try_deposit(&alice, &alice, &100).unwrap_err().unwrap(), required);
+    assert_eq!(h.token.try_deposit(&alice, &bob, &100).unwrap_err().unwrap(), required);
+
+    // Redemption: investor to distributor.
+    h.token.confidential_transfer(&alice, &distributor, &transfer_data(e));
+    assert_eq!(
+        h.token.confidential_balance(&distributor).receiving_commitment,
+        Grumpkin::generator(e)
+    );
+
+    // The config manager re-opens direct transfers by turning hub mode off.
+    h.token.set_hub_mode(&false, &h.config_manager);
+    assert!(h.token.is_distributor(&distributor));
+    h.token.confidential_transfer(&alice, &bob, &transfer_data(e));
+    assert_eq!(h.token.confidential_balance(&bob).receiving_commitment, Grumpkin::generator(e));
 }

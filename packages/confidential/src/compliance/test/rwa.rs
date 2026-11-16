@@ -5,7 +5,7 @@ use soroban_sdk::{
     testutils::{Address as _, Events, MockAuth, MockAuthInvoke},
     token::StellarAssetClient,
     xdr::{AccountFlags, ToXdr},
-    Address, Bytes, BytesN, Env, Error, Event, IntoVal, Val, Vec,
+    Address, Bytes, BytesN, Env, Error, Event, IntoVal, String, Val, Vec,
 };
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
@@ -13,15 +13,19 @@ use crate::{
     compliance::{
         storage::{
             approval_epoch, bump_approval_epoch, can_transact, clawback, compliance_config,
-            deposit_approval_args, force_revoke_spender, forced_transfer, freeze, rwa_config,
-            set_compliance_config, set_rwa_config, spender_transfer_approval_args,
-            transfer_approval_args, unfreeze, withdraw_approval_args,
+            decrement_delegation_count, delegation_count, deposit_approval_args,
+            force_revoke_spender, forced_transfer, freeze, home_domain, hub_mode,
+            increment_delegation_count, initialize_delegation_count, is_distributor, rwa_config,
+            set_compliance_config, set_distributor, set_home_domain, set_hub_mode, set_rwa_config,
+            spender_transfer_approval_args, transfer_approval_args, unfreeze,
+            withdraw_approval_args,
         },
         ApprovalEpochBumped, ClawbackData, ComplianceConfig, ComplianceConfigChanged,
         ComplianceError, ComplianceStorageKey, ConfidentialClawback, ConfidentialClawbackClient,
         ConfidentialCompliance, ConfidentialComplianceClient, ConfidentialForcedTransfer,
-        ConfidentialForcedTransferClient, ConfidentialRwa, ConfidentialRwaClient, ForcedTransfer,
-        Policy, RwaConfig, RwaConfigChanged, RwaHooks,
+        ConfidentialForcedTransferClient, ConfidentialRwa, ConfidentialRwaClient,
+        DistributorChanged, ForcedTransfer, HomeDomainChanged, HubModeChanged, Policy, RwaConfig,
+        RwaConfigChanged, RwaHooks,
     },
     storage::{
         address_to_field, decode_data, forced_destination_to_field, get_account,
@@ -104,6 +108,21 @@ impl ConfidentialRwa for RwaHost {
     fn bump_approval_epoch(e: &Env, admin: Address) {
         admin.require_auth();
         bump_approval_epoch(e);
+    }
+
+    fn set_home_domain(e: &Env, home_domain: Option<String>, admin: Address) {
+        admin.require_auth();
+        set_home_domain(e, &home_domain);
+    }
+
+    fn set_hub_mode(e: &Env, enabled: bool, admin: Address) {
+        admin.require_auth();
+        set_hub_mode(e, enabled);
+    }
+
+    fn set_distributor(e: &Env, account: Address, enabled: bool, admin: Address) {
+        admin.require_auth();
+        set_distributor(e, &account, enabled);
     }
 }
 
@@ -3392,4 +3411,1513 @@ fn contract_poseidon2_matches_the_noir_library_fixture() {
     let hash: U256 = poseidon2_hash::<4, Bn254Fr>(&e, &inputs);
     let expected = hex32("208fbdb70d2faacf04f987b54f12aeeaeb432acc29d650c86ce0f6275b958eb8");
     assert_eq!(hash.to_be_bytes(), Bytes::from_array(&e, &expected));
+}
+
+// ################## REVISION 4 HELPERS ##################
+
+fn rwa_client<'a>(h: &Harness) -> ConfidentialRwaClient<'a> {
+    ConfidentialRwaClient::new(&h.e, &h.host)
+}
+
+fn token_client<'a>(h: &Harness) -> ConfidentialTokenClient<'a> {
+    ConfidentialTokenClient::new(&h.e, &h.host)
+}
+
+/// Flattens the result of a `try_` client call that returns nothing.
+fn flat<C: core::fmt::Debug>(
+    res: Result<Result<(), C>, Result<Error, soroban_sdk::InvokeError>>,
+) -> Result<(), Error> {
+    res.map(|r| r.unwrap()).map_err(|r| r.unwrap())
+}
+
+fn register_data(e: &Env) -> Bytes {
+    RegisterData { payload: register_payload(e), proof: Bytes::new(e) }.to_xdr(e)
+}
+
+fn try_register(h: &Harness, account: &Address) -> Result<(), Error> {
+    flat(token_client(h).try_register(account, &AUDITOR, &register_data(&h.e)))
+}
+
+/// An account created through the real `register` entry point, so that
+/// `RwaHooks::on_register` ran for it.
+fn registered(h: &Harness) -> Address {
+    let a = Address::generate(&h.e);
+    assert_eq!(try_register(h, &a), Ok(()));
+    a
+}
+
+fn try_deposit(h: &Harness, from: &Address, to: &Address) -> Result<(), Error> {
+    flat(token_client(h).try_deposit(from, to, &100))
+}
+
+fn try_transfer(h: &Harness, from: &Address, to: &Address) -> Result<(), Error> {
+    flat(token_client(h).try_confidential_transfer(from, to, &transfer_data(&h.e)))
+}
+
+fn try_spend(h: &Harness, spender: &Address, from: &Address, to: &Address) -> Result<(), Error> {
+    flat(token_client(h).try_confidential_transfer_from(
+        spender,
+        from,
+        to,
+        &spender_transfer_data(&h.e),
+    ))
+}
+
+fn try_delegate(h: &Harness, owner: &Address, spender: &Address) -> Result<(), Error> {
+    flat(token_client(h).try_set_spender(owner, spender, &1_000, &set_spender_data(&h.e)))
+}
+
+fn try_revoke(h: &Harness, owner: &Address, spender: &Address) -> Result<(), Error> {
+    flat(token_client(h).try_revoke_spender(owner, spender))
+}
+
+fn try_force_revoke(h: &Harness, owner: &Address, spender: &Address) -> Result<(), Error> {
+    flat(
+        ConfidentialClawbackClient::new(&h.e, &h.host)
+            .try_force_revoke_spender(owner, spender, &h.admin),
+    )
+}
+
+fn try_flag(h: &Harness, account: &Address, enabled: bool) -> Result<(), Error> {
+    flat(rwa_client(h).try_set_distributor(account, &enabled, &h.admin))
+}
+
+fn try_hub(h: &Harness, enabled: bool) -> Result<(), Error> {
+    flat(rwa_client(h).try_set_hub_mode(&enabled, &h.admin))
+}
+
+fn has_delegation(h: &Harness, owner: &Address, spender: &Address) -> bool {
+    h.e.as_contract(&h.host, || {
+        h.e.storage()
+            .persistent()
+            .has(&ConfidentialTokenStorageKey::Delegation(owner.clone(), spender.clone()))
+    })
+}
+
+fn store_count(h: &Harness, account: &Address, count: u32) {
+    h.e.as_contract(&h.host, || {
+        h.e.storage()
+            .persistent()
+            .set(&ComplianceStorageKey::DelegationCount(account.clone()), &count);
+    });
+}
+
+fn count(h: &Harness, account: &Address) -> Option<u32> {
+    rwa_client(h).delegation_count(account)
+}
+
+fn receiving(h: &Harness, account: &Address) -> BytesN<64> {
+    h.e.as_contract(&h.host, || get_account(&h.e, account).receiving_commitment)
+}
+
+/// An account holding 1 000 confidential units and 1 000 public units. Its
+/// delegation count is uninitialized.
+fn funded(h: &Harness) -> Address {
+    let a = Address::generate(&h.e);
+    store_account(h, &a, AUDITOR, 1_000, 0);
+    h.sac.mint(&a, &1_000);
+    a
+}
+
+fn domain(e: &Env, s: &str) -> Option<String> {
+    Some(String::from_str(e, s))
+}
+
+// ################## DELEGATION COUNT ##################
+
+#[test]
+fn register_initializes_the_delegation_count_to_zero() {
+    let h = configured(None);
+    let a = Address::generate(&h.e);
+    assert_eq!(count(&h, &a), None);
+
+    assert_eq!(try_register(&h, &a), Ok(()));
+    assert_eq!(count(&h, &a), Some(0));
+    // The getter reads the library function.
+    h.e.as_contract(&h.host, || assert_eq!(delegation_count(&h.e, &a), Some(0)));
+}
+
+#[test]
+fn rejected_register_does_not_initialize_the_delegation_count() {
+    let h = configured(None);
+    let a = Address::generate(&h.e);
+    ListPolicyClient::new(&h.e, &h.policy).block(&a);
+    assert_eq!(try_register(&h, &a), err(ComplianceError::NotAuthorizedByPolicy));
+    assert_eq!(count(&h, &a), None);
+}
+
+#[test]
+fn legacy_account_count_stays_unknown_through_every_delegation_change() {
+    let h = configured(None);
+    // Stored directly: `on_register` never ran for it.
+    let a = funded(&h);
+    let s = account(&h, AUDITOR);
+    assert_eq!(count(&h, &a), None);
+
+    assert_eq!(try_delegate(&h, &a, &s), Ok(()));
+    assert!(has_delegation(&h, &a, &s));
+    assert_eq!(count(&h, &a), None);
+
+    assert_eq!(try_revoke(&h, &a, &s), Ok(()));
+    assert!(!has_delegation(&h, &a, &s));
+    assert_eq!(count(&h, &a), None);
+
+    assert_eq!(try_delegate(&h, &a, &s), Ok(()));
+    freeze_account(&h, &a);
+    assert_eq!(try_force_revoke(&h, &a, &s), Ok(()));
+    assert!(!has_delegation(&h, &a, &s));
+    assert_eq!(count(&h, &a), None);
+}
+
+#[test]
+fn set_spender_increments_and_revoke_spender_decrements() {
+    let h = configured(None);
+    let a = registered(&h);
+    let s1 = account(&h, AUDITOR);
+    let s2 = account(&h, AUDITOR);
+
+    assert_eq!(try_delegate(&h, &a, &s1), Ok(()));
+    assert_eq!(count(&h, &a), Some(1));
+    assert_eq!(try_delegate(&h, &a, &s2), Ok(()));
+    assert_eq!(count(&h, &a), Some(2));
+    // The count is the owner's: a spender's count does not move.
+    assert_eq!(count(&h, &s1), None);
+
+    assert_eq!(try_revoke(&h, &a, &s1), Ok(()));
+    assert_eq!(count(&h, &a), Some(1));
+    // One to zero keeps an initialized zero.
+    assert_eq!(try_revoke(&h, &a, &s2), Ok(()));
+    assert_eq!(count(&h, &a), Some(0));
+}
+
+#[test]
+fn spender_count_is_not_touched_by_a_delegation_granted_to_it() {
+    let h = configured(None);
+    let owner = registered(&h);
+    let spender = registered(&h);
+    assert_eq!(try_delegate(&h, &owner, &spender), Ok(()));
+    assert_eq!(count(&h, &owner), Some(1));
+    assert_eq!(count(&h, &spender), Some(0));
+    assert_eq!(try_revoke(&h, &owner, &spender), Ok(()));
+    assert_eq!(count(&h, &spender), Some(0));
+}
+
+#[test]
+fn force_revoke_spender_decrements() {
+    let h = configured(None);
+    let a = registered(&h);
+    let s1 = account(&h, AUDITOR);
+    let s2 = account(&h, AUDITOR);
+    assert_eq!(try_delegate(&h, &a, &s1), Ok(()));
+    assert_eq!(try_delegate(&h, &a, &s2), Ok(()));
+    freeze_account(&h, &a);
+
+    assert_eq!(try_force_revoke(&h, &a, &s1), Ok(()));
+    assert_eq!(count(&h, &a), Some(1));
+    assert_eq!(try_force_revoke(&h, &a, &s2), Ok(()));
+    assert_eq!(count(&h, &a), Some(0));
+    assert!(!has_delegation(&h, &a, &s1));
+    assert!(!has_delegation(&h, &a, &s2));
+}
+
+#[test]
+fn revoke_at_an_initialized_zero_removes_the_count_and_still_revokes() {
+    let h = configured(None);
+    let a = registered(&h);
+    let s = account(&h, AUDITOR);
+    // A delegation the count never saw: the accounting fault.
+    store_delegation(&h, &a, &s, 10);
+    assert_eq!(count(&h, &a), Some(0));
+
+    assert_eq!(try_revoke(&h, &a, &s), Ok(()));
+    assert!(!has_delegation(&h, &a, &s));
+    // Unknown, not zero.
+    assert_eq!(count(&h, &a), None);
+
+    // Once unknown it stays unknown.
+    assert_eq!(try_delegate(&h, &a, &s), Ok(()));
+    assert_eq!(count(&h, &a), None);
+}
+
+#[test]
+fn force_revoke_at_an_initialized_zero_removes_the_count_and_still_revokes() {
+    let h = configured(None);
+    let a = registered(&h);
+    let s = account(&h, AUDITOR);
+    store_delegation(&h, &a, &s, 10);
+    freeze_account(&h, &a);
+
+    assert_eq!(try_force_revoke(&h, &a, &s), Ok(()));
+    assert!(!has_delegation(&h, &a, &s));
+    assert_eq!(count(&h, &a), None);
+}
+
+#[test]
+fn delegation_count_overflow_is_rejected() {
+    let h = configured(None);
+    let a = registered(&h);
+    let s1 = account(&h, AUDITOR);
+    let s2 = account(&h, AUDITOR);
+
+    store_count(&h, &a, u32::MAX - 1);
+    assert_eq!(try_delegate(&h, &a, &s1), Ok(()));
+    assert_eq!(count(&h, &a), Some(u32::MAX));
+
+    assert_eq!(try_delegate(&h, &a, &s2), err(ComplianceError::DelegationCountOverflow));
+    assert_eq!(count(&h, &a), Some(u32::MAX));
+    assert!(!has_delegation(&h, &a, &s2));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3618)")]
+fn increment_delegation_count_at_u32_max_panics() {
+    let h = configured(None);
+    let a = Address::generate(&h.e);
+    store_count(&h, &a, u32::MAX);
+    h.e.as_contract(&h.host, || increment_delegation_count(&h.e, &a));
+}
+
+#[test]
+fn failed_set_spender_leaves_the_count_unchanged() {
+    let h = configured(None);
+    let a = registered(&h);
+    let s = account(&h, AUDITOR);
+    assert_eq!(try_delegate(&h, &a, &s), Ok(()));
+    assert_eq!(count(&h, &a), Some(1));
+
+    // The hook increments, then the core call rejects the duplicate.
+    assert_eq!(
+        try_delegate(&h, &a, &s),
+        token_err(ConfidentialTokenError::DelegationAlreadyExists)
+    );
+    assert_eq!(count(&h, &a), Some(1));
+}
+
+#[test]
+fn failed_revoke_spender_leaves_the_count_unchanged() {
+    let h = configured(None);
+    let a = registered(&h);
+    let s = account(&h, AUDITOR);
+    let other = account(&h, AUDITOR);
+    let not_found = token_err(ConfidentialTokenError::DelegationNotFound);
+
+    // At zero the hook removes the entry; the failed core call restores it.
+    assert_eq!(try_revoke(&h, &a, &other), not_found);
+    assert_eq!(count(&h, &a), Some(0));
+
+    assert_eq!(try_delegate(&h, &a, &s), Ok(()));
+    assert_eq!(try_revoke(&h, &a, &other), not_found);
+    assert_eq!(count(&h, &a), Some(1));
+    assert!(has_delegation(&h, &a, &s));
+}
+
+#[test]
+fn failed_force_revoke_spender_leaves_the_count_unchanged() {
+    let h = configured(None);
+    let a = registered(&h);
+    let s = account(&h, AUDITOR);
+    let other = account(&h, AUDITOR);
+    assert_eq!(try_delegate(&h, &a, &s), Ok(()));
+
+    // Not frozen: rejected before the count is touched.
+    assert_eq!(try_force_revoke(&h, &a, &s), err(ComplianceError::AccountNotFrozen));
+    assert_eq!(count(&h, &a), Some(1));
+
+    // Frozen, no such delegation: decremented, then reverted.
+    freeze_account(&h, &a);
+    assert_eq!(
+        try_force_revoke(&h, &a, &other),
+        token_err(ConfidentialTokenError::DelegationNotFound)
+    );
+    assert_eq!(count(&h, &a), Some(1));
+}
+
+#[test]
+fn failed_second_register_does_not_reset_the_count() {
+    let h = configured(None);
+    let a = registered(&h);
+    let s = account(&h, AUDITOR);
+    assert_eq!(try_delegate(&h, &a, &s), Ok(()));
+
+    assert_eq!(try_register(&h, &a), token_err(ConfidentialTokenError::AccountAlreadyRegistered));
+    assert_eq!(count(&h, &a), Some(1));
+}
+
+#[test]
+fn initialize_delegation_count_writes_zero_only_when_absent() {
+    let h = configured(None);
+    let a = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        initialize_delegation_count(&h.e, &a);
+        assert_eq!(delegation_count(&h.e, &a), Some(0));
+    });
+    store_count(&h, &a, 5);
+    h.e.as_contract(&h.host, || {
+        initialize_delegation_count(&h.e, &a);
+        assert_eq!(delegation_count(&h.e, &a), Some(5));
+    });
+    // The registration hook does not reset it either.
+    h.e.as_contract(&h.host, || RwaHooks::on_register(&h.e, &a, AUDITOR, &register_payload(&h.e)));
+    assert_eq!(count(&h, &a), Some(5));
+}
+
+#[test]
+fn count_maintenance_is_a_no_op_on_an_uninitialized_count() {
+    let h = configured(None);
+    let a = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        increment_delegation_count(&h.e, &a);
+        assert_eq!(delegation_count(&h.e, &a), None);
+        decrement_delegation_count(&h.e, &a);
+        assert_eq!(delegation_count(&h.e, &a), None);
+    });
+}
+
+#[test]
+fn decrement_delegation_count_keeps_zero_after_one_and_removes_at_zero() {
+    let h = configured(None);
+    let a = Address::generate(&h.e);
+    store_count(&h, &a, 2);
+    h.e.as_contract(&h.host, || {
+        decrement_delegation_count(&h.e, &a);
+        assert_eq!(delegation_count(&h.e, &a), Some(1));
+        decrement_delegation_count(&h.e, &a);
+        assert_eq!(delegation_count(&h.e, &a), Some(0));
+        decrement_delegation_count(&h.e, &a);
+        assert_eq!(delegation_count(&h.e, &a), None);
+        // Removed, so a further decrement is the uninitialized no-op.
+        decrement_delegation_count(&h.e, &a);
+        assert_eq!(delegation_count(&h.e, &a), None);
+    });
+}
+
+// ################## HOME DOMAIN ##################
+
+#[test]
+fn set_home_domain_rejects_every_name_outside_the_rule() {
+    let h = configured(None);
+    let e = &h.e;
+    let too_long = std::format!("{}.com", "a".repeat(29));
+    assert_eq!(too_long.len(), 33);
+    let far_too_long = std::format!("{}.com", "a".repeat(200));
+    let rejected: [(&str, &str); 44] = [
+        ("empty", ""),
+        ("33 bytes", &too_long),
+        ("204 bytes", &far_too_long),
+        ("upper case first label", "Example.com"),
+        ("upper case last label", "example.COM"),
+        ("port", "example.com:443"),
+        ("colon", "exa:mple.com"),
+        ("path", "example.com/path"),
+        ("trailing slash", "example.com/"),
+        ("scheme", "https://example.com"),
+        ("user information", "user@example.com"),
+        ("underscore", "ex_ample.com"),
+        ("inner space", "exa mple.com"),
+        ("leading space", " example.com"),
+        ("trailing space", "example.com "),
+        ("tab", "example\t.com"),
+        ("newline", "example.com\n"),
+        ("query", "example.com?x"),
+        ("fragment", "example.com#x"),
+        ("percent", "ex%61mple.com"),
+        ("non-ASCII", "ex\u{e9}mple.com"),
+        ("nul", "example\0.com"),
+        ("wildcard", "*.example.com"),
+        ("plus", "a+b.com"),
+        ("leading dot", ".example.com"),
+        ("trailing dot", "example.com."),
+        ("double dot", "example..com"),
+        ("only a dot", "."),
+        ("only dots", ".."),
+        ("first label starts with hyphen", "-a.com"),
+        ("first label ends with hyphen", "a-.com"),
+        ("last label starts with hyphen", "a.-com"),
+        ("last label ends with hyphen", "a.com-"),
+        ("middle label starts with hyphen", "a.-b.com"),
+        ("label is a hyphen", "a.-.com"),
+        ("single label", "example"),
+        ("single label localhost", "localhost"),
+        ("single letter", "a"),
+        ("IPv4", "1.2.3.4"),
+        ("hex last label", "a.0x1"),
+        ("last label starts with a digit", "example.1com"),
+        ("numeric last label", "example.123"),
+        ("localhost as last label", "a.localhost"),
+        ("localhost under a subdomain", "a.b.localhost"),
+    ];
+
+    e.as_contract(&h.host, || set_home_domain(e, &domain(e, "issuer.example")));
+    for (case, name) in rejected {
+        assert_eq!(
+            flat(rwa_client(&h).try_set_home_domain(&domain(e, name), &h.admin)),
+            err(ComplianceError::InvalidHomeDomain),
+            "{case}: {name:?}"
+        );
+        // A rejected call keeps the stored name.
+        assert_eq!(rwa_client(&h).home_domain(), domain(e, "issuer.example"), "{case}");
+    }
+}
+
+#[test]
+fn set_home_domain_accepts_the_boundaries_of_the_rule() {
+    let h = configured(None);
+    let e = &h.e;
+    let longest = std::format!("{}.com", "a".repeat(28));
+    assert_eq!(longest.len(), 32);
+    let accepted: [&str; 14] = [
+        &longest,
+        "a.b",
+        "example.com",
+        "my-site.example-1.org",
+        "a--b.com",
+        "xn--80ak6aa92e.com",
+        "1.example",
+        "123.456.com",
+        "0x1.a",
+        "a.b9",
+        "a.b-9",
+        "a.b.c.d.e",
+        "localhost.com",
+        "a.localhosts",
+    ];
+    for name in accepted {
+        assert_eq!(
+            flat(rwa_client(&h).try_set_home_domain(&domain(e, name), &h.admin)),
+            Ok(()),
+            "{name:?}"
+        );
+        assert_eq!(rwa_client(&h).home_domain(), domain(e, name), "{name:?}");
+    }
+}
+
+#[test]
+fn set_home_domain_sets_replaces_and_clears_and_always_emits() {
+    let h = configured(None);
+    let e = &h.e;
+    let client = rwa_client(&h);
+    let first = domain(e, "issuer.example");
+    let second = domain(e, "funds.issuer.example");
+    assert_eq!(client.home_domain(), None);
+    e.as_contract(&h.host, || assert_eq!(home_domain(e), None));
+
+    // Clearing an absent value still emits.
+    client.set_home_domain(&None, &h.admin);
+    let events = e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &HomeDomainChanged { home_domain: None }.to_xdr(e, &h.host),
+    );
+    assert_eq!(client.home_domain(), None);
+
+    // Set, the same value again, replace: one event per call.
+    for value in [&first, &first, &second] {
+        client.set_home_domain(value, &h.admin);
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 1);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &HomeDomainChanged { home_domain: value.clone() }.to_xdr(e, &h.host),
+        );
+        assert_eq!(client.home_domain(), *value);
+        e.as_contract(&h.host, || assert_eq!(home_domain(e), *value));
+    }
+
+    client.set_home_domain(&None, &h.admin);
+    let events = e.events().all();
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &HomeDomainChanged { home_domain: None }.to_xdr(e, &h.host),
+    );
+    assert_eq!(client.home_domain(), None);
+
+    // Five successful calls, no epoch advance.
+    assert_eq!(client.approval_epoch(), 1);
+}
+
+#[test]
+fn set_home_domain_does_not_void_an_approval() {
+    let f = approval_flow();
+    let args = current_deposit_args(&f, 100);
+    rwa_client(&f.h).set_home_domain(&domain(&f.h.e, "issuer.example"), &f.h.admin);
+    deposit_with(&f, 100, Some(args));
+    assert_eq!(receiving(&f.h, &f.bob), g_times(&f.h.e, 100));
+}
+
+#[test]
+fn set_home_domain_requires_rwa_config() {
+    let h = setup();
+    let e = &h.e;
+    h.e.as_contract(&h.host, || set_compliance_config(e, &policy_config(&h)));
+    let not_configured = err(ComplianceError::RwaNotConfigured);
+    assert_eq!(
+        try_in_host(&h, || set_home_domain(e, &domain(e, "issuer.example"))),
+        not_configured
+    );
+    assert_eq!(try_in_host(&h, || set_home_domain(e, &None)), not_configured);
+    // The configuration is checked before the name.
+    assert_eq!(try_in_host(&h, || set_home_domain(e, &domain(e, "LOCALHOST"))), not_configured);
+    assert_eq!(rwa_client(&h).home_domain(), None);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3607)")]
+fn set_home_domain_without_rwa_config_panics() {
+    let h = setup();
+    h.e.as_contract(&h.host, || set_home_domain(&h.e, &domain(&h.e, "issuer.example")));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3619)")]
+fn set_home_domain_single_label_panics() {
+    let h = configured(None);
+    h.e.as_contract(&h.host, || set_home_domain(&h.e, &domain(&h.e, "issuer")));
+}
+
+// ################## HUB MODE: CONFIGURATION ##################
+
+#[test]
+fn hub_mode_is_off_and_nobody_is_a_distributor_by_default() {
+    let h = setup();
+    let a = Address::generate(&h.e);
+    let client = rwa_client(&h);
+    assert!(!client.hub_mode());
+    assert!(!client.is_distributor(&a));
+
+    configure(&h, None);
+    assert!(!client.hub_mode());
+    assert!(!client.is_distributor(&a));
+    assert!(!client.is_distributor(&h.host));
+    h.e.as_contract(&h.host, || {
+        assert!(!hub_mode(&h.e));
+        assert!(!is_distributor(&h.e, &a));
+    });
+}
+
+#[test]
+fn set_hub_mode_changes_emit_and_advance_the_epoch_and_repeats_are_no_ops() {
+    let h = configured(None);
+    let e = &h.e;
+    let client = rwa_client(&h);
+
+    // Off -> off.
+    client.set_hub_mode(&false, &h.admin);
+    assert_eq!(e.events().all().events().len(), 0);
+    assert_eq!(client.approval_epoch(), 1);
+    assert!(!client.hub_mode());
+
+    // Off -> on.
+    client.set_hub_mode(&true, &h.admin);
+    let events = e.events().all();
+    assert_eq!(events.events().len(), 2);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &HubModeChanged { enabled: true }.to_xdr(e, &h.host),
+    );
+    assert_eq!(
+        events.events().get(1).unwrap(),
+        &ApprovalEpochBumped { epoch: 2 }.to_xdr(e, &h.host),
+    );
+    assert!(client.hub_mode());
+    assert_eq!(client.approval_epoch(), 2);
+
+    // On -> on.
+    client.set_hub_mode(&true, &h.admin);
+    assert_eq!(e.events().all().events().len(), 0);
+    assert_eq!(client.approval_epoch(), 2);
+    assert!(client.hub_mode());
+
+    // On -> off.
+    client.set_hub_mode(&false, &h.admin);
+    let events = e.events().all();
+    assert_eq!(events.events().len(), 2);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &HubModeChanged { enabled: false }.to_xdr(e, &h.host),
+    );
+    assert_eq!(
+        events.events().get(1).unwrap(),
+        &ApprovalEpochBumped { epoch: 3 }.to_xdr(e, &h.host),
+    );
+    assert!(!client.hub_mode());
+    assert_eq!(client.approval_epoch(), 3);
+}
+
+#[test]
+fn set_distributor_changes_emit_and_advance_the_epoch_and_repeats_are_no_ops() {
+    let h = configured(None);
+    let e = &h.e;
+    let client = rwa_client(&h);
+    let d = Address::generate(e);
+    let other = Address::generate(e);
+
+    // Unflagged -> unflagged.
+    client.set_distributor(&d, &false, &h.admin);
+    assert_eq!(e.events().all().events().len(), 0);
+    assert_eq!(client.approval_epoch(), 1);
+    assert!(!client.is_distributor(&d));
+
+    // Unflagged -> flagged.
+    client.set_distributor(&d, &true, &h.admin);
+    let events = e.events().all();
+    assert_eq!(events.events().len(), 2);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &DistributorChanged { account: d.clone(), enabled: true }.to_xdr(e, &h.host),
+    );
+    assert_eq!(
+        events.events().get(1).unwrap(),
+        &ApprovalEpochBumped { epoch: 2 }.to_xdr(e, &h.host),
+    );
+    assert!(client.is_distributor(&d));
+    // The flag is per address and does not turn hub mode on.
+    assert!(!client.is_distributor(&other));
+    assert!(!client.hub_mode());
+    assert_eq!(client.approval_epoch(), 2);
+
+    // Flagged -> flagged.
+    client.set_distributor(&d, &true, &h.admin);
+    assert_eq!(e.events().all().events().len(), 0);
+    assert_eq!(client.approval_epoch(), 2);
+    assert!(client.is_distributor(&d));
+
+    // Flagged -> unflagged.
+    client.set_distributor(&d, &false, &h.admin);
+    let events = e.events().all();
+    assert_eq!(events.events().len(), 2);
+    assert_eq!(
+        events.events().first().unwrap(),
+        &DistributorChanged { account: d.clone(), enabled: false }.to_xdr(e, &h.host),
+    );
+    assert_eq!(
+        events.events().get(1).unwrap(),
+        &ApprovalEpochBumped { epoch: 3 }.to_xdr(e, &h.host),
+    );
+    assert!(!client.is_distributor(&d));
+    assert_eq!(client.approval_epoch(), 3);
+}
+
+#[test]
+fn hub_setters_require_rwa_config_even_for_a_no_op() {
+    let h = setup();
+    let e = &h.e;
+    e.as_contract(&h.host, || set_compliance_config(e, &policy_config(&h)));
+    let a = Address::generate(e);
+    let not_configured = err(ComplianceError::RwaNotConfigured);
+
+    // The stored values are already `false`: both calls would change nothing.
+    assert_eq!(try_in_host(&h, || set_hub_mode(e, false)), not_configured);
+    assert_eq!(try_in_host(&h, || set_distributor(e, &a, false)), not_configured);
+    assert_eq!(try_in_host(&h, || set_hub_mode(e, true)), not_configured);
+    assert_eq!(try_in_host(&h, || set_distributor(e, &a, true)), not_configured);
+    // The configuration is checked before the address.
+    assert_eq!(try_in_host(&h, || set_distributor(e, &h.host, true)), not_configured);
+
+    assert_eq!(try_hub(&h, true), not_configured);
+    assert_eq!(try_flag(&h, &a, true), not_configured);
+    assert!(!rwa_client(&h).hub_mode());
+    assert!(!rwa_client(&h).is_distributor(&a));
+    assert_eq!(rwa_client(&h).approval_epoch(), 0);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3607)")]
+fn set_hub_mode_no_op_without_rwa_config_panics() {
+    let h = setup();
+    h.e.as_contract(&h.host, || set_hub_mode(&h.e, false));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3607)")]
+fn set_distributor_no_op_without_rwa_config_panics() {
+    let h = setup();
+    let a = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || set_distributor(&h.e, &a, false));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3621)")]
+fn set_distributor_rejects_the_token_address() {
+    let h = configured(None);
+    h.e.as_contract(&h.host, || set_distributor(&h.e, &h.host, true));
+}
+
+#[test]
+fn set_distributor_rejects_the_token_the_approver_and_a_delegating_account() {
+    let h = setup();
+    let approver = Address::generate(&h.e);
+    configure(&h, Some(approver.clone()));
+    let client = rwa_client(&h);
+    let invalid = err(ComplianceError::InvalidDistributor);
+
+    let delegating = registered(&h);
+    let spender = account(&h, AUDITOR);
+    assert_eq!(try_delegate(&h, &delegating, &spender), Ok(()));
+    assert_eq!(count(&h, &delegating), Some(1));
+
+    for (case, account) in
+        [("token", &h.host), ("approver", &approver), ("delegating account", &delegating)]
+    {
+        assert_eq!(try_flag(&h, account, true), invalid, "{case}");
+        assert!(!client.is_distributor(account), "{case}");
+        // Clearing an absent flag is the no-op, whatever the address.
+        assert_eq!(try_flag(&h, account, false), Ok(()), "{case}");
+    }
+    assert_eq!(client.approval_epoch(), 1);
+
+    // The same rules with hub mode on.
+    assert_eq!(try_hub(&h, true), Ok(()));
+    for account in [&h.host, &approver, &delegating] {
+        assert_eq!(try_flag(&h, account, true), invalid);
+    }
+    assert_eq!(client.approval_epoch(), 2);
+
+    // Each cause is the only obstacle: removing it admits the address.
+    assert_eq!(try_revoke(&h, &delegating, &spender), Ok(()));
+    assert_eq!(count(&h, &delegating), Some(0));
+    assert_eq!(try_flag(&h, &delegating, true), Ok(()));
+    assert!(client.is_distributor(&delegating));
+
+    client.set_rwa_config(&AUDITOR, &None, &h.admin);
+    assert_eq!(try_flag(&h, &approver, true), Ok(()));
+    assert!(client.is_distributor(&approver));
+}
+
+#[test]
+fn set_distributor_rejects_any_non_zero_delegation_count() {
+    let h = configured(None);
+    for n in [1, 2, u32::MAX] {
+        let a = Address::generate(&h.e);
+        store_count(&h, &a, n);
+        assert_eq!(try_flag(&h, &a, true), err(ComplianceError::InvalidDistributor), "{n}");
+        assert!(!rwa_client(&h).is_distributor(&a));
+    }
+}
+
+#[test]
+fn set_distributor_accepts_unknown_and_zero_delegation_counts() {
+    let h = configured(None);
+    let client = rwa_client(&h);
+
+    // No confidential account at all.
+    let public = Address::generate(&h.e);
+    assert_eq!(count(&h, &public), None);
+    assert_eq!(try_flag(&h, &public, true), Ok(()));
+
+    // Uninitialized count, although the account holds a delegation.
+    let legacy = account(&h, AUDITOR);
+    store_delegation(&h, &legacy, &account(&h, AUDITOR), 10);
+    assert_eq!(count(&h, &legacy), None);
+    assert_eq!(try_flag(&h, &legacy, true), Ok(()));
+
+    // Initialized zero.
+    let fresh = registered(&h);
+    assert_eq!(count(&h, &fresh), Some(0));
+    assert_eq!(try_flag(&h, &fresh, true), Ok(()));
+
+    for a in [&public, &legacy, &fresh] {
+        assert!(client.is_distributor(a));
+    }
+    assert_eq!(client.approval_epoch(), 4);
+    // Flagging does not touch the count.
+    assert_eq!(count(&h, &public), None);
+    assert_eq!(count(&h, &fresh), Some(0));
+}
+
+#[test]
+fn reflagging_a_distributor_that_has_since_delegated_is_a_no_op() {
+    // The no-op test precedes validation: the stored flag is already `true`.
+    let h = configured(None);
+    let e = &h.e;
+    let client = rwa_client(&h);
+    let d = registered(&h);
+    let s = account(&h, AUDITOR);
+    client.set_distributor(&d, &true, &h.admin);
+    assert_eq!(try_delegate(&h, &d, &s), Ok(()));
+    assert_eq!(count(&h, &d), Some(1));
+    let epoch = client.approval_epoch();
+
+    client.set_distributor(&d, &true, &h.admin);
+    assert_eq!(e.events().all().events().len(), 0);
+    assert!(client.is_distributor(&d));
+    assert_eq!(client.approval_epoch(), epoch);
+
+    // Once unflagged, the delegation keeps it from being flagged again.
+    client.set_distributor(&d, &false, &h.admin);
+    assert_eq!(try_flag(&h, &d, true), err(ComplianceError::InvalidDistributor));
+    assert!(!client.is_distributor(&d));
+    assert_eq!(client.approval_epoch(), epoch + 1);
+}
+
+#[test]
+fn set_rwa_config_rejects_a_flagged_distributor_as_approver() {
+    let h = configured(None);
+    let client = rwa_client(&h);
+    let d = Address::generate(&h.e);
+    let invalid = err(ComplianceError::InvalidApprover);
+    client.set_distributor(&d, &true, &h.admin);
+    let unchanged = Some(RwaConfig { auditor_id: AUDITOR, approver: None });
+
+    // Hub mode off.
+    assert!(!client.hub_mode());
+    assert_eq!(flat(client.try_set_rwa_config(&AUDITOR, &Some(d.clone()), &h.admin)), invalid);
+    assert_eq!(client.rwa_config(), unchanged);
+    assert_eq!(client.approval_epoch(), 2);
+
+    // Hub mode on.
+    client.set_hub_mode(&true, &h.admin);
+    assert_eq!(flat(client.try_set_rwa_config(&AUDITOR, &Some(d.clone()), &h.admin)), invalid);
+    assert_eq!(client.rwa_config(), unchanged);
+    assert_eq!(client.approval_epoch(), 3);
+
+    // Another address is still accepted, and so is `d` once unflagged.
+    let other = Address::generate(&h.e);
+    assert_eq!(flat(client.try_set_rwa_config(&AUDITOR, &Some(other), &h.admin)), Ok(()));
+    client.set_distributor(&d, &false, &h.admin);
+    assert_eq!(flat(client.try_set_rwa_config(&AUDITOR, &Some(d.clone()), &h.admin)), Ok(()));
+    assert_eq!(client.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR, approver: Some(d) }));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3611)")]
+fn set_rwa_config_with_a_distributor_as_approver_panics() {
+    let h = configured(None);
+    let d = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        set_distributor(&h.e, &d, true);
+        set_rwa_config(&h.e, AUDITOR, &Some(d.clone()));
+    });
+}
+
+#[test]
+fn hub_setters_reject_an_epoch_overflow_and_write_nothing() {
+    let h = configured(None);
+    let client = rwa_client(&h);
+    let d = Address::generate(&h.e);
+    let flagged = Address::generate(&h.e);
+    client.set_distributor(&flagged, &true, &h.admin);
+    h.e.as_contract(&h.host, || {
+        h.e.storage().instance().set(&ComplianceStorageKey::ApprovalEpoch, &u32::MAX);
+    });
+    let overflow = err(ComplianceError::ApprovalEpochOverflow);
+
+    assert_eq!(try_hub(&h, true), overflow);
+    assert!(!client.hub_mode());
+    assert_eq!(try_flag(&h, &d, true), overflow);
+    assert!(!client.is_distributor(&d));
+    assert_eq!(try_flag(&h, &flagged, false), overflow);
+    assert!(client.is_distributor(&flagged));
+
+    // A call that changes nothing does not need the epoch.
+    assert_eq!(try_hub(&h, false), Ok(()));
+    assert_eq!(try_flag(&h, &d, false), Ok(()));
+    assert_eq!(try_flag(&h, &flagged, true), Ok(()));
+    assert_eq!(client.approval_epoch(), u32::MAX);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3616)")]
+fn set_hub_mode_epoch_overflow_panics() {
+    let h = configured(None);
+    h.e.as_contract(&h.host, || {
+        h.e.storage().instance().set(&ComplianceStorageKey::ApprovalEpoch, &u32::MAX);
+        set_hub_mode(&h.e, true);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3616)")]
+fn set_distributor_epoch_overflow_panics() {
+    let h = configured(None);
+    let d = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        h.e.storage().instance().set(&ComplianceStorageKey::ApprovalEpoch, &u32::MAX);
+        set_distributor(&h.e, &d, true);
+    });
+}
+
+// ################## HUB MODE: ENFORCEMENT ##################
+
+/// A deployment in hub mode with one distributor `d` and two investors, each
+/// holding 1 000 confidential and 1 000 public units.
+struct Hub<'a> {
+    h: Harness<'a>,
+    d: Address,
+    alice: Address,
+    bob: Address,
+}
+
+fn hub_flow<'a>() -> Hub<'a> {
+    let h = configured(None);
+    let d = funded(&h);
+    let alice = funded(&h);
+    let bob = funded(&h);
+    h.sac.mint(&h.host, &1_000);
+    h.e.as_contract(&h.host, || {
+        set_distributor(&h.e, &d, true);
+        set_hub_mode(&h.e, true);
+    });
+    Hub { h, d, alice, bob }
+}
+
+fn required() -> Result<(), Error> {
+    err(ComplianceError::DistributorRequired)
+}
+
+#[test]
+fn hub_mode_without_a_distributor_rejects_every_credit_and_delegation() {
+    let h = configured(None);
+    h.e.as_contract(&h.host, || set_hub_mode(&h.e, true));
+    let p = parties(&h);
+    for op in [Op::Deposit, Op::Transfer, Op::SpenderTransfer, Op::SetSpender] {
+        assert_eq!(try_hook(&h, op, &p), required(), "{op:?}");
+    }
+
+    // The same through the entry points.
+    let alice = funded(&h);
+    let bob = funded(&h);
+    let s = account(&h, AUDITOR);
+    store_delegation(&h, &alice, &s, 500);
+    assert_eq!(try_deposit(&h, &alice, &bob), required());
+    assert_eq!(try_transfer(&h, &alice, &bob), required());
+    assert_eq!(try_spend(&h, &s, &alice, &bob), required());
+    assert_eq!(try_delegate(&h, &alice, &bob), required());
+    assert_eq!(receiving(&h, &bob), g_times(&h.e, 0));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3620)")]
+fn check_hub_through_on_transfer_panics_distributor_required() {
+    let h = configured(None);
+    h.e.as_contract(&h.host, || set_hub_mode(&h.e, true));
+    let p = parties(&h);
+    h.e.as_contract(&h.host, || {
+        RwaHooks::on_transfer(&h.e, &p.from, &p.to, &transfer_payload(&h.e))
+    });
+}
+
+#[test]
+fn hub_mode_deposit_needs_a_distributor_as_payer_or_recipient() {
+    let f = hub_flow();
+    let h = &f.h;
+    assert_eq!(try_deposit(h, &f.alice, &f.bob), required());
+    assert_eq!(receiving(h, &f.bob), g_times(&h.e, 0));
+    assert_eq!(h.sac.balance(&f.alice), 1_000);
+
+    // Only `from` flagged.
+    assert_eq!(try_deposit(h, &f.d, &f.bob), Ok(()));
+    assert_eq!(receiving(h, &f.bob), g_times(&h.e, 100));
+    // Only `to` flagged.
+    assert_eq!(try_deposit(h, &f.alice, &f.d), Ok(()));
+    assert_eq!(receiving(h, &f.d), g_times(&h.e, 100));
+}
+
+#[test]
+fn hub_mode_transfer_needs_a_distributor_as_sender_or_recipient() {
+    let f = hub_flow();
+    let h = &f.h;
+    assert_eq!(try_transfer(h, &f.alice, &f.bob), required());
+    assert_eq!(try_transfer(h, &f.bob, &f.alice), required());
+    assert_eq!(receiving(h, &f.bob), g_times(&h.e, 0));
+
+    assert_eq!(try_transfer(h, &f.d, &f.bob), Ok(()));
+    assert_eq!(receiving(h, &f.bob), point(&h.e));
+    assert_eq!(try_transfer(h, &f.alice, &f.d), Ok(()));
+    assert_eq!(receiving(h, &f.d), point(&h.e));
+}
+
+#[test]
+fn hub_mode_spender_transfer_needs_a_distributor_as_owner_or_recipient() {
+    let f = hub_flow();
+    let h = &f.h;
+    let s = account(h, AUDITOR);
+    store_delegation(h, &f.alice, &s, 500);
+    store_delegation(h, &f.d, &s, 500);
+
+    assert_eq!(try_spend(h, &s, &f.alice, &f.bob), required());
+    assert_eq!(receiving(h, &f.bob), g_times(&h.e, 0));
+
+    // Only the owner flagged.
+    assert_eq!(try_spend(h, &s, &f.d, &f.bob), Ok(()));
+    assert_eq!(receiving(h, &f.bob), point(&h.e));
+    // Only the recipient flagged.
+    assert_eq!(try_spend(h, &s, &f.alice, &f.d), Ok(()));
+    assert_eq!(receiving(h, &f.d), point(&h.e));
+}
+
+#[test]
+fn hub_mode_a_flagged_spender_does_not_satisfy_the_rule() {
+    let f = hub_flow();
+    let h = &f.h;
+    // The distributor is the spender of an investor's allowance.
+    store_delegation(h, &f.alice, &f.d, 500);
+
+    assert_eq!(try_spend(h, &f.d, &f.alice, &f.bob), required());
+    assert_eq!(receiving(h, &f.bob), g_times(&h.e, 0));
+    let p = Parties { from: f.alice.clone(), to: f.bob.clone(), spender: f.d.clone() };
+    assert_eq!(try_hook(h, Op::SpenderTransfer, &p), required());
+
+    // It may still redeem the allowance to itself: then it is the recipient.
+    assert_eq!(try_spend(h, &f.d, &f.alice, &f.d), Ok(()));
+}
+
+#[test]
+fn hub_mode_set_spender_needs_a_distributor_as_owner_or_spender() {
+    let f = hub_flow();
+    let h = &f.h;
+    let carol = account(h, AUDITOR);
+
+    assert_eq!(try_delegate(h, &f.alice, &f.bob), required());
+    assert!(!has_delegation(h, &f.alice, &f.bob));
+
+    // Only the owner flagged.
+    assert_eq!(try_delegate(h, &f.d, &f.bob), Ok(()));
+    assert!(has_delegation(h, &f.d, &f.bob));
+    // Only the spender flagged.
+    assert_eq!(try_delegate(h, &f.alice, &f.d), Ok(()));
+    assert!(has_delegation(h, &f.alice, &f.d));
+    // A distributor elsewhere in the system does not help two investors.
+    assert_eq!(try_delegate(h, &f.bob, &carol), required());
+}
+
+#[test]
+fn hub_mode_rejected_set_spender_leaves_the_delegation_count_unchanged() {
+    let h = configured(None);
+    let owner = registered(&h);
+    let spender = account(&h, AUDITOR);
+    h.e.as_contract(&h.host, || set_hub_mode(&h.e, true));
+
+    assert_eq!(try_delegate(&h, &owner, &spender), required());
+    assert_eq!(count(&h, &owner), Some(0));
+    assert!(!has_delegation(&h, &owner, &spender));
+}
+
+#[test]
+fn hub_mode_flagged_public_payer_without_an_account_can_deposit_to_an_investor() {
+    let f = hub_flow();
+    let h = &f.h;
+    let payer = Address::generate(&h.e);
+    h.sac.mint(&payer, &1_000);
+    // Not flagged yet: it is just another payer.
+    assert_eq!(try_deposit(h, &payer, &f.bob), required());
+
+    assert_eq!(try_flag(h, &payer, true), Ok(()));
+    assert_eq!(try_deposit(h, &payer, &f.bob), Ok(()));
+    assert_eq!(receiving(h, &f.bob), g_times(&h.e, 100));
+    assert_eq!(h.sac.balance(&payer), 900);
+    // The flag does not replace the recipient's account.
+    let unregistered = Address::generate(&h.e);
+    assert_eq!(
+        try_deposit(h, &payer, &unregistered),
+        token_err(ConfidentialTokenError::AccountNotRegistered)
+    );
+}
+
+#[test]
+fn hub_mode_rejects_an_investor_self_deposit() {
+    let f = hub_flow();
+    let h = &f.h;
+    assert_eq!(try_deposit(h, &f.alice, &f.alice), required());
+    assert_eq!(receiving(h, &f.alice), g_times(&h.e, 0));
+    assert_eq!(h.sac.balance(&f.alice), 1_000);
+    // A distributor funds its own account.
+    assert_eq!(try_deposit(h, &f.d, &f.d), Ok(()));
+}
+
+#[test]
+fn hub_mode_leaves_withdraw_merge_revoke_and_register_open() {
+    let h = configured(None);
+    let e = &h.e;
+    let alice = funded(&h);
+    let s = account(&h, AUDITOR);
+    store_delegation(&h, &alice, &s, 50);
+    h.sac.mint(&h.host, &1_000);
+    e.as_contract(&h.host, || set_hub_mode(e, true));
+    // No distributor exists.
+    let token = token_client(&h);
+
+    assert_eq!(flat(token.try_withdraw(&alice, &alice, &100, &withdraw_data(e))), Ok(()));
+    assert_eq!(h.sac.balance(&alice), 1_100);
+    assert_eq!(flat(token.try_merge(&alice)), Ok(()));
+    assert_eq!(try_revoke(&h, &alice, &s), Ok(()));
+    assert!(!has_delegation(&h, &alice, &s));
+    let fresh = Address::generate(e);
+    assert_eq!(try_register(&h, &fresh), Ok(()));
+    assert_eq!(count(&h, &fresh), Some(0));
+
+    let p = parties(&h);
+    for op in [Op::Register, Op::Merge, Op::Withdraw, Op::Revoke] {
+        assert_eq!(try_hook(&h, op, &p), Ok(()), "{op:?}");
+    }
+}
+
+#[test]
+fn hub_mode_does_not_apply_to_forced_transfer_and_clawback() {
+    let f = forced_flow(None);
+    let e = &f.h.e;
+    e.as_contract(&f.h.host, || set_hub_mode(e, true));
+    assert!(!rwa_client(&f.h).is_distributor(&f.from));
+    assert!(!rwa_client(&f.h).is_distributor(&f.to));
+    // An ordinary credit between the same two addresses is refused.
+    assert_eq!(try_deposit(&f.h, &f.to, &f.to), required());
+
+    force(&f, 40);
+    assert_eq!(receiving(&f.h, &f.to), g_times(e, 47));
+
+    ConfidentialClawbackClient::new(e, &f.h.host).clawback(
+        &f.from,
+        &10,
+        &None,
+        &proof_data(e),
+        &f.h.admin,
+    );
+    e.as_contract(&f.h.host, || {
+        assert_eq!(get_account(e, &f.from).spendable_commitment, g_times(e, 50));
+    });
+}
+
+#[test]
+fn turning_hub_mode_off_keeps_the_flags_and_stops_enforcing() {
+    let f = hub_flow();
+    let h = &f.h;
+    let client = rwa_client(h);
+    assert_eq!(try_transfer(h, &f.alice, &f.bob), required());
+
+    client.set_hub_mode(&false, &h.admin);
+    assert!(client.is_distributor(&f.d));
+    assert_eq!(try_transfer(h, &f.alice, &f.bob), Ok(()));
+    assert_eq!(try_deposit(h, &f.alice, &f.bob), Ok(()));
+    assert_eq!(try_delegate(h, &f.alice, &f.bob), Ok(()));
+    assert_eq!(try_spend(h, &f.bob, &f.alice, &f.bob), Ok(()));
+
+    // Back on: the kept flag is the distributor again, and the delegation
+    // granted meanwhile cannot move value between the two investors.
+    client.set_hub_mode(&true, &h.admin);
+    assert_eq!(try_transfer(h, &f.alice, &f.bob), required());
+    assert_eq!(try_spend(h, &f.bob, &f.alice, &f.bob), required());
+    assert_eq!(try_transfer(h, &f.d, &f.bob), Ok(()));
+}
+
+#[test]
+fn hub_mode_off_does_not_consult_the_flags() {
+    let h = configured(None);
+    let alice = funded(&h);
+    let bob = funded(&h);
+    assert!(!rwa_client(&h).hub_mode());
+    assert_eq!(try_transfer(&h, &alice, &bob), Ok(()));
+    assert_eq!(try_deposit(&h, &alice, &alice), Ok(()));
+    assert_eq!(try_delegate(&h, &alice, &bob), Ok(()));
+}
+
+#[test]
+fn unflagging_a_distributor_makes_its_credits_fail() {
+    let f = hub_flow();
+    let h = &f.h;
+    assert_eq!(try_transfer(h, &f.d, &f.bob), Ok(()));
+    assert_eq!(try_deposit(h, &f.d, &f.bob), Ok(()));
+
+    rwa_client(h).set_distributor(&f.d, &false, &h.admin);
+    // Removing the last distributor does not turn hub mode off.
+    assert!(rwa_client(h).hub_mode());
+    assert_eq!(try_transfer(h, &f.d, &f.bob), required());
+    assert_eq!(try_deposit(h, &f.d, &f.bob), required());
+    assert_eq!(try_transfer(h, &f.alice, &f.d), required());
+    assert_eq!(try_delegate(h, &f.d, &f.bob), required());
+}
+
+#[test]
+fn distributor_status_bypasses_no_gate() {
+    let f = hub_flow();
+    let h = &f.h;
+    // Bound to another auditor.
+    let legacy = account(h, LEGACY_AUDITOR);
+    rwa_client(h).set_distributor(&legacy, &true, &h.admin);
+    assert_eq!(try_transfer(h, &f.alice, &legacy), err(ComplianceError::AuditorMismatch));
+    // Frozen.
+    freeze_account(h, &f.d);
+    assert_eq!(try_transfer(h, &f.d, &f.bob), err(ComplianceError::AccountFrozen));
+    assert_eq!(try_deposit(h, &f.d, &f.bob), err(ComplianceError::AccountFrozen));
+}
+
+// ################## HUB MODE: ORDER OF CHECKS ##################
+
+/// `approval_flow` in hub mode: an approver is configured and neither
+/// `alice` nor `bob` is a distributor.
+fn hub_approval_flow<'a>() -> Flow<'a> {
+    let f = approval_flow();
+    f.h.e.as_contract(&f.h.host, || set_hub_mode(&f.h.e, true));
+    f
+}
+
+// The three tests below supply the sender's authorization only. An operation
+// the hub rule forbids must report it and never reach the approver's
+// `require_auth_for_args`, which would abort with `Error(Auth, InvalidAction)`.
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3620)")]
+fn hub_rejected_deposit_does_not_request_the_approval() {
+    let f = hub_approval_flow();
+    deposit_with(&f, 100, None);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3620)")]
+fn hub_rejected_transfer_does_not_request_the_approval() {
+    let f = hub_approval_flow();
+    transfer_with(&f, None);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3620)")]
+fn hub_rejected_spender_transfer_does_not_request_the_approval() {
+    let (f, spender) = delegated_flow();
+    f.h.e.as_contract(&f.h.host, || set_hub_mode(&f.h.e, true));
+    gate_spend(&f, &spender, &f.approver, None);
+}
+
+#[test]
+fn hub_rule_is_checked_before_the_approver_is_party_rule() {
+    let h = setup();
+    let approver = Address::generate(&h.e);
+    configure(&h, Some(approver.clone()));
+    store_account(&h, &approver, AUDITOR, 0, 0);
+    h.e.as_contract(&h.host, || set_hub_mode(&h.e, true));
+    let p = Parties { from: approver, to: account(&h, AUDITOR), spender: account(&h, AUDITOR) };
+    for op in [Op::Deposit, Op::Transfer, Op::SpenderTransfer] {
+        assert_eq!(try_hook(&h, op, &p), required(), "{op:?}");
+    }
+}
+
+#[test]
+fn approval_is_still_required_when_the_hub_rule_passes() {
+    let f = hub_approval_flow();
+    let e = &f.h.e;
+    rwa_client(&f.h).set_distributor(&f.alice, &true, &f.h.admin);
+
+    let res =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| deposit_with(&f, 100, None)));
+    let payload = res.expect_err("deposit settled without the approver");
+    let message = payload.downcast_ref::<std::string::String>().cloned().unwrap_or_default();
+    assert!(message.contains("Error(Auth, InvalidAction)"), "{message}");
+    assert_eq!(receiving(&f.h, &f.bob), g_times(e, 0));
+
+    deposit_with(&f, 100, Some(current_deposit_args(&f, 100)));
+    assert_eq!(receiving(&f.h, &f.bob), g_times(e, 100));
+}
+
+#[test]
+fn eligibility_and_auditor_errors_take_precedence_over_the_hub_rule() {
+    let h = configured(None);
+    h.e.as_contract(&h.host, || set_hub_mode(&h.e, true));
+    let policy = ListPolicyClient::new(&h.e, &h.policy);
+    let frozen = err(ComplianceError::AccountFrozen);
+    let denied = err(ComplianceError::NotAuthorizedByPolicy);
+    let mismatch = err(ComplianceError::AuditorMismatch);
+    let hub_ops = [Op::Deposit, Op::Transfer, Op::SpenderTransfer, Op::SetSpender];
+
+    // Frozen `from` (the owner).
+    let p = parties(&h);
+    freeze_account(&h, &p.from);
+    for op in hub_ops {
+        assert_eq!(try_hook(&h, op, &p), frozen, "{op:?}");
+    }
+
+    // Frozen `to`.
+    let p = parties(&h);
+    freeze_account(&h, &p.to);
+    for op in [Op::Deposit, Op::Transfer, Op::SpenderTransfer] {
+        assert_eq!(try_hook(&h, op, &p), frozen, "{op:?}");
+    }
+
+    // Frozen spender: the last eligibility gate of both delegation hooks.
+    let p = parties(&h);
+    freeze_account(&h, &p.spender);
+    for op in [Op::SpenderTransfer, Op::SetSpender] {
+        assert_eq!(try_hook(&h, op, &p), frozen, "{op:?}");
+    }
+
+    // Policy-denied `to`.
+    let p = parties(&h);
+    policy.block(&p.to);
+    for op in [Op::Deposit, Op::Transfer, Op::SpenderTransfer] {
+        assert_eq!(try_hook(&h, op, &p), denied, "{op:?}");
+    }
+
+    // Policy-denied `from`.
+    let p = parties(&h);
+    policy.block(&p.from);
+    for op in hub_ops {
+        assert_eq!(try_hook(&h, op, &p), denied, "{op:?}");
+    }
+
+    // `to` bound to another auditor.
+    let p = Parties {
+        from: account(&h, AUDITOR),
+        to: account(&h, LEGACY_AUDITOR),
+        spender: account(&h, AUDITOR),
+    };
+    for op in [Op::Deposit, Op::Transfer, Op::SpenderTransfer] {
+        assert_eq!(try_hook(&h, op, &p), mismatch, "{op:?}");
+    }
+
+    // `from` bound to another auditor.
+    let p = Parties {
+        from: account(&h, LEGACY_AUDITOR),
+        to: account(&h, AUDITOR),
+        spender: account(&h, AUDITOR),
+    };
+    for op in [Op::Transfer, Op::SpenderTransfer, Op::SetSpender] {
+        assert_eq!(try_hook(&h, op, &p), mismatch, "{op:?}");
+    }
+
+    // With every gate passing, the hub rule is what remains.
+    let p = parties(&h);
+    for op in hub_ops {
+        assert_eq!(try_hook(&h, op, &p), required(), "{op:?}");
+    }
+}
+
+#[test]
+fn sac_gate_takes_precedence_over_the_hub_rule() {
+    let h = setup();
+    h.e.as_contract(&h.host, || {
+        set_compliance_config(&h.e, &ComplianceConfig { policy: None, sac_passthrough: true });
+        set_rwa_config(&h.e, AUDITOR, &None);
+        set_hub_mode(&h.e, true);
+    });
+    let p = parties(&h);
+    h.sac.set_authorized(&p.to, &false);
+    for op in [Op::Deposit, Op::Transfer, Op::SpenderTransfer] {
+        assert_eq!(try_hook(&h, op, &p), err(ComplianceError::NotAuthorizedBySac), "{op:?}");
+    }
+}
+
+#[test]
+fn unconfigured_deployment_reports_rwa_not_configured_before_the_hub_rule() {
+    let h = setup();
+    // A hub flag that no setter can write without an `RwaConfig`.
+    h.e.as_contract(&h.host, || {
+        h.e.storage().instance().set(&ComplianceStorageKey::HubMode, &true);
+    });
+    let p = parties(&h);
+    for op in [Op::Deposit, Op::Transfer, Op::SpenderTransfer, Op::SetSpender] {
+        assert_eq!(try_hook(&h, op, &p), err(ComplianceError::RwaNotConfigured), "{op:?}");
+    }
+}
+
+// ################## HUB MODE: APPROVAL EPOCH ##################
+
+// Each test signs the approver's tuple for the current epoch, changes the
+// hub configuration in a way that leaves the deposit permitted, and submits
+// the now stale tuple.
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn approval_does_not_survive_turning_hub_mode_on() {
+    let f = approval_flow();
+    rwa_client(&f.h).set_distributor(&f.alice, &true, &f.h.admin);
+    let stale = current_deposit_args(&f, 100);
+    rwa_client(&f.h).set_hub_mode(&true, &f.h.admin);
+    deposit_with(&f, 100, Some(stale));
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn approval_does_not_survive_turning_hub_mode_off() {
+    let f = hub_approval_flow();
+    let stale = current_deposit_args(&f, 100);
+    rwa_client(&f.h).set_hub_mode(&false, &f.h.admin);
+    deposit_with(&f, 100, Some(stale));
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn approval_does_not_survive_flagging_a_distributor() {
+    let f = approval_flow();
+    let stale = current_deposit_args(&f, 100);
+    let unrelated = Address::generate(&f.h.e);
+    rwa_client(&f.h).set_distributor(&unrelated, &true, &f.h.admin);
+    deposit_with(&f, 100, Some(stale));
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn approval_does_not_survive_unflagging_a_distributor() {
+    let f = approval_flow();
+    let unrelated = Address::generate(&f.h.e);
+    rwa_client(&f.h).set_distributor(&unrelated, &true, &f.h.admin);
+    let stale = current_deposit_args(&f, 100);
+    rwa_client(&f.h).set_distributor(&unrelated, &false, &f.h.admin);
+    deposit_with(&f, 100, Some(stale));
+}
+
+#[test]
+fn approval_survives_hub_setter_calls_that_change_nothing() {
+    let f = approval_flow();
+    let unrelated = Address::generate(&f.h.e);
+    let args = current_deposit_args(&f, 100);
+    rwa_client(&f.h).set_hub_mode(&false, &f.h.admin);
+    rwa_client(&f.h).set_distributor(&unrelated, &false, &f.h.admin);
+    deposit_with(&f, 100, Some(args));
+    assert_eq!(receiving(&f.h, &f.bob), g_times(&f.h.e, 100));
+}
+
+#[test]
+fn approval_signed_after_a_hub_change_settles() {
+    let f = approval_flow();
+    let e = &f.h.e;
+    rwa_client(&f.h).set_distributor(&f.alice, &true, &f.h.admin);
+    rwa_client(&f.h).set_hub_mode(&true, &f.h.admin);
+    assert_eq!(epoch(&f), 3);
+    // The tuple is built by hand for the epoch the two changes produced.
+    let args: Vec<Val> = (3u32, f.alice.clone(), f.bob.clone(), 100i128).into_val(e);
+    deposit_with(&f, 100, Some(args));
+    assert_eq!(receiving(&f.h, &f.bob), g_times(e, 100));
+}
+
+// ################## TTL OF THE NEW PERSISTENT ENTRIES ##################
+
+fn persistent_ttl(h: &Harness, key: &ComplianceStorageKey) -> u32 {
+    use soroban_sdk::testutils::storage::Persistent as _;
+    h.e.as_contract(&h.host, || h.e.storage().persistent().get_ttl(key))
+}
+
+#[test]
+fn reading_a_distributor_flag_extends_its_ttl() {
+    let h = configured(None);
+    let d = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || set_distributor(&h.e, &d, true));
+    let key = ComplianceStorageKey::Distributor(d.clone());
+    // The write itself does not extend.
+    assert!(persistent_ttl(&h, &key) < crate::compliance::DISTRIBUTOR_TTL_THRESHOLD);
+
+    h.e.as_contract(&h.host, || assert!(is_distributor(&h.e, &d)));
+    assert_eq!(persistent_ttl(&h, &key), crate::compliance::DISTRIBUTOR_EXTEND_AMOUNT);
+}
+
+#[test]
+fn reading_a_delegation_count_extends_its_ttl() {
+    let h = configured(None);
+    let a = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || initialize_delegation_count(&h.e, &a));
+    let key = ComplianceStorageKey::DelegationCount(a.clone());
+    assert!(persistent_ttl(&h, &key) < crate::compliance::DELEGATION_COUNT_TTL_THRESHOLD);
+
+    h.e.as_contract(&h.host, || assert_eq!(delegation_count(&h.e, &a), Some(0)));
+    assert_eq!(persistent_ttl(&h, &key), crate::compliance::DELEGATION_COUNT_EXTEND_AMOUNT);
+}
+
+#[test]
+fn initializing_an_existing_delegation_count_extends_its_ttl() {
+    let h = configured(None);
+    let a = Address::generate(&h.e);
+    let key = ComplianceStorageKey::DelegationCount(a.clone());
+    h.e.as_contract(&h.host, || h.e.storage().persistent().set(&key, &3u32));
+    assert!(persistent_ttl(&h, &key) < crate::compliance::DELEGATION_COUNT_TTL_THRESHOLD);
+
+    h.e.as_contract(&h.host, || initialize_delegation_count(&h.e, &a));
+    assert_eq!(persistent_ttl(&h, &key), crate::compliance::DELEGATION_COUNT_EXTEND_AMOUNT);
+    h.e.as_contract(&h.host, || assert_eq!(delegation_count(&h.e, &a), Some(3)));
 }

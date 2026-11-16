@@ -27,8 +27,9 @@
 //! every account must bind to, an optional approver whose authorization
 //! every value-moving operation additionally requires, and — through the
 //! opt-in [`ConfidentialForcedTransfer`] — a forced transfer between
-//! confidential accounts. See `docs/compliance.md#rwa-profile` and
-//! `docs/rwa.md`.
+//! confidential accounts. Hub mode, also optional, restricts ordinary credits
+//! and new delegations to flows through designated distributor addresses.
+//! See `docs/compliance.md#rwa-profile` and `docs/rwa.md`.
 //!
 //! Deployments that never write a configuration pay one instance-storage read
 //! per operation: [`ComplianceHooks`] returns early when
@@ -41,7 +42,7 @@ mod test;
 
 use soroban_sdk::{
     contractclient, contracterror, contractevent, contracttrait, panic_with_error, Address, Bytes,
-    Env,
+    Env, String,
 };
 pub use storage::{ClawbackData, ComplianceConfig, ComplianceStorageKey, RwaConfig};
 
@@ -323,8 +324,8 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
 /// on its [`ConfidentialToken`] impl: the configuration written here is
 /// enforced only by [`RwaHooks`].
 ///
-/// The implementor supplies the bodies of the two admin entry points and
-/// thereby the access-control model, as for [`ConfidentialCompliance`].
+/// The implementor supplies the bodies of the admin entry points and thereby
+/// the access-control model, as for [`ConfidentialCompliance`].
 #[contracttrait]
 pub trait ConfidentialRwa: ConfidentialCompliance {
     /// Sets the designated auditor and the approver, and advances the
@@ -386,6 +387,96 @@ pub trait ConfidentialRwa: ConfidentialCompliance {
     /// [`storage::bump_approval_epoch`].
     fn bump_approval_epoch(e: &Env, operator: Address);
 
+    /// Sets or clears the host name under which the deployment publishes its
+    /// discovery metadata (`docs/compliance.md#home-domain`).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `home_domain` - The host name, or `None` to clear it.
+    /// * `operator` - The address authorizing this call.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::set_home_domain`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["home_domain_changed"]`
+    /// * data - `[home_domain: Option<String>]`
+    ///
+    /// # Security Warning
+    ///
+    /// Implementations MUST authorize `operator` before calling
+    /// [`storage::set_home_domain`]: whoever sets the home domain decides
+    /// which server wallets contact.
+    fn set_home_domain(e: &Env, home_domain: Option<String>, operator: Address);
+
+    /// Turns hub mode on or off and advances the approval epoch
+    /// (`docs/compliance.md#hub-mode`).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `enabled` - The new state.
+    /// * `operator` - The address authorizing this call.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::set_hub_mode`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["hub_mode_changed"]`
+    /// * data - `[enabled: bool]`
+    ///
+    /// followed by:
+    ///
+    /// * topics - `["approval_epoch_bumped"]`
+    /// * data - `[epoch: u32]`
+    ///
+    /// # Security Warning
+    ///
+    /// Implementations MUST authorize `operator` before calling
+    /// [`storage::set_hub_mode`].
+    fn set_hub_mode(e: &Env, enabled: bool, operator: Address);
+
+    /// Sets or clears the distributor flag of `account` and advances the
+    /// approval epoch (`docs/compliance.md#hub-mode`).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The address to flag or unflag.
+    /// * `enabled` - Whether `account` is a distributor after the call.
+    /// * `operator` - The address authorizing this call.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::set_distributor`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["distributor_changed", account: Address]`
+    /// * data - `[enabled: bool]`
+    ///
+    /// followed by:
+    ///
+    /// * topics - `["approval_epoch_bumped"]`
+    /// * data - `[epoch: u32]`
+    ///
+    /// # Notes
+    ///
+    /// A distributor must be an address whose every spend is the issuer's
+    /// decision. A contract that pays out on a third party's instruction
+    /// would relay value between holders; the chain cannot check this.
+    ///
+    /// # Security Warning
+    ///
+    /// Implementations MUST authorize `operator` before calling
+    /// [`storage::set_distributor`].
+    fn set_distributor(e: &Env, account: Address, enabled: bool, operator: Address);
+
     /// Returns the active [`RwaConfig`], or `None` when the profile has not
     /// been configured.
     ///
@@ -427,6 +518,47 @@ pub trait ConfidentialRwa: ConfidentialCompliance {
     /// * `account` - The confidential account to query.
     fn can_receive(e: &Env, account: Address) -> bool {
         storage::can_transact(e, &account)
+    }
+
+    /// Returns the host name under which the deployment publishes its
+    /// discovery metadata, or `None` when none is set.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn home_domain(e: &Env) -> Option<String> {
+        storage::home_domain(e)
+    }
+
+    /// Returns whether hub mode is on.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn hub_mode(e: &Env) -> bool {
+        storage::hub_mode(e)
+    }
+
+    /// Returns whether `account` is flagged as a distributor.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The address to query.
+    fn is_distributor(e: &Env, account: Address) -> bool {
+        storage::is_distributor(e, &account)
+    }
+
+    /// Returns the number of delegations `account` has granted and not yet
+    /// deleted, or `None` when the count was never initialized for it.
+    /// `None` means "unknown", not zero.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `account` - The delegating owner.
+    fn delegation_count(e: &Env, account: Address) -> Option<u32> {
+        storage::delegation_count(e, &account)
     }
 }
 
@@ -622,7 +754,7 @@ impl Hooks for ComplianceHooks {
 /// on a contract that implements [`ConfidentialToken`] and
 /// [`ConfidentialRwa`].
 ///
-/// It differs from [`ComplianceHooks`] in five ways:
+/// It differs from [`ComplianceHooks`] in seven ways:
 ///
 /// 1. **Fails closed.** Every callback reverts unless both the
 ///    [`ComplianceConfig`] and the [`RwaConfig`] are set and the former keeps
@@ -641,6 +773,16 @@ impl Hooks for ComplianceHooks {
 ///    must not direct regulated value. `on_revoke_spender` still gates only the
 ///    owner.
 /// 5. **Deposits.** The recipient of a deposit must be a registered account.
+/// 6. **Hub mode.** While hub mode is on, `on_deposit`, `on_transfer` and
+///    `on_spender_transfer` require `from` or `to` to be a distributor, and
+///    `on_set_spender` requires the owner or the spender to be one (see
+///    [`storage::check_hub`]). The check runs after the gates above and before
+///    the approval gate, so a forbidden operation never requests the approver's
+///    authorization.
+/// 7. **Delegation count.** `on_register` initializes the account's delegation
+///    count, `on_set_spender` increments it and `on_revoke_spender` decrements
+///    it (see [`storage::delegation_count`]). Each callback runs before the
+///    core storage call of its operation, whose failure reverts the write.
 ///
 /// The hooks enforce no balance or volume rule themselves; such rules are the
 /// approver's (`docs/rwa.md`).
@@ -654,6 +796,7 @@ impl Hooks for RwaHooks {
         }
         storage::check_policy(e, account, &config);
         storage::check_sac(e, account, &config);
+        storage::initialize_delegation_count(e, account);
     }
 
     fn on_deposit(e: &Env, from: &Address, to: &Address, amount: i128) {
@@ -661,6 +804,7 @@ impl Hooks for RwaHooks {
         storage::gate_account(e, from, &config);
         storage::gate_account(e, to, &config);
         storage::check_auditor(e, &get_account(e, to), &rwa);
+        storage::check_hub(e, from, to);
         storage::require_approval(
             e,
             &rwa,
@@ -692,6 +836,7 @@ impl Hooks for RwaHooks {
         storage::gate_account(e, to, &config);
         storage::check_auditor(e, &get_account(e, from), &rwa);
         storage::check_auditor(e, &get_account(e, to), &rwa);
+        storage::check_hub(e, from, to);
         storage::require_approval(
             e,
             &rwa,
@@ -713,6 +858,9 @@ impl Hooks for RwaHooks {
         storage::gate_account(e, spender, &config);
         storage::check_auditor(e, &get_account(e, from), &rwa);
         storage::check_auditor(e, &get_account(e, to), &rwa);
+        // The owner counts, the spender does not: a distributor acting as
+        // spender must not move one holder's allowance to another holder.
+        storage::check_hub(e, from, to);
         storage::require_approval(
             e,
             &rwa,
@@ -732,11 +880,14 @@ impl Hooks for RwaHooks {
         storage::gate_account(e, account, &config);
         storage::gate_account(e, spender, &config);
         storage::check_auditor(e, &get_account(e, account), &rwa);
+        storage::check_hub(e, account, spender);
+        storage::increment_delegation_count(e, account);
     }
 
     fn on_revoke_spender(e: &Env, account: &Address, _spender: &Address) {
         let (config, _) = storage::rwa_context(e);
         storage::gate_account(e, account, &config);
+        storage::decrement_delegation_count(e, account);
     }
 }
 
@@ -775,7 +926,8 @@ pub enum ComplianceError {
     AuditorMismatch = 3609,
     /// Indicates an attempt to change the designated auditor.
     AuditorAlreadySet = 3610,
-    /// Indicates the approver is this contract's own address.
+    /// Indicates the approver is this contract's own address or a flagged
+    /// distributor.
     InvalidApprover = 3611,
     /// Indicates the approver is a party to the operation it would approve.
     ApproverIsParty = 3612,
@@ -791,6 +943,19 @@ pub enum ComplianceError {
     ApprovalEpochOverflow = 3616,
     /// Indicates the account's clawback nonce cannot advance past `u32::MAX`.
     NonceOverflow = 3617,
+    /// Indicates the account's delegation count cannot advance past
+    /// `u32::MAX`.
+    DelegationCountOverflow = 3618,
+    /// Indicates the home domain breaks the host-name rule of
+    /// [`storage::set_home_domain`].
+    InvalidHomeDomain = 3619,
+    /// Indicates hub mode is on and no distributor is a party to the credit
+    /// or the delegation.
+    DistributorRequired = 3620,
+    /// Indicates the address cannot be a distributor: it is this contract's
+    /// own address, the configured approver, or an account that has granted
+    /// delegations.
+    InvalidDistributor = 3621,
 }
 
 // ################## CONSTANTS ##################
@@ -800,6 +965,10 @@ pub const FROZEN_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const FROZEN_TTL_THRESHOLD: u32 = FROZEN_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 pub const CLAWBACK_NONCE_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const CLAWBACK_NONCE_TTL_THRESHOLD: u32 = CLAWBACK_NONCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+pub const DISTRIBUTOR_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const DISTRIBUTOR_TTL_THRESHOLD: u32 = DISTRIBUTOR_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+pub const DELEGATION_COUNT_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const DELEGATION_COUNT_TTL_THRESHOLD: u32 = DELEGATION_COUNT_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 // ################## EVENTS ##################
 
@@ -905,4 +1074,43 @@ pub struct ForcedTransfer {
 /// Emits a [`ForcedTransfer`] event.
 pub fn emit_forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128, nonce: u32) {
     ForcedTransfer { from: from.clone(), to: to.clone(), amount, nonce }.publish(e);
+}
+
+/// Event emitted when the home domain is set or cleared. `home_domain` is the
+/// stored value after the call, `None` when it was cleared.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HomeDomainChanged {
+    pub home_domain: Option<String>,
+}
+
+/// Emits a [`HomeDomainChanged`] event.
+pub fn emit_home_domain_changed(e: &Env, home_domain: &Option<String>) {
+    HomeDomainChanged { home_domain: home_domain.clone() }.publish(e);
+}
+
+/// Event emitted when hub mode is turned on or off.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HubModeChanged {
+    pub enabled: bool,
+}
+
+/// Emits a [`HubModeChanged`] event.
+pub fn emit_hub_mode_changed(e: &Env, enabled: bool) {
+    HubModeChanged { enabled }.publish(e);
+}
+
+/// Event emitted when an address is flagged or unflagged as a distributor.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DistributorChanged {
+    #[topic]
+    pub account: Address,
+    pub enabled: bool,
+}
+
+/// Emits a [`DistributorChanged`] event.
+pub fn emit_distributor_changed(e: &Env, account: &Address, enabled: bool) {
+    DistributorChanged { account: account.clone(), enabled }.publish(e);
 }
