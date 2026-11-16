@@ -133,9 +133,16 @@ pub const DOCUMENT_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const DOCUMENT_TTL_THRESHOLD: u32 = DOCUMENT_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 /// Max. number of buckets
-pub const MAX_BUCKETS: u32 = 100;
+pub const MAX_BUCKETS: u32 = 200;
 /// Maximum number of document entries per bucket.
-pub const BUCKET_SIZE: u32 = 50;
+///
+/// A bucket is returned whole by [`DocumentManager::get_documents`], and a
+/// full bucket of documents with [`MAX_URI_LEN`] URIs has to fit the network
+/// limit on a transaction's events and return value.
+///
+/// Bucket indices are derived from this value: a contract that stored
+/// documents under a different bucket size must re-add them after upgrading.
+pub const BUCKET_SIZE: u32 = 25;
 /// Maximum number of documents that can be stored.
 pub const MAX_DOCUMENTS: u32 = BUCKET_SIZE * MAX_BUCKETS; // 5_000
 /// Maximum length for document URI.

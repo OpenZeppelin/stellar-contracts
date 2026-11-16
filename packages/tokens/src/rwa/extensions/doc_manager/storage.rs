@@ -15,10 +15,10 @@
 ///
 /// ## Bucket System
 ///
-/// Documents are stored in buckets of 50 entries each. Each bucket is a
-/// `Vec<(BytesN<32>, Document)>` stored under its bucket index. This eliminates
-/// the need for individual document storage entries and significantly reduces
-/// storage costs.
+/// Documents are stored in buckets of `BUCKET_SIZE` entries each. Each bucket
+/// is a `Vec<(BytesN<32>, Document)>` stored under its bucket index. This
+/// eliminates the need for individual document storage entries and
+/// significantly reduces storage costs.
 ///
 /// ## Swap-and-Pop Pattern
 ///
