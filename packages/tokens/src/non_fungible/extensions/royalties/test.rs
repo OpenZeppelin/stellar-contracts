@@ -168,14 +168,22 @@ fn test_royalty_info_large_sale_price_does_not_overflow() {
         let price = i128::MAX / 10_000 + 1;
         let (_, royalty_amount) = Base::royalty_info(&e, other_token_id, price);
         assert_eq!(royalty_amount, price);
+        // same at the bottom of the range, where `|i128::MIN|` does not fit
+        let (_, royalty_amount) = Base::royalty_info(&e, other_token_id, i128::MIN);
+        assert_eq!(royalty_amount, i128::MIN);
 
-        // 10% and 0.01% of `i128::MAX`, rounded toward zero
+        // 10% and 0.01% of `i128::MAX` and `i128::MIN`, rounded toward zero
+        // (rounding down would give `...573` and `...411` for `i128::MIN`)
         Base::set_default_royalty(&e, &receiver, 1000);
         let (_, royalty_amount) = Base::royalty_info(&e, other_token_id, i128::MAX);
         assert_eq!(royalty_amount, 17014118346046923173168730371588410572);
+        let (_, royalty_amount) = Base::royalty_info(&e, other_token_id, i128::MIN);
+        assert_eq!(royalty_amount, -17014118346046923173168730371588410572);
         Base::set_default_royalty(&e, &receiver, 1);
         let (_, royalty_amount) = Base::royalty_info(&e, other_token_id, i128::MAX);
         assert_eq!(royalty_amount, 17014118346046923173168730371588410);
+        let (_, royalty_amount) = Base::royalty_info(&e, other_token_id, i128::MIN);
+        assert_eq!(royalty_amount, -17014118346046923173168730371588410);
     });
 }
 
