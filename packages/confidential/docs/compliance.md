@@ -267,7 +267,7 @@ Commitment equality is not freshness. A seizure of `alpha` from `(C, O)` leaves 
 
 ## RWA Profile
 
-The RWA profile is the configuration for regulated assets whose issuer must see every balance and may have to enforce rules on them. It is delivered as `RwaHooks`, a `Hooks` implementation a deployment wires instead of `ComplianceHooks`, plus the `ConfidentialRwa` trait and the opt-in `ConfidentialForcedTransfer` trait. It adds no circuit and changes no core entry point. [rwa.md](rwa.md) is the integrator guide: deployment models, the approver service, and the mapping to ERC-7984, ERC-8424 and ERC-3643.
+The RWA profile is the configuration for regulated assets whose issuer must see every balance and may have to enforce rules on them. It is delivered as `RwaHooks`, a `Hooks` implementation a deployment wires instead of `ComplianceHooks`, plus the `ConfidentialRwa` trait and the opt-in `ConfidentialForcedTransfer` trait. It adds no circuit and changes no core entry point. [Hub Mode](#hub-mode) is an optional restriction within it. [rwa.md](rwa.md) is the integrator guide: deployment models, the approver service, and the mapping to ERC-7984, ERC-8424 and ERC-3643.
 
 The profile splits compliance by what the chain can see. Rules over public addresses (eligibility, freeze) run on-chain. Rules over hidden balances and amounts are evaluated off-chain by the issuer's compliance service, which holds the designated auditor key and therefore decrypts every operation; it either monitors and remediates, or, when configured as the approver, authorizes each value-moving operation before it settles.
 
@@ -283,6 +283,7 @@ struct RwaConfig {
 - **Fails closed.** Every callback reverts with `RwaNotConfigured` without an `RwaConfig`, with `NotConfigured` without a `ComplianceConfig`, and with `EligibilityRequired` when the `ComplianceConfig` has neither a policy nor SAC passthrough. While an `RwaConfig` exists, `set_compliance_config` rejects a configuration with neither.
 - **Spender.** The spender of a delegated flow passes the freeze, policy and SAC gates, not the policy gate alone; under SAC passthrough it must therefore be an authorized holder of the base asset, which registration already requires. `revoke_spender` still gates only the owner.
 - **Deposits.** The recipient must be a registered account.
+- **Hub mode and delegation count.** See [Hub Mode](#hub-mode) and [Delegation Count](#delegation-count).
 
 ### Designated Auditor
 
@@ -307,13 +308,68 @@ When `RwaConfig.approver` is set, `deposit`, `withdraw`, `confidential_transfer`
 
 The approval is additional. The operation's own authorizer, its proof and every other gate are still required, and an approver cannot move, create or destroy value. `set_spender`, `merge` and `revoke_spender` change no ownership and require no approval. `clawback` and `forced_transfer` are administrative overrides and require none either.
 
-**Epoch.** `epoch` is a contract-managed `u32` that only increases: `set_rwa_config`, `bump_approval_epoch`, and `set_compliance_config` while an `RwaConfig` exists each advance it, and it reverts with `ApprovalEpochOverflow` instead of wrapping. An authorization names the epoch it was issued for, so removing or replacing the approver, swapping the policy, or an explicit bump voids every outstanding one; disabling and re-enabling the approver does not return to an earlier epoch.
+**Epoch.** `epoch` is a contract-managed `u32` that only increases: `set_rwa_config`, `bump_approval_epoch`, and `set_compliance_config` while an `RwaConfig` exists each advance it on every call, `set_hub_mode` and `set_distributor` advance it when they change the stored value, and it reverts with `ApprovalEpochOverflow` instead of wrapping. An authorization names the epoch it was issued for, so removing or replacing the approver, swapping the policy, or an explicit bump voids every outstanding one; disabling and re-enabling the approver does not return to an earlier epoch.
 
-**Who the approver may be.** The approver must not be a party to the operation it approves (`from`, `to`, or `spender` for a delegated transfer): the hook reverts with `ApproverIsParty`. A party approving its own operation gives no independent check, and an approver that also authorized the invocation would authorize it twice. `set_rwa_config` rejects this contract's own address with `InvalidApprover`. Three host behaviours bound the guarantee above:
+**Who the approver may be.** The approver must not be a party to the operation it approves (`from`, `to`, or `spender` for a delegated transfer): the hook reverts with `ApproverIsParty`. A party approving its own operation gives no independent check, and an approver that also authorized the invocation would authorize it twice. `set_rwa_config` rejects this contract's own address and a flagged distributor ([Hub Mode](#hub-mode)) with `InvalidApprover`. Three host behaviours bound the guarantee above:
 
 - A detached address credential binds `args`, a nonce and an expiry ledger. This is the form an approver service should issue.
 - A transaction whose source account is the approver satisfies the gate through that account's signature on the envelope. The entry still carries `args`, but has no expiry of its own; such envelopes need time bounds.
 - A contract approver that itself invokes the token is authorized without `args` being matched and without its `__check_auth` running. Any path through which that contract calls the token must itself check the token address, the expected epoch, the entry point and the full `args`; a generic forwarding function, even one gated by the contract's own authorization, carries no epoch and is not voided by a bump.
+
+### Hub Mode
+
+A fund that issues and redeems against its transfer agent, with no transfers between investors, can enforce a rule on a recipient's holdings without an approver: if every credit to an investor is sent by the issuer, the issuer, which sees the recipient's holdings as designated auditor, does not send what would breach the rule. Hub mode makes that topology a contract rule.
+
+`set_distributor(account, enabled, operator)` flags an address as a distributor and `set_hub_mode(enabled, operator)` turns the rule on. While it is on, `RwaHooks` rejects with `DistributorRequired`:
+
+| Entry point | Unless a distributor is |
+|:---|:---|
+| `deposit` | `from` (the payer of the underlying) or `to` |
+| `confidential_transfer` | `from` or `to` |
+| `confidential_transfer_from` | `from` (the owner) or `to`; the spender does not count |
+| `set_spender` | `account` or `spender` |
+
+The spender is excluded so that a distributor acting as spender cannot move one investor's allowance to another. `set_spender` is covered so that no delegation is created between investors; one granted before hub mode was turned on remains, and its spender can only pay a distributor. `register`, `merge`, `withdraw` and `revoke_spender` bring no value into a confidential account from outside it and are unaffected. `clawback` and `forced_transfer` are administrative overrides and are exempt. An entry point that credits an account by another path must call `storage::check_hub`.
+
+The check runs after the freeze, policy, SAC and auditor checks and before the [Approval Gate](#approval-gate), so a rejected operation never requests the approver's authorization. Hub mode on with no distributor rejects every credit; the mode is an explicit flag, so clearing the last distributor does not re-open direct transfers.
+
+**The flag is on the address.** A distributor need not be a registered account: a public payer of deposits can be one. Distributor status bypasses no gate. As a confidential holder a distributor is registered and bound to the designated auditor; as a payer or spender it passes the freeze, policy and SAC gates.
+
+**Setters.** Both require an `RwaConfig`, else `RwaNotConfigured`, and may be called from the constructor after `set_rwa_config`, so that a deployment never passes through a state with direct transfers open. A call that does not change the stored value is a no-op: no event and no epoch advance. A change emits `HubModeChanged` or `DistributorChanged`, then advances the approval epoch and emits `ApprovalEpochBumped`: an approval issued under the previous topology is void. The operation's own authorizations carry no epoch; the rule is evaluated at execution, so one that it blocks executes again if the change is reversed before the authorization expires.
+
+`set_distributor(account, true)` reverts with `InvalidDistributor` when `account` is this contract's own address, the configured approver, or an account whose [Delegation Count](#delegation-count) is initialized and non-zero. A distributor is a party to the operations it takes part in, which the approver must never be, so the two roles exclude each other in both setters, whether hub mode is on or off. An account that has already granted delegations is rejected because its spenders could then credit any investor on their own authorization. The contract cannot see the delegations of an account whose count is uninitialized; the operator rules them out from the event archive.
+
+**What the contract cannot check.** These are obligations of the role that calls the setters:
+
+- A distributor's every spend is the issuer's decision. A contract that pays out on a third party's instruction (an escrow, a settlement router, a custody contract) must not be flagged: it would relay value between investors. A spender a distributor appoints can pay any eligible account on its own authorization, so it must be the issuer's own component.
+- The rule constrains token operations, not control of an address. An address whose control can pass to another person without a token operation, such as a contract account with replaceable signers, lets investors transfer outside the rule; the identity policy must not authorize one as an investor account.
+- Two credits prepared from the same view of a recipient both settle, because a transfer proof does not bind the recipient's balance; the same holds for two credits that each consume the last unit of a global limit, such as a holder count. Hub mode removes the approval protocol, not this accounting. Every distributor address, deposit signer and appointed spender must share one authoritative ledger. Admission to it is atomic and serialized per affected identity and per global limit. A reservation is recorded durably before the authorization to distribute is released, and is kept until the settlement is reconciled or that authorization can never execute: a timeout, a failed submission, a temporary freeze or a reversible change of topology is not enough. The simplest conforming operation waits for each distribution to settle before authorizing the next.
+
+Hub mode therefore enforces credit-admission rules that no permitted investor debit can worsen, such as a holding cap or a holder count. It does not enforce rules on what an investor sends: a redemption to a distributor needs no issuer action. [rwa.md](rwa.md#hub-mode) gives the deployment guidance and the costs.
+
+### Delegation Count
+
+`RwaHooks` counts, per account, the delegations it has granted and not yet deleted. `set_distributor` uses the count, and a later holding-cap extension needs it to know that an account holds no escrowed allowance.
+
+| Event | Effect on `DelegationCount(account)` |
+|:---|:---|
+| `register` | written as `0`, unless an entry exists |
+| `set_spender` | `+1`, reverting with `DelegationCountOverflow` at `u32::MAX` |
+| `revoke_spender`, `force_revoke_spender` | `-1` |
+
+`delegation_count(account)` returns `None` for an account that was not registered under these hooks. `None` means unknown, not zero: such an account may hold delegations created before counting started, so creation and deletion leave an absent count absent, and nothing but `register` initializes one. Expired and fully consumed delegations count until they are deleted.
+
+A decrement never fails, so it cannot block a revocation. One that finds an initialized zero, which exact counting from registration makes unreachable, removes the entry: the account returns to unknown instead of reading as zero.
+
+Each hook runs before the core storage call of its operation, and a failure of that call reverts the write. `force_revoke_spender` runs no hook and maintains the count itself. The count is exact only while every creation and deletion passes through `RwaHooks` or `force_revoke_spender`: a deployment that replaces the hooks, or calls the core `storage::set_spender` or `storage::revoke_spender` from an entry point of its own, invalidates every initialized count.
+
+### Home Domain
+
+`set_home_domain(home_domain, operator)` stores the host name under which the deployment publishes its off-chain metadata, such as the address of its approver service, and `home_domain()` returns it. Wallets take the name from the chain, so a server cannot name itself. It requires an `RwaConfig`, else `RwaNotConfigured`. `None` clears the entry.
+
+A host name is 1 to 32 bytes of `a`-`z`, `0`-`9`, `-` and `.`, made of at least two non-empty labels separated by `.`; no label starts or ends with `-`, and the last label starts with a letter and is not `localhost`. Anything else reverts with `InvalidHomeDomain`. The rule excludes a scheme, user information, a port, a path, upper case and every dotted-numeric form. It is a syntactic filter: a client still refuses a name that resolves to a loopback, link-local or private address.
+
+`HomeDomainChanged` carries the stored value after the call and is emitted on every successful call, including one that leaves the value unchanged. The approval epoch does not advance.
 
 ### Forced Transfer
 
@@ -378,6 +434,13 @@ impl Token {
     fn approval_epoch(e: Env) -> u32;
     fn can_send(e: Env, account: Address) -> bool;
     fn can_receive(e: Env, account: Address) -> bool;
+    fn set_home_domain(e: Env, home_domain: Option<String>, operator: Address);
+    fn home_domain(e: Env) -> Option<String>;
+    fn set_hub_mode(e: Env, enabled: bool, operator: Address);
+    fn set_distributor(e: Env, account: Address, enabled: bool, operator: Address);
+    fn hub_mode(e: Env) -> bool;
+    fn is_distributor(e: Env, account: Address) -> bool;
+    fn delegation_count(e: Env, account: Address) -> Option<u32>;
 
     // Forced transfer, opt-in via ConfidentialForcedTransfer
     fn forced_transfer(e: Env, from: Address, to: Address, amount: i128,
@@ -385,7 +448,7 @@ impl Token {
 }
 ```
 
-`can_send` and `can_receive` are the same predicate: both configurations are set with an eligibility gate, and `account` is registered, bound to the designated auditor, not frozen, and passes the policy and SAC gates. They describe public eligibility of a confidential account, not whether an operation will settle, and they return `false` instead of raising a contract error, including when the policy or SAC call fails recoverably.
+`can_send` and `can_receive` are the same predicate: both configurations are set with an eligibility gate, and `account` is registered, bound to the designated auditor, not frozen, and passes the policy and SAC gates. They describe public eligibility of a confidential account, not whether an operation will settle, and they return `false` instead of raising a contract error, including when the policy or SAC call fails recoverably. They are single-party predicates and do not reflect [Hub Mode](#hub-mode): both can be `true` for a transfer that reverts with `DistributorRequired`.
 
 `operator` is the address whose authorization the deployment's access-control module checks ([Admin Authority](#admin-authority)).
 
@@ -398,7 +461,10 @@ impl Token {
 | `Clawback` | `account` (topic), `amount`, `destination` |
 | `RevokeSpender` | as [Event Schema](protocol/interface.md#event-schema), when emitted by `force_revoke_spender` |
 | `RwaConfigChanged` | `auditor_id`, `approver`, `epoch` |
-| `ApprovalEpochBumped` | `epoch`; also emitted after `ComplianceConfigChanged` while an `RwaConfig` exists |
+| `ApprovalEpochBumped` | `epoch`; also emitted after `ComplianceConfigChanged` while an `RwaConfig` exists, and after `HubModeChanged` and `DistributorChanged` |
+| `HomeDomainChanged` | `home_domain` |
+| `HubModeChanged` | `enabled` |
+| `DistributorChanged` | `account` (topic), `enabled` |
 | `ForcedTransfer` | `from` (topic), `to` (topic), `amount`, `nonce` |
 
 ### Errors
@@ -419,13 +485,17 @@ The RWA profile adds:
 | `AuditorNotAllowed` | 3608 | `register` names an auditor other than the designated one |
 | `AuditorMismatch` | 3609 | an operation names a confidential account bound to another auditor |
 | `AuditorAlreadySet` | 3610 | `set_rwa_config` names an auditor other than the stored one |
-| `InvalidApprover` | 3611 | the approver is the contract's own address |
+| `InvalidApprover` | 3611 | the approver is the contract's own address or a flagged distributor |
 | `ApproverIsParty` | 3612 | the approver is `from`, `to` or `spender` of the operation |
 | `InvalidForcedTransferAmount` | 3613 | `amount <= 0` |
 | `InvalidForcedTransferDestination` | 3614 | `to` is `from` or the contract's own address, or its `dest_f` is zero |
 | `EligibilityRequired` | 3615 | the compliance configuration of an RWA deployment has neither a policy nor SAC passthrough |
 | `ApprovalEpochOverflow` | 3616 | the approval epoch is `u32::MAX` |
 | `NonceOverflow` | 3617 | the clawback nonce is `u32::MAX` in `forced_transfer` |
+| `DelegationCountOverflow` | 3618 | the delegation count is `u32::MAX` in `set_spender` |
+| `InvalidHomeDomain` | 3619 | the home domain breaks the host-name rule |
+| `DistributorRequired` | 3620 | hub mode is on and no distributor is a party to the credit or the delegation |
+| `InvalidDistributor` | 3621 | the address to flag is the contract's own address, the configured approver, or an account with an initialized non-zero delegation count |
 
 ---
 

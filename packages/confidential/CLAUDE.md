@@ -11,7 +11,7 @@ The crate ships one token contract at its root (`src/lib.rs` / `src/storage.rs` 
 | `src/lib.rs`, `src/storage.rs` | The `ConfidentialToken` trait — eleven entry points, of which `revoke_spender` is proofless — and the storage/orchestration layer |
 | `src/verifier/` | Separate contract holding per-circuit UltraHonk verification keys |
 | `src/auditor/` | Separate contract holding the auditor key registry |
-| `src/compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract — plus the opt-in `ConfidentialClawback` trait (`clawback`, `force_revoke_spender`); and the RWA profile: `RwaHooks`, `ConfidentialRwa`, and the opt-in `ConfidentialForcedTransfer` (tests in `test/rwa.rs`) |
+| `src/compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract — plus the opt-in `ConfidentialClawback` trait (`clawback`, `force_revoke_spender`); and the RWA profile: `RwaHooks` (designated auditor, approval gate, hub mode, delegation count), `ConfidentialRwa`, and the opt-in `ConfidentialForcedTransfer` (tests in `test/rwa.rs`) |
 | `circuits/` | Noir workspace, compiled by `nargo`, not `cargo` |
 | `docs/` | The specification set; `docs/README.md` is its map (see below) |
 
