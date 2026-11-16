@@ -143,6 +143,83 @@ fn test_no_royalty_set() {
 }
 
 #[test]
+fn test_royalty_info_large_sale_price_does_not_overflow() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let receiver = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let token_id = Enumerable::mint(&e, &owner);
+        let other_token_id = Enumerable::mint(&e, &owner);
+
+        // token-specific royalty path, 5%
+        Base::set_token_royalty(&e, token_id, &receiver, 500);
+        // `1e37 * 500` overflows `i128`, the royalty itself does not
+        let (_, royalty_amount) = Base::royalty_info(&e, token_id, 10i128.pow(37));
+        assert_eq!(royalty_amount, 5 * 10i128.pow(35));
+
+        // default royalty path, 100%: the royalty is the whole sale price
+        Base::set_default_royalty(&e, &receiver, 10_000);
+        let (_, royalty_amount) = Base::royalty_info(&e, other_token_id, i128::MAX);
+        assert_eq!(royalty_amount, i128::MAX);
+        // smallest price that overflowed at 100% before
+        let price = i128::MAX / 10_000 + 1;
+        let (_, royalty_amount) = Base::royalty_info(&e, other_token_id, price);
+        assert_eq!(royalty_amount, price);
+
+        // 10% and 0.01% of `i128::MAX`, rounded toward zero
+        Base::set_default_royalty(&e, &receiver, 1000);
+        let (_, royalty_amount) = Base::royalty_info(&e, other_token_id, i128::MAX);
+        assert_eq!(royalty_amount, 17014118346046923173168730371588410572);
+        Base::set_default_royalty(&e, &receiver, 1);
+        let (_, royalty_amount) = Base::royalty_info(&e, other_token_id, i128::MAX);
+        assert_eq!(royalty_amount, 17014118346046923173168730371588410);
+    });
+}
+
+#[test]
+fn test_royalty_info_matches_direct_formula() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let receiver = Address::generate(&e);
+
+    let prices = [
+        0,
+        1,
+        9_999,
+        10_000,
+        10_001,
+        123_456_789,
+        -1,
+        -9_999,
+        -10_000,
+        -10_001,
+        -123_456_789,
+        i128::MAX / 10_000,
+        i128::MIN / 10_000,
+    ];
+    let basis_points = [0, 1, 99, 100, 250, 1000, 3333, 9999, 10_000];
+
+    e.as_contract(&address, || {
+        let token_id = Enumerable::mint(&e, &owner);
+
+        for bp in basis_points {
+            Base::set_token_royalty(&e, token_id, &receiver, bp);
+            for price in prices {
+                // the direct formula, wherever it does not overflow
+                let expected = price.checked_mul(bp as i128).unwrap() / 10_000;
+                let (_, royalty_amount) = Base::royalty_info(&e, token_id, price);
+                assert_eq!(royalty_amount, expected, "price {price}, basis points {bp}");
+            }
+        }
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #212)")]
 fn test_invalid_royalty_amount() {
     let e = Env::default();
