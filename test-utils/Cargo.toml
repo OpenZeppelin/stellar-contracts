@@ -7,6 +7,9 @@ license.workspace = true
 repository.workspace = true
 version.workspace = true
 
+[package.metadata.stellar]
+cargo_inherit = true
+
 [dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 soroban-env-host = { workspace = true }
