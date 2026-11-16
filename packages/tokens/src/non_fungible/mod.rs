@@ -239,7 +239,8 @@ pub trait NonFungibleToken {
     /// * `e` - Access to Soroban environment.
     /// * `approver` - The address of the approver (should be `owner` or
     ///   `operator`).
-    /// * `approved` - The address receiving the approval.
+    /// * `approved` - The address receiving the approval. Ignored when
+    ///   `live_until_ledger` is `0`.
     /// * `token_id` - Token ID as a number.
     /// * `live_until_ledger` - The ledger number at which the allowance
     ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
@@ -257,6 +258,10 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["approve", approver: Address, token_id: u32]`
     /// * data - `[approved: Address, live_until_ledger: u32]`
+    ///
+    /// On revocation, `approved` is the address whose approval was removed
+    /// and `live_until_ledger` is `0`. If no approval is stored, no event is
+    /// emitted.
     fn approve(
         e: &Env,
         approver: Address,
