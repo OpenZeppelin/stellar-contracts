@@ -171,7 +171,7 @@ pub use crate::governor::{
             outcome_pending, quorum_reached, tally_succeeded, ProposalCore, ProposalStorageKey,
             ProposalVoteCounts, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
         },
-        GovernorQueries, GovernorQueriesClient, GovernorQueriesSpec,
+        GovernorQueries, GovernorQueriesArgs, GovernorQueriesClient, GovernorQueriesSpec,
     },
     settings::{
         emit_quorum_changed,
@@ -181,7 +181,8 @@ pub use crate::governor::{
             set_quorum, set_token_contract, set_version, set_voting_delay, set_voting_period,
             GovernorSettingsStorageKey, QuorumCheckpoint,
         },
-        GovernorSettings, GovernorSettingsClient, GovernorSettingsSpec, QuorumChanged,
+        GovernorSettings, GovernorSettingsArgs, GovernorSettingsClient, GovernorSettingsSpec,
+        QuorumChanged,
     },
     storage::{cancel, cast_vote, count_vote, execute, propose, queue, ProposalSettings},
 };

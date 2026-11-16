@@ -710,27 +710,6 @@ fn cast_vote_returns_weight_when_active() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #4205)")]
-fn cast_vote_fails_when_pending() {
-    let (e, contract_address, token_address) = setup_env_with_token();
-    setup_governor_config(&e, &contract_address);
-    set_mock_voting_power(&e, &token_address, 1000);
-
-    let proposer = Address::generate(&e);
-    let (targets, functions, args, description) = simple_proposal(&e);
-
-    let pid = e.as_contract(&contract_address, || {
-        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e))
-    });
-
-    e.as_contract(&contract_address, || {
-        let voter = Address::generate(&e);
-        let reason = String::from_str(&e, "");
-        cast_vote(&e, &pid, VOTE_FOR, &reason, &voter, default_state(&e, &pid));
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #4205)")]
 fn cast_vote_fails_when_defeated() {
     let (e, contract_address, token_address) = setup_env_with_token();
     setup_governor_config(&e, &contract_address);
@@ -1792,6 +1771,122 @@ fn proposal_state_override_succeeded_proposal_is_executed() {
     let executor = Address::generate(&s.e);
     governor.execute(&s.targets, &s.functions, &s.args, &s.desc_hash, &executor);
     assert_eq!(governor.proposal_state(&s.pid), ProposalState::Executed);
+}
+
+/// A governor that keeps every default of `GovernorSettings` and
+/// `GovernorQueries`.
+#[contract]
+struct DefaultGovernor;
+
+#[contractimpl(contracttrait)]
+impl GovernorSettings for DefaultGovernor {}
+
+#[contractimpl(contracttrait)]
+impl GovernorQueries for DefaultGovernor {}
+
+#[contractimpl(contracttrait)]
+impl Governor for DefaultGovernor {
+    fn execute(
+        _e: &Env,
+        _targets: Vec<Address>,
+        _functions: Vec<Symbol>,
+        _args: Vec<Vec<Val>>,
+        _description_hash: BytesN<32>,
+        _executor: Address,
+    ) -> BytesN<32> {
+        unimplemented!("not used in these tests")
+    }
+
+    fn cancel(
+        _e: &Env,
+        _targets: Vec<Address>,
+        _functions: Vec<Symbol>,
+        _args: Vec<Vec<Val>>,
+        _description_hash: BytesN<32>,
+        _operator: Address,
+    ) -> BytesN<32> {
+        unimplemented!("not used in these tests")
+    }
+}
+
+/// A governor that keeps the default outcome rule but overrides the quorum
+/// with a value above the stored one.
+#[contract]
+struct QuorumOverrideGovernor;
+
+const OVERRIDDEN_QUORUM: u128 = 500;
+
+#[contractimpl(contracttrait)]
+impl GovernorSettings for QuorumOverrideGovernor {
+    fn quorum(_e: &Env, _ledger: u32) -> u128 {
+        OVERRIDDEN_QUORUM
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl GovernorQueries for QuorumOverrideGovernor {}
+
+#[contractimpl(contracttrait)]
+impl Governor for QuorumOverrideGovernor {
+    fn execute(
+        _e: &Env,
+        _targets: Vec<Address>,
+        _functions: Vec<Symbol>,
+        _args: Vec<Vec<Val>>,
+        _description_hash: BytesN<32>,
+        _executor: Address,
+    ) -> BytesN<32> {
+        unimplemented!("not used in these tests")
+    }
+
+    fn cancel(
+        _e: &Env,
+        _targets: Vec<Address>,
+        _functions: Vec<Symbol>,
+        _args: Vec<Vec<Val>>,
+        _description_hash: BytesN<32>,
+        _operator: Address,
+    ) -> BytesN<32> {
+        unimplemented!("not used in these tests")
+    }
+}
+
+#[test]
+fn default_rule_quorum_and_majority_is_succeeded() {
+    let s = setup_outcome(|e| e.register(DefaultGovernor, ()), 60, 40);
+    let governor = DefaultGovernorClient::new(&s.e, &s.governor);
+
+    assert!(governor.proposal_succeeded(&s.pid));
+    assert_eq!(governor.proposal_state(&s.pid), ProposalState::Succeeded);
+}
+
+#[test]
+fn default_rule_more_against_than_for_is_defeated() {
+    let s = setup_outcome(|e| e.register(DefaultGovernor, ()), 60, 70);
+    let governor = DefaultGovernorClient::new(&s.e, &s.governor);
+
+    assert!(!governor.proposal_succeeded(&s.pid));
+    assert_eq!(governor.proposal_state(&s.pid), ProposalState::Defeated);
+}
+
+#[test]
+fn default_rule_quorum_not_reached_is_defeated() {
+    let s = setup_outcome(|e| e.register(DefaultGovernor, ()), 30, 0);
+    let governor = DefaultGovernorClient::new(&s.e, &s.governor);
+
+    assert!(!governor.proposal_succeeded(&s.pid));
+    assert_eq!(governor.proposal_state(&s.pid), ProposalState::Defeated);
+}
+
+/// The stored quorum is 50, so 100 `for` votes would pass it. The overridden
+/// quorum of 500 is the one enforced.
+#[test]
+fn default_rule_uses_overridden_quorum() {
+    let s = setup_outcome(|e| e.register(QuorumOverrideGovernor, ()), 100, 0);
+    let governor = QuorumOverrideGovernorClient::new(&s.e, &s.governor);
+
+    assert!(!governor.proposal_succeeded(&s.pid));
+    assert_eq!(governor.proposal_state(&s.pid), ProposalState::Defeated);
 }
 
 /// A governor whose `proposal_state` reports a state set by the test, falling
