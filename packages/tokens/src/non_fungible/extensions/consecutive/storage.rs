@@ -444,9 +444,14 @@ impl Consecutive {
     /// * `e` - Access to the Soroban environment.
     /// * `approver` - The address of the approver (should be `owner` or
     ///   `operator`).
-    /// * `approved` - The address receiving the approval.
+    /// * `approved` - The address receiving the approval. Ignored when
+    ///   `live_until_ledger` is `0`.
     /// * `token_id` - The identifier of the token to be approved.
-    /// * `live_until_ledger` - The ledger number at which the approval expires.
+    /// * `live_until_ledger` - The ledger number at which the allowance
+    ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
+    ///   `live_until_ledger` argument is implicitly bounded by the maximum
+    ///   allowed TTL extension for a temporary storage entry and specifying a
+    ///   higher value will cause the code to panic.
     ///
     /// # Errors
     ///
@@ -457,6 +462,10 @@ impl Consecutive {
     ///
     /// * topics - `["approve", approver: Address, token_id: u32]`
     /// * data - `[approved: Address, live_until_ledger: u32]`
+    ///
+    /// On revocation, `approved` is the address whose approval was removed
+    /// and `live_until_ledger` is `0`. If no approval is stored, no event is
+    /// emitted.
     ///
     /// # Notes
     ///
