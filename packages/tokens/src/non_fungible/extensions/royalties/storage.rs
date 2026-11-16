@@ -184,17 +184,37 @@ pub(crate) fn royalty_info_unchecked(e: &Env, token_id: u32, sale_price: i128) -
     let token_key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
     if let Some(royalty_info) = e.storage().persistent().get::<_, RoyaltyInfo>(&token_key) {
         e.storage().persistent().extend_ttl(&token_key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
-        let royalty_amount = sale_price * royalty_info.basis_points as i128 / 10000;
-        return (royalty_info.receiver, royalty_amount);
+        return (royalty_info.receiver, royalty_amount(sale_price, royalty_info.basis_points));
     }
 
     // Fall back to default royalty if no token-specific royalty is set
     let default_key = NFTRoyaltiesStorageKey::DefaultRoyalty;
     if let Some(royalty_info) = e.storage().instance().get::<_, RoyaltyInfo>(&default_key) {
-        let royalty_amount = sale_price * royalty_info.basis_points as i128 / 10000;
-        return (royalty_info.receiver, royalty_amount);
+        return (royalty_info.receiver, royalty_amount(sale_price, royalty_info.basis_points));
     }
 
     // No royalty set, return zero royalty
     (e.current_contract_address(), 0)
+}
+
+/// Returns `sale_price * basis_points / 10_000`, rounded toward zero, without
+/// overflowing for any `sale_price`.
+///
+/// Multiplying first would overflow `i128` once `sale_price` exceeds
+/// `i128::MAX / basis_points` (about `1.7e34` at 100%). Instead,
+/// `sale_price` is split into `quotient * 10_000 + remainder`, and each part
+/// is scaled separately. With `basis_points <= 10_000`, which the setters
+/// enforce, neither part exceeds `|sale_price|`, and the sum is the same
+/// value the direct formula gives whenever it does not overflow.
+///
+/// # Arguments
+///
+/// * `sale_price` - The sale price for which royalties are being calculated.
+/// * `basis_points` - The royalty percentage in basis points (at most
+///   `10_000`).
+fn royalty_amount(sale_price: i128, basis_points: u32) -> i128 {
+    let basis_points = basis_points as i128;
+    let quotient = sale_price / 10_000;
+    let remainder = sale_price % 10_000;
+    quotient * basis_points + remainder * basis_points / 10_000
 }
