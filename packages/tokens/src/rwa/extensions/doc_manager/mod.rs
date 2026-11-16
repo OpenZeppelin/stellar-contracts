@@ -140,8 +140,32 @@ pub const MAX_BUCKETS: u32 = 200;
 /// full bucket of documents with [`MAX_URI_LEN`] URIs has to fit the network
 /// limit on a transaction's events and return value.
 ///
-/// Bucket indices are derived from this value: a contract that stored
-/// documents under a different bucket size must re-add them after upgrading.
+/// Bucket indices are derived from this value, so a contract that stored more
+/// than `BUCKET_SIZE` documents under a different bucket size has to rewrite
+/// its buckets before any document function runs on the new code. Until then,
+/// reads return the wrong documents and writes corrupt the buckets. Global
+/// document indices are unaffected, so the rewrite only splits each bucket of
+/// 50, the size used by releases up to v0.8.0, in two. Going from the last
+/// bucket down, no bucket is overwritten before it is read:
+///
+/// ```ignore
+/// const OLD_BUCKET_SIZE: u32 = 50;
+///
+/// let storage = e.storage().persistent();
+/// for b in (0..get_document_count(e).div_ceil(OLD_BUCKET_SIZE)).rev() {
+///     let old: Vec<(BytesN<32>, Document)> =
+///         storage.get(&DocumentStorageKey::Bucket(b)).expect("bucket below count exists");
+///     let split = old.len().min(BUCKET_SIZE);
+///     storage.set(&DocumentStorageKey::Bucket(2 * b), &old.slice(0..split));
+///     if old.len() > split {
+///         storage.set(&DocumentStorageKey::Bucket(2 * b + 1), &old.slice(split..old.len()));
+///     }
+/// }
+/// ```
+///
+/// The rewrite runs in a `migrate` function right after the upgrade. It writes
+/// every bucket, so a contract whose documents exceed one transaction's write
+/// limit has to spread it over several calls.
 pub const BUCKET_SIZE: u32 = 25;
 /// Maximum number of documents that can be stored.
 pub const MAX_DOCUMENTS: u32 = BUCKET_SIZE * MAX_BUCKETS; // 5_000
