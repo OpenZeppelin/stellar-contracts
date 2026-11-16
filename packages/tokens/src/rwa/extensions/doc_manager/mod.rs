@@ -145,27 +145,44 @@ pub const MAX_BUCKETS: u32 = 200;
 /// its buckets before any document function runs on the new code. Until then,
 /// reads return the wrong documents and writes corrupt the buckets. Global
 /// document indices are unaffected, so the rewrite only splits each bucket of
-/// 50, the size used by releases up to v0.8.0, in two. Going from the last
-/// bucket down, no bucket is overwritten before it is read:
+/// 50, the size used by releases up to v0.8.0, in two.
+///
+/// A large document set takes several transactions to rewrite: with
+/// [`MAX_URI_LEN`] URIs, six old buckets fit one transaction's write limit.
+/// The batches go from the last old bucket down, so no old bucket is
+/// overwritten before it is read, and a cursor in instance storage keeps a
+/// repeated call from splitting a bucket twice:
 ///
 /// ```ignore
 /// const OLD_BUCKET_SIZE: u32 = 50;
+/// const REBUCKET_CURSOR: Symbol = symbol_short!("REBUCKET");
 ///
-/// let storage = e.storage().persistent();
-/// for b in (0..get_document_count(e).div_ceil(OLD_BUCKET_SIZE)).rev() {
-///     let old: Vec<(BytesN<32>, Document)> =
-///         storage.get(&DocumentStorageKey::Bucket(b)).expect("bucket below count exists");
-///     let split = old.len().min(BUCKET_SIZE);
-///     storage.set(&DocumentStorageKey::Bucket(2 * b), &old.slice(0..split));
-///     if old.len() > split {
-///         storage.set(&DocumentStorageKey::Bucket(2 * b + 1), &old.slice(split..old.len()));
+/// /// Splits up to `max_buckets` old buckets and returns how many are left.
+/// fn rebucket_documents(e: &Env, max_buckets: u32) -> u32 {
+///     let left: u32 = e
+///         .storage()
+///         .instance()
+///         .get(&REBUCKET_CURSOR)
+///         .unwrap_or_else(|| get_document_count(e).div_ceil(OLD_BUCKET_SIZE));
+///     let rest = left.saturating_sub(max_buckets);
+///     let storage = e.storage().persistent();
+///     for b in (rest..left).rev() {
+///         let old: Vec<(BytesN<32>, Document)> =
+///             storage.get(&DocumentStorageKey::Bucket(b)).expect("bucket below count exists");
+///         let split = old.len().min(BUCKET_SIZE);
+///         storage.set(&DocumentStorageKey::Bucket(2 * b), &old.slice(0..split));
+///         if old.len() > split {
+///             storage.set(&DocumentStorageKey::Bucket(2 * b + 1), &old.slice(split..old.len()));
+///         }
 ///     }
+///     e.storage().instance().set(&REBUCKET_CURSOR, &rest);
+///     rest
 /// }
 /// ```
 ///
-/// The rewrite runs in a `migrate` function right after the upgrade. It writes
-/// every bucket, so a contract whose documents exceed one transaction's write
-/// limit has to spread it over several calls.
+/// The contract calls this behind its own authorization right after the
+/// upgrade, repeating it until it returns 0, and its document functions stay
+/// unavailable in the meantime.
 pub const BUCKET_SIZE: u32 = 25;
 /// Maximum number of documents that can be stored.
 pub const MAX_DOCUMENTS: u32 = BUCKET_SIZE * MAX_BUCKETS; // 5_000
