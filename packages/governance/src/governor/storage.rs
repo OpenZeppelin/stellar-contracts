@@ -1,453 +1,49 @@
 //! # Governor Storage Module
 //!
-//! This module provides storage utilities for the Governor contract.
-//! It defines storage keys and helper functions for managing proposal state,
-//! votes, and configuration parameters.
+//! Helper functions for the proposal lifecycle: creating proposals, voting,
+//! queueing, executing and cancelling. Proposal data is stored under the keys
+//! defined in [`crate::governor::queries::storage`], and the configuration
+//! under the keys in [`crate::governor::settings::storage`].
 
-use soroban_sdk::{
-    contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, String, Symbol, Val,
-    Vec,
-};
+use soroban_sdk::{panic_with_error, Address, BytesN, Env, String, Symbol, Val, Vec};
 
 use crate::{
     governor::{
         emit_proposal_cancelled, emit_proposal_created, emit_proposal_executed,
-        emit_proposal_queued, emit_quorum_changed, emit_vote_cast, GovernorError, ProposalState,
-        GOVERNOR_EXTEND_AMOUNT, GOVERNOR_TTL_THRESHOLD, MAX_DESCRIPTION_LENGTH,
+        emit_proposal_queued, emit_vote_cast,
+        queries::storage::{
+            get_proposal_core, get_proposal_snapshot, get_proposal_vote_counts, hash_proposal,
+            ProposalCore, ProposalStorageKey, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
+        },
+        settings::storage::get_token_contract,
+        GovernorError, ProposalState, MAX_DESCRIPTION_LENGTH,
     },
     votes::VotesClient,
 };
 
-// ################## STORAGE KEYS ##################
-
-/// Storage keys for the Governor contract.
-#[derive(Clone)]
-#[contracttype]
-pub enum GovernorStorageKey {
-    /// The name of the governor.
-    Name,
-    /// The version of the governor contract.
-    Version,
-    /// The voting delay in ledgers.
-    VotingDelay,
-    /// The voting period in ledgers.
-    VotingPeriod,
-    /// Minimum voting power required to propose.
-    ProposalThreshold,
-    /// Proposal data indexed by proposal ID.
-    Proposal(BytesN<32>),
-    /// Number of quorum checkpoints.
-    NumQuorumCheckpoints,
-    /// Individual quorum checkpoint at index.
-    QuorumCheckpoint(u32),
-    /// Vote tallies for a proposal, indexed by proposal ID.
-    ProposalVote(BytesN<32>),
-    /// Whether an account has voted on a proposal.
-    HasVoted(BytesN<32>, Address),
-    /// The address of the token contract that implements the Votes trait.
-    TokenContract,
-}
-
 // ################## STORAGE TYPES ##################
 
-/// Core proposal data stored on-chain.
-#[derive(Clone)]
-#[contracttype]
-pub struct ProposalCore {
-    /// The address that created the proposal.
-    pub proposer: Address,
-    /// The ledger at which voting power is snapshotted. Voting opens on
-    /// the next ledger (`vote_snapshot + 1`).
-    pub vote_snapshot: u32,
-    /// The last ledger where voting is active (inclusive).
-    pub vote_end: u32,
-    /// The current state of the proposal.
-    pub state: ProposalState,
-}
-
-/// A quorum checkpoint recording the quorum value at a specific ledger.
-#[derive(Clone)]
-#[contracttype]
-pub struct QuorumCheckpoint {
-    /// The ledger at which this quorum value took effect.
-    pub ledger: u32,
-    /// The quorum value.
-    pub quorum: u128,
-}
-
-/// Vote tallies for a proposal.
-#[derive(Clone)]
-#[contracttype]
-pub struct ProposalVoteCounts {
-    /// Total voting power cast against the proposal.
-    pub against_votes: u128,
-    /// Total voting power cast in favor of the proposal.
-    pub for_votes: u128,
-    /// Total voting power cast as abstain.
-    pub abstain_votes: u128,
-}
-
-// ################## CONSTANTS ##################
-
-/// Vote type: Against the proposal.
-pub const VOTE_AGAINST: u32 = 0;
-
-/// Vote type: In favor of the proposal.
-pub const VOTE_FOR: u32 = 1;
-
-/// Vote type: Abstain from voting for or against.
-pub const VOTE_ABSTAIN: u32 = 2;
-
-// ################## QUERY_STATE ##################
-
-/// Returns the name of the governor.
+/// Configuration values that [`propose`] enforces when creating a proposal.
 ///
-/// # Arguments
+/// The default [`Governor::propose`](crate::governor::Governor::propose)
+/// fills these from the trait methods
+/// ([`GovernorSettings::proposal_threshold`](crate::governor::GovernorSettings::proposal_threshold),
+/// [`GovernorSettings::voting_delay`](crate::governor::GovernorSettings::voting_delay) and
+/// [`GovernorSettings::voting_period`](crate::governor::GovernorSettings::voting_period)),
+/// so overrides of those methods are what gets enforced.
 ///
-/// * `e` - Access to the Soroban environment.
-///
-/// # Errors
-///
-/// * [`GovernorError::NameNotSet`] - Occurs if the name has not been set.
-pub fn get_name(e: &Env) -> String {
-    e.storage()
-        .instance()
-        .get(&GovernorStorageKey::Name)
-        .unwrap_or_else(|| panic_with_error!(e, GovernorError::NameNotSet))
-}
-
-/// Returns the version of the governor contract.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-///
-/// # Errors
-///
-/// * [`GovernorError::VersionNotSet`] - Occurs if the version has not been set.
-pub fn get_version(e: &Env) -> String {
-    e.storage()
-        .instance()
-        .get(&GovernorStorageKey::Version)
-        .unwrap_or_else(|| panic_with_error!(e, GovernorError::VersionNotSet))
-}
-
-/// Returns the proposal threshold.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-///
-/// # Errors
-///
-/// * [`GovernorError::ProposalThresholdNotSet`] - Occurs if the proposal
-///   threshold has not been set.
-pub fn get_proposal_threshold(e: &Env) -> u128 {
-    e.storage()
-        .instance()
-        .get(&GovernorStorageKey::ProposalThreshold)
-        .unwrap_or_else(|| panic_with_error!(e, GovernorError::ProposalThresholdNotSet))
-}
-
-/// Returns the voting delay in ledgers.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-///
-/// # Errors
-///
-/// * [`GovernorError::VotingDelayNotSet`] - Occurs if the voting delay has not
-///   been set.
-pub fn get_voting_delay(e: &Env) -> u32 {
-    e.storage()
-        .instance()
-        .get(&GovernorStorageKey::VotingDelay)
-        .unwrap_or_else(|| panic_with_error!(e, GovernorError::VotingDelayNotSet))
-}
-
-/// Returns the voting period in ledgers.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-///
-/// # Errors
-///
-/// * [`GovernorError::VotingPeriodNotSet`] - Occurs if the voting period has
-///   not been set.
-pub fn get_voting_period(e: &Env) -> u32 {
-    e.storage()
-        .instance()
-        .get(&GovernorStorageKey::VotingPeriod)
-        .unwrap_or_else(|| panic_with_error!(e, GovernorError::VotingPeriodNotSet))
-}
-
-/// Returns the core proposal data.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-///
-/// # Errors
-///
-/// * [`GovernorError::ProposalNotFound`] - Occurs if the proposal does not
-///   exist.
-pub fn get_proposal_core(e: &Env, proposal_id: &BytesN<32>) -> ProposalCore {
-    let key = GovernorStorageKey::Proposal(proposal_id.clone());
-    let core: ProposalCore = e
-        .storage()
-        .persistent()
-        .get(&key)
-        .unwrap_or_else(|| panic_with_error!(e, GovernorError::ProposalNotFound));
-    e.storage().persistent().extend_ttl(&key, GOVERNOR_TTL_THRESHOLD, GOVERNOR_EXTEND_AMOUNT);
-    core
-}
-
-/// Returns the current state of a proposal.
-///
-/// See [`ProposalState`] for the full lifecycle flowchart.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-/// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
-///
-/// # Errors
-///
-/// * [`GovernorError::ProposalNotFound`] - Occurs if the proposal does not
-///   exist.
-pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>, quorum: u128) -> ProposalState {
-    let core = get_proposal_core(e, proposal_id);
-    derive_proposal_state(e, proposal_id, &core, quorum)
-}
-
-/// Returns the snapshot ledger for a proposal.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-///
-/// # Errors
-///
-/// * [`GovernorError::ProposalNotFound`] - Occurs if the proposal does not
-///   exist.
-pub fn get_proposal_snapshot(e: &Env, proposal_id: &BytesN<32>) -> u32 {
-    let core = get_proposal_core(e, proposal_id);
-    core.vote_snapshot
-}
-
-/// Returns the deadline ledger for a proposal.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-///
-/// # Errors
-///
-/// * [`GovernorError::ProposalNotFound`] - Occurs if the proposal does not
-///   exist.
-pub fn get_proposal_deadline(e: &Env, proposal_id: &BytesN<32>) -> u32 {
-    let core = get_proposal_core(e, proposal_id);
-    core.vote_end
-}
-
-/// Returns the proposer of a proposal.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-///
-/// # Errors
-///
-/// * [`GovernorError::ProposalNotFound`] - Occurs if the proposal does not
-///   exist.
-pub fn get_proposal_proposer(e: &Env, proposal_id: &BytesN<32>) -> Address {
-    let core = get_proposal_core(e, proposal_id);
-    core.proposer
-}
-
-/// Returns the address of the token contract that implements the Votes trait.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-///
-/// # Errors
-///
-/// * [`GovernorError::TokenContractNotSet`] - Occurs if the token contract has
-///   not been set.
-pub fn get_token_contract(e: &Env) -> Address {
-    e.storage()
-        .instance()
-        .get(&GovernorStorageKey::TokenContract)
-        .unwrap_or_else(|| panic_with_error!(e, GovernorError::TokenContractNotSet))
+/// This type is only passed between functions; it is never stored.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProposalSettings {
+    /// Minimum voting power the proposer must hold at the previous ledger.
+    pub threshold: u128,
+    /// Number of ledgers between proposal creation and the vote snapshot.
+    pub voting_delay: u32,
+    /// Number of ledgers during which voting is open.
+    pub voting_period: u32,
 }
 
 // ################## CHANGE STATE ##################
-
-/// Sets the name of the governor.
-///
-/// The name is not validated here. It is the responsibility of the
-/// implementer to ensure that the name is appropriate.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `name` - The name to set.
-///
-/// # Security Warning
-///
-/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-///
-/// It is the responsibility of the implementer to establish appropriate
-/// access controls to ensure that only authorized accounts can call this
-/// function.
-pub fn set_name(e: &Env, name: String) {
-    e.storage().instance().set(&GovernorStorageKey::Name, &name);
-}
-
-/// Sets the version of the governor contract.
-///
-/// The version is not validated here. It is the responsibility of the
-/// implementer to ensure that the version string is appropriate.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `version` - The version string to set.
-///
-/// # Security Warning
-///
-/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-///
-/// It is the responsibility of the implementer to establish appropriate
-/// access controls to ensure that only authorized accounts can call this
-/// function.
-pub fn set_version(e: &Env, version: String) {
-    e.storage().instance().set(&GovernorStorageKey::Version, &version);
-}
-
-/// Sets the proposal threshold.
-///
-/// The threshold value is not validated here. It is the responsibility of
-/// the implementer to ensure that the threshold is reasonable for the
-/// governance use case (e.g., not so high that no one can propose).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `threshold` - The minimum voting power required to create a proposal.
-///
-/// # Security Warning
-///
-/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-///
-/// It is the responsibility of the implementer to establish appropriate
-/// access controls to ensure that only authorized accounts can call this
-/// function.
-pub fn set_proposal_threshold(e: &Env, threshold: u128) {
-    e.storage().instance().set(&GovernorStorageKey::ProposalThreshold, &threshold);
-}
-
-/// Sets the voting delay.
-///
-/// The delay value is not validated here. It is the responsibility of
-/// the implementer to ensure that the delay is appropriate (e.g., enough
-/// time for token holders to prepare, but not so long that governance
-/// becomes unresponsive).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `delay` - The voting delay in ledgers.
-///
-/// # Security Warning
-///
-/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-///
-/// It is the responsibility of the implementer to establish appropriate
-/// access controls to ensure that only authorized accounts can call this
-/// function.
-pub fn set_voting_delay(e: &Env, delay: u32) {
-    e.storage().instance().set(&GovernorStorageKey::VotingDelay, &delay);
-}
-
-/// Sets the voting period.
-///
-/// A zero period is rejected. It would make `vote_end` equal the vote
-/// snapshot, leaving a voting window that no ledger falls inside, so every
-/// proposal would move straight from [`ProposalState::Pending`] to
-/// [`ProposalState::Defeated`] without ever accepting a vote. Since this
-/// setter is typically reachable only through a passing proposal, or only
-/// from the constructor, such a governor would in practice be beyond
-/// recovery.
-///
-/// Any non-zero value is accepted, and it remains the responsibility of the
-/// implementer to ensure that the period is appropriate (e.g., enough time
-/// for voters to participate, but not so long that urgent actions cannot be
-/// taken).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `period` - The voting period in ledgers.
-///
-/// # Errors
-///
-/// * [`GovernorError::InvalidVotingPeriod`] - Occurs if `period` is zero.
-///
-/// # Security Warning
-///
-/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-///
-/// It is the responsibility of the implementer to establish appropriate
-/// access controls to ensure that only authorized accounts can call this
-/// function.
-pub fn set_voting_period(e: &Env, period: u32) {
-    if period == 0 {
-        panic_with_error!(e, GovernorError::InvalidVotingPeriod);
-    }
-    e.storage().instance().set(&GovernorStorageKey::VotingPeriod, &period);
-}
-
-/// Sets the address of the token contract that implements the Votes trait.
-///
-/// This function can only be called **once**. It is expected to be called
-/// during the constructor of the governor contract. Subsequent calls will
-/// fail with [`GovernorError::TokenContractAlreadySet`].
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token_contract` - The address of the token contract.
-///
-/// # Errors
-///
-/// * [`GovernorError::TokenContractAlreadySet`] - Occurs if the token contract
-///   has already been set.
-///
-/// # Security Warning
-///
-/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-///
-/// It is the responsibility of the implementer to establish appropriate
-/// access controls to ensure that only authorized accounts can call this
-/// function.
-pub fn set_token_contract(e: &Env, token_contract: &Address) {
-    let key = GovernorStorageKey::TokenContract;
-    if e.storage().instance().has(&key) {
-        panic_with_error!(e, GovernorError::TokenContractAlreadySet);
-    }
-    e.storage().instance().set(&key, token_contract);
-}
 
 /// Creates a new proposal and returns its unique identifier (proposal ID).
 ///
@@ -462,6 +58,8 @@ pub fn set_token_contract(e: &Env, token_contract: &Address) {
 /// * `args` - The arguments for each function call.
 /// * `description` - A description of the proposal.
 /// * `proposer` - The address creating the proposal.
+/// * `settings` - The proposal threshold, voting delay and voting period to
+///   enforce. See [`ProposalSettings`].
 ///
 /// # Errors
 ///
@@ -475,9 +73,6 @@ pub fn set_token_contract(e: &Env, token_contract: &Address) {
 ///   lacks sufficient voting power.
 /// * [`GovernorError::MathOverflow`] - Occurs if voting schedule calculation
 ///   overflows.
-/// * refer to [`get_proposal_threshold()`] errors.
-/// * refer to [`get_voting_delay()`] errors.
-/// * refer to [`get_voting_period()`] errors.
 /// * refer to [`get_token_contract()`] errors.
 ///
 /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
@@ -492,6 +87,7 @@ pub fn propose(
     args: Vec<Vec<Val>>,
     description: String,
     proposer: &Address,
+    settings: &ProposalSettings,
 ) -> BytesN<32> {
     // Validate proposal length
     let targets_len = targets.len();
@@ -512,8 +108,7 @@ pub fn propose(
     let proposer_votes = get_voting_power(e, proposer, snapshot);
 
     // Check proposer has sufficient voting power
-    let threshold = get_proposal_threshold(e);
-    if proposer_votes < threshold {
+    if proposer_votes < settings.threshold {
         panic_with_error!(e, GovernorError::InsufficientProposerVotes);
     }
 
@@ -524,17 +119,15 @@ pub fn propose(
     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
 
     // Check proposal doesn't already exist
-    if e.storage().persistent().has(&GovernorStorageKey::Proposal(proposal_id.clone())) {
+    if e.storage().persistent().has(&ProposalStorageKey::Proposal(proposal_id.clone())) {
         panic_with_error!(e, GovernorError::ProposalAlreadyExists);
     }
 
     // Calculate voting schedule
-    let voting_delay = get_voting_delay(e);
-    let voting_period = get_voting_period(e);
-    let Some(vote_snapshot) = current_ledger.checked_add(voting_delay) else {
+    let Some(vote_snapshot) = current_ledger.checked_add(settings.voting_delay) else {
         panic_with_error!(e, GovernorError::MathOverflow);
     };
-    let Some(vote_end) = vote_snapshot.checked_add(voting_period) else {
+    let Some(vote_end) = vote_snapshot.checked_add(settings.voting_period) else {
         panic_with_error!(e, GovernorError::MathOverflow);
     };
 
@@ -545,7 +138,7 @@ pub fn propose(
         vote_end,
         state: ProposalState::Pending,
     };
-    e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
+    e.storage().persistent().set(&ProposalStorageKey::Proposal(proposal_id.clone()), &proposal);
 
     // Emit event
     emit_proposal_created(
@@ -563,6 +156,197 @@ pub fn propose(
     proposal_id
 }
 
+/// Casts a vote on a proposal and returns the voter's voting power.
+///
+/// This is the high-level vote flow: it verifies the proposal is active,
+/// fetches the voter's voting power from the token contract at the proposal
+/// snapshot, records the vote, and emits a
+/// [`VoteCast`](crate::governor::VoteCast) event.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `proposal_id` - The unique identifier of the proposal.
+/// * `vote_type` - The type of vote (0 = Against, 1 = For, 2 = Abstain).
+/// * `reason` - An optional explanation for the vote.
+/// * `voter` - The address casting the vote.
+/// * `state` - The proposal's current state, as returned by
+///   [`GovernorQueries::proposal_state`](crate::governor::GovernorQueries::proposal_state).
+///
+/// # Errors
+///
+/// * [`GovernorError::ProposalNotActive`] - If the proposal is not active.
+/// * [`GovernorError::AlreadyVoted`] - If the voter has already voted.
+/// * [`GovernorError::InvalidVoteType`] - If the vote type is invalid.
+/// * [`GovernorError::MathOverflow`] - If vote tallying overflows.
+/// * refer to [`get_proposal_core()`] errors.
+/// * refer to [`get_token_contract()`] errors.
+///
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+///
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can call this
+/// function.
+///
+/// The `state` argument is trusted as given. It must come from
+/// [`GovernorQueries::proposal_state`](crate::governor::GovernorQueries::proposal_state);
+/// passing any other value (e.g. a hardcoded `Active`) bypasses the voting
+/// window.
+pub fn cast_vote(
+    e: &Env,
+    proposal_id: &BytesN<32>,
+    vote_type: u32,
+    reason: &String,
+    voter: &Address,
+    state: ProposalState,
+) -> u128 {
+    if state != ProposalState::Active {
+        panic_with_error!(e, GovernorError::ProposalNotActive);
+    }
+    let snapshot = get_proposal_snapshot(e, proposal_id);
+    let voter_weight = get_voting_power(e, voter, snapshot);
+    count_vote(e, proposal_id, voter, vote_type, voter_weight);
+    emit_vote_cast(e, voter, proposal_id, vote_type, voter_weight, reason);
+    voter_weight
+}
+
+/// Records a vote on a proposal.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `proposal_id` - The unique identifier of the proposal.
+/// * `account` - The address casting the vote.
+/// * `vote_type` - The type of vote (0 = Against, 1 = For, 2 = Abstain).
+/// * `weight` - The voting power of the voter.
+///
+/// # Errors
+///
+/// * [`GovernorError::AlreadyVoted`] - Occurs if the account has already voted
+///   on this proposal.
+/// * [`GovernorError::InvalidVoteType`] - Occurs if the vote type is not 0, 1,
+///   or 2.
+/// * [`GovernorError::MathOverflow`] - Occurs if vote tallying overflows.
+///
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+///
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can call this
+/// function.
+pub fn count_vote(
+    e: &Env,
+    proposal_id: &BytesN<32>,
+    account: &Address,
+    vote_type: u32,
+    weight: u128,
+) {
+    // Check if the account has already voted
+    let voted_key = ProposalStorageKey::HasVoted(proposal_id.clone(), account.clone());
+    if e.storage().persistent().has(&voted_key) {
+        panic_with_error!(e, GovernorError::AlreadyVoted);
+    }
+
+    // Get current vote counts
+    let mut counts = get_proposal_vote_counts(e, proposal_id);
+
+    // Update vote counts based on vote type
+    match vote_type {
+        VOTE_AGAINST => {
+            let Some(new_against) = counts.against_votes.checked_add(weight) else {
+                panic_with_error!(e, GovernorError::MathOverflow);
+            };
+            counts.against_votes = new_against;
+        }
+        VOTE_FOR => {
+            let Some(new_for) = counts.for_votes.checked_add(weight) else {
+                panic_with_error!(e, GovernorError::MathOverflow);
+            };
+            counts.for_votes = new_for;
+        }
+        VOTE_ABSTAIN => {
+            let Some(new_abstain) = counts.abstain_votes.checked_add(weight) else {
+                panic_with_error!(e, GovernorError::MathOverflow);
+            };
+            counts.abstain_votes = new_abstain;
+        }
+        _ => panic_with_error!(e, GovernorError::InvalidVoteType),
+    }
+
+    // Store updated vote counts
+    let vote_key = ProposalStorageKey::ProposalVote(proposal_id.clone());
+    e.storage().persistent().set(&vote_key, &counts);
+
+    // Mark account as having voted
+    e.storage().persistent().set(&voted_key, &true);
+}
+
+/// Queues a succeeded proposal for execution and returns its unique identifier
+/// (proposal ID).
+///
+/// Transitions the proposal from [`ProposalState::Succeeded`] to
+/// [`ProposalState::Queued`]. The `eta` (estimated time of arrival) is
+/// emitted in the event for off-chain consumers but is **not enforced** by
+/// this function or by [`execute`]. Enforcement of the execution delay is
+/// the responsibility of the integration layer (e.g., a timelock contract).
+/// The `eta` is typically computed by the caller as
+/// `current_ledger + timelock_delay`.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `targets` - The addresses of contracts to call.
+/// * `functions` - The function names to invoke on each target.
+/// * `args` - The arguments for each function call.
+/// * `description_hash` - The hash of the proposal description.
+/// * `eta` - The estimated ledger sequence for execution. Emitted in the event
+///   only; not stored or enforced by the governor.
+/// * `state` - The proposal's current state, as returned by
+///   [`GovernorQueries::proposal_state`](crate::governor::GovernorQueries::proposal_state).
+///
+/// # Errors
+///
+/// * [`GovernorError::ProposalNotSuccessful`] - Occurs if the proposal is not
+///   in the `Succeeded` state.
+/// * refer to [`get_proposal_core()`] errors.
+///
+/// # Events
+///
+/// * topics - `["proposal_queued", proposal_id: BytesN<32>]`
+/// * data - `[eta: u32]`
+///
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+///
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can call this
+/// function.
+///
+/// The `state` argument is trusted as given. It must come from
+/// [`GovernorQueries::proposal_state`](crate::governor::GovernorQueries::proposal_state);
+/// passing any other value (e.g. a hardcoded `Succeeded`) bypasses the
+/// outcome of the vote.
+pub fn queue(
+    e: &Env,
+    targets: Vec<Address>,
+    functions: Vec<Symbol>,
+    args: Vec<Vec<Val>>,
+    description_hash: &BytesN<32>,
+    eta: u32,
+    state: ProposalState,
+) -> BytesN<32> {
+    let proposal_id = hash_proposal(e, &targets, &functions, &args, description_hash);
+    let mut proposal = get_proposal_core(e, &proposal_id);
+    if state != ProposalState::Succeeded {
+        panic_with_error!(e, GovernorError::ProposalNotSuccessful);
+    }
+
+    proposal.state = ProposalState::Queued;
+    e.storage().persistent().set(&ProposalStorageKey::Proposal(proposal_id.clone()), &proposal);
+
+    emit_proposal_queued(e, &proposal_id, eta);
+
+    proposal_id
+}
+
 /// Executes a successful proposal and returns its unique identifier (proposal
 /// ID).
 ///
@@ -575,9 +359,8 @@ pub fn propose(
 /// * `description_hash` - The hash of the proposal description.
 /// * `queue_enabled` - Whether queueing is enabled (i.e., whether the proposal
 ///   must be in the `Queued` state to execute).
-/// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
+/// * `state` - The proposal's current state, as returned by
+///   [`GovernorQueries::proposal_state`](crate::governor::GovernorQueries::proposal_state).
 ///
 /// # Errors
 ///
@@ -585,6 +368,8 @@ pub fn propose(
 ///   succeeded.
 /// * [`GovernorError::ProposalAlreadyExecuted`] - Occurs if the proposal has
 ///   already been executed.
+/// * [`GovernorError::ProposalNotQueued`] - Occurs if queueing is enabled and
+///   the proposal is not in the `Queued` state.
 /// * refer to [`get_proposal_core()`] errors.
 ///
 /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
@@ -592,6 +377,11 @@ pub fn propose(
 /// It is the responsibility of the implementer to establish appropriate
 /// access controls to ensure that only authorized accounts can call this
 /// function.
+///
+/// The `state` argument is trusted as given. It must come from
+/// [`GovernorQueries::proposal_state`](crate::governor::GovernorQueries::proposal_state);
+/// passing any other value (e.g. a hardcoded `Succeeded`) bypasses the
+/// outcome of the vote.
 pub fn execute(
     e: &Env,
     targets: Vec<Address>,
@@ -599,7 +389,7 @@ pub fn execute(
     args: Vec<Vec<Val>>,
     description_hash: &BytesN<32>,
     queue_enabled: bool,
-    quorum: u128,
+    state: ProposalState,
 ) -> BytesN<32> {
     let proposal_id = hash_proposal(e, &targets, &functions, &args, description_hash);
 
@@ -607,7 +397,6 @@ pub fn execute(
     let mut proposal = get_proposal_core(e, &proposal_id);
 
     // Check proposal state
-    let state = derive_proposal_state(e, &proposal_id, &proposal, quorum);
     if state == ProposalState::Executed {
         panic_with_error!(e, GovernorError::ProposalAlreadyExecuted);
     }
@@ -633,74 +422,10 @@ pub fn execute(
 
     // Mark as executed
     proposal.state = ProposalState::Executed;
-    e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
+    e.storage().persistent().set(&ProposalStorageKey::Proposal(proposal_id.clone()), &proposal);
 
     // Emit event
     emit_proposal_executed(e, &proposal_id);
-
-    proposal_id
-}
-
-/// Queues a succeeded proposal for execution and returns its unique identifier
-/// (proposal ID).
-///
-/// Transitions the proposal from [`ProposalState::Succeeded`] to
-/// [`ProposalState::Queued`]. The `eta` (estimated time of arrival) is
-/// emitted in the event for off-chain consumers but is **not enforced** by
-/// this function or by [`execute`]. Enforcement of the execution delay is
-/// the responsibility of the integration layer (e.g., a timelock contract).
-/// The `eta` is typically computed by the caller as
-/// `current_ledger + timelock_delay`.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `targets` - The addresses of contracts to call.
-/// * `functions` - The function names to invoke on each target.
-/// * `args` - The arguments for each function call.
-/// * `description_hash` - The hash of the proposal description.
-/// * `eta` - The estimated ledger sequence for execution. Emitted in the event
-///   only; not stored or enforced by the governor.
-/// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
-///
-/// # Errors
-///
-/// * [`GovernorError::ProposalNotSuccessful`] - Occurs if the proposal is not
-///   in the `Succeeded` state.
-/// * refer to [`get_proposal_core()`] errors.
-///
-/// # Events
-///
-/// * topics - `["proposal_queued", proposal_id: BytesN<32>]`
-/// * data - `[eta: u32]`
-///
-/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-///
-/// It is the responsibility of the implementer to establish appropriate
-/// access controls to ensure that only authorized accounts can call this
-/// function.
-pub fn queue(
-    e: &Env,
-    targets: Vec<Address>,
-    functions: Vec<Symbol>,
-    args: Vec<Vec<Val>>,
-    description_hash: &BytesN<32>,
-    eta: u32,
-    quorum: u128,
-) -> BytesN<32> {
-    let proposal_id = hash_proposal(e, &targets, &functions, &args, description_hash);
-    let mut proposal = get_proposal_core(e, &proposal_id);
-    let state = derive_proposal_state(e, &proposal_id, &proposal, quorum);
-    if state != ProposalState::Succeeded {
-        panic_with_error!(e, GovernorError::ProposalNotSuccessful);
-    }
-
-    proposal.state = ProposalState::Queued;
-    e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
-
-    emit_proposal_queued(e, &proposal_id, eta);
 
     proposal_id
 }
@@ -758,7 +483,7 @@ pub fn cancel(
 
     // Mark as cancelled
     proposal.state = ProposalState::Canceled;
-    e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
+    e.storage().persistent().set(&ProposalStorageKey::Proposal(proposal_id.clone()), &proposal);
 
     // Emit event
     emit_proposal_cancelled(e, &proposal_id);
@@ -766,494 +491,7 @@ pub fn cancel(
     proposal_id
 }
 
-// ################## HELPERS ##################
-
-/// Computes and returns the proposal ID from the proposal parameters.
-///
-/// The proposal ID is a deterministic keccak256 hash of the XDR-serialized
-/// targets, functions, args, and description hash. This allows anyone to
-/// compute the ID without storing the full proposal data.
-///
-/// The `description_hash` is computed as `keccak256(description.to_bytes())`,
-/// i.e., a keccak256 hash of the raw UTF-8 bytes of the description string.
-/// Off-chain clients can reproduce this by hashing the raw string bytes
-/// directly — no XDR encoding is required.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `targets` - The addresses of contracts to call.
-/// * `functions` - The function names to invoke on each target.
-/// * `args` - The arguments for each function call.
-/// * `description_hash` - The keccak256 hash of the description's raw bytes.
-pub fn hash_proposal(
-    e: &Env,
-    targets: &Vec<Address>,
-    functions: &Vec<Symbol>,
-    args: &Vec<Vec<Val>>,
-    description_hash: &BytesN<32>,
-) -> BytesN<32> {
-    // Concatenate all inputs for hashing
-    let mut data = Bytes::new(e);
-    data.append(&targets.to_xdr(e));
-    data.append(&functions.to_xdr(e));
-    data.append(&args.to_xdr(e));
-    data.append(&Bytes::from_slice(e, description_hash.to_array().as_slice()));
-
-    e.crypto().keccak256(&data).to_bytes()
-}
-
-/// Prepares a vote by verifying the proposal is active,
-/// and returning the proposal snapshot ledger for voting power lookup.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-/// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
-///
-/// # Errors
-///
-/// * [`GovernorError::ProposalNotActive`] - Occurs if the proposal is not in
-///   the active state.
-/// * refer to [`get_proposal_core()`] errors.
-pub fn check_proposal_state(e: &Env, proposal_id: &BytesN<32>, quorum: u128) -> u32 {
-    let core = get_proposal_core(e, proposal_id);
-    let state = derive_proposal_state(e, proposal_id, &core, quorum);
-    if state != ProposalState::Active {
-        panic_with_error!(e, GovernorError::ProposalNotActive);
-    }
-
-    core.vote_snapshot
-}
-
-/// Derives the current state of a proposal.
-///
-/// Proposal states fall into two categories:
-///
-/// ## Stored states
-///
-/// Written to `core.state` by lifecycle functions and returned immediately
-/// when present. These represent irreversible transitions that have already
-/// occurred:
-///
-/// * [`ProposalState::Canceled`] — set by [`cancel`].
-/// * [`ProposalState::Executed`] — set by [`execute`].
-/// * [`ProposalState::Queued`]   — set by [`queue`].
-/// * [`ProposalState::Expired`]  — set by extensions (e.g. `TimelockControl`).
-///
-/// ## Derived states
-///
-/// Computed on the fly from the current ledger and vote tallies. These are
-/// never persisted; `core.state` remains [`ProposalState::Pending`] (the
-/// initial value from [`propose`]) throughout the voting lifecycle. This
-/// avoids a storage write after every vote while still providing accurate
-/// state queries at any point:
-///
-/// * [`ProposalState::Pending`]   — current ledger is at or before
-///   `vote_start`.
-/// * [`ProposalState::Active`]    — current ledger is between `vote_start` and
-///   `vote_end`. Even if quorum and majority are already met, the proposal
-///   remains `Active` until voting closes so that all voters have the
-///   opportunity to participate.
-/// * [`ProposalState::Succeeded`] — voting ended and quorum + majority were
-///   met.
-/// * [`ProposalState::Defeated`]  — voting ended without meeting quorum or
-///   majority.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-/// * `core` - The proposal's stored core data.
-/// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
-///
-/// # Errors
-///
-/// * [`GovernorError::MathOverflow`] - Occurs if the participation tally
-///   overflows when summing `for` and `abstain` votes.
-fn derive_proposal_state(
-    e: &Env,
-    proposal_id: &BytesN<32>,
-    core: &ProposalCore,
-    quorum: u128,
-) -> ProposalState {
-    // Stored states: return immediately — the transition already happened.
-    match core.state {
-        ProposalState::Canceled | ProposalState::Executed | ProposalState::Queued => {
-            return core.state;
-        }
-        ProposalState::Expired => {
-            return core.state;
-        }
-        _ => {}
-    }
-
-    // Derived states: `core.state` is still `Pending` (its initial value
-    // from `propose`), so we determine the actual state from timing and
-    // vote tallies.
-    let current_ledger = e.ledger().sequence();
-
-    // `vote_snapshot` is the snapshot ledger; voting opens on the next ledger.
-    if current_ledger <= core.vote_snapshot {
-        return ProposalState::Pending;
-    }
-
-    // The proposal stays `Active` until `vote_end` passes, regardless of
-    // whether quorum and majority are already met. This ensures all voters
-    // have the full voting period to participate.
-    if current_ledger <= core.vote_end {
-        return ProposalState::Active;
-    }
-
-    // Voting has ended — check whether quorum and majority were met.
-    let counts = get_proposal_vote_counts(e, proposal_id);
-    let Some(participation) = counts.for_votes.checked_add(counts.abstain_votes) else {
-        panic_with_error!(e, GovernorError::MathOverflow);
-    };
-    if participation >= quorum && counts.for_votes > counts.against_votes {
-        return ProposalState::Succeeded;
-    }
-
-    ProposalState::Defeated
-}
-
-// ################## COUNTING: QUERY STATE ##################
-
-/// Returns the counting mode identifier.
-///
-/// For simple counting, this returns `"simple"`.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-pub fn counting_mode(e: &Env) -> Symbol {
-    Symbol::new(e, "simple")
-}
-
-/// Returns whether an account has voted on a proposal.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-/// * `account` - The address to check.
-pub fn has_voted(e: &Env, proposal_id: &BytesN<32>, account: &Address) -> bool {
-    let key = GovernorStorageKey::HasVoted(proposal_id.clone(), account.clone());
-    if e.storage().persistent().has(&key) {
-        e.storage().persistent().extend_ttl(&key, GOVERNOR_TTL_THRESHOLD, GOVERNOR_EXTEND_AMOUNT);
-        true
-    } else {
-        false
-    }
-}
-
-/// Returns the quorum value effective at the given ledger.
-///
-/// The quorum is the minimum total voting power (for + abstain) that must
-/// participate for a proposal to be valid. Quorum values are stored as
-/// checkpoints, so historical lookups return the value that was in effect
-/// at the requested ledger.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `ledger` - The ledger at which to query the quorum.
-///
-/// # Errors
-///
-/// * [`GovernorError::QuorumNotSet`] - Occurs if no quorum checkpoint exists at
-///   or before the requested ledger.
-pub fn get_quorum(e: &Env, ledger: u32) -> u128 {
-    let num: u32 =
-        e.storage().instance().get(&GovernorStorageKey::NumQuorumCheckpoints).unwrap_or(0);
-
-    if num == 0 {
-        panic_with_error!(e, GovernorError::QuorumNotSet);
-    }
-
-    // Check if ledger is at or after the latest checkpoint.
-    let latest = get_quorum_checkpoint(e, num - 1);
-    if latest.ledger <= ledger {
-        return latest.quorum;
-    }
-
-    // Check if ledger is before the first checkpoint.
-    let first = get_quorum_checkpoint(e, 0);
-    if first.ledger > ledger {
-        panic_with_error!(e, GovernorError::QuorumNotSet);
-    }
-
-    // Binary search for the most recent checkpoint at or before `ledger`.
-    let mut low: u32 = 0;
-    let mut high: u32 = num - 1;
-
-    while low < high {
-        let mid = low + (high - low).div_ceil(2);
-        let cp = get_quorum_checkpoint(e, mid);
-        if cp.ledger <= ledger {
-            low = mid;
-        } else {
-            high = mid - 1;
-        }
-    }
-
-    get_quorum_checkpoint(e, low).quorum
-}
-
-/// Returns the quorum checkpoint at the given index.
-fn get_quorum_checkpoint(e: &Env, index: u32) -> QuorumCheckpoint {
-    let key = GovernorStorageKey::QuorumCheckpoint(index);
-    let cp: QuorumCheckpoint = e
-        .storage()
-        .persistent()
-        .get(&key)
-        .unwrap_or_else(|| panic_with_error!(e, GovernorError::QuorumNotSet));
-    e.storage().persistent().extend_ttl(&key, GOVERNOR_TTL_THRESHOLD, GOVERNOR_EXTEND_AMOUNT);
-    cp
-}
-
-/// Returns whether the quorum has been reached for a proposal.
-///
-/// Quorum is reached when the sum of `for` and `abstain` votes meets or
-/// exceeds the configured quorum value.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-/// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
-///
-/// # Errors
-///
-/// * [`GovernorError::MathOverflow`] - Occurs if participation tally overflows.
-pub fn quorum_reached(e: &Env, proposal_id: &BytesN<32>, quorum: u128) -> bool {
-    let counts = get_proposal_vote_counts(e, proposal_id);
-
-    let Some(participation) = counts.for_votes.checked_add(counts.abstain_votes) else {
-        panic_with_error!(e, GovernorError::MathOverflow);
-    };
-
-    participation >= quorum
-}
-
-/// Returns whether the tally has succeeded for a proposal.
-///
-/// The tally succeeds when the `for` votes strictly exceed the `against` votes.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-pub fn tally_succeeded(e: &Env, proposal_id: &BytesN<32>) -> bool {
-    let counts = get_proposal_vote_counts(e, proposal_id);
-    counts.for_votes > counts.against_votes
-}
-
-/// Returns the vote tallies for a proposal.
-///
-/// If no tally exists yet, this returns a zero-initialized
-/// [`ProposalVoteCounts`].
-///
-/// Vote tally entries are created lazily on the first recorded vote, not at
-/// proposal creation time. This keeps the counting logic loosely coupled to
-/// the proposal lifecycle.
-///
-/// Because of that design, a missing storage entry is interpreted as
-/// "no votes cast yet" rather than an error (`panic`) or `Option::None`.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-pub fn get_proposal_vote_counts(e: &Env, proposal_id: &BytesN<32>) -> ProposalVoteCounts {
-    let key = GovernorStorageKey::ProposalVote(proposal_id.clone());
-    e.storage()
-        .persistent()
-        .get::<_, ProposalVoteCounts>(&key)
-        .inspect(|_| {
-            e.storage().persistent().extend_ttl(
-                &key,
-                GOVERNOR_TTL_THRESHOLD,
-                GOVERNOR_EXTEND_AMOUNT,
-            );
-        })
-        .unwrap_or(ProposalVoteCounts { against_votes: 0, for_votes: 0, abstain_votes: 0 })
-}
-
-// ################## COUNTING: CHANGE STATE ##################
-
-/// Sets the quorum value.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `quorum` - The new quorum value.
-///
-/// # Events
-///
-/// * topics - `["quorum_changed"]`
-/// * data - `[old_quorum: u128, new_quorum: u128]`
-///
-/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-///
-/// It is the responsibility of the implementer to establish appropriate
-/// access controls to ensure that only authorized accounts can call this
-/// function.
-pub fn set_quorum(e: &Env, quorum: u128) {
-    let num: u32 =
-        e.storage().instance().get(&GovernorStorageKey::NumQuorumCheckpoints).unwrap_or(0);
-    let ledger = e.ledger().sequence();
-
-    let old_quorum = if num > 0 {
-        let last = get_quorum_checkpoint(e, num - 1);
-        // If the last checkpoint is at the same ledger, update it in place.
-        if last.ledger == ledger {
-            e.storage().persistent().set(
-                &GovernorStorageKey::QuorumCheckpoint(num - 1),
-                &QuorumCheckpoint { ledger, quorum },
-            );
-            emit_quorum_changed(e, last.quorum, quorum);
-            return;
-        }
-        last.quorum
-    } else {
-        0u128
-    };
-
-    // Append a new checkpoint.
-    e.storage()
-        .persistent()
-        .set(&GovernorStorageKey::QuorumCheckpoint(num), &QuorumCheckpoint { ledger, quorum });
-    e.storage().instance().set(&GovernorStorageKey::NumQuorumCheckpoints, &(num + 1));
-
-    emit_quorum_changed(e, old_quorum, quorum);
-}
-
-/// Records a vote on a proposal.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-/// * `account` - The address casting the vote.
-/// * `vote_type` - The type of vote (0 = Against, 1 = For, 2 = Abstain).
-/// * `weight` - The voting power of the voter.
-///
-/// # Errors
-///
-/// * [`GovernorError::AlreadyVoted`] - Occurs if the account has already voted
-///   on this proposal.
-/// * [`GovernorError::InvalidVoteType`] - Occurs if the vote type is not 0, 1,
-///   or 2.
-/// * [`GovernorError::MathOverflow`] - Occurs if vote tallying overflows.
-///
-/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-///
-/// It is the responsibility of the implementer to establish appropriate
-/// access controls to ensure that only authorized accounts can call this
-/// function.
-pub fn count_vote(
-    e: &Env,
-    proposal_id: &BytesN<32>,
-    account: &Address,
-    vote_type: u32,
-    weight: u128,
-) {
-    // Check if the account has already voted
-    let voted_key = GovernorStorageKey::HasVoted(proposal_id.clone(), account.clone());
-    if e.storage().persistent().has(&voted_key) {
-        panic_with_error!(e, GovernorError::AlreadyVoted);
-    }
-
-    // Get current vote counts
-    let mut counts = get_proposal_vote_counts(e, proposal_id);
-
-    // Update vote counts based on vote type
-    match vote_type {
-        VOTE_AGAINST => {
-            let Some(new_against) = counts.against_votes.checked_add(weight) else {
-                panic_with_error!(e, GovernorError::MathOverflow);
-            };
-            counts.against_votes = new_against;
-        }
-        VOTE_FOR => {
-            let Some(new_for) = counts.for_votes.checked_add(weight) else {
-                panic_with_error!(e, GovernorError::MathOverflow);
-            };
-            counts.for_votes = new_for;
-        }
-        VOTE_ABSTAIN => {
-            let Some(new_abstain) = counts.abstain_votes.checked_add(weight) else {
-                panic_with_error!(e, GovernorError::MathOverflow);
-            };
-            counts.abstain_votes = new_abstain;
-        }
-        _ => panic_with_error!(e, GovernorError::InvalidVoteType),
-    }
-
-    // Store updated vote counts
-    let vote_key = GovernorStorageKey::ProposalVote(proposal_id.clone());
-    e.storage().persistent().set(&vote_key, &counts);
-
-    // Mark account as having voted
-    e.storage().persistent().set(&voted_key, &true);
-}
-
-/// Casts a vote on a proposal and returns the voter's voting power.
-///
-/// This is the high-level vote flow: it verifies the proposal is active,
-/// fetches the voter's voting power from the token contract at the proposal
-/// snapshot, records the vote, and emits a
-/// [`VoteCast`](crate::governor::VoteCast) event.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-/// * `vote_type` - The type of vote (0 = Against, 1 = For, 2 = Abstain).
-/// * `reason` - An optional explanation for the vote.
-/// * `voter` - The address casting the vote.
-/// * `quorum` - The quorum threshold, evaluated at the proposal's
-///   `vote_snapshot` ledger via
-///   [`Governor::quorum`](crate::governor::Governor::quorum).
-///
-/// # Errors
-///
-/// * [`GovernorError::ProposalNotActive`] - If the proposal is not active.
-/// * [`GovernorError::AlreadyVoted`] - If the voter has already voted.
-/// * [`GovernorError::InvalidVoteType`] - If the vote type is invalid.
-/// * [`GovernorError::MathOverflow`] - If vote tallying overflows.
-/// * refer to [`get_proposal_core()`] errors.
-/// * refer to [`get_token_contract()`] errors.
-///
-/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-///
-/// It is the responsibility of the implementer to establish appropriate
-/// access controls to ensure that only authorized accounts can call this
-/// function.
-pub fn cast_vote(
-    e: &Env,
-    proposal_id: &BytesN<32>,
-    vote_type: u32,
-    reason: &String,
-    voter: &Address,
-    quorum: u128,
-) -> u128 {
-    let snapshot = check_proposal_state(e, proposal_id, quorum);
-    let voter_weight = get_voting_power(e, voter, snapshot);
-    count_vote(e, proposal_id, voter, vote_type, voter_weight);
-    emit_vote_cast(e, voter, proposal_id, vote_type, voter_weight, reason);
-    voter_weight
-}
-
-// ################## INTERNAL HELPERS ##################
+// ################## LOW-LEVEL HELPERS ##################
 
 /// Fetches the voting power of an account at a specific ledger sequence
 /// number from the token contract via a cross-contract call to

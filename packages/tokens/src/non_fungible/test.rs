@@ -254,6 +254,128 @@ fn approve_with_operator_works() {
 }
 
 #[test]
+fn revoke_approve_emits_stored_address() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let approved = Address::generate(&e);
+    let unrelated = Address::generate(&e);
+    let token_id = 1;
+
+    e.as_contract(&address, || {
+        e.storage().persistent().set(&NFTStorageKey::Owner(token_id), &owner);
+        Base::approve(&e, &owner, &approved, token_id, 1000);
+        assert_eq!(Base::get_approved(&e, token_id), Some(approved.clone()));
+    });
+
+    e.as_contract(&address, || {
+        // revoke, passing an address that was never approved
+        Base::approve(&e, &owner, &unrelated, token_id, 0);
+        assert_eq!(Base::get_approved(&e, token_id), None);
+
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 1);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Approve {
+                approver: owner.clone(),
+                token_id,
+                approved: approved.clone(),
+                live_until_ledger: 0
+            }
+            .to_xdr(&e, &address)
+        );
+    });
+}
+
+#[test]
+fn revoke_approve_by_operator_emits_stored_address() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let operator = Address::generate(&e);
+    let approved = Address::generate(&e);
+    let unrelated = Address::generate(&e);
+    let token_id = 1;
+
+    e.as_contract(&address, || {
+        e.storage().persistent().set(&NFTStorageKey::Owner(token_id), &owner);
+        Base::approve(&e, &owner, &approved, token_id, 1000);
+    });
+
+    e.as_contract(&address, || {
+        Base::approve_for_all(&e, &owner, &operator, 1000);
+    });
+
+    e.as_contract(&address, || {
+        // the operator revokes the approval the owner granted
+        Base::approve(&e, &operator, &unrelated, token_id, 0);
+        assert_eq!(Base::get_approved(&e, token_id), None);
+
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 1);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &Approve {
+                approver: operator.clone(),
+                token_id,
+                approved: approved.clone(),
+                live_until_ledger: 0
+            }
+            .to_xdr(&e, &address)
+        );
+    });
+}
+
+#[test]
+fn revoke_approve_without_approval_emits_no_event() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let unrelated = Address::generate(&e);
+    let token_id = 1;
+
+    e.as_contract(&address, || {
+        e.storage().persistent().set(&NFTStorageKey::Owner(token_id), &owner);
+
+        Base::approve(&e, &owner, &unrelated, token_id, 0);
+        assert_eq!(Base::get_approved(&e, token_id), None);
+
+        assert_eq!(e.events().all().events().len(), 0);
+    });
+}
+
+#[test]
+fn revoke_approve_twice_emits_one_event() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let approved = Address::generate(&e);
+    let token_id = 1;
+
+    e.as_contract(&address, || {
+        e.storage().persistent().set(&NFTStorageKey::Owner(token_id), &owner);
+        Base::approve(&e, &owner, &approved, token_id, 1000);
+    });
+
+    e.as_contract(&address, || {
+        Base::approve(&e, &owner, &approved, token_id, 0);
+        assert_eq!(e.events().all().events().len(), 1);
+    });
+
+    e.as_contract(&address, || {
+        // the approval is already gone, so the second revocation is a no-op
+        Base::approve(&e, &owner, &approved, token_id, 0);
+        assert_eq!(Base::get_approved(&e, token_id), None);
+        assert_eq!(e.events().all().events().len(), 0);
+    });
+}
+
+#[test]
 fn transfer_nft_works() {
     let e = Env::default();
     e.mock_all_auths();

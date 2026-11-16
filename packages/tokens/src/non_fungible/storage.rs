@@ -320,7 +320,8 @@ impl Base {
     /// * `e` - Access to the Soroban environment.
     /// * `approver` - The address of the approver (should be `owner` or
     ///   `operator`).
-    /// * `approved` - The address receiving the approval.
+    /// * `approved` - The address receiving the approval. Ignored when
+    ///   `live_until_ledger` is `0`.
     /// * `token_id` - The identifier of the token to be approved.
     /// * `live_until_ledger` - The ledger number at which the allowance
     ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
@@ -337,6 +338,10 @@ impl Base {
     ///
     /// * topics - `["approve", approver: Address, token_id: u32]`
     /// * data - `[approved: Address, live_until_ledger: u32]`
+    ///
+    /// On revocation, `approved` is the address whose approval was removed
+    /// and `live_until_ledger` is `0`. If no approval is stored, no event is
+    /// emitted.
     ///
     /// # Notes
     ///
@@ -468,9 +473,11 @@ impl Base {
     /// * `owner` - The address of the token owner.
     /// * `approver` - The address of the approver (should be `owner` or
     ///   `operator`).
-    /// * `approved` - The address receiving the approval.
+    /// * `approved` - The address receiving the approval. Ignored when
+    ///   `live_until_ledger` is `0`.
     /// * `token_id` - The identifier of the token to be approved.
     /// * `live_until_ledger` - The ledger number at which the approval expires.
+    ///   If `live_until_ledger` is `0`, the approval is revoked.
     ///   `live_until_ledger` argument is implicitly bounded by the maximum
     ///   allowed TTL extension for a temporary storage entry and specifying a
     ///   higher value will cause the code to panic.
@@ -481,6 +488,15 @@ impl Base {
     ///   neither the owner nor an approved operator.
     /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger
     ///   number is less than the current ledger number.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["approve", approver: Address, token_id: u32]`
+    /// * data - `[approved: Address, live_until_ledger: u32]`
+    ///
+    /// On revocation, `approved` is the address whose approval was removed
+    /// and `live_until_ledger` is `0`. If no approval is stored, no event is
+    /// emitted.
     pub fn approve_for_owner(
         e: &Env,
         owner: &Address,
@@ -496,9 +512,16 @@ impl Base {
         let key = NFTStorageKey::Approval(token_id);
 
         if live_until_ledger == 0 {
-            e.storage().temporary().remove(&key);
+            // The event names the address that was stored, not the `approved`
+            // argument, which plays no part in a revocation. If no approval is
+            // stored, there is nothing to revoke and no event is emitted.
+            if let Some(ApprovalData { approved: revoked, .. }) =
+                e.storage().temporary().get::<_, ApprovalData>(&key)
+            {
+                e.storage().temporary().remove(&key);
+                emit_approve(e, approver, &revoked, token_id, live_until_ledger);
+            }
 
-            emit_approve(e, approver, approved, token_id, live_until_ledger);
             return;
         }
 
