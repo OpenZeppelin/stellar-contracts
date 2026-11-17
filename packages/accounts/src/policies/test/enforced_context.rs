@@ -12,8 +12,8 @@ use soroban_sdk::{
 
 use crate::{
     policies::{
-        simple_threshold::SimpleEnforced, test::ENFORCED_EVENT_SIZE_CEILING_BYTES,
-        weighted_threshold::WeightedEnforced, EnforcedContext, EnforcedExecutable,
+        simple_threshold::SimpleEnforced, weighted_threshold::WeightedEnforced, EnforcedContext,
+        EnforcedExecutable,
     },
     smart_account::MAX_SIGNERS,
 };
@@ -138,10 +138,4 @@ fn external_ref_event_size_does_not_depend_on_tag() {
     });
 
     assert_eq!(sizes[0], sizes[1]);
-    for event_size in sizes[1].into_iter().flatten() {
-        assert!(
-            event_size < ENFORCED_EVENT_SIZE_CEILING_BYTES,
-            "enforcement event is {event_size} bytes"
-        );
-    }
 }

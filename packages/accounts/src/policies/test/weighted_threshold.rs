@@ -4,15 +4,12 @@ use soroban_sdk::{
     auth::{Context, ContractExecutable, CreateContractWithConstructorHostFnContext},
     contract,
     testutils::{Address as _, Events},
-    xdr::{Limits, WriteXdr},
     Address, Bytes, BytesN, Env, Event, IntoVal, Map, Vec,
 };
+use stellar_test_utils::{assert_events_and_return_within, LIBRARY_HEADROOM_PERCENT};
 
 use crate::{
-    policies::{
-        test::ENFORCED_EVENT_SIZE_CEILING_BYTES, weighted_threshold::*, EnforcedContext,
-        EnforcedExecutable,
-    },
+    policies::{weighted_threshold::*, EnforcedContext, EnforcedExecutable},
     smart_account::{ContextRule, ContextRuleType, Signer},
 };
 
@@ -611,9 +608,8 @@ fn enforce_with_large_constructor_arguments_succeeds() {
 
         let events = e.events().all();
         assert_eq!(events.events().len(), 1);
-        let event = events.events().first().unwrap();
         assert_eq!(
-            event,
+            events.events().first().unwrap(),
             &WeightedEnforced {
                 smart_account: smart_account.clone(),
                 context_rule_id: context_rule.id,
@@ -625,10 +621,7 @@ fn enforce_with_large_constructor_arguments_succeeds() {
             }
             .to_xdr(&e, &address),
         );
-        let event_size = WriteXdr::to_xdr(event, Limits::none()).unwrap().len();
-        assert!(
-            event_size < ENFORCED_EVENT_SIZE_CEILING_BYTES,
-            "enforcement event is {event_size} bytes"
-        );
     });
+
+    assert_events_and_return_within(&e, (), LIBRARY_HEADROOM_PERCENT);
 }

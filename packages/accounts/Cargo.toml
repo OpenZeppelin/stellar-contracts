@@ -25,3 +25,4 @@ soroban-test-helpers = { workspace = true }
 ed25519-dalek = { workspace = true }
 p256 = { workspace = true, features = ["ecdsa"] }
 hex-literal = { workspace = true }
+stellar-test-utils = { workspace = true }
