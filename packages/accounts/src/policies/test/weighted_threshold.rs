@@ -8,9 +8,11 @@ use soroban_sdk::{
     Address, Bytes, BytesN, Env, Event, IntoVal, Map, Vec,
 };
 
-use super::ENFORCED_EVENT_SIZE_CEILING_BYTES;
 use crate::{
-    policies::{weighted_threshold::*, EnforcedContext},
+    policies::{
+        test::ENFORCED_EVENT_SIZE_CEILING_BYTES, weighted_threshold::*, EnforcedContext,
+        EnforcedExecutable,
+    },
     smart_account::{ContextRule, ContextRuleType, Signer},
 };
 
@@ -616,7 +618,7 @@ fn enforce_with_large_constructor_arguments_succeeds() {
                 smart_account: smart_account.clone(),
                 context_rule_id: context_rule.id,
                 context: EnforcedContext::CreateContract(
-                    ContractExecutable::Wasm(wasm_hash),
+                    EnforcedExecutable::Wasm(wasm_hash),
                     salt,
                 ),
                 signer_ids: Vec::from_array(&e, [1]),

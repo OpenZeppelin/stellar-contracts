@@ -171,8 +171,8 @@ pub fn get_threshold(e: &Env, context_rule_id: u32, smart_account: &Address) -> 
 /// * `e` - Access to the Soroban environment.
 /// * `context` - The authorization context.
 /// * `authenticated_signers` - The list of authenticated signers.
-/// * `context_rule` - The context rule for this policy. Its positionally
-///   aligned `signer_ids` are included in the enforcement event.
+/// * `context_rule` - The context rule for this policy. The enforcement event
+///   carries the IDs of the authenticated signers, taken from its `signer_ids`.
 /// * `smart_account` - The address of the smart account.
 ///
 /// # Errors
@@ -203,7 +203,7 @@ pub fn enforce(
         SimpleEnforced {
             smart_account: smart_account.clone(),
             context_rule_id: context_rule.id,
-            context: context.into(),
+            context: EnforcedContext::new(e, context),
             signer_ids: authenticated_signer_ids(e, authenticated_signers, context_rule),
         }
         .publish(e);

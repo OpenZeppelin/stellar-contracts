@@ -8,9 +8,8 @@ use soroban_sdk::{
     Address, Bytes, Env, Event, IntoVal, String, Vec,
 };
 
-use super::ENFORCED_EVENT_SIZE_CEILING_BYTES;
 use crate::{
-    policies::{simple_threshold::*, EnforcedContext},
+    policies::{simple_threshold::*, test::ENFORCED_EVENT_SIZE_CEILING_BYTES, EnforcedContext},
     smart_account::{ContextRule, ContextRuleType, MAX_EXTERNAL_KEY_SIZE, MAX_SIGNERS},
 };
 

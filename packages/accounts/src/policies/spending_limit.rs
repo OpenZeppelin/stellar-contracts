@@ -305,7 +305,7 @@ pub fn enforce(
                         SpendingLimitEnforced {
                             smart_account: smart_account.clone(),
                             context_rule_id: context_rule.id,
-                            context: context.into(),
+                            context: EnforcedContext::new(e, context),
                             amount,
                             total_spent_in_period: data.cached_total_spent,
                         }

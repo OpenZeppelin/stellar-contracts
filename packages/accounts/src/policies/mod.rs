@@ -7,8 +7,8 @@
 //! (rolling window spending limits) that can be used to build policy contracts.
 use soroban_sdk::{
     auth::{
-        Context, ContractContext, ContractExecutable, CreateContractHostFnContext,
-        CreateContractWithConstructorHostFnContext,
+        Context, ContractContext, ContractExecutable, ContractExecutableRef,
+        CreateContractHostFnContext, CreateContractWithConstructorHostFnContext,
     },
     contractclient, contracttype, Address, BytesN, Env, FromVal, Symbol, Val, Vec,
 };
@@ -170,17 +170,9 @@ pub trait Policy {
 
 /// Compact projection of an authorization [`Context`] for policy events.
 ///
-/// Contract-call and constructor arguments are omitted, so their size does not
-/// affect this projection.
-///
-/// # Size Limitation
-///
-/// [`ContractExecutable::ExternalRef`] retains its tag unchanged; this
-/// projection does not bound the tag's size. In Protocol 28, the host can pass
-/// deployment authorizations to `__check_auth` before validating the reference
-/// key, including child authorizations that are never executed. An oversized
-/// tag can therefore still cause an enforcement event to exceed the
-/// transaction's event-size limit even when no deployment takes place.
+/// Contract-call and constructor arguments are omitted and an external
+/// executable reference keeps only the hash of its tag (see
+/// [`EnforcedExecutable`]), so the size of this projection is bounded.
 #[contracttype]
 #[derive(Clone, Debug)]
 pub enum EnforcedContext {
@@ -188,23 +180,57 @@ pub enum EnforcedContext {
     CallContract(Address, Symbol),
     /// Executable and salt of a contract creation, with or without constructor
     /// arguments.
-    CreateContract(ContractExecutable, BytesN<32>),
+    CreateContract(EnforcedExecutable, BytesN<32>),
 }
 
-impl From<&Context> for EnforcedContext {
-    fn from(context: &Context) -> Self {
+/// Fixed-size projection of a [`ContractExecutable`] for policy events.
+#[contracttype]
+#[derive(Clone, Debug)]
+pub enum EnforcedExecutable {
+    /// SHA-256 hash of the Wasm code.
+    Wasm(BytesN<32>),
+    /// Owner of the referenced executable entry and the SHA-256 hash of its
+    /// tag.
+    ExternalRef(Address, BytesN<32>),
+}
+
+impl EnforcedContext {
+    /// Creates the event projection of an authorization context.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context` - The authorization context to project.
+    pub fn new(e: &Env, context: &Context) -> Self {
         match context {
             Context::Contract(ContractContext { contract, fn_name, .. }) => {
                 Self::CallContract(contract.clone(), fn_name.clone())
             }
             Context::CreateContractHostFn(CreateContractHostFnContext { executable, salt }) => {
-                Self::CreateContract(executable.clone(), salt.clone())
+                Self::CreateContract(EnforcedExecutable::new(e, executable), salt.clone())
             }
             Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
                 executable,
                 salt,
                 ..
-            }) => Self::CreateContract(executable.clone(), salt.clone()),
+            }) => Self::CreateContract(EnforcedExecutable::new(e, executable), salt.clone()),
+        }
+    }
+}
+
+impl EnforcedExecutable {
+    /// Creates the event projection of a contract executable.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `executable` - The contract executable to project.
+    pub fn new(e: &Env, executable: &ContractExecutable) -> Self {
+        match executable {
+            ContractExecutable::Wasm(wasm_hash) => Self::Wasm(wasm_hash.clone()),
+            ContractExecutable::ExternalRef(ContractExecutableRef { owner, tag }) => {
+                Self::ExternalRef(owner.clone(), e.crypto().sha256(&tag.to_bytes()).to_bytes())
+            }
         }
     }
 }
