@@ -25,3 +25,4 @@ soroban-sdk = { workspace = true, features = ["testutils"] }
 soroban-test-helpers = { workspace = true }
 k256 = { workspace = true, features = ["ecdsa"] }
 p256 = { workspace = true, features = ["ecdsa"] }
+stellar-test-utils = { workspace = true }

@@ -2759,6 +2759,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-test-utils"
+version = "0.8.0"
+dependencies = [
+ "soroban-env-host 28.0.2",
+ "soroban-sdk 28.0.0",
+]
+
+[[package]]
 name = "stellar-tokens"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2780,6 +2788,7 @@ dependencies = [
  "soroban-test-helpers",
  "stellar-contract-utils 0.8.0",
  "stellar-governance 0.8.0",
+ "stellar-test-utils",
 ]
 
 [[package]]

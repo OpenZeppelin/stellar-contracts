@@ -1,0 +1,15 @@
+[package]
+name = "stellar-test-utils"
+description = "Test support shared by the workspace crates; not published"
+publish = false
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[package.metadata.stellar]
+cargo_inherit = true
+
+[dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+soroban-env-host = { workspace = true }
