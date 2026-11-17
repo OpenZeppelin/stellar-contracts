@@ -470,6 +470,16 @@ For external signers, there are two options:
   - Maximum policies per context rule: 5
 - Signers and policies are stored in a global registry and deduplicated across rules. The same signer object (identified by its XDR encoding) is stored once regardless of how many rules reference it. Each signer and policy is assigned a stable `u32` ID that is used when removing them from a rule (`remove_signer`, `remove_policy`).
 
+## Migration Guide: from v0.8.x to 0.9.0
+
+### Policy enforcement events (breaking change)
+
+The `simple_enforced`, `weighted_enforced`, and `spending_limit_enforced` events no longer carry the full authorization `Context`, whose call and constructor arguments could push an event past the transaction's event-size limit. Event decoders must be updated:
+
+- `context_rule_id` moved from the data to the topics: `[<event_name>, smart_account: Address, context_rule_id: u32]`.
+- `context: Context` is replaced by `context: EnforcedContext`. A contract call keeps its target and function name (`CallContract`), and a deployment keeps its executable and salt (`CreateContract`). Call and constructor arguments are dropped, and an `ExternalRef` executable keeps its owner and the SHA-256 hash of its tag (`EnforcedExecutable::ExternalRef`).
+- In `simple_enforced` and `weighted_enforced`, `authenticated_signers: Vec<Signer>` is replaced by `signer_ids: Vec<u32>`, the registry IDs of the authenticated signers.
+
 ## Migration Guide: from v0.7.x to 0.8.0
 
 ### Signed message now binds the smart account address (breaking change)
