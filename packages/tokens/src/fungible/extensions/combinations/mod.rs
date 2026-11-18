@@ -55,7 +55,9 @@
 //! `Compose<(Vault, Capped, TotalSupply)>`. `RWA`, `Vault` and
 //! `Capped` require `TotalSupply` next to them, e.g.
 //! `Compose<(RWA, TotalSupply)>`; a list with one of them but without
-//! `TotalSupply` is rejected with a dedicated compile error.
+//! `TotalSupply` (e.g. `Compose<(RWA,)>`) is rejected with a dedicated
+//! compile error. The bare form (`Compose<RWA>`) is rejected too, with the
+//! generic error.
 //! `FungibleVotes` tracks voting units, not the token supply, and has no
 //! curated combination with `TotalSupply`. The resolved contract type
 //! enforces every listed transfer
@@ -171,8 +173,9 @@ mod fold {
     /// the list.
     ///
     /// The supply state of a running result is tracked by its wrapper: a
-    /// bare contribution has no supply, `NeedsSupply<C>` is waiting for
-    /// `TotalSupply`, and [`HasSupply<C>`](HasSupply) has it. The bare `RWA`,
+    /// bare contribution has no supply (except `TotalSupply` itself, as the
+    /// first entry or alone), `NeedsSupply<C>` is waiting for `TotalSupply`,
+    /// and [`HasSupply<C>`](HasSupply) has it. The bare `RWA`,
     /// `Vault`, `Capped` and capped combinations therefore only ever appear
     /// inside one of the two wrappers.
     ///
@@ -191,16 +194,17 @@ mod fold {
     #[allow(dead_code)] // type-level marker, never constructed
     pub struct HasSupply<C>(core::marker::PhantomData<C>);
 
-    /// Resolution of a [`HasSupply`] contribution by [`Finalize`]: nothing
-    /// resolves to `TotalSupply`, the list policies to their supply-tracking
-    /// combination, and the self-tracking contract types (`RWA`, `Vault`, the
-    /// capped contract types) to themselves.
+    /// Resolution of a [`HasSupply`] contribution by [`Finalize`]: [`Nil`]
+    /// (only additive extensions next to `TotalSupply`) resolves to
+    /// `TotalSupply`, the list policies to their supply-tracking combination,
+    /// and the self-tracking contract types (`RWA`, `Vault`, the capped
+    /// contract types) to themselves.
     #[diagnostic::on_unimplemented(
         message = "`{Self}` cannot be combined with `TotalSupply` in a `Compose` list",
         note = "no combination of these contract types is curated"
     )]
     pub trait WithSupply {
-        type Out: super::ContractOverrides;
+        type Out: crate::fungible::ContractOverrides;
     }
 
     /// Error carrier for a list that ends with the `TotalSupply` requirement
@@ -215,10 +219,13 @@ mod fold {
     pub trait SupplyRequirementMet {}
 
     /// Final step of the fold: maps the folded contribution to the resolved
-    /// contract type. Its only non-trivial rule is [`Nil`] resolving to
-    /// `Base` (a list of only additive extensions is a vanilla token).
+    /// contract type. Contract types resolve to themselves; the non-trivial
+    /// rules are [`Nil`] resolving to `Base` (a list of only additive
+    /// extensions is a vanilla token), and [`HasSupply<C>`](HasSupply)
+    /// resolving to the supply-tracking contract type of `C` through
+    /// [`WithSupply`].
     pub trait Finalize {
-        type Out: super::ContractOverrides;
+        type Out: crate::fungible::ContractOverrides;
     }
 }
 
@@ -267,10 +274,14 @@ impl Extension for Burnable {
     type Contribution = Nil;
 }
 
-// Identity rows: combining with `Nil` changes nothing. One pair of rows per
-// contract type an entry can contribute directly, plus the `Nil`/`Nil` row
-// for lists of only additive extensions. Curated multi-type combinations are
-// additional rows, declared in both orders so lists stay order-insensitive.
+// Identity rows: combining with `Nil` changes nothing. Both orders for the
+// contract types an entry contributes bare (`TotalSupply` has its own rows
+// below), plus the `Nil`/`Nil` row for lists of only additive extensions.
+// Combined types only need `X + Nil`, since they are never the right-hand
+// side. `Nil + RWA`, `Nil + Vault` and `Nil + Capped` serve the requirement
+// rows below (`Nil: Combine<Y>` when a list starts with additive entries).
+// Curated multi-type combinations are additional rows, declared in both
+// orders so lists stay order-insensitive.
 impl Combine<Nil> for Nil {
     type Out = Nil;
 }
@@ -403,13 +414,19 @@ impl Combine<TotalSupply> for BlockList {
 impl Combine<TotalSupply> for AllowBlockList {
     type Out = HasSupply<AllowBlockList>;
 }
-// `TotalSupply` as the first entry behaves as a supply with nothing in it
-// yet.
-impl<Y> Combine<Y> for TotalSupply
-where
-    HasSupply<Nil>: Combine<Y>,
-{
-    type Out = Pair<HasSupply<Nil>, Y>;
+// `TotalSupply` as the first entry: the next entry gets the supply. There is
+// no row for a second `TotalSupply`, so a duplicate fails right here.
+impl Combine<Nil> for TotalSupply {
+    type Out = HasSupply<Nil>;
+}
+impl Combine<AllowList> for TotalSupply {
+    type Out = HasSupply<AllowList>;
+}
+impl Combine<BlockList> for TotalSupply {
+    type Out = HasSupply<BlockList>;
+}
+impl<Y> Combine<NeedsSupply<Y>> for TotalSupply {
+    type Out = HasSupply<Y>;
 }
 
 // Open `TotalSupply` requirement: the running result is `NeedsSupply<X>`.
@@ -603,7 +620,9 @@ impl Finalize for AllowBlockListVotes {
 
 // Bare forms: a single entry may also be written without the one-element
 // tuple, so a stray trailing comma (or its absence) does not change the
-// meaning.
+// meaning. `RWA`, `Vault` and `Capped` have no bare form: they need
+// `TotalSupply` in the list, so `Compose<RWA>` is rejected (with the generic
+// `Composable` error).
 impl Composable for Base {
     type Out = Base;
 }
