@@ -331,6 +331,19 @@ impl Combine<TotalSupply> for CappedRWA {
 impl Combine<TotalSupply> for CappedVault {
     type Out = CappedVault;
 }
+// The other order: `TotalSupply` first, then the self-tracking contract type.
+// The capped combinations need no row here: they are never entries of the
+// list, so they only ever appear as the running result (on the left).
+impl Combine<RWA> for TotalSupply {
+    type Out = RWA;
+}
+impl Combine<Vault> for TotalSupply {
+    type Out = Vault;
+}
+impl Combine<Capped> for TotalSupply {
+    type Out = Capped;
+}
+
 // A repeated `TotalSupply` is ignored as well, like a repeated additive
 // extension. The rows above already cover a repeat after a self-tracking
 // contract type; these cover a repeat after a `TotalSupply` that is already
@@ -346,15 +359,6 @@ impl Combine<TotalSupply> for TotalSupplyBlockList {
 }
 impl Combine<TotalSupply> for TotalSupplyAllowBlockList {
     type Out = TotalSupplyAllowBlockList;
-}
-impl Combine<RWA> for TotalSupply {
-    type Out = RWA;
-}
-impl Combine<Vault> for TotalSupply {
-    type Out = Vault;
-}
-impl Combine<Capped> for TotalSupply {
-    type Out = Capped;
 }
 
 // Curated capped combinations. A list policy that already tracks the supply
