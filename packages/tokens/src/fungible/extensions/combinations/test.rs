@@ -76,6 +76,8 @@ fn additive_extensions_are_ignored() {
     assert_composes_to::<(RWA, Burnable, TotalSupply), RWA>();
     assert_composes_to::<(TotalSupply, Burnable), TotalSupply>();
     assert_composes_to::<(Burnable, TotalSupply), TotalSupply>();
+    assert_composes_to::<(Burnable, TotalSupply, Burnable, AllowList), TotalSupplyAllowList>();
+    assert_composes_to::<(TotalSupply, Burnable, RWA), RWA>();
     // Higher arities, covering every tuple impl.
     assert_composes_to::<(Burnable, FungibleVotes, Burnable), FungibleVotes>();
     assert_composes_to::<(BlockList, Burnable, Burnable, Burnable), BlockList>();

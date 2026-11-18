@@ -173,8 +173,8 @@ mod fold {
     /// the list.
     ///
     /// The supply state of a running result is tracked by its wrapper: a
-    /// bare contribution has no supply (except `TotalSupply` itself, as the
-    /// first entry or alone), `NeedsSupply<C>` is waiting for `TotalSupply`,
+    /// bare contribution has no supply (except `TotalSupply` itself, until a
+    /// contract type arrives), `NeedsSupply<C>` is waiting for `TotalSupply`,
     /// and [`HasSupply<C>`](HasSupply) has it. The bare `RWA`,
     /// `Vault`, `Capped` and capped combinations therefore only ever appear
     /// inside one of the two wrappers.
@@ -194,11 +194,10 @@ mod fold {
     #[allow(dead_code)] // type-level marker, never constructed
     pub struct HasSupply<C>(core::marker::PhantomData<C>);
 
-    /// Resolution of a [`HasSupply`] contribution by [`Finalize`]: [`Nil`]
-    /// (only additive extensions next to `TotalSupply`) resolves to
-    /// `TotalSupply`, the list policies to their supply-tracking combination,
-    /// and the self-tracking contract types (`RWA`, `Vault`, the capped
-    /// contract types) to themselves.
+    /// Resolution of a [`HasSupply`] contribution by [`Finalize`]: the list
+    /// policies resolve to their supply-tracking combination, and the
+    /// self-tracking contract types (`RWA`, `Vault`, the capped contract
+    /// types) to themselves.
     #[diagnostic::on_unimplemented(
         message = "`{Self}` cannot be combined with `TotalSupply` in a `Compose` list",
         note = "no combination of these contract types is curated"
@@ -401,9 +400,10 @@ impl Combine<Capped> for Vault {
 }
 
 // `TotalSupply` meets a running result without a supply requirement: the
-// result gets the supply.
+// result gets the supply. After only additive entries, the running result
+// is the bare `TotalSupply` itself.
 impl Combine<TotalSupply> for Nil {
-    type Out = HasSupply<Nil>;
+    type Out = TotalSupply;
 }
 impl Combine<TotalSupply> for AllowList {
     type Out = HasSupply<AllowList>;
@@ -414,10 +414,12 @@ impl Combine<TotalSupply> for BlockList {
 impl Combine<TotalSupply> for AllowBlockList {
     type Out = HasSupply<AllowBlockList>;
 }
-// `TotalSupply` as the first entry: the next entry gets the supply. There is
-// no row for a second `TotalSupply`, so a duplicate fails right here.
+// `TotalSupply` as the running result (first entry, or after only additive
+// entries): additive entries keep it bare, and the next contract type gets
+// the supply. There is no row for a second `TotalSupply`, so a duplicate
+// fails right here.
 impl Combine<Nil> for TotalSupply {
-    type Out = HasSupply<Nil>;
+    type Out = TotalSupply;
 }
 impl Combine<AllowList> for TotalSupply {
     type Out = HasSupply<AllowList>;
@@ -536,9 +538,6 @@ where
 // What a contribution resolves to once it tracks the total supply: the list
 // policies resolve to their supply-tracking combination, and the
 // self-tracking contract types to themselves.
-impl WithSupply for Nil {
-    type Out = TotalSupply;
-}
 impl WithSupply for AllowList {
     type Out = TotalSupplyAllowList;
 }
