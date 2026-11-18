@@ -174,7 +174,7 @@ pub trait Policy {
 /// executable reference keeps only the hash of its tag (see
 /// [`EnforcedExecutable`]), so the size of this projection is bounded.
 #[contracttype]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EnforcedContext {
     /// Target contract and function name of a contract invocation.
     CallContract(Address, Symbol),
@@ -185,7 +185,7 @@ pub enum EnforcedContext {
 
 /// Fixed-size projection of a [`ContractExecutable`] for policy events.
 #[contracttype]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EnforcedExecutable {
     /// SHA-256 hash of the Wasm code.
     Wasm(BytesN<32>),

@@ -96,7 +96,7 @@ use crate::{
 
 /// Event emitted when a weighted threshold policy is enforced.
 #[contractevent]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WeightedEnforced {
     #[topic]
     pub smart_account: Address,

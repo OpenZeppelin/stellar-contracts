@@ -58,7 +58,7 @@ use crate::{
 
 /// Event emitted when a simple threshold policy is enforced.
 #[contractevent]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SimpleEnforced {
     #[topic]
     pub smart_account: Address,

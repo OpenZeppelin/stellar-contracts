@@ -45,7 +45,7 @@ use crate::{
 
 /// Event emitted when a spending limit policy is enforced.
 #[contractevent]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpendingLimitEnforced {
     #[topic]
     pub smart_account: Address,
