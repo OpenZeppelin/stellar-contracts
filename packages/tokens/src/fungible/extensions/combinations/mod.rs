@@ -20,6 +20,10 @@
 //!   (`RWA`, `Vault`, [`Capped`] and the capped combinations) changes nothing:
 //!   `Compose<(RWA, TotalSupply)>` resolves to `RWA`, like `Compose<RWA>`.
 //!
+//! The same goes for repeats: listing `Burnable` or `TotalSupply` more than
+//! once is accepted and ignored, in any position. Repeating a contract type
+//! (e.g. `AllowList` twice) is rejected.
+//!
 //! Usage:
 //!
 //! ```ignore
@@ -326,6 +330,22 @@ impl Combine<TotalSupply> for CappedRWA {
 }
 impl Combine<TotalSupply> for CappedVault {
     type Out = CappedVault;
+}
+// A repeated `TotalSupply` is ignored as well, like a repeated additive
+// extension. The rows above already cover a repeat after a self-tracking
+// contract type; these cover a repeat after a `TotalSupply` that is already
+// in the running result, so the repeat is accepted in every position.
+impl Combine<TotalSupply> for TotalSupply {
+    type Out = TotalSupply;
+}
+impl Combine<TotalSupply> for TotalSupplyAllowList {
+    type Out = TotalSupplyAllowList;
+}
+impl Combine<TotalSupply> for TotalSupplyBlockList {
+    type Out = TotalSupplyBlockList;
+}
+impl Combine<TotalSupply> for TotalSupplyAllowBlockList {
+    type Out = TotalSupplyAllowBlockList;
 }
 impl Combine<RWA> for TotalSupply {
     type Out = RWA;

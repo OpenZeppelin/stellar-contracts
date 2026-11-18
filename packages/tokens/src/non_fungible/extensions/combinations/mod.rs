@@ -17,7 +17,9 @@
 //! for [`crate::non_fungible::royalties::NonFungibleRoyalties`]) may be
 //! listed as well: they do not affect the resolved contract type and are
 //! enabled by implementing their trait, whether or not they are listed. A
-//! list holding only additive extensions resolves to [`Base`].
+//! list holding only additive extensions resolves to [`Base`]. Listing an
+//! additive extension more than once is accepted and ignored, in any
+//! position; repeating a contract type (e.g. `Enumerable` twice) is rejected.
 //!
 //! Usage:
 //!

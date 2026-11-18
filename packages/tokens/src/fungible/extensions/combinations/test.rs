@@ -324,6 +324,40 @@ fn total_supply_combinations_are_order_insensitive() {
     assert_ne!(TypeId::of::<TotalSupplyAllowBlockList>(), TypeId::of::<TotalSupplyAllowList>());
 }
 
+// A repeated `TotalSupply` is ignored in every position, like a repeated
+// `Burnable`, whether the supply comes from `TotalSupply` itself or from a
+// self-tracking contract type.
+#[test]
+fn repeated_total_supply_is_ignored_in_any_position() {
+    assert_composes_to::<(TotalSupply, TotalSupply), TotalSupply>();
+    assert_composes_to::<(TotalSupply, Burnable, TotalSupply), TotalSupply>();
+    assert_composes_to::<(RWA, TotalSupply, TotalSupply), RWA>();
+    assert_composes_to::<(TotalSupply, RWA, TotalSupply), RWA>();
+    assert_composes_to::<(TotalSupply, TotalSupply, RWA), RWA>();
+    assert_composes_to::<(TotalSupply, TotalSupply, Vault), Vault>();
+    assert_composes_to::<(TotalSupply, TotalSupply, Capped), Capped>();
+    assert_composes_to::<(AllowList, TotalSupply, TotalSupply), TotalSupplyAllowList>();
+    assert_composes_to::<(TotalSupply, AllowList, TotalSupply), TotalSupplyAllowList>();
+    assert_composes_to::<(TotalSupply, TotalSupply, BlockList), TotalSupplyBlockList>();
+    assert_composes_to::<(BlockList, TotalSupply, TotalSupply), TotalSupplyBlockList>();
+    assert_composes_to::<(AllowList, BlockList, TotalSupply, TotalSupply), TotalSupplyAllowBlockList>(
+    );
+    assert_composes_to::<(TotalSupply, AllowList, BlockList, TotalSupply), TotalSupplyAllowBlockList>(
+    );
+    assert_composes_to::<(AllowList, TotalSupply, Capped, TotalSupply), CappedAllowList>();
+    assert_composes_to::<(AllowList, TotalSupply, TotalSupply, Capped), CappedAllowList>();
+    assert_composes_to::<(TotalSupply, TotalSupply, AllowList, Capped), CappedAllowList>();
+    assert_composes_to::<(RWA, TotalSupply, Capped, TotalSupply), CappedRWA>();
+    assert_composes_to::<(TotalSupply, TotalSupply, RWA, Capped), CappedRWA>();
+}
+
+#[test]
+fn repeated_burnable_is_ignored_in_any_position() {
+    assert_composes_to::<(Burnable, AllowList, Burnable), AllowList>();
+    assert_composes_to::<(Burnable, Burnable, RWA), RWA>();
+    assert_composes_to::<(AllowList, Burnable, TotalSupply, Burnable), TotalSupplyAllowList>();
+}
+
 // `RWA` and `Vault` track the supply themselves: they resolve to themselves
 // with or without `TotalSupply` listed, in any position.
 #[test]
