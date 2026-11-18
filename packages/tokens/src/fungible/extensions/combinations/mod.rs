@@ -188,9 +188,11 @@ mod fold {
 
     /// Running result of a list whose `TotalSupply` requirement is met: the
     /// contribution `C` it stands for, now tracking the total supply. Reached
-    /// when `TotalSupply` meets a running result or an open [`NeedsSupply`]
-    /// requirement. [`Finalize`] maps it to the supply-tracking contract type
-    /// of `C` (refer to [`WithSupply`]).
+    /// when `TotalSupply` meets `AllowList`, `BlockList`, `AllowBlockList` or
+    /// an open [`NeedsSupply`] requirement, in either order. (`TotalSupply`
+    /// next to only additive entries stays the bare `TotalSupply`.) Later
+    /// entries fold into `C` and keep the wrapper. [`Finalize`] maps it to the
+    /// supply-tracking contract type of `C` (refer to [`WithSupply`]).
     #[allow(dead_code)] // type-level marker, never constructed
     pub struct HasSupply<C>(core::marker::PhantomData<C>);
 

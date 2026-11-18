@@ -50,8 +50,10 @@
 //! ```
 //!
 //! In the [`crate::fungible::combinations::Compose`] list, `Capped` requires
-//! `TotalSupply` next to it, like `RWA` and `Vault`, and a list with `Capped`
-//! but without `TotalSupply` is rejected with a dedicated compile error.
+//! `TotalSupply` next to it, like `RWA` and `Vault`. A list with `Capped` but
+//! without `TotalSupply` (e.g. `Compose<(Capped,)>`) is rejected with a
+//! dedicated compile error; the bare form (`Compose<Capped>`) is rejected
+//! too, with the generic error.
 //! `Compose<(Capped, TotalSupply)>` resolves to [`Capped`]; `Capped` combined
 //! with `AllowList`, `BlockList` (or both), `RWA` or `Vault` resolves to the
 //! matching capped combination, e.g. `Compose<(AllowList, Capped,
