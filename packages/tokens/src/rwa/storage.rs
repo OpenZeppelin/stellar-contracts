@@ -91,14 +91,14 @@ impl MintOverrides for RWA {
 /// bound.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not an RWA contract type, so `RWAToken` cannot be implemented",
-    note = "list `RWA` in the `Compose` list, e.g. `Compose<(RWA, TotalSupply)>`"
+    note = "list `RWA` in the `Compose` list, e.g. `Compose<(RWA,)>`"
 )]
 pub trait RWAContractType {}
 
 impl RWAContractType for RWA {}
 
 /// Contract type enforcing a maximum total supply on top of [`RWA`], resolved
-/// by `Compose<(RWA, Capped, TotalSupply)>`.
+/// by `Compose<(RWA, Capped)>`.
 ///
 /// Its `mint` and `batch_mint` check the cap (refer to
 /// [`crate::fungible::capped::Capped`]) before running RWA's own mint path.

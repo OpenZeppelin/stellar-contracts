@@ -193,7 +193,10 @@ pub trait FungibleToken {
     /// the token is made of: `Compose<(Base,)>` for the vanilla case,
     /// `Compose<(AllowList,)>` for an allowlist token,
     /// `Compose<(AllowList, TotalSupply)>` for a curated combination, and so
-    /// on. Invalid lists are rejected at compile time.
+    /// on. Only the entries that change the contract type have to be listed;
+    /// additive extensions (e.g. `Burnable`), and `TotalSupply` next to a
+    /// contract type that already tracks the supply, may be left out. Invalid
+    /// lists are rejected at compile time.
     type ContractType: ContractOverrides;
 
     /// Returns the amount of tokens held by `account`.

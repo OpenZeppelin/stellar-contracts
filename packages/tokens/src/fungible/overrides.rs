@@ -181,6 +181,22 @@ impl MintOverrides for Base {
 /// type. The same holds for the contract types that do not track the supply:
 /// `AllowList`, `BlockList`, `AllowBlockList`, `FungibleVotes` and the votes
 /// combinations.
+///
+/// Whether `TotalSupply` has to be listed in the `Compose` list depends on the
+/// rest of the list: `AllowList` and `BlockList` need it to track the supply,
+/// while `RWA`, `Vault` and `Capped` track it on their own. Implementing
+/// `FungibleTotalSupply` on a contract type that does not track the supply
+/// is the case where a missing `TotalSupply` surfaces, so this trait carries
+/// a dedicated compile error pointing at the fix.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not track the total supply, so `FungibleTotalSupply` cannot be \
+               implemented",
+    note = "add `TotalSupply` to the `Compose` list, e.g. `Compose<(AllowList, TotalSupply)>`",
+    note = "`RWA`, `Vault` and `Capped` track the supply on their own and need no `TotalSupply` \
+            entry",
+    note = "`Base`, `FungibleVotes` and the votes combinations have no supply-tracking \
+            combination; `Compose<(TotalSupply,)>` replaces `Base`"
+)]
 pub trait TotalSupplyOverrides {
     fn total_supply(e: &Env) -> i128 {
         total_supply(e)

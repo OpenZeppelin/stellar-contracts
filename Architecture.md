@@ -315,16 +315,21 @@ pub struct MyToken;
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for MyToken {
-    // From a type-safety perspective there are two kinds of extensions:
-    // *overriding* ones change the base behavior and compete for the single
-    // `ContractType` slot, so `Compose` must resolve them; *additive* ones
-    // (e.g. `Burnable`) change nothing and override nothing. Listing an
-    // additive extension in `Compose` serves no type-safety purpose: the
-    // entry is ignored by the resolution, and the extension is enabled by
-    // implementing its trait, listed or not. Listing them is made optional
-    // purely to unify the developer experience: developers can list every
-    // extension they use and never have to figure out which ones are
-    // additive and which ones are overriding.
+    // `Compose` determines the base type of the token; the extension traits
+    // the contract implements decide which entry points it exposes. The rule
+    // for the list follows from that: an entry has to be listed when it
+    // changes the base type, and may be listed or left out otherwise.
+    // *Overriding* extensions change the base behavior and compete for the
+    // single `ContractType` slot, so `Compose` must resolve them; *additive*
+    // ones (e.g. `Burnable`) change nothing and override nothing, so listing
+    // them is optional: the entry is ignored by the resolution, and the
+    // extension is enabled by implementing its trait, listed or not. The
+    // same holds for `TotalSupply` next to a contract type that already
+    // tracks the supply (`RWA`, `Vault`, `Capped`), while next to `AllowList`
+    // or `BlockList` it changes the type and has to be listed. Accepting the
+    // optional entries unifies the developer experience: developers can list
+    // every extension they use and never have to figure out which ones
+    // change the type.
     type ContractType = Compose<(Base,)>;
     // The macro fills in every method body, no manual overrides needed.
     // Alternatively, custom overrides can be provided here (optional)

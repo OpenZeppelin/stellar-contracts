@@ -132,6 +132,8 @@ pub trait NonFungibleToken {
     /// [`crate::non_fungible::combinations::Compose`], by listing the
     /// extensions the token is made of: `Compose<(Base,)>` for the vanilla
     /// case, `Compose<(Enumerable,)>` for an enumerable token, and so on.
+    /// Only the entries that change the contract type have to be listed;
+    /// additive extensions (e.g. `Burnable`, `Royalties`) may be left out.
     /// Invalid lists are rejected at compile time.
     type ContractType: ContractOverrides;
 

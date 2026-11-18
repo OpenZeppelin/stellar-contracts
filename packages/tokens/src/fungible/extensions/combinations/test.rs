@@ -55,6 +55,9 @@ fn bare_forms_resolve_to_themselves() {
     assert_composes_to::<BlockList, BlockList>();
     assert_composes_to::<TotalSupply, TotalSupply>();
     assert_composes_to::<FungibleVotes, FungibleVotes>();
+    assert_composes_to::<RWA, RWA>();
+    assert_composes_to::<Vault, Vault>();
+    assert_composes_to::<Capped, Capped>();
 }
 
 #[test]
@@ -64,6 +67,9 @@ fn tuple_forms_resolve_to_themselves() {
     assert_composes_to::<(BlockList,), BlockList>();
     assert_composes_to::<(TotalSupply,), TotalSupply>();
     assert_composes_to::<(FungibleVotes,), FungibleVotes>();
+    assert_composes_to::<(RWA,), RWA>();
+    assert_composes_to::<(Vault,), Vault>();
+    assert_composes_to::<(Capped,), Capped>();
 }
 
 #[test]
@@ -94,12 +100,27 @@ fn additive_only_lists_resolve_to_base() {
     assert_composes_to::<(Burnable, Burnable), Base>();
 }
 
-// `Capped` is a contract type of its own and, like `RWA` and `Vault`, requires
-// `TotalSupply` in the list. Every capped list resolves to its capped contract
-// type in every order. Lists missing `TotalSupply` are rejected at compile
-// time and cannot be covered here.
+// `Capped` is a contract type of its own and, like `RWA` and `Vault`, tracks
+// the supply itself. Every capped list resolves to its capped contract type in
+// every order, with or without `TotalSupply` listed.
 #[test]
 fn capped_lists_resolve_to_the_capped_contract_types() {
+    assert_composes_to::<(Burnable, Capped), Capped>();
+    assert_composes_to::<(AllowList, Capped), CappedAllowList>();
+    assert_composes_to::<(Capped, AllowList), CappedAllowList>();
+    assert_composes_to::<(BlockList, Capped), CappedBlockList>();
+    assert_composes_to::<(Capped, BlockList), CappedBlockList>();
+    assert_composes_to::<(AllowList, BlockList, Capped), CappedAllowBlockList>();
+    assert_composes_to::<(AllowList, Capped, BlockList), CappedAllowBlockList>();
+    assert_composes_to::<(BlockList, AllowList, Capped), CappedAllowBlockList>();
+    assert_composes_to::<(BlockList, Capped, AllowList), CappedAllowBlockList>();
+    assert_composes_to::<(Capped, AllowList, BlockList), CappedAllowBlockList>();
+    assert_composes_to::<(Capped, BlockList, AllowList), CappedAllowBlockList>();
+    assert_composes_to::<(RWA, Capped), CappedRWA>();
+    assert_composes_to::<(Capped, RWA), CappedRWA>();
+    assert_composes_to::<(Vault, Capped), CappedVault>();
+    assert_composes_to::<(Capped, Vault), CappedVault>();
+    // `TotalSupply` listed as well changes nothing.
     assert_composes_to::<(Capped, TotalSupply), Capped>();
     assert_composes_to::<(TotalSupply, Capped), Capped>();
     assert_composes_to::<(Burnable, Capped, TotalSupply), Capped>();
@@ -303,11 +324,12 @@ fn total_supply_combinations_are_order_insensitive() {
     assert_ne!(TypeId::of::<TotalSupplyAllowBlockList>(), TypeId::of::<TotalSupplyAllowList>());
 }
 
-// `RWA` and `Vault` require `TotalSupply` in the list and resolve to
-// themselves once it is there, in any position. Lists missing it are rejected
-// at compile time and cannot be covered here.
+// `RWA` and `Vault` track the supply themselves: they resolve to themselves
+// with or without `TotalSupply` listed, in any position.
 #[test]
-fn rwa_and_vault_require_total_supply_in_the_list() {
+fn total_supply_is_ignored_next_to_rwa_and_vault() {
+    assert_composes_to::<(Burnable, RWA), RWA>();
+    assert_composes_to::<(Vault, Burnable), Vault>();
     assert_composes_to::<(RWA, TotalSupply), RWA>();
     assert_composes_to::<(TotalSupply, RWA), RWA>();
     assert_composes_to::<(Burnable, RWA, Burnable, TotalSupply), RWA>();

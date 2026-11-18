@@ -6,6 +6,12 @@
 //! uniformly with [`Compose`], by listing the extensions the token is made
 //! of.
 //!
+//! The list determines the base type of the token; the extension traits the
+//! contract implements decide which entry points it exposes. This gives the
+//! rule for what goes in the list: an entry has to be listed when it changes
+//! the base type, and an entry that does not change it may be listed or left
+//! out (it is accepted and ignored).
+//!
 //! Additive extensions (e.g. [`Burnable`] for
 //! [`crate::non_fungible::burnable::NonFungibleBurnable`], or [`Royalties`]
 //! for [`crate::non_fungible::royalties::NonFungibleRoyalties`]) may be
