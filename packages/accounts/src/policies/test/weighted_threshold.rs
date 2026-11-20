@@ -1,14 +1,15 @@
 extern crate std;
 
 use soroban_sdk::{
-    auth::Context,
+    auth::{Context, ContractExecutable, CreateContractWithConstructorHostFnContext},
     contract,
     testutils::{Address as _, Events},
-    Address, Env, IntoVal, Map, Vec,
+    Address, Bytes, BytesN, Env, Event, IntoVal, Map, Vec,
 };
+use stellar_test_utils::{assert_events_and_return_within, LIBRARY_HEADROOM_PERCENT};
 
 use crate::{
-    policies::weighted_threshold::*,
+    policies::{weighted_threshold::*, EnforcedContext, EnforcedExecutable},
     smart_account::{ContextRule, ContextRuleType, Signer},
 };
 
@@ -37,7 +38,7 @@ fn create_test_context_rule(e: &Env) -> ContextRule {
         context_type: ContextRuleType::Default,
         name: soroban_sdk::String::from_str(e, "test_rule"),
         signers,
-        signer_ids: Vec::new(e),
+        signer_ids: Vec::from_array(e, [1, 2]),
         policies,
         policy_ids: Vec::new(e),
         valid_until: None,
@@ -264,23 +265,21 @@ fn enforce_success() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let smart_account = Address::generate(&e);
+    let context_rule = create_test_context_rule(&e);
+    let signer = context_rule.signers.get_unchecked(0);
+    let authenticated_signers = Vec::from_array(&e, [signer.clone()]);
+    let mut signer_weights = Map::new(&e);
+    signer_weights.set(signer, 100);
 
     e.mock_all_auths();
 
-    let authenticated_signers = e.as_contract(&address, || {
-        let (weights, addr1, _) = create_test_weights(&e);
-        let authenticated_signers = Vec::from_array(&e, [Signer::Delegated(addr1)]);
-        let params = WeightedThresholdAccountParams { signer_weights: weights, threshold: 75 };
-        let context_rule = create_test_context_rule(&e);
+    e.as_contract(&address, || {
+        let params = WeightedThresholdAccountParams { signer_weights, threshold: 75 };
 
         install(&e, &params, &context_rule, &smart_account);
-
-        authenticated_signers
     });
 
     e.as_contract(&address, || {
-        let context_rule = create_test_context_rule(&e);
-
         let context = Context::Contract(soroban_sdk::auth::ContractContext {
             contract: Address::generate(&e),
             fn_name: soroban_sdk::symbol_short!("test"),
@@ -573,4 +572,56 @@ fn enforce_threshold_not_met_fails() {
         // Should fail because weight is 50 but threshold is 75
         enforce(&e, &context, &authenticated_signers, &context_rule, &smart_account);
     });
+}
+
+#[test]
+fn enforce_with_large_constructor_arguments_succeeds() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_test_context_rule(&e);
+    let signer = context_rule.signers.get_unchecked(0);
+    let authenticated_signers = Vec::from_array(&e, [signer.clone()]);
+    let mut signer_weights = Map::new(&e);
+    signer_weights.set(signer, 100);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let params = WeightedThresholdAccountParams { signer_weights, threshold: 75 };
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        let wasm_hash = BytesN::from_array(&e, &[1; 32]);
+        let salt = BytesN::from_array(&e, &[2; 32]);
+        let constructor_args =
+            Vec::from_array(&e, [Bytes::from_slice(&e, &std::vec![0; 20_000]).into_val(&e)]);
+        let context =
+            Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
+                executable: ContractExecutable::Wasm(wasm_hash.clone()),
+                salt: salt.clone(),
+                constructor_args,
+            });
+
+        enforce(&e, &context, &authenticated_signers, &context_rule, &smart_account);
+
+        let events = e.events().all();
+        assert_eq!(events.events().len(), 1);
+        assert_eq!(
+            events.events().first().unwrap(),
+            &WeightedEnforced {
+                smart_account: smart_account.clone(),
+                context_rule_id: context_rule.id,
+                context: EnforcedContext::CreateContract(
+                    EnforcedExecutable::Wasm(wasm_hash),
+                    salt,
+                ),
+                signer_ids: Vec::from_array(&e, [1]),
+            }
+            .to_xdr(&e, &address),
+        );
+    });
+
+    assert_events_and_return_within(&e, (), LIBRARY_HEADROOM_PERCENT);
 }

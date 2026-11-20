@@ -5,7 +5,13 @@
 //! utility functions for `simple_threshold` (basic M-of-N multisig),
 //! `weighted_threshold` (complex weighted voting), and `spending_limit`
 //! (rolling window spending limits) that can be used to build policy contracts.
-use soroban_sdk::{auth::Context, contractclient, Address, Env, FromVal, Val, Vec};
+use soroban_sdk::{
+    auth::{
+        Context, ContractContext, ContractExecutable, ContractExecutableRef,
+        CreateContractHostFnContext, CreateContractWithConstructorHostFnContext,
+    },
+    contractclient, contracttype, Address, BytesN, Env, FromVal, Symbol, Val, Vec,
+};
 
 use crate::smart_account::{ContextRule, Signer};
 
@@ -160,6 +166,98 @@ pub trait Policy {
     /// policy-specific (e.g., removing threshold parameters, clearing
     /// spending windows).
     fn uninstall(e: &Env, context_rule: ContextRule, smart_account: Address);
+}
+
+/// Compact projection of an authorization [`Context`] for policy events.
+///
+/// Contract-call and constructor arguments are omitted and an external
+/// executable reference keeps only the hash of its tag (see
+/// [`EnforcedExecutable`]), so the size of this projection is bounded.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EnforcedContext {
+    /// Target contract and function name of a contract invocation.
+    CallContract(Address, Symbol),
+    /// Executable and salt of a contract creation, with or without constructor
+    /// arguments.
+    CreateContract(EnforcedExecutable, BytesN<32>),
+}
+
+/// Fixed-size projection of a [`ContractExecutable`] for policy events.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EnforcedExecutable {
+    /// SHA-256 hash of the Wasm code.
+    Wasm(BytesN<32>),
+    /// Owner of the referenced executable entry and the SHA-256 hash of its
+    /// tag.
+    ExternalRef(Address, BytesN<32>),
+}
+
+impl EnforcedContext {
+    /// Creates the event projection of an authorization context.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context` - The authorization context to project.
+    pub fn new(e: &Env, context: &Context) -> Self {
+        match context {
+            Context::Contract(ContractContext { contract, fn_name, .. }) => {
+                Self::CallContract(contract.clone(), fn_name.clone())
+            }
+            Context::CreateContractHostFn(CreateContractHostFnContext { executable, salt }) => {
+                Self::CreateContract(EnforcedExecutable::new(e, executable), salt.clone())
+            }
+            Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
+                executable,
+                salt,
+                ..
+            }) => Self::CreateContract(EnforcedExecutable::new(e, executable), salt.clone()),
+        }
+    }
+}
+
+impl EnforcedExecutable {
+    /// Creates the event projection of a contract executable.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `executable` - The contract executable to project.
+    pub fn new(e: &Env, executable: &ContractExecutable) -> Self {
+        match executable {
+            ContractExecutable::Wasm(wasm_hash) => Self::Wasm(wasm_hash.clone()),
+            ContractExecutable::ExternalRef(ContractExecutableRef { owner, tag }) => {
+                Self::ExternalRef(owner.clone(), e.crypto().sha256(&tag.to_bytes()).to_bytes())
+            }
+        }
+    }
+}
+
+/// Resolves authenticated signers to their positionally aligned IDs in a
+/// context rule.
+///
+/// The smart-account authorization path constructs `authenticated_signers` by
+/// filtering `context_rule.signers`, so every signer in this vector belongs to
+/// the rule and preserves the rule's order. The signer and signer-ID vectors
+/// are kept positionally aligned when a context rule is loaded. A signer with
+/// no aligned ID is omitted, keeping direct calls with a malformed
+/// [`ContextRule`] from panicking while leaving the standard path unchanged.
+fn authenticated_signer_ids(
+    e: &Env,
+    authenticated_signers: &Vec<Signer>,
+    context_rule: &ContextRule,
+) -> Vec<u32> {
+    Vec::from_iter(
+        e,
+        authenticated_signers.iter().filter_map(|signer| {
+            context_rule
+                .signers
+                .first_index_of(&signer)
+                .and_then(|index| context_rule.signer_ids.get(index))
+        }),
+    )
 }
 
 // A `PolicyClientInterface` must be declared here instead of using the public
