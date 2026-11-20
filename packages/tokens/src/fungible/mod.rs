@@ -35,8 +35,9 @@
 //!   symbol, and decimals.
 //! - Burnable: Enables token holders to destroy their tokens.
 //! - TotalSupply: Tracks and exposes the total amount of tokens in circulation.
-//! - Capped: Enables the contract to set a maximum limit on the total supply
-//!   (requires the TotalSupply extension).
+//! - Capped: Enables the contract to set a maximum limit on the total supply.
+//!   Listing the `TotalSupply` type in the `Compose<(...)>` list is optional,
+//!   but the contract has to implement the `FungibleTotalSupply` trait.
 //!
 //! ## Compatibility and Compliance
 //!

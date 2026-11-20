@@ -82,8 +82,8 @@ background. There is no need to implement or import it.
 #### Extensions
 
 - **Burnable**: Allow token holders to destroy their tokens
-- **TotalSupply**: Track and expose the total supply (opt-in; `RWA`, `Vault` and `Capped` require it). Tokens upgraded from v0.7.x or earlier have to migrate the stored supply with `migrate_total_supply` (see `examples/upgradeable/v2`)
-- **Capped**: Set maximum supply limits (requires the TotalSupply extension)
+- **TotalSupply**: Track and expose the total supply (opt-in). For `RWA`, `Vault` and `Capped`, listing the `TotalSupply` type in the `Compose<(...)>` list is optional, but the contract has to implement the `FungibleTotalSupply` trait. Tokens upgraded from v0.7.x or earlier have to migrate the stored supply with `migrate_total_supply` (see `examples/upgradeable/v2`)
+- **Capped**: Set maximum supply limits (listing the `TotalSupply` type in the `Compose<(...)>` list is optional, but the contract has to implement the `FungibleTotalSupply` trait)
 - **Allowlist**: Restrict transfers to approved addresses
 - **Blocklist**: Prevent transfers from/to blocked addresses
 - **Votes**: Track voting power for governance integration

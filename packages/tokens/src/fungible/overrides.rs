@@ -191,7 +191,8 @@ impl MintOverrides for Base {
 #[diagnostic::on_unimplemented(
     message = "`{Self}` does not track the total supply, so `FungibleTotalSupply` cannot be \
                implemented",
-    note = "add `TotalSupply` to the `Compose` list, e.g. `Compose<(AllowList, TotalSupply)>`",
+    note = "for `AllowList`, `BlockList` or both, add `TotalSupply` to the `Compose` list, e.g. \
+            `Compose<(AllowList, TotalSupply)>`",
     note = "`RWA`, `Vault` and `Capped` track the supply on their own and need no `TotalSupply` \
             entry",
     note = "`Base`, `FungibleVotes` and the votes combinations have no supply-tracking \

@@ -63,6 +63,17 @@
 //! from such a version has to move it with [`migrate_total_supply`] right
 //! after the upgrade, otherwise its supply reads as `0` and burns panic. The
 //! `examples/upgradeable` `v1` / `v2` contracts show the full upgrade.
+//!
+//! The same gap appears when a deployed token that never tracked the supply
+//! (e.g. one on `Base`, `AllowList` or `FungibleVotes`) is upgraded to a
+//! supply-tracking contract type (`TotalSupply`, a `TotalSupply`
+//! combination, or `Capped`). Nothing records the balances that already
+//! exist, so `total_supply()` reads `0` (or only what was minted after the
+//! upgrade), burning a pre-upgrade balance panics with
+//! [`crate::fungible::FungibleTokenError::MathOverflow`], and a `Capped`
+//! token can mint past its cap. Such an upgrade has to seed the counter with
+//! the circulating supply (e.g. through [`increase_total_supply`]) in the
+//! same transaction.
 
 pub mod storage;
 

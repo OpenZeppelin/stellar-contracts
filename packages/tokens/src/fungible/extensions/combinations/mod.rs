@@ -9,8 +9,9 @@
 //! contract implements decide which entry points it exposes. This gives the
 //! rule for what goes in the list: an entry has to be listed when it changes
 //! the base type, and an entry that does not change it may be listed or left
-//! out (it is accepted and ignored). Two kinds of entries do not change the
-//! base type:
+//! out (it is accepted and ignored). The exception is `Base` itself, which
+//! cannot be listed next to anything else (`Compose<(AllowList, Base)>` is
+//! rejected). Two kinds of entries do not change the base type:
 //!
 //! - Additive extensions (e.g. [`Burnable`] for
 //!   [`crate::fungible::burnable::FungibleBurnable`]) are enabled by

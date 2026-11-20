@@ -37,8 +37,8 @@ type TotalSupplyBlockList = Compose<(TotalSupply, BlockList)>;
 type TotalSupplyAllowBlockList = Compose<(BlockList, TotalSupply, AllowList)>;
 
 // Pins every `Composable` mapping: the resolved `Out` type must be exactly the
-// expected contract type. Invalid lists are rejected at compile time and
-// cannot be covered here without a compile-fail harness.
+// expected contract type. Rejected lists are pinned separately, by the
+// compile-time checks below.
 fn assert_composes_to<List, Expected>()
 where
     List: Composable,
@@ -47,6 +47,40 @@ where
 {
     assert_eq!(TypeId::of::<Compose<List>>(), TypeId::of::<Expected>());
 }
+
+// Compile-time check of whether a list is accepted, so that rejected lists
+// can be pinned without a compile-fail harness. A path like
+// `IsComposable::<L>::VALUE` prefers the inherent constant, which only exists
+// when `L: Composable`; otherwise it falls back to the trait constant.
+struct IsComposable<L: ?Sized>(core::marker::PhantomData<L>);
+
+trait NotComposable {
+    const VALUE: bool = false;
+}
+impl<L: ?Sized> NotComposable for IsComposable<L> {}
+
+impl<L: ?Sized + Composable> IsComposable<L> {
+    const VALUE: bool = true;
+}
+
+// Sanity check: the probe reports an accepted list as accepted.
+const _: () = assert!(IsComposable::<(AllowList, BlockList)>::VALUE);
+const _: () = assert!(IsComposable::<(Burnable, Vault)>::VALUE);
+// Repeated contract types are rejected.
+const _: () = assert!(!IsComposable::<(AllowList, AllowList)>::VALUE);
+const _: () = assert!(!IsComposable::<(BlockList, BlockList)>::VALUE);
+const _: () = assert!(!IsComposable::<(Capped, Capped)>::VALUE);
+const _: () = assert!(!IsComposable::<(RWA, RWA)>::VALUE);
+// Contract types without a curated combination are rejected.
+const _: () = assert!(!IsComposable::<(AllowList, RWA)>::VALUE);
+const _: () = assert!(!IsComposable::<(RWA, Vault)>::VALUE);
+const _: () = assert!(!IsComposable::<(FungibleVotes, Capped)>::VALUE);
+// `TotalSupply` has no combination with the contract types that do not track
+// the supply, and `Base` combines with nothing.
+const _: () = assert!(!IsComposable::<(FungibleVotes, TotalSupply)>::VALUE);
+const _: () = assert!(!IsComposable::<(AllowList, FungibleVotes, TotalSupply)>::VALUE);
+const _: () = assert!(!IsComposable::<(Base, TotalSupply)>::VALUE);
+const _: () = assert!(!IsComposable::<(AllowList, Base)>::VALUE);
 
 #[test]
 fn bare_forms_resolve_to_themselves() {
@@ -364,6 +398,7 @@ fn repeated_burnable_is_ignored_in_any_position() {
 fn total_supply_is_ignored_next_to_rwa_and_vault() {
     assert_composes_to::<(Burnable, RWA), RWA>();
     assert_composes_to::<(Vault, Burnable), Vault>();
+    assert_composes_to::<(Burnable, Vault), Vault>();
     assert_composes_to::<(RWA, TotalSupply), RWA>();
     assert_composes_to::<(TotalSupply, RWA), RWA>();
     assert_composes_to::<(Burnable, RWA, Burnable, TotalSupply), RWA>();
