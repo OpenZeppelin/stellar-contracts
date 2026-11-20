@@ -91,6 +91,7 @@ global POSEIDON2_IV_BASE: Field = 18446744073709551616; // 2^64
 /// | `delta_aud_r`     | 12    | `AUDITOR_RECIPIENT`               |
 /// | `delta_ecdh`      | 13    | `ECDH_SHARED_SECRET`              |
 /// | `delta_esc_allow_r_aud` | 17 | `ESCROWED_ALLOWANCE_BLINDING_AUDITOR` |
+/// | `delta_forced_dest` | 18 | `FORCED_DESTINATION` |
 ///
 /// Tags 14-16 are not implemented here (docs/protocol/domain-separators.md).
 pub mod domain {
@@ -151,6 +152,11 @@ pub mod domain {
     /// `Poseidon2(ESCROWED_ALLOWANCE_BLINDING_AUDITOR, s_a_s, op_i)`.
     /// Constraint S14, docs/protocol/auditing.md#spender-allowance-auditing (`delta_esc_allow_r_aud`).
     pub global ESCROWED_ALLOWANCE_BLINDING_AUDITOR: Field = 17;
+    /// Destination public input of a forced transfer:
+    /// `Poseidon2(FORCED_DESTINATION, address_to_field(to))`.
+    /// docs/compliance.md#forced-transfer (`delta_forced_dest`). Like `ADDRESS`, the contract computes
+    /// it off-circuit; the clawback circuit consumes the resulting Field as an opaque public input.
+    pub global FORCED_DESTINATION: Field = 18;
 }
 
 // ################## CORE PRIMITIVES ##################
