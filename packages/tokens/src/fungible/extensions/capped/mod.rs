@@ -39,7 +39,7 @@
 //!
 //! #[contractimpl(contracttrait)]
 //! impl FungibleToken for MyToken {
-//!     type ContractType = Compose<(Capped, TotalSupply)>;
+//!     type ContractType = Compose<(Capped,)>;
 //! }
 //!
 //! #[contractimpl(contracttrait)]
@@ -49,13 +49,13 @@
 //! impl FungibleCapped for MyToken {}
 //! ```
 //!
-//! In the [`crate::fungible::combinations::Compose`] list, `Capped` requires
-//! `TotalSupply` next to it, like `RWA` and `Vault`, and a list with `Capped`
-//! but without `TotalSupply` is rejected with a dedicated compile error.
-//! `Compose<(Capped, TotalSupply)>` resolves to [`Capped`]; `Capped` combined
-//! with `AllowList`, `BlockList` (or both), `RWA` or `Vault` resolves to the
-//! matching capped combination, e.g. `Compose<(AllowList, Capped,
-//! TotalSupply)>` to `CappedAllowList`.
+//! The [`Capped`] contract type tracks the supply the cap is checked against,
+//! like `RWA` and `Vault`, so `TotalSupply` does not need to be listed next
+//! to it; listing it is accepted and changes nothing.
+//! `Compose<(Capped,)>` resolves to [`Capped`]; `Capped` combined with
+//! `AllowList`, `BlockList` (or both), `RWA` or `Vault` resolves to the
+//! matching capped combination, e.g. `Compose<(AllowList, Capped)>` to
+//! `CappedAllowList`.
 //!
 //! On a capped vault, the cap bounds the supply of shares: it is enforced on
 //! `deposit` and `mint`, and reflected in `max_deposit` and `max_mint`.

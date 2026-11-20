@@ -53,7 +53,7 @@ impl TotalSupplyOverrides for Vault {}
 /// behavior is picked based on the contract's `ContractType`.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a vault contract type, so `FungibleVault` cannot be implemented",
-    note = "list `Vault` in the `Compose` list, e.g. `Compose<(Vault, TotalSupply)>`"
+    note = "list `Vault` in the `Compose` list, e.g. `Compose<(Vault,)>`"
 )]
 pub trait VaultOverrides {
     fn query_asset(e: &Env) -> Address {
@@ -130,7 +130,7 @@ pub trait VaultOverrides {
 impl VaultOverrides for Vault {}
 
 /// Contract type enforcing a maximum supply of shares on top of [`Vault`],
-/// resolved by `Compose<(Vault, Capped, TotalSupply)>`.
+/// resolved by `Compose<(Vault, Capped)>`.
 ///
 /// The cap (refer to [`crate::fungible::capped::Capped`]) bounds the number of
 /// shares in circulation. It is enforced on both share-creating entry points,

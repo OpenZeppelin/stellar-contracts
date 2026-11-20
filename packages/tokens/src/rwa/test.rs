@@ -10,7 +10,7 @@ use stellar_contract_utils::pausable::{self, Pausable};
 use crate::{
     fungible::{
         capped::{Capped, FungibleCapped},
-        total_supply::{FungibleTotalSupply, TotalSupply, TotalSupplyOverrides},
+        total_supply::{FungibleTotalSupply, TotalSupplyOverrides},
         Compose, ContractOverrides, FungibleToken, FungibleTokenError, MintOverrides,
         MuxedTransfer, Transfer,
     },
@@ -2000,7 +2000,7 @@ impl Pausable for CappedRWAContract {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for CappedRWAContract {
-    type ContractType = Compose<(RWA, Capped, TotalSupply)>;
+    type ContractType = Compose<(RWA, Capped)>;
 }
 
 #[contractimpl(contracttrait)]

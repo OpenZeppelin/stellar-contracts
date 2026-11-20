@@ -5,20 +5,25 @@
 //! decides all overridable behavior. The contract type is selected uniformly
 //! with [`Compose`], by listing the extensions the token is made of.
 //!
-//! Additive extensions (e.g. [`Burnable`] for
-//! [`crate::fungible::burnable::FungibleBurnable`]) may be listed as well:
-//! they do not affect the resolved contract type and are enabled by
-//! implementing their trait, whether or not they are listed. A list holding
-//! only additive extensions resolves to [`Base`].
+//! The list determines the base type of the token; the extension traits the
+//! contract implements decide which entry points it exposes. This gives the
+//! rule for what goes in the list: an entry has to be listed when it changes
+//! the base type, and an entry that does not change it may be listed or left
+//! out (it is accepted and ignored). The exception is `Base` itself, which
+//! cannot be listed next to anything else (`Compose<(AllowList, Base)>` is
+//! rejected). Two kinds of entries do not change the base type:
 //!
-//! [`Capped`] (for [`crate::fungible::capped::FungibleCapped`]) is a contract
-//! type: its mint checks the cap. A cap needs the supply to be tracked, so it
-//! requires `TotalSupply` in the list, like `RWA` and `Vault`:
-//! `Compose<(Capped, TotalSupply)>` resolves to `Capped`, `Capped` combined
-//! with `AllowList`, `BlockList` (or both), `RWA` or `Vault` resolves to the
-//! matching capped combination (e.g. `Compose<(AllowList, Capped,
-//! TotalSupply)>` to `CappedAllowList`), and a list with `Capped` but without
-//! `TotalSupply` is rejected.
+//! - Additive extensions (e.g. [`Burnable`] for
+//!   [`crate::fungible::burnable::FungibleBurnable`]) are enabled by
+//!   implementing their trait, whether or not they are listed. A list holding
+//!   only additive extensions resolves to [`Base`].
+//! - `TotalSupply` next to a contract type that already tracks the supply
+//!   (`RWA`, `Vault`, [`Capped`] and the capped combinations) changes nothing:
+//!   `Compose<(RWA, TotalSupply)>` resolves to `RWA`, like `Compose<RWA>`.
+//!
+//! The same goes for repeats: listing `Burnable` or `TotalSupply` more than
+//! once is accepted and ignored, in any position. Repeating a contract type
+//! (e.g. `AllowList` twice) is rejected.
 //!
 //! Usage:
 //!
@@ -49,26 +54,26 @@
 //! `Compose<(AllowList, BlockList, FungibleVotes)>`. [`TotalSupply`] can be
 //! added to `AllowList`, `BlockList` or both, e.g.
 //! `Compose<(AllowList, TotalSupply)>` or
-//! `Compose<(AllowList, BlockList, TotalSupply)>`. `Capped` can be added to
-//! any of those supply-tracking lists, and to `RWA` or `Vault`, e.g.
-//! `Compose<(AllowList, Capped, TotalSupply)>` or
-//! `Compose<(Vault, Capped, TotalSupply)>`. `RWA`, `Vault` and
-//! `Capped` require `TotalSupply` next to them, e.g.
-//! `Compose<(RWA, TotalSupply)>`; a list with one of them but without
-//! `TotalSupply` is rejected with a dedicated compile error, as is a list
-//! naming `TotalSupply` twice.
-//! `FungibleVotes` tracks voting units, not the token supply, and has no
-//! curated combination with `TotalSupply`. The resolved contract type
-//! enforces every listed transfer
-//! policy, tracks voting units when `FungibleVotes` is listed, tracks the
-//! total supply when `TotalSupply` is listed, and backs the corresponding
-//! extension traits. The list is order-insensitive:
+//! `Compose<(AllowList, BlockList, TotalSupply)>`. `FungibleVotes` tracks
+//! voting units, not the token supply, and has no curated combination with
+//! `TotalSupply`.
+//!
+//! `Capped` is a contract type of its own: its mint checks the cap, and it
+//! tracks the supply the cap is checked against. Combined with `AllowList`,
+//! `BlockList` (or both), `RWA` or `Vault`, it resolves to the matching capped
+//! combination, e.g. `Compose<(AllowList, Capped)>` to `CappedAllowList`.
+//!
+//! The resolved contract type enforces every listed transfer policy, tracks
+//! voting units when `FungibleVotes` is listed, tracks the total supply when
+//! `TotalSupply`, `RWA`, `Vault` or `Capped` is listed, and backs the
+//! corresponding extension traits. The list is order-insensitive:
 //! `Compose<(BlockList, AllowList)>` resolves to the same contract type as
 //! `Compose<(AllowList, BlockList)>`. Invalid lists do not compile: contract
 //! types without a curated combination (e.g. `AllowList` with `RWA`) cannot
-//! be listed together, and implementing an extension trait the list does not
-//! back (e.g. [`crate::fungible::total_supply::FungibleTotalSupply`] without
-//! `TotalSupply` in the list) is rejected by that trait's bound.
+//! be listed together, and implementing an extension trait the resolved
+//! contract type does not back (e.g.
+//! [`crate::fungible::total_supply::FungibleTotalSupply`] on a plain
+//! `AllowList` token) is rejected by that trait's bound.
 
 mod storage;
 
@@ -109,21 +114,21 @@ pub type Compose<L> = <L as Composable>::Out;
 /// A list is folded pairwise, left to right. Single contract types resolve to
 /// themselves (with or without the one-element tuple form), curated pairs
 /// resolve to their combined contract type (in either order), and additive
-/// extensions are ignored. Contract types without a curated pairwise
+/// extensions are ignored, as is `TotalSupply` next to a contract type that
+/// already tracks the supply. Contract types without a curated pairwise
 /// combination (e.g. `AllowList` and `RWA`) cannot be listed together, so
 /// such lists do not compile.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a valid contract type combination",
     note = "valid single contract types: `Base`, `AllowList`, `BlockList`, `TotalSupply`, \
-            `FungibleVotes`",
+            `FungibleVotes`, `RWA`, `Vault`, `Capped`",
     note = "curated combinations: `(AllowList, BlockList)`, `(AllowList, FungibleVotes)`, \
             `(BlockList, FungibleVotes)`, `(AllowList, BlockList, FungibleVotes)`, `(AllowList, \
-            TotalSupply)`, `(BlockList, TotalSupply)`, `(AllowList, BlockList, TotalSupply)`, \
-            `(RWA, TotalSupply)`, `(Vault, TotalSupply)`",
-    note = "capped combinations: `(Capped, TotalSupply)`, `(AllowList, Capped, TotalSupply)`, \
-            `(BlockList, Capped, TotalSupply)`, `(AllowList, BlockList, Capped, TotalSupply)`, \
-            `(RWA, Capped, TotalSupply)`, `(Vault, Capped, TotalSupply)`",
-    note = "`RWA`, `Vault` and `Capped` require `TotalSupply` in the list",
+            TotalSupply)`, `(BlockList, TotalSupply)`, `(AllowList, BlockList, TotalSupply)`",
+    note = "capped combinations: `(AllowList, Capped)`, `(BlockList, Capped)`, `(AllowList, \
+            BlockList, Capped)`, `(RWA, Capped)`, `(Vault, Capped)`",
+    note = "`TotalSupply` may be listed next to `RWA`, `Vault` or `Capped`, which already track \
+            the supply; it does not change the resolved type",
     note = "additive extensions (e.g. `Burnable`) may be listed alongside a contract type; they \
             do not affect the resolved type",
     note = "lists of up to 5 entries are supported"
@@ -166,109 +171,15 @@ mod fold {
         type Out;
     }
 
-    /// Contribution of an entry that only works with the total supply
-    /// tracked (`RWA`, `Vault`, `Capped`): the contribution `C` it stands
-    /// for, plus an open requirement that `TotalSupply` appears somewhere in
-    /// the list.
-    ///
-    /// This gives `RWA`, `Vault` and `Capped` two roles inside the fold. The
-    /// entry a developer writes contributes `NeedsSupply<RWA>`, never the bare
-    /// `RWA`. The bare `RWA` only shows up as the running result after
-    /// `TotalSupply` has been met. So every row below with a bare `RWA`,
-    /// `Vault`, `Capped` or capped combination on its left-hand side applies
-    /// to a list that already contains `TotalSupply`, except inside a
-    /// `NeedsSupply` wrapper, where the requirement is still open.
-    ///
-    /// Meeting `TotalSupply` removes the wrapper (refer to [`WithSupply`]);
-    /// other entries fold into `C` and keep the requirement open; a list that
-    /// ends with it open is rejected by [`Finalize`] through
-    /// [`SupplyRequirementMet`].
-    #[allow(dead_code)] // type-level marker, never constructed
-    pub struct NeedsSupply<C>(core::marker::PhantomData<C>);
-
-    /// Resolution of a contribution once `TotalSupply` joins it: the list
-    /// policies resolve to their supply-tracking combination, and the
-    /// self-tracking contract types (`RWA`, `Vault`, the capped contract
-    /// types) to themselves.
-    #[diagnostic::on_unimplemented(
-        message = "`{Self}` cannot be combined with `TotalSupply` in a `Compose` list",
-        note = "no combination of these contract types is curated"
-    )]
-    pub trait WithSupply {
-        type Out;
-    }
-
-    /// Error carrier for a list that ends with the `TotalSupply` requirement
-    /// open, e.g. `Compose<(RWA,)>`. Nothing implements it, on purpose: it
-    /// exists only so that its message is printed when the [`Finalize`] row
-    /// for [`NeedsSupply`] fails its `where` clause. Refer to [`Probe`] for
-    /// how these error rows work.
-    #[diagnostic::on_unimplemented(
-        message = "this `Compose` list requires `TotalSupply`",
-        note = "`RWA`, `Vault` and `Capped` only work with the total supply tracked; add \
-                `TotalSupply` to the list, e.g. `Compose<(RWA, TotalSupply)>`"
-    )]
-    pub trait SupplyRequirementMet {}
-
-    /// Error carrier for `TotalSupply` appearing twice in a list, e.g.
-    /// `Compose<(RWA, TotalSupply, TotalSupply)>`. Nothing implements it, on
-    /// purpose: it exists only so that its message is printed when one of the
-    /// duplicate rows fails its `where` clause. Refer to [`Probe`] for how
-    /// these error rows work.
-    #[diagnostic::on_unimplemented(
-        message = "`TotalSupply` is listed more than once in this `Compose` list",
-        note = "list `TotalSupply` once"
-    )]
-    pub trait SupplyListedOnce {}
-
-    /// Lends a type parameter to the error rows. It carries no meaning of
-    /// its own. Why it is needed, step by step, using the row that rejects a
-    /// second `TotalSupply` after `RWA`:
-    ///
-    /// 1. An error row is an impl that can never succeed. Its `where` clause
-    ///    demands a trait nothing implements ([`SupplyListedOnce`]), and that
-    ///    trait's `on_unimplemented` attribute carries the message. When the
-    ///    compiler selects the row and fails that clause, it prints the message
-    ///    instead of the generic [`Combine`] one.
-    /// 2. The obvious spelling, `impl Combine<TotalSupply> for RWA where RWA:
-    ///    SupplyListedOnce`, does not compile. A `where` clause that mentions
-    ///    no type parameter is evaluated while the library itself is being
-    ///    compiled, and since it is false, the crate is rejected (Rust calls
-    ///    these trivial bounds).
-    /// 3. Making the row generic in `Self` or in the trait argument defers the
-    ///    check but breaks the message. The compiler picks candidate impls by
-    ///    shape alone, so a generic row is the candidate for every unrelated
-    ///    pair as well, and prints its message for them.
-    /// 4. The row therefore has to stay concrete in both positions and still
-    ///    name a type parameter. `impl<T>` provides it and defers the check.
-    ///    The clause `RWA: Probe<Never = T>` ties `T` to the impl, which Rust
-    ///    requires of every type parameter, and pins it to [`Never`], since
-    ///    every type implements `Probe` that way. `T: SupplyListedOnce` is the
-    ///    clause that fails at the use site and selects the message.
-    pub trait Probe {
-        type Never;
-    }
-
-    /// The type every [`Probe`] projects to. Empty because nothing is ever
-    /// constructed from it; it only exists to be the `T` of the error rows.
-    pub enum Never {}
-
-    impl<T> Probe for T {
-        type Never = Never;
-    }
-
     /// Final step of the fold: maps the folded contribution to the resolved
-    /// contract type. Its only non-trivial rule is [`Nil`] resolving to
-    /// `Base` (a list of only additive extensions is a vanilla token).
+    /// contract type. Contract types resolve to themselves; [`Nil`] resolves
+    /// to `Base` (a list of only additive extensions is a vanilla token).
     pub trait Finalize {
-        type Out: super::ContractOverrides;
+        type Out: crate::fungible::ContractOverrides;
     }
 }
 
-use fold::{
-    Combine, Extension, Finalize, NeedsSupply, Nil, Probe, SupplyListedOnce, SupplyRequirementMet,
-    WithSupply,
-};
+use fold::{Combine, Extension, Finalize, Nil};
 
 type Contrib<T> = <T as Extension>::Contribution;
 type Pair<A, B> = <A as Combine<B>>::Out;
@@ -287,123 +198,57 @@ impl Extension for BlockList {
 impl Extension for TotalSupply {
     type Contribution = TotalSupply;
 }
-// `RWA` and `Vault` only work with the total supply tracked, so they open a
-// requirement that `TotalSupply` appears in the list. Inside the fold, the
-// bare `RWA` and `Vault` mean that requirement has been met (refer to
-// `NeedsSupply`).
 impl Extension for RWA {
-    type Contribution = NeedsSupply<RWA>;
+    type Contribution = RWA;
 }
 impl Extension for Vault {
-    type Contribution = NeedsSupply<Vault>;
+    type Contribution = Vault;
 }
 impl Extension for FungibleVotes {
     type Contribution = FungibleVotes;
 }
-// `Capped` is a contract type of its own (its mint checks the cap), and like
-// `RWA` and `Vault` it needs the supply to be tracked, so it opens the same
-// requirement. Combined with a list policy, `RWA` or `Vault`, it resolves to
-// the matching capped combination.
 impl Extension for Capped {
-    type Contribution = NeedsSupply<Capped>;
+    type Contribution = Capped;
 }
 // Additive extensions contribute nothing.
 impl Extension for Burnable {
     type Contribution = Nil;
 }
 
-// Identity rows: combining with `Nil` changes nothing. One pair of rows per
-// contract type, plus the `Nil`/`Nil` row for lists of only additive
-// extensions. Curated multi-type combinations are additional rows, declared
-// in both orders so lists stay order-insensitive.
-impl Combine<Nil> for Nil {
-    type Out = Nil;
-}
-impl Combine<Nil> for Base {
-    type Out = Base;
+// Identity rows: combining with `Nil` changes nothing. Any running result
+// absorbs a following additive entry; a list that starts with additive
+// entries takes the first contract type as its running result.
+impl<X> Combine<Nil> for X {
+    type Out = X;
 }
 impl Combine<Base> for Nil {
     type Out = Base;
 }
-impl Combine<Nil> for AllowList {
-    type Out = AllowList;
-}
 impl Combine<AllowList> for Nil {
     type Out = AllowList;
-}
-impl Combine<Nil> for BlockList {
-    type Out = BlockList;
 }
 impl Combine<BlockList> for Nil {
     type Out = BlockList;
 }
-impl Combine<Nil> for TotalSupply {
-    type Out = TotalSupply;
-}
 impl Combine<TotalSupply> for Nil {
     type Out = TotalSupply;
-}
-impl Combine<Nil> for RWA {
-    type Out = RWA;
-}
-impl Combine<RWA> for Nil {
-    type Out = RWA;
-}
-impl Combine<Nil> for Vault {
-    type Out = Vault;
-}
-impl Combine<Vault> for Nil {
-    type Out = Vault;
-}
-impl Combine<Nil> for FungibleVotes {
-    type Out = FungibleVotes;
 }
 impl Combine<FungibleVotes> for Nil {
     type Out = FungibleVotes;
 }
-impl Combine<Nil> for AllowBlockList {
-    type Out = AllowBlockList;
+impl Combine<RWA> for Nil {
+    type Out = RWA;
 }
-impl Combine<Nil> for AllowListVotes {
-    type Out = AllowListVotes;
-}
-impl Combine<Nil> for BlockListVotes {
-    type Out = BlockListVotes;
-}
-impl Combine<Nil> for AllowBlockListVotes {
-    type Out = AllowBlockListVotes;
-}
-impl Combine<Nil> for TotalSupplyAllowList {
-    type Out = TotalSupplyAllowList;
-}
-impl Combine<Nil> for TotalSupplyBlockList {
-    type Out = TotalSupplyBlockList;
-}
-impl Combine<Nil> for TotalSupplyAllowBlockList {
-    type Out = TotalSupplyAllowBlockList;
-}
-impl Combine<Nil> for Capped {
-    type Out = Capped;
+impl Combine<Vault> for Nil {
+    type Out = Vault;
 }
 impl Combine<Capped> for Nil {
     type Out = Capped;
 }
-impl Combine<Nil> for CappedAllowList {
-    type Out = CappedAllowList;
-}
-impl Combine<Nil> for CappedBlockList {
-    type Out = CappedBlockList;
-}
-impl Combine<Nil> for CappedAllowBlockList {
-    type Out = CappedAllowBlockList;
-}
-impl Combine<Nil> for CappedRWA {
-    type Out = CappedRWA;
-}
-impl Combine<Nil> for CappedVault {
-    type Out = CappedVault;
-}
 
+// Curated multi-type combinations are declared in both orders so lists stay
+// order-insensitive.
+//
 // Curated pairs.
 impl Combine<BlockList> for AllowList {
     type Out = AllowBlockList;
@@ -423,18 +268,6 @@ impl Combine<FungibleVotes> for BlockList {
 impl Combine<BlockList> for FungibleVotes {
     type Out = BlockListVotes;
 }
-impl Combine<TotalSupply> for AllowList {
-    type Out = TotalSupplyAllowList;
-}
-impl Combine<AllowList> for TotalSupply {
-    type Out = TotalSupplyAllowList;
-}
-impl Combine<TotalSupply> for BlockList {
-    type Out = TotalSupplyBlockList;
-}
-impl Combine<BlockList> for TotalSupply {
-    type Out = TotalSupplyBlockList;
-}
 
 // Curated triples: reached from any of their pairs by adding the missing
 // member, so every ordering of the three resolves to the same type.
@@ -447,6 +280,20 @@ impl Combine<BlockList> for AllowListVotes {
 impl Combine<AllowList> for BlockListVotes {
     type Out = AllowBlockListVotes;
 }
+
+// `TotalSupply` with the list policies: the result tracks the supply.
+impl Combine<TotalSupply> for AllowList {
+    type Out = TotalSupplyAllowList;
+}
+impl Combine<AllowList> for TotalSupply {
+    type Out = TotalSupplyAllowList;
+}
+impl Combine<TotalSupply> for BlockList {
+    type Out = TotalSupplyBlockList;
+}
+impl Combine<BlockList> for TotalSupply {
+    type Out = TotalSupplyBlockList;
+}
 impl Combine<TotalSupply> for AllowBlockList {
     type Out = TotalSupplyAllowBlockList;
 }
@@ -457,14 +304,73 @@ impl Combine<AllowList> for TotalSupplyBlockList {
     type Out = TotalSupplyAllowBlockList;
 }
 
-// Curated capped combinations. `Capped` meets another entry either before
-// `TotalSupply` (inside the open requirement, refer to `NeedsSupply`) or
-// after it; both reach the same rows, and the result is the same capped
-// contract type either way.
+// `TotalSupply` next to a contract type that tracks the supply on its own is
+// ignored, in either order. The rows are concrete (not one generic row over
+// the self-tracking types) so that an invalid pair such as
+// `(FungibleVotes, TotalSupply)` keeps the `Combine` error message.
+impl Combine<TotalSupply> for RWA {
+    type Out = RWA;
+}
+impl Combine<TotalSupply> for Vault {
+    type Out = Vault;
+}
+impl Combine<TotalSupply> for Capped {
+    type Out = Capped;
+}
+impl Combine<TotalSupply> for CappedAllowList {
+    type Out = CappedAllowList;
+}
+impl Combine<TotalSupply> for CappedBlockList {
+    type Out = CappedBlockList;
+}
+impl Combine<TotalSupply> for CappedAllowBlockList {
+    type Out = CappedAllowBlockList;
+}
+impl Combine<TotalSupply> for CappedRWA {
+    type Out = CappedRWA;
+}
+impl Combine<TotalSupply> for CappedVault {
+    type Out = CappedVault;
+}
+// The other order: `TotalSupply` first, then the self-tracking contract type.
+// The capped combinations need no row here: they are never entries of the
+// list, so they only ever appear as the running result (on the left).
+impl Combine<RWA> for TotalSupply {
+    type Out = RWA;
+}
+impl Combine<Vault> for TotalSupply {
+    type Out = Vault;
+}
+impl Combine<Capped> for TotalSupply {
+    type Out = Capped;
+}
+
+// A repeated `TotalSupply` is ignored as well, like a repeated additive
+// extension. The rows above already cover a repeat after a self-tracking
+// contract type; these cover a repeat after a `TotalSupply` that is already
+// in the running result, so the repeat is accepted in every position.
+impl Combine<TotalSupply> for TotalSupply {
+    type Out = TotalSupply;
+}
+impl Combine<TotalSupply> for TotalSupplyAllowList {
+    type Out = TotalSupplyAllowList;
+}
+impl Combine<TotalSupply> for TotalSupplyBlockList {
+    type Out = TotalSupplyBlockList;
+}
+impl Combine<TotalSupply> for TotalSupplyAllowBlockList {
+    type Out = TotalSupplyAllowBlockList;
+}
+
+// Curated capped combinations. A list policy that already tracks the supply
+// (`TotalSupply` listed before `Capped`) resolves to the same capped type.
 impl Combine<AllowList> for Capped {
     type Out = CappedAllowList;
 }
 impl Combine<Capped> for AllowList {
+    type Out = CappedAllowList;
+}
+impl Combine<Capped> for TotalSupplyAllowList {
     type Out = CappedAllowList;
 }
 impl Combine<BlockList> for Capped {
@@ -473,7 +379,13 @@ impl Combine<BlockList> for Capped {
 impl Combine<Capped> for BlockList {
     type Out = CappedBlockList;
 }
+impl Combine<Capped> for TotalSupplyBlockList {
+    type Out = CappedBlockList;
+}
 impl Combine<Capped> for AllowBlockList {
+    type Out = CappedAllowBlockList;
+}
+impl Combine<Capped> for TotalSupplyAllowBlockList {
     type Out = CappedAllowBlockList;
 }
 impl Combine<BlockList> for CappedAllowList {
@@ -494,372 +406,14 @@ impl Combine<Vault> for Capped {
 impl Combine<Capped> for Vault {
     type Out = CappedVault;
 }
-// The supply-tracking list combinations meet `Capped` after `TotalSupply`.
-impl Combine<Capped> for TotalSupplyAllowList {
-    type Out = CappedAllowList;
-}
-impl Combine<Capped> for TotalSupplyBlockList {
-    type Out = CappedBlockList;
-}
-impl Combine<Capped> for TotalSupplyAllowBlockList {
-    type Out = CappedAllowBlockList;
-}
 
-// What a contribution resolves to once `TotalSupply` joins it.
-impl WithSupply for AllowList {
-    type Out = TotalSupplyAllowList;
-}
-impl WithSupply for BlockList {
-    type Out = TotalSupplyBlockList;
-}
-impl WithSupply for AllowBlockList {
-    type Out = TotalSupplyAllowBlockList;
-}
-impl WithSupply for RWA {
-    type Out = RWA;
-}
-impl WithSupply for Vault {
-    type Out = Vault;
-}
-// The capped contract types track the supply themselves.
-impl WithSupply for Capped {
-    type Out = Capped;
-}
-impl WithSupply for CappedAllowList {
-    type Out = CappedAllowList;
-}
-impl WithSupply for CappedBlockList {
-    type Out = CappedBlockList;
-}
-impl WithSupply for CappedAllowBlockList {
-    type Out = CappedAllowBlockList;
-}
-impl WithSupply for CappedRWA {
-    type Out = CappedRWA;
-}
-impl WithSupply for CappedVault {
-    type Out = CappedVault;
-}
-
-// Open `TotalSupply` requirement, seen from the accumulator side: the running
-// result is `NeedsSupply<X>` and the next entry arrives.
-//
-// `TotalSupply` closes it.
-impl<X: WithSupply> Combine<TotalSupply> for NeedsSupply<X> {
-    type Out = <X as WithSupply>::Out;
-}
-// Any other entry folds into the wrapped contribution and keeps it open.
-impl<X: Combine<Nil>> Combine<Nil> for NeedsSupply<X> {
-    type Out = NeedsSupply<Pair<X, Nil>>;
-}
-impl<X: Combine<Base>> Combine<Base> for NeedsSupply<X> {
-    type Out = NeedsSupply<Pair<X, Base>>;
-}
-impl<X: Combine<AllowList>> Combine<AllowList> for NeedsSupply<X> {
-    type Out = NeedsSupply<Pair<X, AllowList>>;
-}
-impl<X: Combine<BlockList>> Combine<BlockList> for NeedsSupply<X> {
-    type Out = NeedsSupply<Pair<X, BlockList>>;
-}
-impl<X: Combine<FungibleVotes>> Combine<FungibleVotes> for NeedsSupply<X> {
-    type Out = NeedsSupply<Pair<X, FungibleVotes>>;
-}
-impl<X: Combine<Y>, Y> Combine<NeedsSupply<Y>> for NeedsSupply<X> {
-    type Out = NeedsSupply<Pair<X, Y>>;
-}
-
-// Open `TotalSupply` requirement, seen from the entry side: the next entry is
-// `RWA` or `Vault`, contributing `NeedsSupply<Y>`.
-//
-// An accumulator that already holds the supply satisfies it on the spot.
-impl<Y: WithSupply> Combine<NeedsSupply<Y>> for TotalSupply {
-    type Out = <Y as WithSupply>::Out;
-}
-impl<Y> Combine<NeedsSupply<Y>> for TotalSupplyAllowList
-where
-    TotalSupplyAllowList: Combine<Y>,
-{
-    type Out = Pair<TotalSupplyAllowList, Y>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for TotalSupplyBlockList
-where
-    TotalSupplyBlockList: Combine<Y>,
-{
-    type Out = Pair<TotalSupplyBlockList, Y>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for TotalSupplyAllowBlockList
-where
-    TotalSupplyAllowBlockList: Combine<Y>,
-{
-    type Out = Pair<TotalSupplyAllowBlockList, Y>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for RWA
-where
-    RWA: Combine<Y>,
-{
-    type Out = Pair<RWA, Y>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for Vault
-where
-    Vault: Combine<Y>,
-{
-    type Out = Pair<Vault, Y>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for Capped
-where
-    Capped: Combine<Y>,
-{
-    type Out = Pair<Capped, Y>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for CappedAllowList
-where
-    CappedAllowList: Combine<Y>,
-{
-    type Out = Pair<CappedAllowList, Y>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for CappedBlockList
-where
-    CappedBlockList: Combine<Y>,
-{
-    type Out = Pair<CappedBlockList, Y>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for CappedAllowBlockList
-where
-    CappedAllowBlockList: Combine<Y>,
-{
-    type Out = Pair<CappedAllowBlockList, Y>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for CappedRWA
-where
-    CappedRWA: Combine<Y>,
-{
-    type Out = Pair<CappedRWA, Y>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for CappedVault
-where
-    CappedVault: Combine<Y>,
-{
-    type Out = Pair<CappedVault, Y>;
-}
-// An accumulator without the supply takes the requirement over.
-impl<Y> Combine<NeedsSupply<Y>> for Nil
-where
-    Nil: Combine<Y>,
-{
-    type Out = NeedsSupply<Pair<Nil, Y>>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for Base
-where
-    Base: Combine<Y>,
-{
-    type Out = NeedsSupply<Pair<Base, Y>>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for AllowList
-where
-    AllowList: Combine<Y>,
-{
-    type Out = NeedsSupply<Pair<AllowList, Y>>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for BlockList
-where
-    BlockList: Combine<Y>,
-{
-    type Out = NeedsSupply<Pair<BlockList, Y>>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for AllowBlockList
-where
-    AllowBlockList: Combine<Y>,
-{
-    type Out = NeedsSupply<Pair<AllowBlockList, Y>>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for FungibleVotes
-where
-    FungibleVotes: Combine<Y>,
-{
-    type Out = NeedsSupply<Pair<FungibleVotes, Y>>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for AllowListVotes
-where
-    AllowListVotes: Combine<Y>,
-{
-    type Out = NeedsSupply<Pair<AllowListVotes, Y>>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for BlockListVotes
-where
-    BlockListVotes: Combine<Y>,
-{
-    type Out = NeedsSupply<Pair<BlockListVotes, Y>>;
-}
-impl<Y> Combine<NeedsSupply<Y>> for AllowBlockListVotes
-where
-    AllowBlockListVotes: Combine<Y>,
-{
-    type Out = NeedsSupply<Pair<AllowBlockListVotes, Y>>;
-}
-
-// `TotalSupply` listed twice. These rows never succeed: they exist only to
-// select the error message (refer to `Probe`). Their left-hand side is the
-// running result, not the entry a developer wrote, and a bare `RWA`, `Vault`
-// or capped contract type only becomes the running result after `TotalSupply`
-// was met (refer to `NeedsSupply`), so a `TotalSupply` arriving here is always
-// a second one. One concrete row per pair.
-impl<T> Combine<TotalSupply> for TotalSupply
-where
-    TotalSupply: Probe<Never = T>,
-    T: SupplyListedOnce,
-{
-    type Out = TotalSupply;
-}
-impl<T> Combine<TotalSupply> for TotalSupplyAllowList
-where
-    TotalSupplyAllowList: Probe<Never = T>,
-    T: SupplyListedOnce,
-{
-    type Out = TotalSupplyAllowList;
-}
-impl<T> Combine<TotalSupply> for TotalSupplyBlockList
-where
-    TotalSupplyBlockList: Probe<Never = T>,
-    T: SupplyListedOnce,
-{
-    type Out = TotalSupplyBlockList;
-}
-impl<T> Combine<TotalSupply> for TotalSupplyAllowBlockList
-where
-    TotalSupplyAllowBlockList: Probe<Never = T>,
-    T: SupplyListedOnce,
-{
-    type Out = TotalSupplyAllowBlockList;
-}
-impl<T> Combine<TotalSupply> for RWA
-where
-    RWA: Probe<Never = T>,
-    T: SupplyListedOnce,
-{
-    type Out = RWA;
-}
-impl<T> Combine<TotalSupply> for Vault
-where
-    Vault: Probe<Never = T>,
-    T: SupplyListedOnce,
-{
-    type Out = Vault;
-}
-
-impl<T> Combine<TotalSupply> for Capped
-where
-    Capped: Probe<Never = T>,
-    T: SupplyListedOnce,
-{
-    type Out = Capped;
-}
-impl<T> Combine<TotalSupply> for CappedAllowList
-where
-    CappedAllowList: Probe<Never = T>,
-    T: SupplyListedOnce,
-{
-    type Out = CappedAllowList;
-}
-impl<T> Combine<TotalSupply> for CappedBlockList
-where
-    CappedBlockList: Probe<Never = T>,
-    T: SupplyListedOnce,
-{
-    type Out = CappedBlockList;
-}
-impl<T> Combine<TotalSupply> for CappedAllowBlockList
-where
-    CappedAllowBlockList: Probe<Never = T>,
-    T: SupplyListedOnce,
-{
-    type Out = CappedAllowBlockList;
-}
-impl<T> Combine<TotalSupply> for CappedRWA
-where
-    CappedRWA: Probe<Never = T>,
-    T: SupplyListedOnce,
-{
-    type Out = CappedRWA;
-}
-impl<T> Combine<TotalSupply> for CappedVault
-where
-    CappedVault: Probe<Never = T>,
-    T: SupplyListedOnce,
-{
-    type Out = CappedVault;
-}
-
+// Every running result other than `Nil` is a contract type and resolves to
+// itself.
 impl Finalize for Nil {
     type Out = Base;
 }
-// A list that ends with the `TotalSupply` requirement open, e.g. `(RWA,)`.
-// This row never succeeds; it only selects the error message (refer to
-// `Probe`).
-impl<X> Finalize for NeedsSupply<X>
-where
-    NeedsSupply<X>: SupplyRequirementMet,
-{
-    type Out = Base;
-}
-impl Finalize for Base {
-    type Out = Base;
-}
-impl Finalize for AllowList {
-    type Out = AllowList;
-}
-impl Finalize for BlockList {
-    type Out = BlockList;
-}
-impl Finalize for TotalSupply {
-    type Out = TotalSupply;
-}
-impl Finalize for RWA {
-    type Out = RWA;
-}
-impl Finalize for Vault {
-    type Out = Vault;
-}
-impl Finalize for FungibleVotes {
-    type Out = FungibleVotes;
-}
-impl Finalize for AllowBlockList {
-    type Out = AllowBlockList;
-}
-impl Finalize for AllowListVotes {
-    type Out = AllowListVotes;
-}
-impl Finalize for BlockListVotes {
-    type Out = BlockListVotes;
-}
-impl Finalize for AllowBlockListVotes {
-    type Out = AllowBlockListVotes;
-}
-impl Finalize for TotalSupplyAllowList {
-    type Out = TotalSupplyAllowList;
-}
-impl Finalize for TotalSupplyBlockList {
-    type Out = TotalSupplyBlockList;
-}
-impl Finalize for TotalSupplyAllowBlockList {
-    type Out = TotalSupplyAllowBlockList;
-}
-impl Finalize for Capped {
-    type Out = Capped;
-}
-impl Finalize for CappedAllowList {
-    type Out = CappedAllowList;
-}
-impl Finalize for CappedBlockList {
-    type Out = CappedBlockList;
-}
-impl Finalize for CappedAllowBlockList {
-    type Out = CappedAllowBlockList;
-}
-impl Finalize for CappedRWA {
-    type Out = CappedRWA;
-}
-impl Finalize for CappedVault {
-    type Out = CappedVault;
+impl<X: ContractOverrides> Finalize for X {
+    type Out = X;
 }
 
 // Bare forms: a single entry may also be written without the one-element
@@ -877,32 +431,17 @@ impl Composable for BlockList {
 impl Composable for TotalSupply {
     type Out = TotalSupply;
 }
-// `RWA`, `Vault` and `Capped` written bare, i.e. `Compose<RWA>`, miss
-// `TotalSupply` by construction. These rows never succeed; they only select
-// the error message (refer to `Probe`).
-impl<T> Composable for Capped
-where
-    Capped: Probe<Never = T>,
-    T: SupplyRequirementMet,
-{
-    type Out = Capped;
-}
-impl<T> Composable for RWA
-where
-    RWA: Probe<Never = T>,
-    T: SupplyRequirementMet,
-{
-    type Out = RWA;
-}
-impl<T> Composable for Vault
-where
-    Vault: Probe<Never = T>,
-    T: SupplyRequirementMet,
-{
-    type Out = Vault;
-}
 impl Composable for FungibleVotes {
     type Out = FungibleVotes;
+}
+impl Composable for RWA {
+    type Out = RWA;
+}
+impl Composable for Vault {
+    type Out = Vault;
+}
+impl Composable for Capped {
+    type Out = Capped;
 }
 impl Composable for Burnable {
     type Out = Base;

@@ -7,7 +7,7 @@ use soroban_sdk::{
 use crate::{
     fungible::{
         capped::{Capped, FungibleCapped},
-        total_supply::{total_supply, FungibleTotalSupply, TotalSupply, TotalSupplyStorageKey},
+        total_supply::{total_supply, FungibleTotalSupply, TotalSupplyStorageKey},
         Base, Compose, ContractOverrides, FungibleToken, FungibleTokenError,
     },
     vault::{
@@ -1581,7 +1581,7 @@ impl CappedVaultContract {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for CappedVaultContract {
-    type ContractType = Compose<(Vault, Capped, TotalSupply)>;
+    type ContractType = Compose<(Vault, Capped)>;
 
     fn decimals(e: &Env) -> u32 {
         Vault::decimals(e)

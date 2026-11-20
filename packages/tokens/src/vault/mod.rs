@@ -21,11 +21,12 @@ use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 /// [`FungibleVault`] requires
 /// [`crate::fungible::total_supply::FungibleTotalSupply`] to be implemented
 /// alongside it (an empty `impl` block is enough), so that the supply of
-/// shares is exposed by the contract. `TotalSupply` has to be listed in the
-/// contract type as well, e.g. `Compose<(Vault, TotalSupply)>`.
+/// shares is exposed by the contract. The contract type is selected with
+/// `Compose<(Vault,)>`; listing `TotalSupply` next to it is accepted but
+/// changes nothing, since `Vault` already tracks the supply.
 ///
 /// For a maximum supply of shares, `Capped` is listed too:
-/// `Compose<(Vault, Capped, TotalSupply)>` resolves to [`CappedVault`], which
+/// `Compose<(Vault, Capped)>` resolves to [`CappedVault`], which
 /// enforces the cap on `deposit` and `mint` and reports it through
 /// `max_deposit` and `max_mint`. Each method delegates to the contract type
 /// through [`VaultOverrides`].

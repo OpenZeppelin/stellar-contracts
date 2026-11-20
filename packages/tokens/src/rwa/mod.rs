@@ -152,11 +152,12 @@ use crate::fungible::{total_supply::FungibleTotalSupply, FungibleToken};
 /// through the ERC-20 interface), and [`RWAToken`] requires
 /// [`crate::fungible::total_supply::FungibleTotalSupply`] to be implemented
 /// alongside it (an empty `impl` block is enough), so that the supply is
-/// exposed by the contract. `TotalSupply` has to be listed in the contract
-/// type as well, e.g. `Compose<(RWA, TotalSupply)>`.
+/// exposed by the contract. The contract type is selected with
+/// `Compose<(RWA,)>`; listing `TotalSupply` next to it is accepted but changes
+/// nothing, since `RWA` already tracks the supply.
 ///
 /// For a maximum total supply, `Capped` is listed too:
-/// `Compose<(RWA, Capped, TotalSupply)>` resolves to [`CappedRWA`], whose
+/// `Compose<(RWA, Capped)>` resolves to [`CappedRWA`], whose
 /// mints check the cap. The `mint` and `batch_mint` bodies then mint through
 /// `Self::ContractType::mint` and `Self::ContractType::batch_mint`, which
 /// reach [`RWA`] or [`CappedRWA`] depending on the list.

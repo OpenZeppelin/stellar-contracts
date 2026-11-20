@@ -13,13 +13,12 @@ use crate::fungible::{
 /// [`MintOverrides`]) checks the cap first, then mints through the supply
 /// counter. Transfers, approvals and burns behave as on [`TotalSupply`].
 ///
-/// A cap needs the supply to be tracked, so in a
-/// [`crate::fungible::combinations::Compose`] list `Capped` requires
-/// `TotalSupply` next to it, e.g. `Compose<(Capped, TotalSupply)>`. For
-/// combining the cap with the allowlist or blocklist transfer policies, with
-/// `RWA` or with `Vault`, list them together, e.g.
-/// `Compose<(AllowList, Capped, TotalSupply)>`; each combination resolves to
-/// its own capped contract type.
+/// A cap needs the supply to be tracked, so `Capped` tracks it on its own:
+/// `Compose<(Capped,)>` is enough, and listing `TotalSupply` next to it
+/// changes nothing. For combining the cap with the allowlist or blocklist
+/// transfer policies, with `RWA` or with `Vault`, list them together, e.g.
+/// `Compose<(AllowList, Capped)>`; each combination resolves to its own capped
+/// contract type.
 pub struct Capped;
 
 /// Marker for the contract types that enforce the cap, backing
@@ -40,7 +39,7 @@ pub struct Capped;
 /// bound.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` does not enforce a cap, so `FungibleCapped` cannot be implemented",
-    note = "add `Capped` to the `Compose` list, e.g. `Compose<(Capped, TotalSupply)>`"
+    note = "add `Capped` to the `Compose` list, e.g. `Compose<(Capped,)>`"
 )]
 pub trait CappedContractType {}
 

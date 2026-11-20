@@ -45,11 +45,13 @@
 //! impl FungibleTotalSupply for MyToken {}
 //! ```
 //!
-//! The [`crate::rwa::RWA`] and [`crate::vault::Vault`] contract types track
-//! the supply as part of their own accounting. They require `TotalSupply`
-//! next to them in the list, e.g. `Compose<(RWA, TotalSupply)>`, and
-//! [`crate::rwa::RWAToken`] and [`crate::vault::FungibleVault`] require
-//! [`FungibleTotalSupply`] as well.
+//! The [`crate::rwa::RWA`], [`crate::vault::Vault`] and
+//! [`crate::fungible::capped::Capped`] contract types track the supply as part
+//! of their own accounting, so `TotalSupply` does not need to be listed next
+//! to them (listing it is accepted and changes nothing).
+//! [`crate::rwa::RWAToken`], [`crate::vault::FungibleVault`] and
+//! [`crate::fungible::capped::FungibleCapped`] require [`FungibleTotalSupply`]
+//! as well.
 //! [`crate::fungible::votes::FungibleVotes`] tracks voting units, which are
 //! not the token supply, so it does not back this extension.
 //!
@@ -61,6 +63,17 @@
 //! from such a version has to move it with [`migrate_total_supply`] right
 //! after the upgrade, otherwise its supply reads as `0` and burns panic. The
 //! `examples/upgradeable` `v1` / `v2` contracts show the full upgrade.
+//!
+//! The same gap appears when a deployed token that never tracked the supply
+//! (e.g. one on `Base`, `AllowList` or `FungibleVotes`) is upgraded to a
+//! supply-tracking contract type (`TotalSupply`, a `TotalSupply`
+//! combination, or `Capped`). Nothing records the balances that already
+//! exist, so `total_supply()` reads `0` (or only what was minted after the
+//! upgrade), burning a pre-upgrade balance panics with
+//! [`crate::fungible::FungibleTokenError::MathOverflow`], and a `Capped`
+//! token can mint past its cap. Such an upgrade has to seed the counter with
+//! the circulating supply (e.g. through [`increase_total_supply`]) in the
+//! same transaction.
 
 pub mod storage;
 
@@ -93,11 +106,13 @@ use crate::fungible::FungibleToken;
 /// [`crate::fungible::blocklist::BlockList`] in any of their valid
 /// combinations (refer to [`crate::fungible::combinations::Compose`]).
 ///
-/// [`crate::rwa::RWA`] and [`crate::vault::Vault`] track the supply as part
-/// of their own accounting. They require `TotalSupply` next to them in the
-/// list, e.g. `Compose<(RWA, TotalSupply)>`, and this trait alongside:
-/// [`crate::rwa::RWAToken`] and [`crate::vault::FungibleVault`] have it as a
-/// supertrait, so implementing them without it does not compile.
+/// [`crate::rwa::RWA`], [`crate::vault::Vault`] and
+/// [`crate::fungible::capped::Capped`] track the supply as part of their own
+/// accounting, so they back this trait without `TotalSupply` in the list
+/// (e.g. `Compose<(RWA,)>`). [`crate::rwa::RWAToken`],
+/// [`crate::vault::FungibleVault`] and
+/// [`crate::fungible::capped::FungibleCapped`] have it as a supertrait, so
+/// implementing them without it does not compile.
 ///
 /// [`crate::fungible::votes::FungibleVotes`] (alone or combined with the list
 /// policies) tracks voting units rather than the token supply and does not

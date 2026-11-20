@@ -2,10 +2,7 @@
 
 use soroban_sdk::{contract, contractimpl, Address, Env, MuxedAddress, String};
 use stellar_tokens::{
-    fungible::{
-        total_supply::{FungibleTotalSupply, TotalSupply},
-        Base, Compose, FungibleToken,
-    },
+    fungible::{total_supply::FungibleTotalSupply, Base, Compose, FungibleToken},
     vault::{FungibleVault, Vault},
 };
 
@@ -33,7 +30,7 @@ impl ExampleContract {
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
-    type ContractType = Compose<(Vault, TotalSupply)>;
+    type ContractType = Compose<(Vault,)>;
 
     // Allows override of decimals and other base functions.
 

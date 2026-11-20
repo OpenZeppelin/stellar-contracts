@@ -35,8 +35,9 @@
 //!   symbol, and decimals.
 //! - Burnable: Enables token holders to destroy their tokens.
 //! - TotalSupply: Tracks and exposes the total amount of tokens in circulation.
-//! - Capped: Enables the contract to set a maximum limit on the total supply
-//!   (requires the TotalSupply extension).
+//! - Capped: Enables the contract to set a maximum limit on the total supply.
+//!   Listing the `TotalSupply` type in the `Compose<(...)>` list is optional,
+//!   but the contract has to implement the `FungibleTotalSupply` trait.
 //!
 //! ## Compatibility and Compliance
 //!
@@ -193,7 +194,10 @@ pub trait FungibleToken {
     /// the token is made of: `Compose<(Base,)>` for the vanilla case,
     /// `Compose<(AllowList,)>` for an allowlist token,
     /// `Compose<(AllowList, TotalSupply)>` for a curated combination, and so
-    /// on. Invalid lists are rejected at compile time.
+    /// on. Only the entries that change the contract type have to be listed;
+    /// additive extensions (e.g. `Burnable`), and `TotalSupply` next to a
+    /// contract type that already tracks the supply, may be left out. Invalid
+    /// lists are rejected at compile time.
     type ContractType: ContractOverrides;
 
     /// Returns the amount of tokens held by `account`.
