@@ -20,6 +20,7 @@ OpenZeppelin Stellar Contracts are published as separate crates on [crates.io](h
 - [stellar-confidential](https://crates.io/crates/stellar-confidential): Confidential token with encrypted balances and zero-knowledge proofs
 - [stellar-contract-utils](https://crates.io/crates/stellar-contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
 - [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
+- [stellar-finance](https://crates.io/crates/stellar-finance): Finance utilities (vesting)
 - [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
 - [stellar-macros](https://crates.io/crates/stellar-macros): Proc macros (`#[only_owner]`, `#[when_not_paused]`, etc.)
 - [stellar-tokens](https://crates.io/crates/stellar-tokens): Token types (fungible, non-fungible, real-world assets, vaults)
@@ -35,6 +36,7 @@ Refer to the [OpenZeppelin for Stellar Contracts](https://docs.openzeppelin.com/
   - [`confidential/`](packages/confidential): Confidential token with encrypted balances and zero-knowledge proofs
   - [`contract-utils/`](packages/contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
   - [`fee-abstraction/`](packages/fee-abstraction): Utilities for covering transaction fees with fungible tokens instead of XLM
+  - [`finance/`](packages/finance): Finance utilities (vesting)
   - [`governance/`](packages/governance): Governance utilities (governor, votes, timelock)
   - [`macros/`](packages/macros): Proc macros for some of the modules (`#[only_owner]`, `#[when_not_paused]`, etc.)
   - [`tokens/`](packages/tokens): Various token types (fungible, non-fungible, real-world assets, vaults)

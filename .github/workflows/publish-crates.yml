@@ -56,6 +56,7 @@ jobs:
       # Skipped: stellar-fee-abstraction (dev-deps on stellar-tokens, stellar-macros)
       # Skipped: stellar-tokens (depends on stellar-contract-utils, stellar-governance)
       # Skipped: stellar-confidential (depends on stellar-contract-utils)
+      # Skipped: stellar-finance (depends on stellar-access, stellar-contract-utils)
       # Skipped: stellar-zk-email (not published to crates.io yet)
 
   publish:
@@ -110,3 +111,7 @@ jobs:
       # stellar-confidential depends on stellar-contract-utils
       - name: Publish stellar-confidential
         run: cargo publish -p stellar-confidential --no-verify
+
+      # stellar-finance depends on stellar-access, stellar-contract-utils
+      - name: Publish stellar-finance
+        run: cargo publish -p stellar-finance --no-verify

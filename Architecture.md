@@ -262,6 +262,7 @@ A failed invocation reports `Error(Contract, #N)`, and the code alone does not s
 | 4000–4999 | `stellar-governance`               |
 | 5000–5999 | `stellar-fee-abstraction`          |
 | 6000–6999 | `stellar-zk-email`                 |
+| 7000–7999 | `stellar-finance`                  |
 
 The library never allocates codes in 3900–3999; that block is reserved for smart-account policies built outside this repository. Codes below 100 are left to contract-specific errors, as in `examples/`.
 
@@ -302,6 +303,7 @@ Within its package's range, each enum owns a block:
 | 4200–4299 | `GovernorError`              | `stellar_governance::governor`                                          |
 | 5000–5099 | `FeeAbstractionError`        | `stellar_fee_abstraction`                                               |
 | 6000–6099 | `DKIMRegistryError`          | `stellar_zk_email::dkim_registry`                                       |
+| 7000–7099 | `VestingError`               | `stellar_finance::vesting`                                              |
 
 A new variant takes the next free code in its enum's block, and a new enum takes the next free block in its package's range. An enum whose block is full continues in the next free block of its package's range, and that block is added to the enum's row above. `.github/scripts/check_error_codes.py` runs in CI and fails when two enums share a code.
 

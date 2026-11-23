@@ -11,6 +11,7 @@ This crate is part of the [OpenZeppelin Stellar Contracts](https://github.com/Op
 - **[stellar-confidential](https://crates.io/crates/stellar-confidential)**: Confidential token with encrypted balances and zero-knowledge proofs
 - [stellar-contract-utils](https://crates.io/crates/stellar-contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
 - [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
+- [stellar-finance](https://crates.io/crates/stellar-finance): Finance utilities (vesting)
 - [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
 - [stellar-macros](https://crates.io/crates/stellar-macros): Proc macros (`#[only_owner]`, `#[when_not_paused]`, etc.)
 - [stellar-tokens](https://crates.io/crates/stellar-tokens): Token types (fungible, non-fungible, real-world assets, vaults)
