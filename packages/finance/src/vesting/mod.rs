@@ -130,8 +130,11 @@
 //!
 //! ## Token behavior
 //!
-//! - Fee-on-transfer and rebasing tokens follow the live balance; a fee charged
-//!   on `release` is paid out of what the receiver gets.
+//! - Fee-on-transfer and rebasing tokens follow the live balance. A fee
+//!   deducted from the transferred amount is paid out of what the receiver
+//!   gets. A fee charged to the sender on top of the amount lowers the vesting
+//!   contract's balance, and so the allocation, on every release; before `end`
+//!   this can briefly stall `release` (see the next point).
 //! - A balance reduced outside `release` (an issuer clawback, a negative
 //!   rebase) can bring the vested amount below the amount already released.
 //!   Before `end`, `release` then panics with
@@ -142,6 +145,9 @@
 //!   0.
 //! - Token-side failures are not mapped to vesting errors: the release reverts
 //!   unchanged and can be retried once the cause is fixed.
+//! - `release` accepts any address as `token`, so anyone can make the vesting
+//!   contract emit [`Released`] for a worthless token contract that reports any
+//!   balance. Indexers must filter `Released` events by `token`.
 //!
 //! ### Stellar Asset Contract tokens
 //!
@@ -169,7 +175,8 @@
 //! `i128::MAX`: later deposits keep being released in full, but
 //! [`VestingWallet::released`] reports `i128::MAX` forever and
 //! [`VestingWallet::vested_amount`] panics with
-//! [`VestingError::AllocationOverflow`] whenever the balance is not 0.
+//! [`VestingError::AllocationOverflow`] whenever the balance is not 0 (for a
+//! timestamp at or after the cliff).
 //!
 //! ## Storage and TTL
 //!
@@ -226,6 +233,9 @@
 //! See `examples/vesting-wallet/linear` for the full contract.
 
 mod storage;
+
+#[cfg(test)]
+mod test;
 
 use soroban_sdk::{contracterror, contractevent, contracttrait, panic_with_error, Address, Env};
 
@@ -334,7 +344,8 @@ pub trait VestingWallet {
     /// * refer to [`get_schedule`] errors.
     /// * refer to [`total_allocation`] errors. This includes the state after
     ///   the overflow scenario described in the module docs, where this
-    ///   function panics whenever the balance is not 0.
+    ///   function panics whenever the balance is not 0 (for a timestamp at or
+    ///   after the cliff).
     fn vested_amount(e: &Env, token: Address, timestamp: u64) -> i128 {
         let schedule = storage::get_schedule(e);
 
@@ -511,6 +522,9 @@ pub const RELEASED_TTL_THRESHOLD: u32 = RELEASED_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 // ################## EVENTS ##################
 
 /// Event emitted when vested tokens are released to the owner.
+///
+/// `token` is chosen by the caller of `release`, so consumers must filter on
+/// it: any contract address can appear here.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Released {

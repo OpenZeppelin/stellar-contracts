@@ -43,11 +43,18 @@ The `vesting` module implements a trustless vesting contract. Any SEP-41 token s
 **Several schedules: one vesting contract each.** A vesting contract holds exactly one schedule. To vest with a different schedule (other dates or another curve), another vesting contract is deployed with that schedule. To have a second, independent instance of the same schedule (for another receiver, or a grant tracked apart), another copy is deployed as well. Copies share the same uploaded Wasm, so each deployment is cheap.
 
 ```rust
-use soroban_sdk::{contract, contractimpl, Address, Env};
+use soroban_sdk::{contract, contracterror, contractimpl, panic_with_error, Address, Env};
 use stellar_access::ownable::{set_owner, Ownable};
 // `VestingSchedule` must be in scope: the default `vesting_curve` body is
 // expanded in this module.
 use stellar_finance::vesting::{set_schedule, VestingSchedule, VestingWallet};
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum ExampleError {
+    RenounceDisabled = 1,
+}
 
 #[contract]
 pub struct VestingWalletContract;
@@ -64,10 +71,32 @@ impl VestingWalletContract {
 impl VestingWallet for VestingWalletContract {}
 
 #[contractimpl(contracttrait)]
-impl Ownable for VestingWalletContract {}
+impl Ownable for VestingWalletContract {
+    // Without an owner, `release` has nowhere to send tokens, so renouncing
+    // would lock every unreleased token forever.
+    fn renounce_ownership(e: &Env) {
+        panic_with_error!(e, ExampleError::RenounceDisabled);
+    }
+}
+```
+
+## Installation
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+# We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
+stellar-finance = "=0.8.0"
+stellar-access = "=0.8.0"
 ```
 
 ## Examples
 
-- [`examples/vesting-wallet/linear`](../../examples/vesting-wallet/linear): linear schedule, renounce disabled
-- [`examples/vesting-wallet/monthly-steps`](../../examples/vesting-wallet/monthly-steps): custom `vesting_curve` unlocking in monthly pieces
+See the following examples in the repository:
+- [`examples/vesting-wallet/linear/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/vesting-wallet/linear) - Linear schedule, renounce disabled
+- [`examples/vesting-wallet/monthly-steps/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/vesting-wallet/monthly-steps) - Custom `vesting_curve` unlocking in monthly pieces
+
+## License
+
+This package is part of the Stellar Contracts library and follows the same licensing terms.
