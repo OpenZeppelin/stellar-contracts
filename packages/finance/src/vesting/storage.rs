@@ -195,8 +195,9 @@ pub fn set_schedule(e: &Env, start: u64, duration: u64, cliff_duration: u64) {
 }
 
 /// Sends `amount` of `token` from the vesting contract to the current owner,
-/// records it as released, and returns it. Returns `0` without a transfer, a
-/// storage write, or an event when `amount` is `0`.
+/// records it as released, and returns it. Returns `0` without a transfer, an
+/// event, or a change to the released amount when `amount` is `0` (reading an
+/// existing released-amount entry still extends its TTL).
 ///
 /// # Arguments
 ///

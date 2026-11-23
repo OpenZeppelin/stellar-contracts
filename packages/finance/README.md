@@ -45,8 +45,8 @@ The `vesting` module implements a trustless vesting contract. Any SEP-41 token s
 ```rust
 use soroban_sdk::{contract, contracterror, contractimpl, panic_with_error, Address, Env};
 use stellar_access::ownable::{set_owner, Ownable};
-// `VestingSchedule` must be in scope: the default `vesting_curve` body is
-// expanded in this module.
+// `VestingSchedule` must be in scope: the generated `vesting_curve` contract
+// function takes it as a parameter.
 use stellar_finance::vesting::{set_schedule, VestingSchedule, VestingWallet};
 
 #[contracterror]

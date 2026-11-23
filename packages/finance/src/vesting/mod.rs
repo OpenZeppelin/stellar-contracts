@@ -100,9 +100,12 @@
 //!
 //! An override must never decrease as `timestamp` grows. That rule is only
 //! caught in the second case above, so it is the override author's
-//! responsibility. `vesting_curve` is exported as a contract function only
-//! because every `#[contracttrait]` method is; it is not meant to be called on
-//! its own.
+//! responsibility. Likewise, at a fixed timestamp, adding `d` tokens to the
+//! allocation must raise the vested amount by at most `d`; otherwise a top-up
+//! unlocks part of the original allocation early. The linear curve and the
+//! monthly-steps example both satisfy this. `vesting_curve` is exported as a
+//! contract function only because every `#[contracttrait]` method is; it is not
+//! meant to be called on its own.
 //!
 //! See `examples/vesting-wallet/monthly-steps` for an override.
 //!
@@ -130,11 +133,14 @@
 //!
 //! ## Token behavior
 //!
-//! - Fee-on-transfer and rebasing tokens follow the live balance. A fee
-//!   deducted from the transferred amount is paid out of what the receiver
-//!   gets. A fee charged to the sender on top of the amount lowers the vesting
-//!   contract's balance, and so the allocation, on every release; before `end`
-//!   this can briefly stall `release` (see the next point).
+//! - Any SEP-41 token whose `transfer` takes exactly the sent amount from the
+//!   sender is supported. This includes every Stellar Asset Contract (XLM and
+//!   classic assets) and standard SEP-41 tokens. A fee deducted from the sent
+//!   amount only reduces what the receiver gets; rebasing tokens follow the
+//!   live balance.
+//! - Tokens that take more than the sent amount from the sender (a fee charged
+//!   on top) are not supported: every release then shrinks the allocation, and
+//!   from `end` on `release` cannot pay the fee, so it reverts.
 //! - A balance reduced outside `release` (an issuer clawback, a negative
 //!   rebase) can bring the vested amount below the amount already released.
 //!   Before `end`, `release` then panics with
@@ -145,6 +151,11 @@
 //!   0.
 //! - Token-side failures are not mapped to vesting errors: the release reverts
 //!   unchanged and can be retried once the cause is fixed.
+//! - Each token must be reachable through a single contract address. The amount
+//!   already released is tracked per address, so a token whose balances can be
+//!   read and moved through two different contract addresses counts as two
+//!   tokens, and its balance can be released faster than the schedule allows. A
+//!   Stellar Asset Contract has exactly one address per asset.
 //! - `release` accepts any address as `token`, so anyone can make the vesting
 //!   contract emit [`Released`] for a worthless token contract that reports any
 //!   balance. Indexers must filter `Released` events by `token`.
@@ -155,7 +166,9 @@
 //! flags and the receiver's account:
 //! - a G-account receiver needs a trustline for the asset, with a limit high
 //!   enough for the released amounts;
-//! - XLM can only be sent to an existing account;
+//! - XLM sent to a G-account that does not exist yet creates the account if the
+//!   payout is at least two base reserves; a smaller payout fails until the
+//!   account exists;
 //! - with `AUTH_REQUIRED`, funding the vesting contract fails until the issuer
 //!   authorizes it;
 //! - with `AUTH_REVOCABLE`, the issuer can deauthorize the vesting contract or
@@ -198,8 +211,8 @@
 //! ## Example
 //!
 //! ```ignore,rust
-//! // `VestingSchedule` must be in scope: the default `vesting_curve` body is
-//! // expanded in the contract's module.
+//! // `VestingSchedule` must be in scope: the generated `vesting_curve`
+//! // contract function takes it as a parameter.
 //! use stellar_finance::vesting::{self, VestingSchedule, VestingWallet};
 //!
 //! #[contract]
@@ -417,8 +430,9 @@ pub trait VestingWallet {
     /// Sends the releasable amount of `token` to the current owner and returns
     /// it. Callable by anyone.
     ///
-    /// Returns `0` without a transfer, a storage write, or an event when
-    /// nothing is releasable.
+    /// Returns `0` without a transfer, an event, or a change to the released
+    /// amount when nothing is releasable. Reading an existing released-amount
+    /// entry still extends its TTL.
     ///
     /// # Arguments
     ///
@@ -473,6 +487,9 @@ pub trait VestingWallet {
     ///   amount already released makes `release` panic with
     ///   [`VestingError::ClawbackOrDecreasingCurve`]; a smaller decrease is not
     ///   detected.
+    /// * At a fixed `timestamp`, adding `d` to `total_allocation` must raise
+    ///   the result by at most `d`. Otherwise a top-up unlocks part of the
+    ///   original allocation early. This is not checked.
     fn vesting_curve(
         e: &Env,
         schedule: VestingSchedule,

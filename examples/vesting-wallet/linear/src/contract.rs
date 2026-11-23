@@ -1,16 +1,18 @@
 //! Vesting Wallet Example Contract (linear schedule).
 //!
-//! Holds any SEP-41 tokens sent to it and releases them to the owner linearly
-//! between the cliff and the end of the schedule. Setup is a deployment
-//! followed by a plain token transfer to this contract.
+//! Holds any SEP-41 tokens sent to it and releases them to the owner. Nothing
+//! is available before the cliff; after that, tokens unlock linearly until
+//! `end`. Setup is a deployment followed by a plain token transfer to this
+//! contract.
 //!
 //! `renounce_ownership` is disabled: without an owner, `release` has nowhere
 //! to send tokens.
 
 use soroban_sdk::{contract, contracterror, contractimpl, panic_with_error, Address, Env};
 use stellar_access::ownable::{set_owner, Ownable};
-// `VestingSchedule` is used by the default `vesting_curve` body, which
-// `#[contractimpl(contracttrait)]` expands in this module.
+// `VestingSchedule` must be in scope: `#[contractimpl(contracttrait)]`
+// generates the `vesting_curve` contract function here, and it takes a
+// `VestingSchedule` parameter.
 use stellar_finance::vesting::{set_schedule, VestingSchedule, VestingWallet};
 
 #[contracterror]

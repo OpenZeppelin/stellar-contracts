@@ -688,6 +688,25 @@ fn release_after_end_new_deposit_works() {
 }
 
 #[test]
+fn top_up_after_partial_release_before_end_works() {
+    // A plain transfer while the schedule runs vests on the same schedule:
+    // nothing from the original grant is unlocked early.
+    let (e, receiver, vesting, token) = setup();
+    let client = VestingMockClient::new(&e, &vesting);
+    set_time(&e, 1_500);
+    assert_eq!(client.release(&token), 500);
+
+    mint(&e, &token, &vesting, 300);
+    // Allocation is now 1_300, half of it (650) vested; 500 already released.
+    assert_eq!(client.releasable(&token), 150);
+    assert_eq!(client.release(&token), 150);
+
+    set_time(&e, END);
+    assert_eq!(client.release(&token), 650);
+    assert_eq!(TokenClient::new(&e, &token).balance(&receiver), 1_300);
+}
+
+#[test]
 fn release_after_end_following_clawback_works() {
     // A clawback stalls at most until `end`.
     let e = Env::default();
