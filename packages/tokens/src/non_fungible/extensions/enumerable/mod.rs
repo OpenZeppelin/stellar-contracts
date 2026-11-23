@@ -40,20 +40,31 @@ use crate::non_fungible::NonFungibleToken;
 /// 2. Enumerability can also be offloaded to off-chain services. This extension
 ///    exists for the use-cases where the enumeration is required as an on-chain
 ///    operation.
-/// 3. The storage keys written by a transfer, mint or burn are chosen by the
+/// 3. Concurrent transactions on the same list: for typical collections, such
+///    as transfers between individual accounts and occasional mints or burns,
+///    this is an unlikely edge case and needs no special handling. It only
+///    matters for lists that many transactions change at the same time.
+///
+///    The storage keys written by a transfer, mint or burn are chosen by the
 ///    current state, not only by the call's arguments: an owner's list is
 ///    indexed by that owner's balance, and the global list by the total supply.
 ///    Soroban transactions declare their storage keys (the footprint) at
-///    simulation time. If another transaction changes one of these counters
-///    before a prepared transaction is applied, for example by sending a token
-///    to the same recipient or by burning a token, the prepared transaction
-///    accesses a key outside its footprint and fails. Any third party can cause
-///    this on purpose. This matters most for contracts that hold tokens on
-///    behalf of many users (staking, escrow, marketplaces, lending), since all
-///    their deposits and withdrawals go through a single owner list. Such
-///    contracts should avoid this extension and enumerate off-chain instead.
-///    Clients can reduce failures by adding the neighbouring list indices to
-///    the footprint.
+///    simulation time. If another transaction changes one of these counters in
+///    the short window between simulation and execution (usually a few
+///    seconds), the prepared transaction accesses a key outside its footprint
+///    and fails. The sender pays the fee and can simply retry.
+///
+///    Lists that see heavy concurrent use are the ones affected:
+///    * the owner list of a contract that holds tokens on behalf of many users
+///      (staking, escrow, marketplaces, lending), since all deposits and
+///      withdrawals go through it. A third party can also cause failures on
+///      purpose by repeatedly depositing and withdrawing its own token.
+///    * the global list during bursts of mints or burns (e.g. a public mint),
+///      since every mint and burn changes the total supply.
+///
+///    Contracts in these situations should prefer off-chain enumeration.
+///    Clients can also reduce failures by adding the neighbouring list indices
+///    to the footprint.
 #[contracttrait]
 pub trait NonFungibleEnumerable: NonFungibleToken<ContractType: EnumerableContractType> {
     /// Returns the total amount of tokens stored by the contract.
