@@ -681,7 +681,9 @@ fn release_after_end_new_deposit_works() {
     set_time(&e, 2_500);
     client.release(&token);
 
-    mint(&e, &token, &vesting, 300);
+    let funder = Address::generate(&e);
+    mint(&e, &token, &funder, 300);
+    TokenClient::new(&e, &token).transfer(&funder, &vesting, &300);
     assert_eq!(client.release(&token), 300);
     assert_eq!(client.released(&token), 1_300);
     assert_eq!(TokenClient::new(&e, &token).balance(&receiver), 1_300);
@@ -696,7 +698,9 @@ fn top_up_after_partial_release_before_end_works() {
     set_time(&e, 1_500);
     assert_eq!(client.release(&token), 500);
 
-    mint(&e, &token, &vesting, 300);
+    let funder = Address::generate(&e);
+    mint(&e, &token, &funder, 300);
+    TokenClient::new(&e, &token).transfer(&funder, &vesting, &300);
     // Allocation is now 1_300, half of it (650) vested; 500 already released.
     assert_eq!(client.releasable(&token), 150);
     assert_eq!(client.release(&token), 150);

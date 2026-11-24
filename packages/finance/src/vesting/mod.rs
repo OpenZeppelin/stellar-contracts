@@ -49,9 +49,11 @@
 //! computes an amount.
 //!
 //! So a late (or forgotten and later sent) funding does not shift the
-//! schedule. Tokens sent after `cliff` are partly vested as soon as they
-//! arrive, and fully vested if sent after `end`. Tokens sent before `cliff`
-//! (including before `start`) follow the full schedule.
+//! schedule: the tokens follow the original schedule, as if they had been sent
+//! before `start`. If sent after `end`, they are releasable at once. Before
+//! that, how much is releasable right away depends on the curve and on
+//! rounding: nothing before `cliff`, and with a stepped curve, nothing until
+//! the next step.
 //!
 //! ### Several tokens, one schedule
 //!

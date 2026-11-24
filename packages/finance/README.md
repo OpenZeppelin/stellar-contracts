@@ -24,10 +24,11 @@ This package provides finance modules for Soroban smart contracts:
 
 ### Vesting
 
-The `vesting` module implements a trustless vesting contract. Any SEP-41 token sent to it (including XLM through its Stellar Asset Contract) is released to the receiver following one schedule: nothing before the cliff, then a linear curve, then everything from the end of the schedule.
+The `vesting` module implements a trustless vesting contract. A SEP-41 token sent to it (including XLM through its Stellar Asset Contract) is released to the receiver following one schedule: nothing before the cliff, then a linear curve, then everything from the end of the schedule.
 
 - **Receiver**: the `Ownable` owner of the vesting contract. Ownership can be transferred in two steps; the examples disable renouncing.
 - **Release**: `release(token)` is permissionless and always pays the current owner.
+- **Supported tokens**: every Stellar Asset Contract and standard SEP-41 token. Not supported: tokens that take more than the sent amount from the sender (a fee charged on top), and tokens whose balances can be moved through more than one contract address. See "Token behavior" in the `vesting` module docs.
 - **Custom schedules**: overriding the single `vesting_curve` method; the library still applies the cliff, the end, and the bounds checks.
 
 #### How a vesting contract works
@@ -36,7 +37,7 @@ The `vesting` module implements a trustless vesting contract. Any SEP-41 token s
 2. **Fund.** Tokens are sent to the vesting contract's address with a plain transfer on the token contract, exactly like sending to any other address. For example, funding with XLM means sending XLM to the vesting contract's address. Anyone can fund, any number of times, and no function of the vesting contract is called.
 3. **Release.** As time passes, tokens vest according to the schedule. Anyone can call `release(token)` at any time, and the amount vested so far (minus what was already released) is sent to the receiver.
 
-**Funding does not start the schedule.** The schedule runs on its own dates, set at deployment, whether the vesting contract holds any tokens or not. A transfer to the vesting contract only runs the token contract's code: the vesting contract is not called, there is no hook and no notification, so it cannot know when, or whether, it received tokens. It only sees its current balance, read from the token contract whenever it computes an amount. A late (or forgotten and later sent) funding therefore does not shift the schedule: tokens sent after `cliff` are partly vested as soon as they arrive, fully vested if sent after `end`, and tokens sent before `cliff` (including before `start`) follow the full schedule.
+**Funding does not start the schedule.** The schedule runs on its own dates, set at deployment, whether the vesting contract holds any tokens or not. A transfer to the vesting contract only runs the token contract's code: the vesting contract is not called, there is no hook and no notification, so it cannot know when, or whether, it received tokens. It only sees its current balance, read from the token contract whenever it computes an amount. A late (or forgotten and later sent) funding therefore does not shift the schedule: the tokens follow the original schedule, as if they had been sent before `start`. If sent after `end`, they are releasable at once. Before that, how much is releasable right away depends on the curve and on rounding: nothing before `cliff`, and with a stepped curve, nothing until the next step.
 
 **Several tokens, one schedule.** Any SEP-41 token can be sent to the same vesting contract, and each one is released separately with `release(token)`. The amount already released is tracked per token, but every token follows the same single schedule.
 
