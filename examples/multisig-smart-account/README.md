@@ -224,6 +224,10 @@ If you want to deploy accounts to deterministic addresses bound to their
 initial configuration, or predict an account's address before deploying it, see
 the [factory example](factory/README.md).
 
+## Recovering a Lost Key
+
+If you want a quorum of guardians to restore access to an account whose owner lost their keys, see the [social recovery policy example](social-recovery-policy/README.md).
+
 ## Next Steps
 
 1. Review the [Smart Accounts documentation](https://docs.openzeppelin.com/stellar-contracts/accounts/smart-account) to learn more about:

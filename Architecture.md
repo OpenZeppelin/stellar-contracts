@@ -293,6 +293,7 @@ Within its package's range, each enum owns a block:
 | 3200–3209 | `SimpleThresholdError`       | `stellar_accounts::policies::simple_threshold`                          |
 | 3210–3219 | `WeightedThresholdError`     | `stellar_accounts::policies::weighted_threshold`                        |
 | 3220–3229 | `SpendingLimitError`         | `stellar_accounts::policies::spending_limit`                            |
+| 3230–3239 | `SocialRecoveryError`        | `stellar_accounts::policies::social_recovery`                           |
 | 3300–3399 | `AuditorError`               | `stellar_confidential::auditor`                                         |
 | 3400–3499 | `VerifierError`              | `stellar_confidential::verifier`                                        |
 | 3500–3599 | `ConfidentialTokenError`     | `stellar_confidential`                                                  |

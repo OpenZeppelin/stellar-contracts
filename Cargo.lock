@@ -1480,6 +1480,7 @@ dependencies = [
  "soroban-sdk 28.0.0",
  "stellar-accounts",
  "stellar-contract-utils 0.8.0",
+ "stellar-test-utils",
 ]
 
 [[package]]
@@ -1492,6 +1493,14 @@ dependencies = [
 
 [[package]]
 name = "multisig-ed25519-verifier-example"
+version = "0.8.0"
+dependencies = [
+ "soroban-sdk 28.0.0",
+ "stellar-accounts",
+]
+
+[[package]]
+name = "multisig-social-recovery-policy-example"
 version = "0.8.0"
 dependencies = [
  "soroban-sdk 28.0.0",
