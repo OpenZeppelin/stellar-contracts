@@ -196,6 +196,15 @@ impl RecoveryPolicyContract {
         social_recovery::cancel(e, context_rule_id, &smart_account)
     }
 
+    pub fn set_config(
+        e: &Env,
+        params: SocialRecoveryAccountParams,
+        context_rule_id: u32,
+        smart_account: Address,
+    ) {
+        social_recovery::set_config(e, &params, context_rule_id, &smart_account)
+    }
+
     pub fn get_epoch(e: &Env, context_rule_id: u32, smart_account: Address) -> u32 {
         social_recovery::get_epoch(e, context_rule_id, &smart_account)
     }
@@ -781,6 +790,45 @@ fn recovery_rule_cannot_authorize_cancel() {
     let r = Recovery::new();
     r.authorize_cancel(Map::new(&r.e), r.rule_id.get());
     r.policy_client.cancel(&r.rule_id.get(), &r.account);
+}
+
+#[test]
+fn policy_contract_rule_can_take_over() {
+    let r = Recovery::new();
+    let key = Signer::External(r.verifier.clone(), Bytes::from_array(&r.e, &[5; 32]));
+    let key_rule = r.client.add_context_rule(
+        &ContextRuleType::CallContract(r.policy.clone()),
+        &String::from_str(&r.e, "canceller"),
+        &None,
+        &vec![&r.e, key.clone()],
+        &Map::new(&r.e),
+    );
+    let attacker = Address::generate(&r.e);
+    let mut params = r.params(r.template(Map::new(&r.e)));
+    params.guardians = vec![&r.e, attacker.clone()];
+    params.threshold = 1;
+    params.delay_ledgers = 1;
+    let invocation = contract_fn(
+        &r.policy,
+        "set_config",
+        &[
+            to_scval(&r.e, params.clone()),
+            to_scval(&r.e, r.rule_id.get()),
+            to_scval(&r.e, r.account.clone()),
+        ],
+    );
+    let signatures = map![&r.e, (key, Bytes::from_array(&r.e, &[9; 64]))];
+    let entry = r.account_entry(&r.account, signatures, vec![&r.e, key_rule.id], invocation);
+    r.e.set_auths(&[entry]);
+    r.policy_client.set_config(&params, &r.rule_id.get(), &r.account);
+
+    let signers = r.signers(&[6]);
+    r.approve(&attacker, &signers);
+    r.at(START + 1);
+    let rule = r.complete(&params.template, &signers);
+
+    assert_eq!(rule.context_type, ContextRuleType::Default);
+    assert_eq!(rule.signers, signers);
 }
 
 #[test]

@@ -78,6 +78,11 @@
 //!   rejects every context except `transfer`. The cancel has no deadline, but
 //!   an attacker can complete and remove the old rule in one transaction, so in
 //!   practice the veto window is `delay_ledgers`.
+//! - **Rules on this policy contract.** The authorization that passes
+//!   [`cancel`] also passes [`set_config`] and [`uninstall`]. A rule admitting
+//!   calls on this policy contract can replace the guardians and the template
+//!   and then recover the account, so it holds the owner's full authority
+//!   unless a policy on that rule limits it to [`cancel`].
 //! - **Guardians.** A guardian quorum acting together is indistinguishable from
 //!   the owner, except through the owner's cancel.
 //! - **Upgrades.** Whoever can upgrade a deployment of this policy controls

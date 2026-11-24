@@ -415,6 +415,7 @@ The account's authorization entry is the same one a direct completion uses, root
 
 - **Lost keys only.** Anyone holding the owner's keys can remove the policy, cancel any attempt and replace the guardians immediately. The policy does not protect an account whose keys were stolen.
 - **Veto window.** The owner's veto lasts as long as `delay_ledgers` in practice, and only rules that admit a call on the policy contract can cast it.
+- **Rules on the policy contract.** A rule that admits a call on the policy contract can also call `set_config` and `uninstall`, so it can replace the guardians and the template and then recover the account. It holds the owner's full authority unless a policy on that rule limits it to `cancel`.
 - **Guardians.** A quorum of guardians acting together cannot be told apart from the owner, except by the owner's cancel. Guardians must confirm off-chain that a new key belongs to the person recovering.
 - **The old rule.** A recovery adds a rule and removes nothing. The lost key keeps its authority until the new owner removes the old rule.
 - **Upgrades.** The example contract is not upgradeable. Whoever can upgrade a deployment of this policy controls recovery for every smart account that uses it.
