@@ -50,10 +50,7 @@
 //!
 //! So a late (or forgotten and later sent) funding does not shift the
 //! schedule: the tokens follow the original schedule, as if they had been sent
-//! before `start`. If sent after `end`, they are releasable at once. Before
-//! that, how much is releasable right away depends on the curve and on
-//! rounding: nothing before `cliff`, and with a stepped curve, nothing until
-//! the next step.
+//! before `start`.
 //!
 //! ### Several tokens, one schedule
 //!
