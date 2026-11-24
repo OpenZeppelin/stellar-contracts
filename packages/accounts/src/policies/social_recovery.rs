@@ -62,7 +62,7 @@
 //!   account's authorization retires the attempt without adding a rule. A
 //!   recovery is complete only when the smart account emits
 //!   `context_rule_added` in the same transaction.
-//! - A `valid_until` on the recovery rule turns recovery off at that ledger.
+//! - A `valid_until` on the recovery rule turns recovery off after that ledger.
 //!
 //! # Security Warning
 //!

@@ -428,7 +428,7 @@ The account's authorization entry is the same one a direct completion uses, root
 |---|---|---|
 | Installing the policy on a `Default` rule or a rule for another contract | `install` fails with `InvalidConfig` (3232) | Scope the recovery rule to `CallContract(smart_account)` |
 | Giving the recovery rule signers or other policies | `install` accepts it; extra policies add checks that can block completion | Keep the rule at no signers and this policy alone |
-| Setting `valid_until` on the recovery rule | Recovery stops working at that ledger, with no event | Leave it `None` unless recovery should be time-boxed |
+| Setting `valid_until` on the recovery rule | Recovery stops working after that ledger, with no event | Leave it `None` unless recovery should be time-boxed |
 | Changing the admin rule's policies without updating the template | A recovery adds a rule with the old shape, because the template does not follow the admin rule | Call `set_config` with the new template |
 | Guardians approving the same keys in a different order | Each order is its own attempt, and none reaches the threshold | Copy `signers` from the first `recovery_approval_recorded` event |
 | Approving with an old epoch | `StaleEpoch` (3235) | Read `get_epoch` just before signing |

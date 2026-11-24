@@ -602,6 +602,27 @@ fn recovery_completes_through_account() {
 }
 
 #[test]
+fn recovery_rule_valid_until_ledger_still_completes() {
+    let r = Recovery::bare();
+    let params = r.params(r.template(Map::new(&r.e)));
+    let rule = r.client.add_context_rule(
+        &ContextRuleType::CallContract(r.account.clone()),
+        &String::from_str(&r.e, "recovery"),
+        &Some(EXECUTABLE_AFTER),
+        &Vec::new(&r.e),
+        &map![&r.e, (r.policy.clone(), params.into_val(&r.e))],
+    );
+    r.rule_id.set(rule.id);
+    let signers = r.signers(&[2]);
+    r.reach_quorum(&signers);
+
+    r.at(EXECUTABLE_AFTER + 1);
+    assert!(!r.try_complete(&params.template, &signers));
+    r.at(EXECUTABLE_AFTER);
+    assert!(r.try_complete(&params.template, &signers));
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #3238)")] // SocialRecoveryError::NotAllowed
 fn completion_below_threshold_panics() {
     let r = Recovery::new();
