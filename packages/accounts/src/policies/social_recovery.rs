@@ -353,8 +353,8 @@ pub struct RecoveryApprovalRecorded {
 /// * `signers` - The approved signer set.
 /// * `guardian` - The approving guardian.
 /// * `approvals` - The number of approvals on the attempt.
-/// * `quorum_deadline` - The ledger by which the attempt must reach the
-///   threshold.
+/// * `quorum_deadline` - The first ledger at which the attempt can no longer
+///   reach the threshold.
 ///
 /// # Events
 ///
