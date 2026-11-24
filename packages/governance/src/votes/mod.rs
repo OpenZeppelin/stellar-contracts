@@ -17,6 +17,32 @@
 //! - **Checkpoints**: Historical snapshots of voting power at specific ledger
 //!   sequence numbers
 //!
+//! # Checkpoint Storage and Transaction Footprints
+//!
+//! Soroban transactions declare the storage keys they touch at simulation
+//! time, and a transaction that touches any other key fails. Any account can
+//! add a checkpoint to a delegate's history (for example by sending tokens to
+//! an account that delegates to it), at most one per ledger. If every
+//! checkpoint lived in its own storage entry, the keys read by `cast_vote` or
+//! written by a transfer would move with each new checkpoint, and a third
+//! party could make other users' prepared transactions fail.
+//!
+//! To prevent this, checkpoints are stored in chunks of up to
+//! [`CHECKPOINTS_PER_CHUNK`] entries, and the keys a transaction touches change
+//! only when a new chunk is started. A prepared transaction can therefore fail
+//! only if a new chunk is started between its simulation and its execution.
+//! Filling a chunk takes [`CHECKPOINTS_PER_CHUNK`] checkpoints, so this
+//! happens at most once every [`CHECKPOINTS_PER_CHUNK`] ledgers for each
+//! history.
+//!
+//! For writes (transfers, delegations, mints and burns), clients can rule
+//! this out for gaps of up to [`CHECKPOINTS_PER_CHUNK`] ledgers by also
+//! declaring, for each history written, the chunk after the one written to.
+//! This does not always work for historical reads ([`get_votes_at_checkpoint`]
+//! and [`get_total_supply_at_checkpoint`]): once a new chunk is started, the
+//! lookup can search through older chunks it did not read at simulation. Such
+//! a read can then fail, and can be simulated and submitted again.
+//!
 //! # Usage
 //!
 //! This module is to be integrated into a token contract and is responsible
@@ -212,6 +238,14 @@ pub const VOTES_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 
 /// TTL threshold for extending storage entries (in ledgers)
 pub const VOTES_TTL_THRESHOLD: u32 = VOTES_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
+/// Maximum number of checkpoints stored in a single storage entry.
+///
+/// Checkpoints are grouped into chunks so that the storage keys a
+/// transaction touches change only when a new chunk is started, not every
+/// time a checkpoint is added. See the module documentation for why this
+/// matters.
+pub const CHECKPOINTS_PER_CHUNK: u32 = 16;
 
 // ################## EVENTS ##################
 

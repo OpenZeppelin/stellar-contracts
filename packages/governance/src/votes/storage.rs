@@ -1,8 +1,8 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 
 use crate::votes::{
-    emit_delegate_changed, emit_delegate_votes_changed, VotesError, VOTES_EXTEND_AMOUNT,
-    VOTES_TTL_THRESHOLD,
+    emit_delegate_changed, emit_delegate_votes_changed, VotesError, CHECKPOINTS_PER_CHUNK,
+    VOTES_EXTEND_AMOUNT, VOTES_TTL_THRESHOLD,
 };
 
 // ################## ENUMS ##################
@@ -48,6 +48,10 @@ pub enum CheckpointType {
 /// Only delegated voting power counts as votes (i.e., only delegatees can
 /// vote), so the storage design tracks delegates and their checkpointed
 /// voting power separately from the raw voting units held by each account.
+///
+/// Checkpoints are stored in chunks of up to [`CHECKPOINTS_PER_CHUNK`]
+/// entries: checkpoint `i` lives in chunk `i / CHECKPOINTS_PER_CHUNK` at
+/// position `i % CHECKPOINTS_PER_CHUNK`.
 #[derive(Clone)]
 #[contracttype]
 pub enum VotesStorageKey {
@@ -55,12 +59,12 @@ pub enum VotesStorageKey {
     Delegatee(Address),
     /// Number of checkpoints for a delegate
     NumCheckpoints(Address),
-    /// Individual checkpoint for a delegate at index
-    DelegateCheckpoint(Address, u32),
+    /// Chunk of checkpoints for a delegate, at chunk index
+    DelegateCheckpointChunk(Address, u32),
     /// Number of total supply checkpoints
     NumTotalSupplyCheckpoints,
-    /// Individual total supply checkpoint at index
-    TotalSupplyCheckpoint(u32),
+    /// Chunk of total supply checkpoints, at chunk index
+    TotalSupplyCheckpointChunk(u32),
     /// Voting units held by an account (tracked separately from delegation)
     VotingUnits(Address),
 }
@@ -80,11 +84,10 @@ pub enum VotesStorageKey {
 /// [`VotesError::CheckpointNotFound`] - If no checkpoint exists
 /// at the given index.
 pub fn get_checkpoint(e: &Env, checkpoint_type: &CheckpointType, index: u32) -> Checkpoint {
-    let key = checkpoint_storage_key(checkpoint_type, index);
-    let Some(checkpoint) = e.storage().persistent().get::<_, Checkpoint>(&key) else {
+    let chunk = get_chunk(e, checkpoint_type, index / CHECKPOINTS_PER_CHUNK);
+    let Some(checkpoint) = chunk.get(index % CHECKPOINTS_PER_CHUNK) else {
         panic_with_error!(e, VotesError::CheckpointNotFound);
     };
-    e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
     checkpoint
 }
 
@@ -365,39 +368,76 @@ fn move_delegate_votes(e: &Env, from: Option<&Address>, to: Option<&Address>, am
     }
 }
 
-/// Binary search over checkpoints to find votes at a given ledger.
+/// Finds the votes recorded at `ledger` by searching over chunks.
+///
+/// Which chunks are read depends on `ledger`, on the number of chunks and on
+/// the first checkpoint of each chunk, but not on the number of checkpoints in
+/// the latest chunk. For a past `ledger`, checkpoints appended to the latest
+/// chunk after a transaction was simulated are all after `ledger`, so they do
+/// not change the keys it reads. This keeps prepared transactions within their
+/// footprint unless a new chunk is started in between.
+///
+/// When a new chunk is started in between, the latest-chunk check misses and
+/// the binary search covers one more chunk, so its midpoints can move to
+/// chunks that were not read at simulation. Declaring the next chunk in the
+/// footprint does not always prevent this.
 fn lookup_checkpoint_at(e: &Env, ledger: u32, num: u32, checkpoint_type: &CheckpointType) -> u128 {
     if num == 0 {
         return 0;
     }
 
-    // Check if ledger is after the latest checkpoint
-    let latest = get_checkpoint(e, checkpoint_type, num - 1);
-    if latest.ledger <= ledger {
-        return latest.votes;
+    // Check the latest chunk first: most lookups end here.
+    let last_chunk_index = (num - 1) / CHECKPOINTS_PER_CHUNK;
+    let latest = get_chunk(e, checkpoint_type, last_chunk_index);
+    if let Some(votes) = votes_in_chunk_at(&latest, ledger) {
+        return votes;
     }
-
-    // Check if ledger is before the first checkpoint
-    let first = get_checkpoint(e, checkpoint_type, 0);
-    if first.ledger > ledger {
+    if last_chunk_index == 0 {
         return 0;
     }
 
-    // Binary search
+    // Check if ledger is before the first checkpoint
+    let mut found = get_chunk(e, checkpoint_type, 0);
+    if !chunk_starts_at_or_before(&found, ledger) {
+        return 0;
+    }
+
+    // Binary search for the last chunk that starts at or before `ledger`.
+    // The latest chunk is already ruled out.
     let mut low: u32 = 0;
-    let mut high: u32 = num - 1;
+    let mut high: u32 = last_chunk_index - 1;
 
     while low < high {
         let mid = low + (high - low).div_ceil(2);
-        let checkpoint = get_checkpoint(e, checkpoint_type, mid);
-        if checkpoint.ledger <= ledger {
+        let chunk = get_chunk(e, checkpoint_type, mid);
+        if chunk_starts_at_or_before(&chunk, ledger) {
             low = mid;
+            found = chunk;
         } else {
             high = mid - 1;
         }
     }
 
-    get_checkpoint(e, checkpoint_type, low).votes
+    votes_in_chunk_at(&found, ledger)
+        .expect("the chunk was selected because it starts at or before `ledger`")
+}
+
+/// Returns the votes of the last checkpoint in `chunk` recorded at or before
+/// `ledger`, or `None` if every checkpoint in `chunk` is after `ledger`.
+fn votes_in_chunk_at(chunk: &Vec<Checkpoint>, ledger: u32) -> Option<u128> {
+    for i in (0..chunk.len()).rev() {
+        let checkpoint = chunk.get_unchecked(i);
+        if checkpoint.ledger <= ledger {
+            return Some(checkpoint.votes);
+        }
+    }
+    None
+}
+
+/// Returns `true` if the first checkpoint in `chunk` was recorded at or
+/// before `ledger`.
+fn chunk_starts_at_or_before(chunk: &Vec<Checkpoint>, ledger: u32) -> bool {
+    chunk.first().is_some_and(|checkpoint| checkpoint.ledger <= ledger)
 }
 
 /// Applies a [`CheckpointOp`] to compute the new votes value from the
@@ -413,14 +453,29 @@ fn apply_checkpoint_op(e: &Env, previous: u128, op: CheckpointOp, delta: u128) -
     }
 }
 
-/// Returns the storage key for a checkpoint at the given index.
-fn checkpoint_storage_key(checkpoint_type: &CheckpointType, index: u32) -> VotesStorageKey {
+/// Returns the storage key for the checkpoint chunk at the given chunk index.
+fn chunk_storage_key(checkpoint_type: &CheckpointType, chunk_index: u32) -> VotesStorageKey {
     match checkpoint_type {
-        CheckpointType::TotalSupply => VotesStorageKey::TotalSupplyCheckpoint(index),
+        CheckpointType::TotalSupply => VotesStorageKey::TotalSupplyCheckpointChunk(chunk_index),
         CheckpointType::Account(account) => {
-            VotesStorageKey::DelegateCheckpoint(account.clone(), index)
+            VotesStorageKey::DelegateCheckpointChunk(account.clone(), chunk_index)
         }
     }
+}
+
+/// Returns the checkpoint chunk at the given chunk index.
+///
+/// # Errors
+///
+/// * [`VotesError::CheckpointNotFound`] - If no chunk exists at the given
+///   index.
+fn get_chunk(e: &Env, checkpoint_type: &CheckpointType, chunk_index: u32) -> Vec<Checkpoint> {
+    let key = chunk_storage_key(checkpoint_type, chunk_index);
+    let Some(chunk) = e.storage().persistent().get::<_, Vec<Checkpoint>>(&key) else {
+        panic_with_error!(e, VotesError::CheckpointNotFound);
+    };
+    e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
+    chunk
 }
 
 /// Returns the number of checkpoints for the given checkpoint type.
@@ -444,6 +499,12 @@ fn get_num_checkpoints(e: &Env, checkpoint_type: &CheckpointType) -> u32 {
 
 /// Pushes a new checkpoint or updates the last one if same ledger sequence
 /// number. Returns (previous_votes, new_votes).
+///
+/// A new checkpoint is appended to the latest chunk, and a new chunk is
+/// started only when the latest one is full. Within a chunk, the storage key
+/// written stays the same however many checkpoints are added, so third
+/// parties adding checkpoints can only push a prepared transaction outside
+/// its footprint when a new chunk is started in between.
 fn push_checkpoint(
     e: &Env,
     checkpoint_type: &CheckpointType,
@@ -453,24 +514,35 @@ fn push_checkpoint(
     let num = get_num_checkpoints(e, checkpoint_type);
     let ledger = e.ledger().sequence();
 
-    let last_checkpoint =
-        if num > 0 { Some(get_checkpoint(e, checkpoint_type, num - 1)) } else { None };
+    // The chunk holding the latest checkpoint (empty if there is none yet)
+    let mut chunk = if num > 0 {
+        get_chunk(e, checkpoint_type, (num - 1) / CHECKPOINTS_PER_CHUNK)
+    } else {
+        Vec::new(e)
+    };
+    let last_checkpoint = chunk.last();
 
     let previous_votes = last_checkpoint.as_ref().map_or(0, |cp| cp.votes);
     let votes = apply_checkpoint_op(e, previous_votes, op, delta);
+    let checkpoint = Checkpoint { ledger, votes };
 
     // Check if we can update the last checkpoint (same ledger sequence number)
-    if let Some(cp) = &last_checkpoint {
-        if cp.ledger == ledger {
-            let key = checkpoint_storage_key(checkpoint_type, num - 1);
-            e.storage().persistent().set(&key, &Checkpoint { ledger, votes });
-            return (previous_votes, votes);
-        }
+    if last_checkpoint.is_some_and(|cp| cp.ledger == ledger) {
+        chunk.set(chunk.len() - 1, checkpoint);
+        let key = chunk_storage_key(checkpoint_type, (num - 1) / CHECKPOINTS_PER_CHUNK);
+        e.storage().persistent().set(&key, &chunk);
+        return (previous_votes, votes);
     }
 
-    // Create new checkpoint
-    let key = checkpoint_storage_key(checkpoint_type, num);
-    e.storage().persistent().set(&key, &Checkpoint { ledger, votes });
+    // Create new checkpoint at index `num`, starting a new chunk if the latest
+    // one is full
+    if num.is_multiple_of(CHECKPOINTS_PER_CHUNK) {
+        chunk = Vec::from_array(e, [checkpoint]);
+    } else {
+        chunk.push_back(checkpoint);
+    }
+    let key = chunk_storage_key(checkpoint_type, num / CHECKPOINTS_PER_CHUNK);
+    e.storage().persistent().set(&key, &chunk);
 
     // Update checkpoint count
     match checkpoint_type {
