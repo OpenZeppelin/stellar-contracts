@@ -755,6 +755,7 @@ pub fn enforce(
 ///   scoped to `CallContract(smart_account)`.
 /// * [`SocialRecoveryError::AlreadyInstalled`] - When the policy is already
 ///   installed for the smart account and context rule.
+/// * [`SocialRecoveryError::MathOverflow`] - When the epoch overflows.
 /// * refer to [`validate_config`] errors.
 ///
 /// # Events
@@ -1105,6 +1106,7 @@ pub fn cancel(e: &Env, context_rule_id: u32, smart_account: &Address) {
 ///
 /// * [`SocialRecoveryError::NotInstalled`] - When the policy is not installed
 ///   for the smart account and context rule.
+/// * [`SocialRecoveryError::MathOverflow`] - When the epoch overflows.
 /// * refer to [`validate_config`] errors.
 ///
 /// # Events
