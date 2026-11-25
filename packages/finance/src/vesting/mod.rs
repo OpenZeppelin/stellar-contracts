@@ -120,15 +120,12 @@
 //!
 //! ## Payouts have no memo or muxed id
 //!
-//! `release` sends to the owner's plain `Address`. The receiver must be an
-//! address that can receive tokens without a memo (a self-custodied account or
-//! a smart account), not an exchange or custodian deposit address that tells
-//! customers apart by memo: tokens sent there arrive on-chain but cannot be
-//! credited to the right customer. This is not supported because the receiver
-//! is the `Ownable` owner, which also has to sign for ownership transfers, and
-//! a muxed id is not something that signs. Supporting memos would need a
-//! separate muxed id kept in sync on every ownership change, so `Ownable`
-//! could no longer be reused unchanged.
+//! `release` sends to the owner's plain `Address`, with no memo or muxed id.
+//! The receiver should not be an exchange or custodian deposit address that
+//! tells customers apart by memo: tokens sent there arrive on-chain but cannot
+//! be credited to the right customer. This is not supported because the
+//! receiver is the `Ownable` owner, which also has to sign for ownership
+//! transfers, and a muxed id is not something that signs.
 //!
 //! ## Token behavior
 //!
@@ -155,9 +152,6 @@
 //!   read and moved through two different contract addresses counts as two
 //!   tokens, and its balance can be released faster than the schedule allows. A
 //!   Stellar Asset Contract has exactly one address per asset.
-//! - `release` accepts any address as `token`, so anyone can make the vesting
-//!   contract emit [`Released`] for a worthless token contract that reports any
-//!   balance. Indexers must filter `Released` events by `token`.
 //!
 //! ### Stellar Asset Contract tokens
 //!
@@ -190,15 +184,6 @@
 //! [`VestingError::AllocationOverflow`] whenever the balance is not 0 (for a
 //! timestamp at or after the cliff).
 //!
-//! ## Storage and TTL
-//!
-//! The schedule is in instance storage; extending the instance TTL is the
-//! contract developer's responsibility. The amount released per token is in
-//! persistent storage and extended on every read. An archived entry is never
-//! read as absent: it is restored before the call runs, and the invoker pays
-//! the restore fee, so a long gap between releases costs a fee but loses
-//! nothing.
-//!
 //! ## Composition
 //!
 //! The vesting module calls `require_auth` nowhere; the only privileged
@@ -209,40 +194,7 @@
 //!
 //! ## Example
 //!
-//! ```ignore,rust
-//! // `VestingSchedule` must be in scope: the generated `vesting_curve`
-//! // contract function takes it as a parameter.
-//! use stellar_finance::vesting::{self, VestingSchedule, VestingWallet};
-//!
-//! #[contract]
-//! pub struct VestingWalletContract;
-//!
-//! #[contractimpl]
-//! impl VestingWalletContract {
-//!     pub fn __constructor(
-//!         e: &Env,
-//!         receiver: Address,
-//!         start: u64,
-//!         duration: u64,
-//!         cliff_duration: u64,
-//!     ) {
-//!         ownable::set_owner(e, &receiver);
-//!         vesting::set_schedule(e, start, duration, cliff_duration);
-//!     }
-//! }
-//!
-//! #[contractimpl(contracttrait)]
-//! impl VestingWallet for VestingWalletContract {}
-//!
-//! #[contractimpl(contracttrait)]
-//! impl Ownable for VestingWalletContract {
-//!     fn renounce_ownership(e: &Env) {
-//!         panic_with_error!(e, ExampleError::RenounceDisabled);
-//!     }
-//! }
-//! ```
-//!
-//! See `examples/vesting-wallet/linear` for the full contract.
+//! See `examples/vesting-wallet/linear` for a complete vesting contract.
 
 mod storage;
 
@@ -250,6 +202,7 @@ mod storage;
 mod test;
 
 use soroban_sdk::{contracterror, contractevent, contracttrait, panic_with_error, Address, Env};
+use stellar_access::ownable::get_owner;
 
 pub use crate::vesting::storage::{
     get_released, get_schedule, linear_vesting_curve, release, set_schedule, token_balance,
@@ -441,7 +394,8 @@ pub trait VestingWallet {
     /// # Errors
     ///
     /// * refer to [`VestingWallet::releasable`] errors.
-    /// * refer to [`release`] errors.
+    /// * [`VestingError::OwnerRenounced`] - When there is no owner, even if
+    ///   nothing is releasable.
     ///
     /// # Events
     ///
@@ -453,9 +407,18 @@ pub trait VestingWallet {
     /// No authorization is required: the tokens can only go to the current
     /// owner. Token-side failures (no trustline, deauthorized holder, ...)
     /// revert the call unchanged.
+    ///
+    /// A contract that picks its receiver differently (a fixed address, a
+    /// role) can override this function and call [`release`] with its own
+    /// receiver; the storage functions do not depend on `Ownable`.
     fn release(e: &Env, token: Address) -> i128 {
         let amount = Self::releasable(e, token.clone());
-        storage::release(e, &token, amount)
+        // Checked even when `amount` is 0, so a renounced contract always
+        // reports why nothing can be released.
+        let Some(owner) = get_owner(e) else {
+            panic_with_error!(e, VestingError::OwnerRenounced);
+        };
+        storage::release(e, &token, &owner, amount)
     }
 
     /// The vesting curve: the amount of `token` vested at `timestamp` out of

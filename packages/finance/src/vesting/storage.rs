@@ -1,5 +1,4 @@
 use soroban_sdk::{contracttype, panic_with_error, token::TokenClient, Address, Env};
-use stellar_access::ownable::get_owner;
 use stellar_contract_utils::math::i128_fixed_point::mul_div_floor;
 
 use crate::vesting::{
@@ -194,8 +193,8 @@ pub fn set_schedule(e: &Env, start: u64, duration: u64, cliff_duration: u64) {
     emit_vesting_schedule_set(e, &schedule);
 }
 
-/// Sends `amount` of `token` from the vesting contract to the current owner,
-/// records it as released, and returns it. Returns `0` without a transfer, an
+/// Sends `amount` of `token` from the vesting contract to `to`, records it as
+/// released, and returns it. Returns `0` without a transfer, an
 /// event, or a change to the released amount when `amount` is `0` (reading an
 /// existing released-amount entry still extends its TTL).
 ///
@@ -203,12 +202,8 @@ pub fn set_schedule(e: &Env, start: u64, duration: u64, cliff_duration: u64) {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The address of the token contract.
+/// * `to` - The receiver of the released tokens.
 /// * `amount` - The amount to release.
-///
-/// # Errors
-///
-/// * [`VestingError::OwnerRenounced`] - When there is no owner, even if
-///   `amount` is `0`.
 ///
 /// # Events
 ///
@@ -224,17 +219,13 @@ pub fn set_schedule(e: &Env, start: u64, duration: u64, cliff_duration: u64) {
 ///
 /// # Security Warning
 ///
-/// **IMPORTANT**: This function lacks authorization checks and trusts
-/// `amount`: it applies none of the vesting rules. Passing anything other than
-/// the result of [`crate::vesting::VestingWallet::releasable`], computed in the
-/// same invocation, can pay out unvested tokens.
-pub fn release(e: &Env, token: &Address, amount: i128) -> i128 {
-    // Checked even when `amount` is 0, so a renounced contract always
-    // reports why nothing can be released.
-    let Some(owner) = get_owner(e) else {
-        panic_with_error!(e, VestingError::OwnerRenounced);
-    };
-
+/// **IMPORTANT**: This function lacks authorization checks and trusts both
+/// `to` and `amount`: it applies none of the vesting rules. Passing an
+/// `amount` other than the result of
+/// [`crate::vesting::VestingWallet::releasable`], computed in the same
+/// invocation, can pay out unvested tokens, and the caller is responsible for
+/// choosing the right receiver.
+pub fn release(e: &Env, token: &Address, to: &Address, amount: i128) -> i128 {
     if amount == 0 {
         return 0;
     }
@@ -247,11 +238,11 @@ pub fn release(e: &Env, token: &Address, amount: i128) -> i128 {
 
     // State is updated before the external call. If the transfer fails, the
     // whole invocation reverts, including the write and the event.
-    emit_released(e, token, &owner, amount);
+    emit_released(e, token, to, amount);
 
     // No signature is needed: the vesting contract is the direct caller, and
     // this is the only place it moves its own tokens.
-    TokenClient::new(e, token).transfer(&e.current_contract_address(), &owner, &amount);
+    TokenClient::new(e, token).transfer(&e.current_contract_address(), to, &amount);
 
     amount
 }
