@@ -43,6 +43,10 @@
 //! lookup can search through older chunks it did not read at simulation. Such
 //! a read can then fail, and can be simulated and submitted again.
 //!
+//! A write stores the whole chunk again, so checkpoints added to it after
+//! simulation also raise the bytes written. Clients declaring the next chunk
+//! should leave room in the write-bytes limit for a full chunk.
+//!
 //! # Usage
 //!
 //! This module is to be integrated into a token contract and is responsible

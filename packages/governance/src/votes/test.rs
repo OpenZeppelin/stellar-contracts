@@ -889,6 +889,43 @@ fn writes_touch_the_same_chunk_while_it_grows() {
 }
 
 #[test]
+fn writes_stay_within_the_next_chunk_when_a_new_chunk_starts() {
+    // A client that also declares the chunk after the latest one it touches
+    // stays within its footprint after `CHECKPOINTS_PER_CHUNK` third-party
+    // checkpoints, from a partly full and from a full latest chunk.
+    for (count, simulated_chunks) in
+        [(CHECKPOINTS_PER_CHUNK + 2, [1].as_slice()), (2 * CHECKPOINTS_PER_CHUNK, &[1, 2])]
+    {
+        let (e, contract_address) = setup_env();
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+        let account = CheckpointType::Account(alice.clone());
+        let supply = CheckpointType::TotalSupply;
+
+        e.as_contract(&contract_address, || {
+            build_history(&e, &alice, count);
+
+            let transfer = || transfer_voting_units(&e, Some(&alice), Some(&bob), 1);
+            let mint = || transfer_voting_units(&e, None, Some(&bob), 1);
+            let simulated = (chunks_read(&e, &account, transfer), chunks_read(&e, &supply, mint));
+            assert_eq!(simulated.0, simulated_chunks);
+            assert_eq!(simulated.1, simulated_chunks);
+
+            third_party_appends(&e, &alice, CHECKPOINTS_PER_CHUNK);
+            let executed = (chunks_read(&e, &account, transfer), chunks_read(&e, &supply, mint));
+
+            // The executed writes moved on to a new chunk, which is the one
+            // declared on top of the simulated chunks
+            let next = simulated_chunks.last().unwrap() + 1;
+            for chunks in [&executed.0, &executed.1] {
+                assert!(chunks.contains(&next));
+                assert!(chunks.iter().all(|c| simulated_chunks.contains(c) || *c == next));
+            }
+        });
+    }
+}
+
+#[test]
 fn historical_reads_can_move_when_a_new_chunk_starts() {
     // Documents the accepted limitation: once a third party starts a new chunk,
     // a historical lookup can read an older chunk it did not read at
