@@ -147,11 +147,6 @@
 //!   0.
 //! - Token-side failures are not mapped to vesting errors: the release reverts
 //!   unchanged and can be retried once the cause is fixed.
-//! - Each token must be reachable through a single contract address. The amount
-//!   already released is tracked per address, so a token whose balances can be
-//!   read and moved through two different contract addresses counts as two
-//!   tokens, and its balance can be released faster than the schedule allows. A
-//!   Stellar Asset Contract has exactly one address per asset.
 //!
 //! ### Stellar Asset Contract tokens
 //!
