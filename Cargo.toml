@@ -27,11 +27,13 @@ members = [
     "examples/multisig-smart-account/*",
     "examples/timelock-controller",
     "examples/upgradeable/*",
+    "examples/vesting-wallet/*",
     "packages/accounts",
     "packages/access",
     "packages/confidential",
     "packages/contract-utils",
     "packages/fee-abstraction",
+    "packages/finance",
     "packages/governance",
     "packages/macros",
     "packages/tokens",
@@ -80,6 +82,7 @@ stellar-accounts = { path = "packages/accounts", version = "0.8.0" }
 stellar-confidential = { path = "packages/confidential", version = "0.8.0" }
 stellar-contract-utils = { path = "packages/contract-utils", version = "0.8.0" }
 stellar-fee-abstraction = { path = "packages/fee-abstraction", version = "0.8.0" }
+stellar-finance = { path = "packages/finance", version = "0.8.0" }
 stellar-governance = { path = "packages/governance", version = "0.8.0" }
 stellar-tokens = { path = "packages/tokens", version = "0.8.0" }
 stellar-macros = { path = "packages/macros", version = "0.8.0" }

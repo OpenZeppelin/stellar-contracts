@@ -12,6 +12,7 @@ packages/
 ├── confidential/    # confidential token (encrypted balances, ZK proofs)
 ├── contract-utils/  # pausable, upgradeable, math, crypto, merkle_distributor
 ├── fee-abstraction/ # fee forwarder
+├── finance/         # vesting
 ├── governance/      # governor, timelock, votes
 ├── macros/          # only_owner / only_role / when_paused, etc.
 ├── tokens/          # fungible + non_fungible + rwa + vault
