@@ -9,13 +9,11 @@
 //! `revoke_spender` does not gate the spender), and — when an approver is
 //! configured — requires its authorization for every value-moving
 //! operation. The contract implements [`ConfidentialCompliance`],
-//! [`ConfidentialClawback`], [`ConfidentialRwa`], and
-//! [`ConfidentialForcedTransfer`] on top.
+//! [`ConfidentialClawback`] and [`ConfidentialRwa`] on top.
 //!
 //! Wiring [`RwaHooks`] is what satisfies the deployment obligation of
-//! [`ConfidentialClawback`] and [`ConfidentialForcedTransfer`]: a frozen
-//! account cannot move its balance between the construction and the
-//! submission of an override proof.
+//! [`ConfidentialClawback`]: a frozen account cannot move its balance between
+//! the construction and the submission of a clawback proof.
 //!
 //! Admin authority follows the separation of duties in
 //! `packages/confidential/docs/compliance.md#admin-authority`, with one
@@ -26,23 +24,21 @@
 //! | `freezer` | `freeze`, `unfreeze` |
 //! | `config_manager` | `set_compliance_config`, `set_rwa_config` |
 //! | `clawback` | `clawback`, `force_revoke_spender` |
-//! | `forced_transfer` | `forced_transfer` |
 //!
 //! The constructor grants none of them; the admin grants each role after
 //! deployment. The approver is not a role: it is the address set through
 //! `set_rwa_config`, and it must not be the sender, recipient, or spender
 //! of an operation it approves.
 //!
-//! `clawback` and `forced_transfer` take a proof whose witness includes the
-//! auditor's secret key. Do not use either on a public network before the
-//! verifier accepts zero-knowledge proofs
-//! (`packages/confidential/docs/compliance.md#forced-transfer`).
+//! `clawback` takes a proof whose witness includes the auditor's secret key.
+//! Do not use it on a public network before the verifier accepts
+//! zero-knowledge proofs (`packages/confidential/README.md`).
 use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_confidential::{
     compliance::{
         storage as compliance, ClawbackData, ComplianceConfig, ConfidentialClawback,
-        ConfidentialCompliance, ConfidentialForcedTransfer, ConfidentialRwa, RwaConfig, RwaHooks,
+        ConfidentialCompliance, ConfidentialRwa, RwaConfig, RwaHooks,
     },
     storage as confidential, ConfidentialAccount, ConfidentialToken, SpenderDelegation,
 };
@@ -60,7 +56,7 @@ impl RwaTokenContract {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `admin` - The access-control admin, which grants the `freezer`,
-    ///   `config_manager`, `clawback`, and `forced_transfer` roles.
+    ///   `config_manager`, and `clawback` roles.
     /// * `underlying_asset` - The SEP-41 token backing confidential balances.
     /// * `verifier` - The confidential verifier registry.
     /// * `auditor` - The confidential auditor registry.
@@ -144,22 +140,6 @@ impl ConfidentialClawback for RwaTokenContract {
     #[only_role(operator, "clawback")]
     fn force_revoke_spender(e: &Env, account: Address, spender: Address, operator: Address) {
         compliance::force_revoke_spender(e, &account, &spender);
-    }
-}
-
-#[contractimpl(contracttrait)]
-impl ConfidentialForcedTransfer for RwaTokenContract {
-    #[only_role(operator, "forced_transfer")]
-    fn forced_transfer(
-        e: &Env,
-        from: Address,
-        to: Address,
-        amount: i128,
-        data: Bytes,
-        operator: Address,
-    ) {
-        let decoded: ClawbackData = confidential::decode_data(e, &data);
-        compliance::forced_transfer(e, &from, &to, amount, &decoded.proof);
     }
 }
 

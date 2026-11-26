@@ -6,18 +6,17 @@ use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 use crate::{
     auditor::ConfidentialAuditorClient,
     compliance::{
-        emit_clawback, emit_compliance_config_changed, emit_forced_transfer, emit_frozen,
-        emit_rwa_config_changed, emit_unfrozen, ComplianceError, PolicyClient,
-        CLAWBACK_NONCE_EXTEND_AMOUNT, CLAWBACK_NONCE_TTL_THRESHOLD, FROZEN_EXTEND_AMOUNT,
-        FROZEN_TTL_THRESHOLD,
+        emit_clawback, emit_compliance_config_changed, emit_frozen, emit_rwa_config_changed,
+        emit_unfrozen, ComplianceError, PolicyClient, CLAWBACK_NONCE_EXTEND_AMOUNT,
+        CLAWBACK_NONCE_TTL_THRESHOLD, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
     storage::{
-        add_to_receiving, address_to_field, append_amount, append_field, append_point,
-        forced_destination_to_field, get_account, get_address_as_field_element, get_auditor,
-        get_underlying_asset, revoke_spender, set_commitments, verify,
+        address_to_field, append_amount, append_field, append_point, get_account,
+        get_address_as_field_element, get_auditor, get_underlying_asset, revoke_spender,
+        set_commitments, verify,
     },
     verifier::CircuitType,
-    ConfidentialAccount, SpenderTransferPayload, TransferPayload, WithdrawPayload,
+    SpenderTransferPayload, TransferPayload, WithdrawPayload,
 };
 
 // ################## TYPES ##################
@@ -71,8 +70,8 @@ pub enum ComplianceStorageKey {
     /// Per-account frozen flag. Persistent storage; only set when an account
     /// is frozen and removed on unfreeze.
     Frozen(Address),
-    /// Number of seizures and forced transfers executed against the account.
-    /// Persistent storage; absent until the first one.
+    /// Number of seizures executed against the account. Persistent storage;
+    /// absent until the first seizure.
     ClawbackNonce(Address),
     /// Singleton [`RwaConfig`]. Instance storage.
     RwaConfig,
@@ -112,9 +111,9 @@ pub fn is_frozen(e: &Env, account: &Address) -> bool {
     }
 }
 
-/// Returns the number of seizures and forced transfers executed against
-/// `account`, or `0` when there has been none. The value is a public input of
-/// the next clawback proof (`docs/compliance.md#circuit`).
+/// Returns the number of seizures executed against `account`, or `0` when it
+/// has never been seized from. The value is a public input of the next
+/// clawback proof (`docs/compliance.md#circuit`).
 ///
 /// # Arguments
 ///
@@ -338,7 +337,23 @@ pub fn clawback(
     };
     let nonce = clawback_nonce(e, account);
 
-    let pi = clawback_public_inputs(e, &data, &k_aud, amount, &addr_f, account, &dest_f, nonce);
+    // PI order (docs/compliance.md#circuit):
+    //   C_spend, C_receive, K_aud, alpha, addr_f, acct_f, dest_f, nonce
+    //
+    // `addr_f`, `acct_f`, `dest_f` and `nonce` are referenced by no
+    // constraint; their membership in the public-input set binds the proof to
+    // one contract, one account, one settlement destination, and one
+    // execution, on the `register` precedent.
+    let mut pi = Bytes::new(e);
+    append_point(&mut pi, &data.spendable_commitment);
+    append_point(&mut pi, &data.receiving_commitment);
+    append_point(&mut pi, &k_aud);
+    append_amount(&mut pi, e, amount);
+    append_field(&mut pi, &addr_f);
+    append_field(&mut pi, &address_to_field(e, account));
+    append_field(&mut pi, &dest_f);
+    append_amount(&mut pi, e, i128::from(nonce));
+
     verify(e, CircuitType::Clawback, &pi, proof);
 
     let seized = Grumpkin::mul(e, &Grumpkin::generator(e), amount as u128);
@@ -466,121 +481,12 @@ pub fn set_rwa_config(e: &Env, auditor_id: u32, approver: &Option<Address>) {
     emit_rwa_config_changed(e, auditor_id, approver);
 }
 
-/// Moves the public `amount` from the frozen account `from` to the
-/// registered account `to` inside the pool. No underlying moves.
-///
-/// The proof is a clawback proof (`docs/compliance.md#circuit`): it
-/// establishes that the prover holds the secret key of the auditor `from` is
-/// bound to, knows the openings of `from`'s commitments, and that
-/// `amount <= v_spend + v_receive`. Its destination public input is
-/// [`forced_destination_to_field`]`(to)`, not `address_to_field(to)`, so a
-/// proof built for a forced transfer cannot execute a clawback and a
-/// clawback proof cannot execute a forced transfer. Both share the account's
-/// clawback nonce, so one proof executes once.
-///
-/// State update: `from.C_spend <- C_spend + C_receive - amount * G`,
-/// `from.C_receive <- O`, `to.C_receive <- to.C_receive + amount * G`. The
-/// credit carries zero blinding, like a deposit, so `to` can always open it.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `from` - The frozen confidential account being debited.
-/// * `to` - The confidential account being credited.
-/// * `amount` - The strictly positive amount.
-/// * `proof` - The raw UltraHonk proof bytes, from the decoded
-///   [`ClawbackData`].
-///
-/// # Errors
-///
-/// * refer to [`rwa_context`] errors.
-/// * [`ComplianceError::AccountNotFrozen`] - When `from` is not frozen.
-/// * [`ComplianceError::InvalidForcedTransferAmount`] - When `amount <= 0`.
-/// * [`ComplianceError::InvalidForcedTransferDestination`] - When `to` is
-///   `from` or this contract's own address, or its destination field is zero.
-/// * refer to [`gate_account`] errors (for `to`).
-/// * refer to [`crate::storage::get_account`] errors (for `from` and `to`).
-/// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors.
-/// * [`crate::ConfidentialTokenError::NonCanonicalEncoding`] - When a stored
-///   commitment or auditor key coordinate is not a canonical `Bn254Fr` value.
-/// * [`crate::ConfidentialTokenError::InvalidProof`] - When the proof fails
-///   verification.
-/// * [`ComplianceError::NonceOverflow`] - When the clawback nonce is
-///   `u32::MAX`.
-///
-/// # Events
-///
-/// * topics - `["forced_transfer", from: Address, to: Address]`
-/// * data - `[amount: i128, nonce: u32]` (`nonce` is the value consumed by this
-///   call, as in the public inputs)
-///
-/// # Notes
-///
-/// * This is an administrative override: it invokes no [`Hooks`](crate::Hooks)
-///   callback and requires no approver authorization. `from` passes no
-///   eligibility gate and may be bound to any auditor; the proof must come from
-///   that auditor.
-/// * Escrowed allowances of `from` are out of reach until
-///   [`force_revoke_spender`] folds them back.
-/// * The amount is public.
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks. The trait
-/// entry point
-/// [`crate::compliance::ConfidentialForcedTransfer::forced_transfer`] is
-/// responsible for authorizing `operator`.
-pub fn forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128, proof: &Bytes) {
-    let (config, _) = rwa_context(e);
-
-    if !is_frozen(e, from) {
-        panic_with_error!(e, ComplianceError::AccountNotFrozen);
-    }
-    if amount <= 0 {
-        panic_with_error!(e, ComplianceError::InvalidForcedTransferAmount);
-    }
-    if to == from || to == &e.current_contract_address() {
-        panic_with_error!(e, ComplianceError::InvalidForcedTransferDestination);
-    }
-    let dest_f = forced_destination_to_field(e, to);
-    // Zero is clawback's `None` sentinel; keep the two domains disjoint.
-    if dest_f == BytesN::from_array(e, &[0u8; 32]) {
-        panic_with_error!(e, ComplianceError::InvalidForcedTransferDestination);
-    }
-
-    let data = get_account(e, from);
-    gate_account(e, to, &config);
-
-    let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
-    let k_aud = auditor.get_key(&data.auditor_id);
-    let addr_f = get_address_as_field_element(e);
-    let nonce = clawback_nonce(e, from);
-
-    let pi = clawback_public_inputs(e, &data, &k_aud, amount, &addr_f, from, &dest_f, nonce);
-    verify(e, CircuitType::Clawback, &pi, proof);
-
-    let moved = Grumpkin::mul(e, &Grumpkin::generator(e), amount as u128);
-    let c_spend_new = Grumpkin::sub(
-        e,
-        &Grumpkin::add(e, &data.spendable_commitment, &data.receiving_commitment),
-        &moved,
-    );
-    set_commitments(e, from, &c_spend_new, &Grumpkin::identity(e));
-    add_to_receiving(e, to, &moved);
-    let Some(next_nonce) = nonce.checked_add(1) else {
-        panic_with_error!(e, ComplianceError::NonceOverflow);
-    };
-    e.storage().persistent().set(&ComplianceStorageKey::ClawbackNonce(from.clone()), &next_nonce);
-
-    emit_forced_transfer(e, from, to, amount, nonce);
-}
-
 // ################## LOW-LEVEL HELPERS ##################
 
 /// Returns both configurations of an RWA deployment, reverting unless the
 /// deployment is fully configured. Every [`crate::compliance::RwaHooks`]
-/// callback and [`forced_transfer`] start here, so an unconfigured
-/// deployment rejects every operation instead of passing it ungated.
+/// callback starts here, so an unconfigured deployment rejects every
+/// operation instead of passing it ungated.
 ///
 /// # Arguments
 ///
@@ -713,38 +619,6 @@ pub fn spender_transfer_approval_args(
 /// the SAC `authorized()` passthrough.
 fn has_eligibility_gate(config: &ComplianceConfig) -> bool {
     config.policy.is_some() || config.sac_passthrough
-}
-
-/// Assembles the public inputs of the clawback circuit
-/// (`docs/compliance.md#circuit`):
-/// `C_spend, C_receive, K_aud, alpha, addr_f, acct_f, dest_f, nonce`.
-///
-/// `addr_f`, `acct_f`, `dest_f` and `nonce` are referenced by no constraint;
-/// their membership in the public-input set binds the proof to one contract,
-/// one account, one settlement destination, and one execution, on the
-/// `register` precedent. [`clawback`] and [`forced_transfer`] differ only in
-/// how they derive `dest_f`.
-#[allow(clippy::too_many_arguments)]
-fn clawback_public_inputs(
-    e: &Env,
-    data: &ConfidentialAccount,
-    k_aud: &BytesN<64>,
-    amount: i128,
-    addr_f: &BytesN<32>,
-    account: &Address,
-    dest_f: &BytesN<32>,
-    nonce: u32,
-) -> Bytes {
-    let mut pi = Bytes::new(e);
-    append_point(&mut pi, &data.spendable_commitment);
-    append_point(&mut pi, &data.receiving_commitment);
-    append_point(&mut pi, k_aud);
-    append_amount(&mut pi, e, amount);
-    append_field(&mut pi, addr_f);
-    append_field(&mut pi, &address_to_field(e, account));
-    append_field(&mut pi, dest_f);
-    append_amount(&mut pi, e, i128::from(nonce));
-    pi
 }
 
 /// Asserts that `account` passes every configured compliance gate against the

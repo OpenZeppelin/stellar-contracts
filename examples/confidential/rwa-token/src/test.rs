@@ -2,17 +2,17 @@ extern crate std;
 
 use soroban_sdk::{
     contract, contractimpl, contracttype,
-    testutils::{Address as _, Events, MockAuth, MockAuthInvoke},
+    testutils::{Address as _, MockAuth, MockAuthInvoke},
     token::StellarAssetClient,
     xdr::ToXdr,
-    Address, Bytes, BytesN, Env, Error, Event, IntoVal, Symbol,
+    Address, Bytes, BytesN, Env, Error, IntoVal, Symbol,
 };
 use stellar_access::access_control::AccessControlError;
 use stellar_confidential::{
     auditor::{storage as auditor_storage, ConfidentialAuditor, ConfidentialAuditorClient},
     compliance::{
-        storage::transfer_approval_args, ClawbackData, ComplianceConfig, ComplianceError,
-        ForcedTransfer, Policy, RwaConfig,
+        storage::transfer_approval_args, ClawbackData, ComplianceConfig, ComplianceError, Policy,
+        RwaConfig,
     },
     verifier::{CircuitType, ConfidentialVerifier},
     RegisterData, RegisterPayload, TransferData, TransferPayload,
@@ -86,7 +86,6 @@ struct Harness<'a> {
     freezer: Address,
     config_manager: Address,
     clawback: Address,
-    forced_transfer: Address,
     treasury: Address,
 }
 
@@ -127,25 +126,12 @@ fn deploy<'a>(e: Env, approver: Option<Address>) -> Harness<'a> {
     let freezer = Address::generate(&e);
     let config_manager = Address::generate(&e);
     let clawback = Address::generate(&e);
-    let forced_transfer = Address::generate(&e);
     token.grant_role(&freezer, &Symbol::new(&e, "freezer"), &admin);
     token.grant_role(&config_manager, &Symbol::new(&e, "config_manager"), &admin);
     token.grant_role(&clawback, &Symbol::new(&e, "clawback"), &admin);
-    token.grant_role(&forced_transfer, &Symbol::new(&e, "forced_transfer"), &admin);
 
     let treasury = Address::generate(&e);
-    Harness {
-        e,
-        sac,
-        token,
-        allowlist,
-        admin,
-        freezer,
-        config_manager,
-        clawback,
-        forced_transfer,
-        treasury,
-    }
+    Harness { e, sac, token, allowlist, admin, freezer, config_manager, clawback, treasury }
 }
 
 impl Harness<'_> {
@@ -223,7 +209,7 @@ fn constructor_writes_both_configurations() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3614)")]
+#[should_panic(expected = "Error(Contract, #3612)")]
 fn constructor_rejects_missing_eligibility_gate() {
     let e = Env::default();
     e.mock_all_auths();
@@ -260,23 +246,9 @@ fn rwa_entry_points_require_their_roles() {
         h.token.try_set_rwa_config(&AUDITOR_ID, &None, &outsider).unwrap_err().unwrap(),
         unauthorized
     );
-    assert_eq!(
-        h.token
-            .try_forced_transfer(&outsider, &outsider, &1, &proof_data(&h.e), &outsider)
-            .unwrap_err()
-            .unwrap(),
-        unauthorized
-    );
     // A role does not extend to another duty.
     assert_eq!(
         h.token.try_set_rwa_config(&AUDITOR_ID, &None, &h.freezer).unwrap_err().unwrap(),
-        unauthorized
-    );
-    assert_eq!(
-        h.token
-            .try_forced_transfer(&outsider, &outsider, &1, &proof_data(&h.e), &h.config_manager)
-            .unwrap_err()
-            .unwrap(),
         unauthorized
     );
 }
@@ -306,18 +278,10 @@ fn compliance_entry_points_require_their_roles() {
         h.token.try_force_revoke_spender(&account, &outsider, &outsider).unwrap_err().unwrap(),
         unauthorized
     );
-    // The forced-transfer role does not carry the clawback duty, nor the
-    // reverse.
+    // The config_manager role does not carry the clawback duty.
     assert_eq!(
         h.token
-            .try_clawback(&account, &1, &None, &proof_data(&h.e), &h.forced_transfer)
-            .unwrap_err()
-            .unwrap(),
-        unauthorized
-    );
-    assert_eq!(
-        h.token
-            .try_forced_transfer(&account, &account, &1, &proof_data(&h.e), &h.clawback)
+            .try_clawback(&account, &1, &None, &proof_data(&h.e), &h.config_manager)
             .unwrap_err()
             .unwrap(),
         unauthorized
@@ -418,45 +382,29 @@ fn registration_under_another_auditor_is_rejected() {
 }
 
 #[test]
-fn lost_account_is_recovered_by_forced_transfer() {
+fn lost_account_is_recovered_by_clawback_and_deposit() {
     let h = setup(None);
+    h.onboard(&h.treasury);
     let lost = h.investor();
     h.sac.mint(&lost, &300);
     h.token.deposit(&lost, &lost, &300);
     let fresh = h.investor();
 
+    // Seize the full balance of the frozen account to the treasury...
     h.token.freeze(&lost, &h.freezer);
-    h.token.forced_transfer(&lost, &fresh, &300, &proof_data(&h.e), &h.forced_transfer);
+    h.token.clawback(&lost, &300, &Some(h.treasury.clone()), &proof_data(&h.e), &h.clawback);
+    assert_eq!(h.sac.balance(&h.treasury), 300);
+    // ...and deposit it into the holder's new account.
+    h.token.deposit(&h.treasury, &fresh, &300);
 
-    let events = h.e.events().all();
-    assert_eq!(events.events().len(), 1);
-    assert_eq!(
-        events.events().first().unwrap(),
-        &ForcedTransfer { from: lost.clone(), to: fresh.clone(), amount: 300, nonce: 0 }
-            .to_xdr(&h.e, &h.token.address),
-    );
+    assert_eq!(h.token.confidential_balance(&lost).spendable_commitment, Grumpkin::identity(&h.e));
+    assert_eq!(h.token.confidential_balance(&lost).receiving_commitment, Grumpkin::identity(&h.e));
     assert_eq!(
         h.token.confidential_balance(&fresh).receiving_commitment,
         Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 300)
     );
-    assert_eq!(h.token.confidential_balance(&lost).spendable_commitment, Grumpkin::identity(&h.e));
-    // The pool still backs every claim.
+    assert_eq!(h.sac.balance(&h.treasury), 0);
     assert_eq!(h.sac.balance(&h.token.address), 300);
-    assert_eq!(h.token.clawback_nonce(&lost), 1);
-}
-
-#[test]
-fn forced_transfer_requires_a_frozen_source() {
-    let h = setup(None);
-    let a = h.investor();
-    let b = h.investor();
-    assert_eq!(
-        h.token
-            .try_forced_transfer(&a, &b, &1, &proof_data(&h.e), &h.forced_transfer)
-            .unwrap_err()
-            .unwrap(),
-        contract_error(ComplianceError::AccountNotFrozen as u32)
-    );
 }
 
 // ################## TIER 1: APPROVAL GATE ##################
@@ -630,9 +578,6 @@ fn role_holders_must_authorize() {
     assert_auth_failure("force_revoke_spender", || {
         unsigned.force_revoke_spender(&a, &b, &h.clawback)
     });
-    assert_auth_failure("forced_transfer", || {
-        unsigned.forced_transfer(&a, &b, &1, &proof_data(&h.e), &h.forced_transfer)
-    });
 
     h.e.mock_all_auths();
     assert!(h.token.is_frozen(&a));
@@ -735,7 +680,7 @@ fn constructor_stores_the_approver_and_grants_no_role() {
         })
     );
     assert_eq!(h.token.get_admin(), Some(h.admin.clone()));
-    for role in ["freezer", "config_manager", "clawback", "forced_transfer"] {
+    for role in ["freezer", "config_manager", "clawback"] {
         assert_eq!(h.token.has_role(&h.admin, &Symbol::new(&h.e, role)), None, "{role}");
     }
     assert_eq!(h.token.try_freeze(&h.treasury, &h.admin).unwrap_err().unwrap(), unauthorized);

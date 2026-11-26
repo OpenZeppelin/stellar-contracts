@@ -12,27 +12,23 @@ use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 use crate::{
     compliance::{
         storage::{
-            clawback, compliance_config, deposit_approval_args, force_revoke_spender,
-            forced_transfer, freeze, rwa_config, set_compliance_config, set_rwa_config,
-            spender_transfer_approval_args, transfer_approval_args, unfreeze,
+            compliance_config, deposit_approval_args, freeze, rwa_config, set_compliance_config,
+            set_rwa_config, spender_transfer_approval_args, transfer_approval_args, unfreeze,
             withdraw_approval_args,
         },
-        ClawbackData, ComplianceConfig, ComplianceError, ComplianceStorageKey,
-        ConfidentialClawback, ConfidentialClawbackClient, ConfidentialCompliance,
-        ConfidentialComplianceClient, ConfidentialForcedTransfer, ConfidentialForcedTransferClient,
-        ConfidentialRwa, ConfidentialRwaClient, ForcedTransfer, Policy, RwaConfig,
+        ComplianceConfig, ComplianceError, ComplianceStorageKey, ConfidentialCompliance,
+        ConfidentialComplianceClient, ConfidentialRwa, ConfidentialRwaClient, Policy, RwaConfig,
         RwaConfigChanged, RwaHooks,
     },
     storage::{
-        address_to_field, decode_data, forced_destination_to_field, get_account,
-        get_address_as_field_element, get_auditor, set_address_as_field_element, set_auditor,
-        set_underlying_asset, set_verifier,
+        get_account, get_auditor, set_address_as_field_element, set_auditor, set_underlying_asset,
+        set_verifier,
     },
     verifier::CircuitType,
-    ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, ConfidentialTokenError,
-    ConfidentialTokenStorageKey, Hooks, RegisterData, RegisterPayload, SetSpenderData,
-    SetSpenderPayload, SpenderDelegation, SpenderTransferData, SpenderTransferPayload,
-    TransferData, TransferPayload, WithdrawData, WithdrawPayload,
+    ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, ConfidentialTokenStorageKey,
+    Hooks, RegisterData, RegisterPayload, SetSpenderData, SetSpenderPayload, SpenderDelegation,
+    SpenderTransferData, SpenderTransferPayload, TransferData, TransferPayload, WithdrawData,
+    WithdrawPayload,
 };
 
 // ################## MOCK CONTRACTS ##################
@@ -74,47 +70,10 @@ impl ConfidentialCompliance for RwaHost {
 }
 
 #[contractimpl(contracttrait)]
-impl ConfidentialClawback for RwaHost {
-    fn clawback(
-        e: &Env,
-        account: Address,
-        amount: i128,
-        destination: Option<Address>,
-        data: Bytes,
-        admin: Address,
-    ) {
-        admin.require_auth();
-        let d: ClawbackData = decode_data(e, &data);
-        clawback(e, &account, amount, &destination, &d.proof);
-    }
-
-    fn force_revoke_spender(e: &Env, account: Address, spender: Address, admin: Address) {
-        admin.require_auth();
-        force_revoke_spender(e, &account, &spender);
-    }
-}
-
-#[contractimpl(contracttrait)]
 impl ConfidentialRwa for RwaHost {
     fn set_rwa_config(e: &Env, auditor_id: u32, approver: Option<Address>, admin: Address) {
         admin.require_auth();
         set_rwa_config(e, auditor_id, &approver);
-    }
-}
-
-#[contractimpl(contracttrait)]
-impl ConfidentialForcedTransfer for RwaHost {
-    fn forced_transfer(
-        e: &Env,
-        from: Address,
-        to: Address,
-        amount: i128,
-        data: Bytes,
-        admin: Address,
-    ) {
-        admin.require_auth();
-        let d: ClawbackData = decode_data(e, &data);
-        forced_transfer(e, &from, &to, amount, &d.proof);
     }
 }
 
@@ -147,71 +106,18 @@ impl Policy for PanicPolicy {
     }
 }
 
-/// Accepts every proof and records the public inputs of the last
-/// verification, so tests can inspect what the contract assembled.
+/// Accepts every proof.
 #[contract]
-struct RecordingVerifier;
-
-#[contractimpl]
-impl RecordingVerifier {
-    pub fn last_public_inputs(e: &Env) -> Bytes {
-        e.storage().instance().get(&symbol_short!("pi")).unwrap()
-    }
-
-    pub fn last_circuit(e: &Env) -> CircuitType {
-        e.storage().instance().get(&symbol_short!("ct")).unwrap()
-    }
-}
+struct AcceptingVerifier;
 
 #[contractimpl(contracttrait)]
-impl crate::verifier::ConfidentialVerifier for RecordingVerifier {
-    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
-
-    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
-
-    fn verify_proof(e: &Env, ct: CircuitType, pi: Bytes, _proof: Bytes) -> bool {
-        e.storage().instance().set(&symbol_short!("pi"), &pi);
-        e.storage().instance().set(&symbol_short!("ct"), &ct);
-        true
-    }
-}
-
-/// Models a proof's binding to its public inputs: the first blob it accepts
-/// becomes the statement, and every later verification succeeds only on the
-/// identical blob.
-#[contract]
-struct BoundProofVerifier;
-
-#[contractimpl(contracttrait)]
-impl crate::verifier::ConfidentialVerifier for BoundProofVerifier {
-    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
-
-    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
-
-    fn verify_proof(e: &Env, _ct: CircuitType, pi: Bytes, _proof: Bytes) -> bool {
-        let key = symbol_short!("bound");
-        match e.storage().instance().get::<_, Bytes>(&key) {
-            None => {
-                e.storage().instance().set(&key, &pi);
-                true
-            }
-            Some(bound) => bound == pi,
-        }
-    }
-}
-
-/// Rejects every proof.
-#[contract]
-struct RejectingVerifier;
-
-#[contractimpl(contracttrait)]
-impl crate::verifier::ConfidentialVerifier for RejectingVerifier {
+impl crate::verifier::ConfidentialVerifier for AcceptingVerifier {
     fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
 
     fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
 
     fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
-        false
+        true
     }
 }
 
@@ -245,7 +151,7 @@ struct Harness<'a> {
 }
 
 fn setup<'a>() -> Harness<'a> {
-    setup_with(|e| e.register(RecordingVerifier, ()))
+    setup_with(|e| e.register(AcceptingVerifier, ()))
 }
 
 fn setup_with<'a>(register_verifier: impl FnOnce(&Env) -> Address) -> Harness<'a> {
@@ -433,10 +339,6 @@ fn set_spender_data(e: &Env) -> Bytes {
     SetSpenderData { payload: set_spender_payload(e), proof: Bytes::new(e) }.to_xdr(e)
 }
 
-fn proof_data(e: &Env) -> Bytes {
-    ClawbackData { proof: Bytes::new(e) }.to_xdr(e)
-}
-
 fn freeze_account(h: &Harness, account: &Address) {
     h.e.as_contract(&h.host, || freeze(&h.e, account));
 }
@@ -490,7 +392,7 @@ fn set_rwa_config_requires_compliance_config() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3614)")]
+#[should_panic(expected = "Error(Contract, #3612)")]
 fn set_rwa_config_requires_eligibility_gate() {
     let h = setup();
     h.e.as_contract(&h.host, || {
@@ -612,7 +514,7 @@ fn every_hook_reverts_without_eligibility_gate() {
     let b = account(&h, AUDITOR);
     let open = ComplianceConfig { policy: None, sac_passthrough: false };
     ConfidentialComplianceClient::new(&h.e, &h.host).set_compliance_config(&open, &h.admin);
-    assert_every_hook_reverts_with(&h, &a, &b, 3614);
+    assert_every_hook_reverts_with(&h, &a, &b, 3612);
 }
 
 #[test]
@@ -646,7 +548,7 @@ fn on_transfer_without_compliance_config_panics_not_configured() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3614)")]
+#[should_panic(expected = "Error(Contract, #3612)")]
 fn on_transfer_without_eligibility_gate_panics() {
     let h = configured(None);
     let a = account(&h, AUDITOR);
@@ -1545,472 +1447,6 @@ fn approver_may_take_part_in_operations_outside_the_gate() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3615)")]
-fn forced_transfer_nonce_overflow_panics() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    e.as_contract(&f.h.host, || {
-        e.storage()
-            .persistent()
-            .set(&ComplianceStorageKey::ClawbackNonce(f.from.clone()), &u32::MAX);
-    });
-    force(&f, 40);
-}
-
-// ################## FORCED TRANSFER ##################
-
-/// A frozen source holding `spendable` + `receiving` and a registered
-/// destination, on a configured deployment with a funded pool.
-struct Forced<'a> {
-    h: Harness<'a>,
-    from: Address,
-    to: Address,
-}
-
-fn forced_flow<'a>(approver: Option<Address>) -> Forced<'a> {
-    forced_flow_with(approver, |e| e.register(RecordingVerifier, ()))
-}
-
-fn forced_flow_with<'a>(
-    approver: Option<Address>,
-    register_verifier: impl FnOnce(&Env) -> Address,
-) -> Forced<'a> {
-    let h = setup_with(register_verifier);
-    configure(&h, approver);
-    let from = Address::generate(&h.e);
-    store_account(&h, &from, AUDITOR, 70, 30);
-    freeze_account(&h, &from);
-    let to = Address::generate(&h.e);
-    store_account(&h, &to, AUDITOR, 5, 7);
-    h.sac.mint(&h.host, &1_000);
-    Forced { h, from, to }
-}
-
-fn force(f: &Forced, amount: i128) {
-    ConfidentialForcedTransferClient::new(&f.h.e, &f.h.host).forced_transfer(
-        &f.from,
-        &f.to,
-        &amount,
-        &proof_data(&f.h.e),
-        &f.h.admin,
-    );
-}
-
-#[test]
-fn forced_transfer_moves_amount_and_conserves_value() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    force(&f, 40);
-
-    let events = e.events().all();
-    assert_eq!(events.events().len(), 1);
-    assert_eq!(
-        events.events().first().unwrap(),
-        &ForcedTransfer { from: f.from.clone(), to: f.to.clone(), amount: 40, nonce: 0 }
-            .to_xdr(e, &f.h.host),
-    );
-
-    e.as_contract(&f.h.host, || {
-        let src = get_account(e, &f.from);
-        // C_spend <- 70G + 30G - 40G, C_receive <- O.
-        assert_eq!(src.spendable_commitment, g_times(e, 60));
-        assert_eq!(src.receiving_commitment, Grumpkin::identity(e));
-        let dst = get_account(e, &f.to);
-        // Spendable untouched; the credit lands in the receiving balance.
-        assert_eq!(dst.spendable_commitment, g_times(e, 5));
-        assert_eq!(dst.receiving_commitment, g_times(e, 47));
-    });
-    // No underlying moved.
-    assert_eq!(StellarAssetClient::new(e, &f.h.sac_addr).balance(&f.h.host), 1_000);
-    assert_eq!(StellarAssetClient::new(e, &f.h.sac_addr).balance(&f.to), 0);
-}
-
-#[test]
-fn forced_transfer_can_move_the_full_balance() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    force(&f, 100);
-    e.as_contract(&f.h.host, || {
-        let src = get_account(e, &f.from);
-        assert_eq!(src.spendable_commitment, Grumpkin::identity(e));
-        assert_eq!(src.receiving_commitment, Grumpkin::identity(e));
-        assert_eq!(get_account(e, &f.to).receiving_commitment, g_times(e, 107));
-    });
-}
-
-#[test]
-fn forced_transfer_needs_no_approval() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    let approver = Address::generate(e);
-    ConfidentialRwaClient::new(e, &f.h.host).set_rwa_config(&AUDITOR, &Some(approver), &f.h.admin);
-    let call = invoke(
-        &f.h.host,
-        "forced_transfer",
-        (f.from.clone(), f.to.clone(), 40i128, proof_data(e), f.h.admin.clone()).into_val(e),
-        &[],
-    );
-    // Only the operator authorizes; the approver does not.
-    ConfidentialForcedTransferClient::new(e, &f.h.host)
-        .mock_auths(&[MockAuth { address: &f.h.admin, invoke: &call }])
-        .forced_transfer(&f.from, &f.to, &40, &proof_data(e), &f.h.admin);
-    e.as_contract(&f.h.host, || {
-        assert_eq!(get_account(e, &f.to).receiving_commitment, g_times(e, 47));
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Auth, InvalidAction)")]
-fn forced_transfer_requires_the_operator() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    ConfidentialForcedTransferClient::new(e, &f.h.host).mock_auths(&[]).forced_transfer(
-        &f.from,
-        &f.to,
-        &40,
-        &proof_data(e),
-        &f.h.admin,
-    );
-}
-
-#[test]
-fn forced_transfer_shares_and_advances_the_clawback_nonce() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    let clawback_client = ConfidentialClawbackClient::new(e, &f.h.host);
-    assert_eq!(clawback_client.clawback_nonce(&f.from), 0);
-
-    force(&f, 10);
-    assert_eq!(clawback_client.clawback_nonce(&f.from), 1);
-
-    clawback_client.clawback(&f.from, &10, &None, &proof_data(e), &f.h.admin);
-    assert_eq!(clawback_client.clawback_nonce(&f.from), 2);
-
-    force(&f, 10);
-    let events = e.events().all();
-    assert_eq!(clawback_client.clawback_nonce(&f.from), 3);
-    assert_eq!(
-        events.events().first().unwrap(),
-        &ForcedTransfer { from: f.from.clone(), to: f.to.clone(), amount: 10, nonce: 2 }
-            .to_xdr(e, &f.h.host),
-    );
-}
-
-/// Splits a public-input blob into its eleven 32-byte fields.
-fn fields(e: &Env, pi: &Bytes) -> std::vec::Vec<BytesN<32>> {
-    assert_eq!(pi.len(), 11 * 32);
-    (0..11u32)
-        .map(|i| {
-            let mut buf = [0u8; 32];
-            pi.slice(i * 32..(i + 1) * 32).copy_into_slice(&mut buf);
-            BytesN::from_array(e, &buf)
-        })
-        .collect()
-}
-
-fn last_public_inputs(h: &Harness) -> std::vec::Vec<BytesN<32>> {
-    let pi = RecordingVerifierClient::new(&h.e, &h.verifier).last_public_inputs();
-    fields(&h.e, &pi)
-}
-
-/// The 64 bytes of a point as its two 32-byte coordinates.
-fn coordinates(e: &Env, p: &BytesN<64>) -> (BytesN<32>, BytesN<32>) {
-    let bytes = p.to_array();
-    let mut x = [0u8; 32];
-    let mut y = [0u8; 32];
-    x.copy_from_slice(&bytes[..32]);
-    y.copy_from_slice(&bytes[32..]);
-    (BytesN::from_array(e, &x), BytesN::from_array(e, &y))
-}
-
-#[test]
-fn forced_transfer_public_inputs_differ_from_clawback_only_in_destination() {
-    // One deployment, one source account, one destination, one nonce: the
-    // forced transfer is executed, the source is put back to the same
-    // commitments and nonce, and the same statement is executed as a
-    // clawback. Token (field 7) and source account (field 8) bindings are
-    // therefore identical and are compared too.
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    let verifier = RecordingVerifierClient::new(e, &f.h.verifier);
-
-    force(&f, 40);
-    let forced_pi = last_public_inputs(&f.h);
-    assert_eq!(verifier.last_circuit(), CircuitType::Clawback);
-
-    store_account(&f.h, &f.from, AUDITOR, 70, 30);
-    e.as_contract(&f.h.host, || {
-        e.storage().persistent().remove(&ComplianceStorageKey::ClawbackNonce(f.from.clone()));
-    });
-    ConfidentialClawbackClient::new(e, &f.h.host).clawback(
-        &f.from,
-        &40,
-        &Some(f.to.clone()),
-        &proof_data(e),
-        &f.h.admin,
-    );
-    let clawback_pi = last_public_inputs(&f.h);
-    assert_eq!(verifier.last_circuit(), CircuitType::Clawback);
-
-    for i in (0..11usize).filter(|i| *i != 9) {
-        assert_eq!(forced_pi[i].to_array(), clawback_pi[i].to_array(), "field {i}");
-    }
-    e.as_contract(&f.h.host, || {
-        // Fields 0-3: the source's commitments as stored before the call.
-        let (sx, sy) = coordinates(e, &g_times(e, 70));
-        let (rx, ry) = coordinates(e, &g_times(e, 30));
-        assert_eq!([&forced_pi[0], &forced_pi[1]], [&sx, &sy]);
-        assert_eq!([&forced_pi[2], &forced_pi[3]], [&rx, &ry]);
-        // Fields 4-5: the designated auditor's key.
-        let (kx, ky) = coordinates(e, &Grumpkin::generator(e));
-        assert_eq!([&forced_pi[4], &forced_pi[5]], [&kx, &ky]);
-        // Field 6: the public amount. Field 7: this token. Field 8: the
-        // source account. Field 9: the destination binding.
-        assert_eq!(forced_pi[6], field(e, 40));
-        assert_eq!(forced_pi[7], address_to_field(e, &f.h.host));
-        assert_eq!(forced_pi[8], address_to_field(e, &f.from));
-        assert_eq!(forced_pi[9], forced_destination_to_field(e, &f.to));
-        assert_eq!(clawback_pi[9], address_to_field(e, &f.to));
-        assert_ne!(forced_pi[9], clawback_pi[9]);
-        assert_ne!(forced_pi[9], BytesN::from_array(e, &[0u8; 32]));
-    });
-}
-
-#[test]
-fn forced_destination_field_is_bound_to_the_destination() {
-    let h = setup();
-    let a = Address::generate(&h.e);
-    let b = Address::generate(&h.e);
-    h.e.as_contract(&h.host, || {
-        assert_eq!(forced_destination_to_field(&h.e, &a), forced_destination_to_field(&h.e, &a));
-        assert_ne!(forced_destination_to_field(&h.e, &a), forced_destination_to_field(&h.e, &b));
-        assert_ne!(forced_destination_to_field(&h.e, &a), address_to_field(&h.e, &a));
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3506)")]
-fn forced_transfer_proof_does_not_execute_as_clawback() {
-    // The verifier binds itself to the public inputs of the first proof it
-    // sees (the forced transfer). After the source is restored to the same
-    // commitments and nonce, the same statement in clawback mode differs in
-    // the destination field and is rejected.
-    let f = forced_flow_with(None, |e| e.register(BoundProofVerifier, ()));
-    let e = &f.h.e;
-    force(&f, 40);
-    store_account(&f.h, &f.from, AUDITOR, 70, 30);
-    e.as_contract(&f.h.host, || {
-        e.storage().persistent().remove(&ComplianceStorageKey::ClawbackNonce(f.from.clone()));
-    });
-    ConfidentialClawbackClient::new(e, &f.h.host).clawback(
-        &f.from,
-        &40,
-        &Some(f.to.clone()),
-        &proof_data(e),
-        &f.h.admin,
-    );
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3506)")]
-fn forced_transfer_proof_does_not_execute_twice() {
-    // Restoring the source's commitments leaves the nonce advanced, so the
-    // first proof's statement no longer matches.
-    let f = forced_flow_with(None, |e| e.register(BoundProofVerifier, ()));
-    force(&f, 40);
-    store_account(&f.h, &f.from, AUDITOR, 70, 30);
-    force(&f, 40);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3506)")]
-fn forced_transfer_proof_is_bound_to_the_destination() {
-    let f = forced_flow_with(None, |e| e.register(BoundProofVerifier, ()));
-    let e = &f.h.e;
-    force(&f, 40);
-    store_account(&f.h, &f.from, AUDITOR, 70, 30);
-    e.as_contract(&f.h.host, || {
-        e.storage().persistent().remove(&ComplianceStorageKey::ClawbackNonce(f.from.clone()));
-    });
-    let other = account(&f.h, AUDITOR);
-    ConfidentialForcedTransferClient::new(e, &f.h.host).forced_transfer(
-        &f.from,
-        &other,
-        &40,
-        &proof_data(e),
-        &f.h.admin,
-    );
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3607)")]
-fn forced_transfer_requires_rwa_config() {
-    let h = setup();
-    h.e.as_contract(&h.host, || set_compliance_config(&h.e, &policy_config(&h)));
-    let from = account(&h, AUDITOR);
-    freeze_account(&h, &from);
-    let to = account(&h, AUDITOR);
-    h.e.as_contract(&h.host, || forced_transfer(&h.e, &from, &to, 1, &Bytes::new(&h.e)));
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3604)")]
-fn forced_transfer_requires_frozen_source() {
-    let f = forced_flow(None);
-    f.h.e.as_contract(&f.h.host, || unfreeze(&f.h.e, &f.from));
-    force(&f, 40);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3612)")]
-fn forced_transfer_zero_amount_panics() {
-    let f = forced_flow(None);
-    force(&f, 0);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3612)")]
-fn forced_transfer_negative_amount_panics() {
-    let f = forced_flow(None);
-    force(&f, -1);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3613)")]
-fn forced_transfer_to_self_panics() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    ConfidentialForcedTransferClient::new(e, &f.h.host).forced_transfer(
-        &f.from,
-        &f.from,
-        &40,
-        &proof_data(e),
-        &f.h.admin,
-    );
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3613)")]
-fn forced_transfer_to_the_token_panics() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    ConfidentialForcedTransferClient::new(e, &f.h.host).forced_transfer(
-        &f.from,
-        &f.h.host,
-        &40,
-        &proof_data(e),
-        &f.h.admin,
-    );
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3501)")]
-fn forced_transfer_to_unregistered_account_panics() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    let nobody = Address::generate(e);
-    ConfidentialForcedTransferClient::new(e, &f.h.host).forced_transfer(
-        &f.from,
-        &nobody,
-        &40,
-        &proof_data(e),
-        &f.h.admin,
-    );
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3601)")]
-fn forced_transfer_to_frozen_account_panics() {
-    let f = forced_flow(None);
-    freeze_account(&f.h, &f.to);
-    force(&f, 40);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3602)")]
-fn forced_transfer_to_policy_denied_account_panics() {
-    let f = forced_flow(None);
-    ListPolicyClient::new(&f.h.e, &f.h.policy).block(&f.to);
-    force(&f, 40);
-}
-
-#[test]
-fn forced_transfer_from_legacy_source_uses_its_own_auditor_key() {
-    let h = setup();
-    configure(&h, None);
-    let from = Address::generate(&h.e);
-    store_account(&h, &from, LEGACY_AUDITOR, 50, 0);
-    freeze_account(&h, &from);
-    let to = account(&h, AUDITOR);
-    ConfidentialForcedTransferClient::new(&h.e, &h.host).forced_transfer(
-        &from,
-        &to,
-        &50,
-        &proof_data(&h.e),
-        &h.admin,
-    );
-
-    // The proof is verified against the key of the auditor the source is
-    // bound to, not the designated auditor's.
-    let pi = last_public_inputs(&h);
-    let (kx, ky) = coordinates(&h.e, &g_times(&h.e, 2));
-    assert_eq!([&pi[4], &pi[5]], [&kx, &ky]);
-    h.e.as_contract(&h.host, || {
-        assert_eq!(get_account(&h.e, &to).receiving_commitment, g_times(&h.e, 50));
-    });
-}
-
-#[test]
-fn rejected_forced_transfer_proof_changes_nothing() {
-    let f = forced_flow_with(None, |e| e.register(RejectingVerifier, ()));
-    let e = &f.h.e;
-    let res = ConfidentialForcedTransferClient::new(e, &f.h.host).try_forced_transfer(
-        &f.from,
-        &f.to,
-        &40,
-        &proof_data(e),
-        &f.h.admin,
-    );
-    assert!(res.is_err());
-
-    e.as_contract(&f.h.host, || {
-        let src = get_account(e, &f.from);
-        assert_eq!(src.spendable_commitment, g_times(e, 70));
-        assert_eq!(src.receiving_commitment, g_times(e, 30));
-        assert_eq!(get_account(e, &f.to).receiving_commitment, g_times(e, 7));
-    });
-    assert_eq!(ConfidentialClawbackClient::new(e, &f.h.host).clawback_nonce(&f.from), 0);
-}
-
-#[test]
-fn recovery_revokes_delegations_then_moves_the_full_balance() {
-    // Freeze, fold every delegation back, then force-transfer everything to
-    // a fresh account.
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    let spender = account(&f.h, AUDITOR);
-    store_delegation(&f.h, &f.from, &spender, 25);
-
-    ConfidentialClawbackClient::new(e, &f.h.host)
-        .force_revoke_spender(&f.from, &spender, &f.h.admin);
-    let fresh = account(&f.h, AUDITOR);
-    ConfidentialForcedTransferClient::new(e, &f.h.host).forced_transfer(
-        &f.from,
-        &fresh,
-        &125,
-        &proof_data(e),
-        &f.h.admin,
-    );
-
-    e.as_contract(&f.h.host, || {
-        let src = get_account(e, &f.from);
-        assert_eq!(src.spendable_commitment, Grumpkin::identity(e));
-        assert_eq!(src.receiving_commitment, Grumpkin::identity(e));
-        assert_eq!(get_account(e, &fresh).receiving_commitment, g_times(e, 125));
-    });
-}
-
-#[test]
 fn rejected_hook_leaves_commitments_unchanged() {
     let h = configured(None);
     let alice = Address::generate(&h.e);
@@ -2025,40 +1461,6 @@ fn rejected_hook_leaves_commitments_unchanged() {
         assert_eq!(get_account(&h.e, &alice).spendable_commitment, g_times(&h.e, 1_000));
         assert_eq!(get_account(&h.e, &frozen).receiving_commitment, Grumpkin::identity(&h.e));
     });
-}
-
-fn hex32(s: &str) -> [u8; 32] {
-    let mut out = [0u8; 32];
-    for (i, byte) in out.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&s[2 * i..2 * i + 2], 16).unwrap();
-    }
-    out
-}
-
-#[test]
-fn forced_destination_to_field_matches_testdata_vectors() {
-    let h = setup();
-    let e = &h.e;
-
-    // (strkey, expected) from
-    // circuits/lib/testdata/forced_destination_to_field.json: the two
-    // addresses of the `address_to_field` vectors.
-    let vectors: [(&str, [u8; 32]); 2] = [
-        (
-            "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-            hex32("2b07bfd7c614007acad5b1d37a3fdc64a915b44dd0dafc5d5cf0bd2d2ef3ab7a"),
-        ),
-        (
-            "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
-            hex32("2bbf4aadf66599f9f9a99357f94b9c3c2657aa890e277ed9fe366ac4c8f6b5be"),
-        ),
-    ];
-
-    for (strkey, expected) in vectors {
-        let addr = Address::from_str(e, strkey);
-        let got = e.as_contract(&h.host, || forced_destination_to_field(e, &addr));
-        assert_eq!(got, BytesN::from_array(e, &expected), "forced_destination_to_field({strkey})");
-    }
 }
 
 /// Runs `withdraw(alice, recipient, 100, data)` with the sender's
@@ -2140,10 +1542,6 @@ fn err(code: ComplianceError) -> Result<(), Error> {
     Err(Error::from_contract_error(code as u32))
 }
 
-fn token_err(code: ConfidentialTokenError) -> Result<(), Error> {
-    Err(Error::from_contract_error(code as u32))
-}
-
 /// Runs `f` inside the token's frame and returns the error it aborts with.
 /// Unlike `hook_panic`, the result is a typed `Error`, and a contract error
 /// is told apart from a host trap.
@@ -2221,13 +1619,6 @@ fn try_hook(h: &Harness, op: Op, p: &Parties) -> Result<(), Error> {
         }
         Op::Revoke => RwaHooks::on_revoke_spender(e, &p.from, &p.spender),
     })
-}
-
-fn try_force(f: &Forced, from: &Address, to: &Address, amount: i128) -> Result<(), Error> {
-    ConfidentialForcedTransferClient::new(&f.h.e, &f.h.host)
-        .try_forced_transfer(from, to, &amount, &proof_data(&f.h.e), &f.h.admin)
-        .map(|r| r.unwrap())
-        .map_err(|r| r.unwrap())
 }
 
 // ################## P1: APPROVAL GATE ##################
@@ -2546,190 +1937,7 @@ fn sac_passthrough_over_a_non_sac_underlying_fails_closed() {
     }
 }
 
-// ################## P3: FORCED TRANSFER ##################
-
-// Pins branch: forced_transfer / two preconditions fail at once / the
-//   order is freeze, amount, destination identity, source registration,
-//   destination gates, destination registration and auditor; state unchanged
-// Verifies: INV-6
-#[test]
-fn forced_transfer_checks_run_in_documented_order() {
-    let f = forced_flow(None);
-    let h = &f.h;
-    let e = &h.e;
-
-    // 1. Freeze before amount, destination and registration.
-    let unfrozen = account(h, AUDITOR);
-    assert_eq!(try_force(&f, &unfrozen, &unfrozen, 0), err(ComplianceError::AccountNotFrozen));
-    let nobody = Address::generate(e);
-    assert_eq!(try_force(&f, &nobody, &f.to, 1), err(ComplianceError::AccountNotFrozen));
-
-    // 2. Amount before destination.
-    assert_eq!(
-        try_force(&f, &f.from, &f.from, 0),
-        err(ComplianceError::InvalidForcedTransferAmount)
-    );
-
-    // 3. Destination identity before the source's registration.
-    let ghost = Address::generate(e);
-    freeze_account(h, &ghost);
-    assert_eq!(
-        try_force(&f, &ghost, &ghost, 1),
-        err(ComplianceError::InvalidForcedTransferDestination)
-    );
-    assert_eq!(
-        try_force(&f, &ghost, &h.host, 1),
-        err(ComplianceError::InvalidForcedTransferDestination)
-    );
-
-    // 4. Source registration before the destination's gates.
-    let frozen_to = account(h, AUDITOR);
-    freeze_account(h, &frozen_to);
-    assert_eq!(
-        try_force(&f, &ghost, &frozen_to, 1),
-        token_err(ConfidentialTokenError::AccountNotRegistered)
-    );
-
-    // 5. Destination gates before its registration.
-    let legacy_frozen = account(h, LEGACY_AUDITOR);
-    freeze_account(h, &legacy_frozen);
-    assert_eq!(try_force(&f, &f.from, &legacy_frozen, 1), err(ComplianceError::AccountFrozen));
-    let denied_unregistered = Address::generate(e);
-    ListPolicyClient::new(e, &h.policy).block(&denied_unregistered);
-    assert_eq!(
-        try_force(&f, &f.from, &denied_unregistered, 1),
-        err(ComplianceError::NotAuthorizedByPolicy)
-    );
-
-    // Nothing moved and the nonce did not advance.
-    e.as_contract(&h.host, || {
-        assert_eq!(get_account(e, &f.from).spendable_commitment, g_times(e, 70));
-        assert_eq!(get_account(e, &f.from).receiving_commitment, g_times(e, 30));
-        assert_eq!(get_account(e, &f.to).receiving_commitment, g_times(e, 7));
-    });
-    assert_eq!(ConfidentialClawbackClient::new(e, &h.host).clawback_nonce(&f.from), 0);
-}
-
-// Pins branch: forced_transfer -> gate_account(to) / SAC passthrough, `to`
-//   deauthorized / NotAuthorizedBySac #3603; `from` passes no gate
-// Verifies: INV-6
-#[test]
-fn forced_transfer_gates_the_destination_on_the_sac_and_not_the_source() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    ConfidentialComplianceClient::new(e, &f.h.host).set_compliance_config(
-        &ComplianceConfig { policy: Some(f.h.policy.clone()), sac_passthrough: true },
-        &f.h.admin,
-    );
-    f.h.sac.set_authorized(&f.to, &false);
-    assert_eq!(try_force(&f, &f.from, &f.to, 40), err(ComplianceError::NotAuthorizedBySac));
-
-    // The source is not gated: denying it does not block the override.
-    f.h.sac.set_authorized(&f.to, &true);
-    f.h.sac.set_authorized(&f.from, &false);
-    ListPolicyClient::new(e, &f.h.policy).block(&f.from);
-    assert_eq!(try_force(&f, &f.from, &f.to, 40), Ok(()));
-}
-
-// Pins branch: forced_transfer -> verify / the statement of an executed
-//   proof replayed against another account in the same state / InvalidProof
-// Verifies: INV-12
-#[test]
-fn forced_transfer_proof_is_bound_to_the_source_account() {
-    let f = forced_flow_with(None, |e| e.register(BoundProofVerifier, ()));
-    force(&f, 40);
-    // A second frozen account in the state the proof was built against.
-    let twin = Address::generate(&f.h.e);
-    store_account(&f.h, &twin, AUDITOR, 70, 30);
-    freeze_account(&f.h, &twin);
-    assert_eq!(try_force(&f, &twin, &f.to, 40), token_err(ConfidentialTokenError::InvalidProof));
-}
-
-// Pins branch: forced_transfer -> verify / the statement replayed with
-//   another amount / InvalidProof
-// Verifies: INV-12
-#[test]
-fn forced_transfer_proof_is_bound_to_the_amount() {
-    let f = forced_flow_with(None, |e| e.register(BoundProofVerifier, ()));
-    force(&f, 40);
-    store_account(&f.h, &f.from, AUDITOR, 70, 30);
-    f.h.e.as_contract(&f.h.host, || {
-        f.h.e.storage().persistent().remove(&ComplianceStorageKey::ClawbackNonce(f.from.clone()));
-    });
-    assert_eq!(try_force(&f, &f.from, &f.to, 41), token_err(ConfidentialTokenError::InvalidProof));
-}
-
-// Pins branch: forced_transfer / success / the amount, token and nonce
-//   public inputs carry the call's amount, this contract's field element
-//   and the stored nonce
-// Verifies: INV-11, INV-12
-#[test]
-fn forced_transfer_public_inputs_carry_amount_token_and_nonce() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    e.as_contract(&f.h.host, || {
-        e.storage().persistent().set(&ComplianceStorageKey::ClawbackNonce(f.from.clone()), &5u32);
-    });
-    force(&f, 40);
-
-    let pi = last_public_inputs(&f.h);
-    assert_eq!(pi[6], field(e, 40));
-    e.as_contract(&f.h.host, || assert_eq!(pi[7], get_address_as_field_element(e)));
-    assert_eq!(pi[10], field(e, 5));
-}
-
-// Pins branch: forced_transfer -> auditor.get_key / `from` bound to an id
-//   the registry does not hold / AuditorNotRegistered #3301
-// Verifies: INV-6
-#[test]
-fn forced_transfer_from_source_with_unregistered_auditor_fails() {
-    let f = forced_flow(None);
-    let orphan = Address::generate(&f.h.e);
-    store_account(&f.h, &orphan, 7, 50, 0);
-    freeze_account(&f.h, &orphan);
-    // AuditorError::AuditorNotRegistered
-    assert_eq!(try_force(&f, &orphan, &f.to, 10), Err(Error::from_contract_error(3301)));
-}
-
-// Pins branch: forced_transfer / stored configuration invalid / it reverts
-//   with EligibilityRequired #3614 or NotConfigured #3600
-// Verifies: INV-1, INV-6
-#[test]
-fn forced_transfer_fails_closed_on_an_invalid_stored_configuration() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    e.as_contract(&f.h.host, || {
-        e.storage().instance().set(
-            &ComplianceStorageKey::Config,
-            &ComplianceConfig { policy: None, sac_passthrough: false },
-        );
-    });
-    assert_eq!(try_force(&f, &f.from, &f.to, 40), err(ComplianceError::EligibilityRequired));
-    e.as_contract(&f.h.host, || e.storage().instance().remove(&ComplianceStorageKey::Config));
-    assert_eq!(try_force(&f, &f.from, &f.to, 40), err(ComplianceError::NotConfigured));
-}
-
-// Pins branch: forced_transfer entry point / `data` is not a ClawbackData /
-//   InvalidData #3507
-// Verifies: INV-6
-#[test]
-fn forced_transfer_rejects_malformed_data() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    let res = ConfidentialForcedTransferClient::new(e, &f.h.host).try_forced_transfer(
-        &f.from,
-        &f.to,
-        &40,
-        &42u32.to_xdr(e),
-        &f.h.admin,
-    );
-    assert_eq!(
-        res.unwrap_err().unwrap(),
-        Error::from_contract_error(ConfidentialTokenError::InvalidData as u32)
-    );
-}
-
-// ################## P4: ORDER OF CHECKS IN THE HOOKS ##################
+// ################## P3: ORDER OF CHECKS IN THE HOOKS ##################
 
 // Pins branch: rwa_context / both configurations absent / every hook
 //   reports RwaNotConfigured #3607, not NotConfigured #3600
@@ -2777,7 +1985,7 @@ fn hook_checks_run_in_documented_order() {
     assert_eq!(try_hook(&h, Op::SpenderTransfer, &p), err(ComplianceError::NotAuthorizedByPolicy));
 }
 
-// ################## P5: HOOK VARIANTS ##################
+// ################## P4: HOOK VARIANTS ##################
 
 // Pins branch: on_spender_transfer / the spender is bound to another
 //   auditor or not registered / the hook passes
@@ -2811,7 +2019,7 @@ fn frozen_address_can_register_but_not_transact() {
     );
 }
 
-// ################## P6: CONFIGURATION ##################
+// ################## P5: CONFIGURATION ##################
 
 // Pins branch: set_rwa_config / auditor and approver both invalid / the
 //   auditor check wins; the token is rejected as approver on a later call
@@ -2860,26 +2068,4 @@ fn disabling_the_approver_emits_rwa_config_changed_without_approver() {
         &RwaConfigChanged { auditor_id: AUDITOR, approver: None }.to_xdr(&h.e, &h.host),
     );
     assert_eq!(client.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR, approver: None }));
-}
-
-#[test]
-fn contract_poseidon2_matches_the_noir_library_fixture() {
-    // `circuits/lib/testdata/poseidon_with_domain.json`: domain 2 over
-    // [0xdead, 0xbeef]. The contract's Poseidon2 and the Noir library's
-    // `poseidon_with_domain` are the same function, which is what lets
-    // `fixtures_match_testdata` (Noir) stand as an independent check of
-    // `forced_destination_to_field`.
-    use soroban_poseidon::poseidon2_hash;
-    use soroban_sdk::{crypto::bn254::Bn254Fr, U256};
-
-    let e = Env::default();
-    let inputs = soroban_sdk::vec![
-        &e,
-        U256::from_u32(&e, 2),
-        U256::from_u32(&e, 0xdead),
-        U256::from_u32(&e, 0xbeef)
-    ];
-    let hash: U256 = poseidon2_hash::<4, Bn254Fr>(&e, &inputs);
-    let expected = hex32("208fbdb70d2faacf04f987b54f12aeeaeb432acc29d650c86ce0f6275b958eb8");
-    assert_eq!(hash.to_be_bytes(), Bytes::from_array(&e, &expected));
 }

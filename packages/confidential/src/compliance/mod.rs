@@ -24,10 +24,9 @@
 //!
 //! A regulated deployment wires [`RwaHooks`] instead of [`ComplianceHooks`]
 //! and implements [`ConfidentialRwa`]. The profile adds a designated auditor
-//! every account must bind to, an optional approver whose authorization
-//! every value-moving operation additionally requires, and — through the
-//! opt-in [`ConfidentialForcedTransfer`] — a forced transfer between
-//! confidential accounts. See `docs/compliance.md#rwa-profile`.
+//! every account must bind to and an optional approver whose authorization
+//! every value-moving operation additionally requires. See
+//! `docs/compliance.md#rwa-profile`.
 //!
 //! Deployments that never write a configuration pay one instance-storage read
 //! per operation: [`ComplianceHooks`] returns early when
@@ -373,63 +372,6 @@ pub trait ConfidentialRwa: ConfidentialCompliance {
     }
 }
 
-/// Opt-in forced transfer between confidential accounts
-/// (`docs/compliance.md#forced-transfer`). Recovery of a lost account is a
-/// forced transfer of its full balance.
-///
-/// # Deployment obligation
-///
-/// As for [`ConfidentialClawback`], the source must be frozen and the freeze
-/// must actually gate it: a contract implementing this trait MUST wire
-/// [`RwaHooks`].
-///
-/// # Proof-system restriction
-///
-/// The proof carries the auditor's secret key as a witness. Until the
-/// verifier accepts zero-knowledge proofs
-/// (`packages/confidential/README.md`), each proof may leak bits of that
-/// key; do not use this entry point, or [`ConfidentialClawback::clawback`],
-/// on a public network before then.
-#[contracttrait]
-pub trait ConfidentialForcedTransfer: ConfidentialClawback + ConfidentialRwa {
-    /// Moves the public `amount` from the frozen account `from` to the
-    /// registered account `to` inside the pool, against a clawback proof
-    /// built by the auditor `from` is bound to.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `from` - The frozen confidential account being debited.
-    /// * `to` - The confidential account being credited.
-    /// * `amount` - The strictly positive amount.
-    /// * `data` - XDR-encoded [`ClawbackData`].
-    /// * `operator` - The address authorizing this call.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`crate::storage::decode_data`] errors.
-    /// * refer to [`storage::forced_transfer`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["forced_transfer", from: Address, to: Address]`
-    /// * data - `[amount: i128, nonce: u32]`
-    ///
-    /// # Security Warning
-    ///
-    /// Implementations MUST authorize `operator` before decoding `data` into
-    /// [`ClawbackData`] and calling [`storage::forced_transfer`]. The call
-    /// moves funds without the owner's authorization.
-    fn forced_transfer(
-        e: &Env,
-        from: Address,
-        to: Address,
-        amount: i128,
-        data: Bytes,
-        operator: Address,
-    );
-}
-
 // ################## HOOKS IMPL ##################
 
 /// [`Hooks`] implementation that checks every token callback against the
@@ -711,16 +653,9 @@ pub enum ComplianceError {
     InvalidApprover = 3610,
     /// Indicates the approver is a party to the operation it would approve.
     ApproverIsParty = 3611,
-    /// Indicates the forced-transfer amount is not strictly positive.
-    InvalidForcedTransferAmount = 3612,
-    /// Indicates the forced-transfer destination is the source, this
-    /// contract's own address, or maps to the zero field.
-    InvalidForcedTransferDestination = 3613,
     /// Indicates a compliance configuration of an RWA deployment has neither
     /// a policy nor SAC passthrough.
-    EligibilityRequired = 3614,
-    /// Indicates the account's clawback nonce cannot advance past `u32::MAX`.
-    NonceOverflow = 3615,
+    EligibilityRequired = 3612,
 }
 
 // ################## CONSTANTS ##################
@@ -801,23 +736,4 @@ pub struct RwaConfigChanged {
 /// Emits an [`RwaConfigChanged`] event.
 pub fn emit_rwa_config_changed(e: &Env, auditor_id: u32, approver: &Option<Address>) {
     RwaConfigChanged { auditor_id, approver: approver.clone() }.publish(e);
-}
-
-/// Event emitted when a public amount is moved between two confidential
-/// accounts by a forced transfer. `nonce` is the source's clawback nonce
-/// consumed by the call.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ForcedTransfer {
-    #[topic]
-    pub from: Address,
-    #[topic]
-    pub to: Address,
-    pub amount: i128,
-    pub nonce: u32,
-}
-
-/// Emits a [`ForcedTransfer`] event.
-pub fn emit_forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128, nonce: u32) {
-    ForcedTransfer { from: from.clone(), to: to.clone(), amount, nonce }.publish(e);
 }

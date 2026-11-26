@@ -263,11 +263,24 @@ Commitment equality is not freshness. A seizure of `alpha` from `(C, O)` leaves 
 
 `Clawback` is a receiving-side reset and a `T_0` anchor, alongside `Merge` ([Recovery](protocol/wallet-state.md#recovery); [Terminology](indexer.md#terminology)). It is not a checkpoint: it carries no `b_tilde`, so its effect on the spendable side is absorbed into the next owner-initiated proof operation. The owner applies the `Merge` row of [Wallet State and Recovery](protocol/wallet-state.md) followed by `W_spend.v -= amount`; the auditor advances its standing opening identically ([Sender-auditor opening capability](protocol/auditing.md#sender-auditor-opening-capability)). A `RevokeSpender` emitted by `force_revoke_spender` is indistinguishable from an owner-initiated one for both consumers.
 
+
+### Account Recovery
+
+A holder who has lost its spending key holds a balance no owner proof can move. The issuer moves it to an account the holder registers under a new key, with entry points that already exist:
+
+1. `freeze(lost)`, then `force_revoke_spender(lost, s)` for every delegation of `lost`, including expired ones, which the contract cannot enumerate and the operator takes from the event archive ([Forced Revocation](#forced-revocation)).
+2. `clawback(lost, amount, Some(treasury))` for the full balance, which the auditor knows from its ledger. The underlying moves to `treasury`.
+3. `deposit(treasury, fresh, amount)`. `fresh` is credited with zero blinding, as by any deposit.
+
+`treasury` is an issuer-controlled address that passes the deposit's gates, and under the [Approval Gate](#approval-gate) the deposit needs the approver's authorization like any other. The amount is public in both steps. Between the two transactions the value sits in `treasury`; nothing on-chain links the deposit to the seizure.
+
+The clawback proof has the auditor's secret key as a witness, and the verifier accepts only non-zero-knowledge proofs today ([Zero-knowledge setting](../README.md#zero-knowledge-setting)): neither clawback nor this recovery should be used on a public network until that changes.
+
 ---
 
 ## RWA Profile
 
-The RWA profile is the configuration for regulated assets whose issuer must see every balance and may have to enforce rules on them. It is delivered as `RwaHooks`, a `Hooks` implementation a deployment wires instead of `ComplianceHooks`, plus the `ConfidentialRwa` trait and the opt-in `ConfidentialForcedTransfer` trait. It adds no circuit and changes no core entry point.
+The RWA profile is the configuration for regulated assets whose issuer must see every balance and may have to enforce rules on them. It is delivered as `RwaHooks`, a `Hooks` implementation a deployment wires instead of `ComplianceHooks`, plus the `ConfidentialRwa` trait. It adds no circuit and changes no core entry point.
 
 The profile splits compliance by what the chain can see. Rules over public addresses (eligibility, freeze) run on-chain. Rules over hidden balances and amounts are evaluated off-chain by the issuer's compliance service, which holds the designated auditor key and therefore decrypts every operation; it either monitors and remediates, or, when configured as the approver, authorizes each value-moving operation before it settles.
 
@@ -302,7 +315,7 @@ When `RwaConfig.approver` is set, `deposit`, `withdraw`, `confidential_transfer`
 
 `payload` is the operation's decoded payload ([Interface](protocol/interface.md)), so an authorization covers one statement: any valid proof of it is acceptable, and no other payload is. The approver obtains the amount of a transfer from the recipient-auditor ciphertexts in that payload ([Per-Transfer Auditor Ciphertexts](protocol/auditing.md#per-transfer-auditor-ciphertexts)).
 
-The approval is additional. The operation's own authorizer, its proof and every other gate are still required, and an approver cannot move, create or destroy value. `set_spender`, `merge` and `revoke_spender` change no ownership and require no approval. `clawback` and `forced_transfer` are administrative overrides and require none either.
+The approval is additional. The operation's own authorizer, its proof and every other gate are still required, and an approver cannot move, create or destroy value. `set_spender`, `merge` and `revoke_spender` change no ownership and require no approval. `clawback` is an administrative override and requires none either.
 
 **Revocation.** The contract keeps no approval state: an authorization is spent by its nonce and lapses at its expiry ledger, both chosen by the approver. To void outstanding authorizations before they lapse, the deployment replaces the approver through `set_rwa_config`, or the approver rotates the key its authorizations are checked against, since the host checks them against the approver's signers when the operation executes. Disabling and re-enabling the same approver does not void them. A change of the compliance configuration voids nothing either; the freeze, policy and SAC gates are evaluated at execution.
 
@@ -313,34 +326,6 @@ The approval is additional. The operation's own authorizer, its proof and every 
 - A contract approver that itself invokes the token is authorized without `args` being matched and without its `__check_auth` running. Any path through which that contract calls the token must itself check the token address, the entry point and the full `args`; a generic forwarding function, even one gated by the contract's own authorization, approves whatever it forwards.
 
 The approver signing key, the designated auditor's decryption key and the admin roles belong in separate custody, so that the approver's decisions are visible to someone who does not hold its key. While the approver is unavailable, the gated operations stop; the deployment's `set_rwa_config` role can replace the approver or disable the gate.
-
-### Forced Transfer
-
-`forced_transfer(from, to, amount, data, operator)` moves a public `amount` from a frozen account to another registered account inside the pool. It is `clawback` with a confidential destination: the same proof statement, verified against the same key, with no underlying moved. Recovery of a lost account is a forced transfer of its full balance to a fresh account.
-
-The proof is a clawback proof ([Circuit](#circuit)) built by the auditor `from` is bound to. Its public inputs are those of [Contract Flow](#contract-flow) step 2, in the same order and from the same sources, except the destination input:
-
-| Entry point | `dest_f` |
-|:---|:---|
-| `clawback`, `Some(d)` | `address_to_field(d)` |
-| `clawback`, `None` | the zero field |
-| `forced_transfer` | `Poseidon2(18, address_to_field(to))` ([Domain Separation Constants](protocol/domain-separators.md)) |
-
-The circuit references `dest_f` in no gate, so the tag is what assigns a proof to one settlement mode: a proof built for a forced transfer verifies in neither clawback branch, and a clawback proof does not verify as a forced transfer. A `to` whose `dest_f` is zero is rejected, keeping the third row disjoint from the second. Both entry points read and advance the same `ClawbackNonce(from)` ([Anti-Replay and the Freeze](#anti-replay-and-the-freeze)), so a proof executes at most once across both.
-
-`forced_transfer` runs, after the deployment's access-control check on `operator`:
-
-1. **Preconditions**, in this order. Both configurations valid, as for `RwaHooks`. `is_frozen(from)`, else `AccountNotFrozen`. `amount > 0`, else `InvalidForcedTransferAmount`. `to` is neither `from` nor this contract and its `dest_f` is non-zero, else `InvalidForcedTransferDestination`. `from` is registered. `to` passes the freeze, policy and SAC gates. `to` is registered. `from` passes no eligibility gate and may be bound to any auditor.
-2. **Verification** against `CircuitType::Clawback`.
-3. **State update.** `from.C_spend <- C_spend + C_receive - amount·G`, `from.C_receive <- O`, then `to.C_receive <- to.C_receive + amount·G`. The sum of all commitments is unchanged and the pool's balance is untouched.
-4. **Nonce.** `ClawbackNonce(from) <- nonce + 1`, reverting with `NonceOverflow` instead of wrapping.
-5. **Event.** `ForcedTransfer { from, to, amount, nonce }`, where `nonce` is the value step 4 consumed.
-
-No `Hooks` callback is invoked. For `from`, a `ForcedTransfer` is what a `Clawback` is: a receiving-side reset and a `T_0` anchor, not a checkpoint, and the source owner and its auditor apply the rule of [Wallet and Auditor Consequences](#wallet-and-auditor-consequences); the destination owner and its auditor apply the `Deposit` rule, the credit carrying zero blinding ([Wallet State and Recovery](protocol/wallet-state.md)).
-
-**Recovery procedure.** Freeze the lost account; `force_revoke_spender` each of its delegations, including expired ones, which the contract cannot enumerate and the operator takes from the event archive; then force-transfer the full balance. The circuit proves `amount <= v_spend + v_receive`, so a smaller amount leaves a remainder a further forced transfer can move.
-
-**Restrictions.** A deployment that implements `ConfidentialForcedTransfer` MUST wire `RwaHooks`, for the reason given in [Anti-Replay and the Freeze](#anti-replay-and-the-freeze). An issued proof stays executable by the operator until the source's commitments, its nonce or the auditor key change. The amount is public. The proof's witness includes the auditor's secret key, and the verifier accepts only non-zero-knowledge proofs today (see the package `README.md`): neither `forced_transfer` nor `clawback` should be used on a public network until it accepts zero-knowledge ones, and nothing on-chain enforces that.
 
 ---
 
@@ -373,10 +358,6 @@ impl Token {
     // RWA profile, via ConfidentialRwa (admin auth per Admin Authority)
     fn set_rwa_config(e: Env, auditor_id: u32, approver: Option<Address>, operator: Address);
     fn rwa_config(e: Env) -> Option<RwaConfig>;
-
-    // Forced transfer, opt-in via ConfidentialForcedTransfer
-    fn forced_transfer(e: Env, from: Address, to: Address, amount: i128,
-                       data: Bytes /* XDR ClawbackData { proof } */, operator: Address);
 }
 ```
 
@@ -391,7 +372,6 @@ impl Token {
 | `Clawback` | `account` (topic), `amount`, `destination` |
 | `RevokeSpender` | as [Event Schema](protocol/interface.md#event-schema), when emitted by `force_revoke_spender` |
 | `RwaConfigChanged` | `auditor_id`, `approver` |
-| `ForcedTransfer` | `from` (topic), `to` (topic), `amount`, `nonce` |
 
 ### Errors
 
@@ -412,10 +392,7 @@ The RWA profile adds:
 | `AuditorAlreadySet` | 3609 | `set_rwa_config` names an auditor other than the stored one |
 | `InvalidApprover` | 3610 | the approver is the contract's own address |
 | `ApproverIsParty` | 3611 | the approver is `from`, `to` or `spender` of the operation |
-| `InvalidForcedTransferAmount` | 3612 | `amount <= 0` |
-| `InvalidForcedTransferDestination` | 3613 | `to` is `from` or the contract's own address, or its `dest_f` is zero |
-| `EligibilityRequired` | 3614 | the compliance configuration of an RWA deployment has neither a policy nor SAC passthrough |
-| `NonceOverflow` | 3615 | the clawback nonce is `u32::MAX` in `forced_transfer` |
+| `EligibilityRequired` | 3612 | the compliance configuration of an RWA deployment has neither a policy nor SAC passthrough |
 
 ---
 
