@@ -19,33 +19,27 @@
 //!
 //! # Checkpoint Storage and Transaction Footprints
 //!
-//! Soroban transactions declare the storage keys they touch at simulation
-//! time, and a transaction that touches any other key fails. Any account can
-//! add a checkpoint to a delegate's history (for example by sending tokens to
-//! an account that delegates to it), at most one per ledger. If every
-//! checkpoint lived in its own storage entry, the keys read by `cast_vote` or
-//! written by a transfer would move with each new checkpoint, and a third
-//! party could make other users' prepared transactions fail.
+//! A Soroban transaction fails if it touches a storage key not recorded at its
+//! simulation, or writes more bytes than recorded. Any account can add a
+//! checkpoint to a delegate's history (for example by sending tokens to an
+//! account that delegates to it), at most one per ledger, so adding
+//! checkpoints must keep both stable.
 //!
-//! To prevent this, checkpoints are stored in chunks of up to
-//! [`CHECKPOINTS_PER_CHUNK`] entries, and the keys a transaction touches change
-//! only when a new chunk is started. A prepared transaction can therefore fail
-//! only if a new chunk is started between its simulation and its execution.
-//! Filling a chunk takes [`CHECKPOINTS_PER_CHUNK`] checkpoints, so this
-//! happens at most once every [`CHECKPOINTS_PER_CHUNK`] ledgers for each
-//! history.
+//! Checkpoints are therefore stored in fixed-size chunks of
+//! [`CHECKPOINTS_PER_CHUNK`], where unused slots hold an empty placeholder.
+//! Adding a checkpoint changes a chunk's contents, but not its key or its size.
+//! A prepared transaction can fail only if a new chunk is started between its
+//! simulation and its execution, at most once every [`CHECKPOINTS_PER_CHUNK`]
+//! ledgers per history.
 //!
-//! For writes (transfers, delegations, mints and burns), clients can rule
-//! this out for gaps of up to [`CHECKPOINTS_PER_CHUNK`] ledgers by also
-//! declaring, for each history written, the chunk after the one written to.
+//! For writes (transfers, delegations, mints and burns), clients can rule this
+//! out for gaps of up to [`CHECKPOINTS_PER_CHUNK`] ledgers by also declaring
+//! the next chunk and one chunk's worth of extra write bytes.
+//!
 //! This does not always work for historical reads ([`get_votes_at_checkpoint`]
 //! and [`get_total_supply_at_checkpoint`]): once a new chunk is started, the
 //! lookup can search through older chunks it did not read at simulation. Such
 //! a read can then fail, and can be simulated and submitted again.
-//!
-//! A write stores the whole chunk again, so checkpoints added to it after
-//! simulation also raise the bytes written. Clients declaring the next chunk
-//! should leave room in the write-bytes limit for a full chunk.
 //!
 //! # Usage
 //!
@@ -243,13 +237,14 @@ pub const VOTES_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 /// TTL threshold for extending storage entries (in ledgers)
 pub const VOTES_TTL_THRESHOLD: u32 = VOTES_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
-/// Maximum number of checkpoints stored in a single storage entry.
+/// Number of checkpoints stored in a single storage entry.
 ///
 /// Checkpoints are grouped into chunks so that the storage keys a
 /// transaction touches change only when a new chunk is started, not every
-/// time a checkpoint is added. See the module documentation for why this
-/// matters.
-pub const CHECKPOINTS_PER_CHUNK: u32 = 16;
+/// time a checkpoint is added. Every write stores a full chunk, so a larger
+/// chunk makes writes more expensive, and a smaller one starts new chunks more
+/// often. See the module documentation for why this matters.
+pub const CHECKPOINTS_PER_CHUNK: u32 = 10;
 
 // ################## EVENTS ##################
 

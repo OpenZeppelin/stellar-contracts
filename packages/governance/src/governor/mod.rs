@@ -169,10 +169,9 @@
 //! [`crate::votes::CHECKPOINTS_PER_CHUNK`], so the keys a lookup reads change
 //! only when a new chunk is started. A third party can therefore push a
 //! prepared vote or proposal outside its footprint only if a new chunk is
-//! started between its
-//! simulation and its execution, which happens at most once every
-//! [`crate::votes::CHECKPOINTS_PER_CHUNK`] ledgers for each delegate. The
-//! vote or proposal can then be simulated and submitted again.
+//! started between its simulation and its execution, which happens at most
+//! once every [`crate::votes::CHECKPOINTS_PER_CHUNK`] ledgers for each
+//! delegate. The vote or proposal can then be simulated and submitted again.
 //! See the "Checkpoint Storage and Transaction Footprints" section of the
 //! [`crate::votes`] module.
 

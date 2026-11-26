@@ -49,9 +49,10 @@ pub enum CheckpointType {
 /// vote), so the storage design tracks delegates and their checkpointed
 /// voting power separately from the raw voting units held by each account.
 ///
-/// Checkpoints are stored in chunks of up to [`CHECKPOINTS_PER_CHUNK`]
-/// entries: checkpoint `i` lives in chunk `i / CHECKPOINTS_PER_CHUNK` at
-/// position `i % CHECKPOINTS_PER_CHUNK`.
+/// Checkpoints are stored in chunks of [`CHECKPOINTS_PER_CHUNK`] slots:
+/// checkpoint `i` lives in chunk `i / CHECKPOINTS_PER_CHUNK` at position
+/// `i % CHECKPOINTS_PER_CHUNK`. Every chunk holds all its slots from the
+/// start, and the slots after the latest checkpoint hold an empty placeholder.
 #[derive(Clone)]
 #[contracttype]
 pub enum VotesStorageKey {
@@ -84,11 +85,10 @@ pub enum VotesStorageKey {
 /// [`VotesError::CheckpointNotFound`] - If no checkpoint exists
 /// at the given index.
 pub fn get_checkpoint(e: &Env, checkpoint_type: &CheckpointType, index: u32) -> Checkpoint {
-    let chunk = get_chunk(e, checkpoint_type, index / CHECKPOINTS_PER_CHUNK);
-    let Some(checkpoint) = chunk.get(index % CHECKPOINTS_PER_CHUNK) else {
+    if index >= get_num_checkpoints(e, checkpoint_type) {
         panic_with_error!(e, VotesError::CheckpointNotFound);
-    };
-    checkpoint
+    }
+    get_existing_checkpoint(e, checkpoint_type, index)
 }
 
 /// Returns the current voting power (delegated votes) of an account.
@@ -108,7 +108,7 @@ pub fn get_votes(e: &Env, account: &Address) -> u128 {
     if num == 0 {
         return 0;
     }
-    get_checkpoint(e, &cp_type, num - 1).votes
+    get_existing_checkpoint(e, &cp_type, num - 1).votes
 }
 
 /// Returns the voting power (delegated votes) of an account at a specific
@@ -149,7 +149,7 @@ pub fn get_total_supply(e: &Env) -> u128 {
     if num == 0 {
         return 0;
     }
-    get_checkpoint(e, &cp_type, num - 1).votes
+    get_existing_checkpoint(e, &cp_type, num - 1).votes
 }
 
 /// Returns the total supply of voting units at a specific past ledger
@@ -336,13 +336,13 @@ pub fn transfer_voting_units(e: &Env, from: Option<&Address>, to: Option<&Addres
 // ################## INTERNAL HELPERS ##################
 
 /// Sets the voting units for an account.
+///
+/// Zero is stored rather than removing the entry: removing writes no bytes,
+/// so a transfer of a full balance would otherwise write more bytes than
+/// simulated if a third party sent the account tokens in between.
 fn set_voting_units(e: &Env, account: &Address, units: u128) {
     let key = VotesStorageKey::VotingUnits(account.clone());
-    if units == 0 {
-        e.storage().persistent().remove(&key);
-    } else {
-        e.storage().persistent().set(&key, &units);
-    }
+    e.storage().persistent().set(&key, &units);
 }
 
 /// Moves delegated votes from one delegate to another.
@@ -389,7 +389,8 @@ fn lookup_checkpoint_at(e: &Env, ledger: u32, num: u32, checkpoint_type: &Checkp
     // Check the latest chunk first: most lookups end here.
     let last_chunk_index = (num - 1) / CHECKPOINTS_PER_CHUNK;
     let latest = get_chunk(e, checkpoint_type, last_chunk_index);
-    if let Some(votes) = votes_in_chunk_at(&latest, ledger) {
+    let filled = (num - 1) % CHECKPOINTS_PER_CHUNK + 1;
+    if let Some(votes) = votes_in_chunk_at(&latest, filled, ledger) {
         return votes;
     }
     if last_chunk_index == 0 {
@@ -418,14 +419,15 @@ fn lookup_checkpoint_at(e: &Env, ledger: u32, num: u32, checkpoint_type: &Checkp
         }
     }
 
-    votes_in_chunk_at(&found, ledger)
+    votes_in_chunk_at(&found, CHECKPOINTS_PER_CHUNK, ledger)
         .expect("the chunk was selected because it starts at or before `ledger`")
 }
 
-/// Returns the votes of the last checkpoint in `chunk` recorded at or before
-/// `ledger`, or `None` if every checkpoint in `chunk` is after `ledger`.
-fn votes_in_chunk_at(chunk: &Vec<Checkpoint>, ledger: u32) -> Option<u128> {
-    for i in (0..chunk.len()).rev() {
+/// Returns the votes of the last checkpoint among the first `filled` slots of
+/// `chunk` recorded at or before `ledger`, or `None` if every one of them is
+/// after `ledger`.
+fn votes_in_chunk_at(chunk: &Vec<Checkpoint>, filled: u32, ledger: u32) -> Option<u128> {
+    for i in (0..filled).rev() {
         let checkpoint = chunk.get_unchecked(i);
         if checkpoint.ledger <= ledger {
             return Some(checkpoint.votes);
@@ -478,6 +480,24 @@ fn get_chunk(e: &Env, checkpoint_type: &CheckpointType, chunk_index: u32) -> Vec
     chunk
 }
 
+/// Returns the checkpoint at `index`, which must be lower than the number of
+/// checkpoints.
+fn get_existing_checkpoint(e: &Env, checkpoint_type: &CheckpointType, index: u32) -> Checkpoint {
+    get_chunk(e, checkpoint_type, index / CHECKPOINTS_PER_CHUNK)
+        .get_unchecked(index % CHECKPOINTS_PER_CHUNK)
+}
+
+/// Returns a new chunk holding `checkpoint` in its first slot and the empty
+/// placeholder in all the others.
+fn new_chunk(e: &Env, checkpoint: Checkpoint) -> Vec<Checkpoint> {
+    let mut chunk = Vec::new(e);
+    chunk.push_back(checkpoint);
+    for _ in 1..CHECKPOINTS_PER_CHUNK {
+        chunk.push_back(Checkpoint { ledger: 0, votes: 0 });
+    }
+    chunk
+}
+
 /// Returns the number of checkpoints for the given checkpoint type.
 fn get_num_checkpoints(e: &Env, checkpoint_type: &CheckpointType) -> u32 {
     match checkpoint_type {
@@ -500,11 +520,12 @@ fn get_num_checkpoints(e: &Env, checkpoint_type: &CheckpointType) -> u32 {
 /// Pushes a new checkpoint or updates the last one if same ledger sequence
 /// number. Returns (previous_votes, new_votes).
 ///
-/// A new checkpoint is appended to the latest chunk, and a new chunk is
-/// started only when the latest one is full. Within a chunk, the storage key
-/// written stays the same however many checkpoints are added, so third
-/// parties adding checkpoints can only push a prepared transaction outside
-/// its footprint when a new chunk is started in between.
+/// Every chunk holds all its slots from the start, so writing a chunk always
+/// writes the same number of bytes, however many checkpoints it holds. The
+/// checkpoint count is written on both paths for the same reason. Third
+/// parties adding checkpoints therefore change neither the keys a prepared
+/// transaction writes nor the number of bytes, unless a new chunk is started
+/// in between.
 fn push_checkpoint(
     e: &Env,
     checkpoint_type: &CheckpointType,
@@ -514,45 +535,50 @@ fn push_checkpoint(
     let num = get_num_checkpoints(e, checkpoint_type);
     let ledger = e.ledger().sequence();
 
-    // The chunk holding the latest checkpoint (empty if there is none yet)
-    let mut chunk = if num > 0 {
-        get_chunk(e, checkpoint_type, (num - 1) / CHECKPOINTS_PER_CHUNK)
-    } else {
-        Vec::new(e)
-    };
-    let last_checkpoint = chunk.last();
+    // The chunk holding the latest checkpoint, if there is one
+    let latest = (num > 0).then(|| {
+        let chunk = get_chunk(e, checkpoint_type, (num - 1) / CHECKPOINTS_PER_CHUNK);
+        let last_checkpoint = chunk.get_unchecked((num - 1) % CHECKPOINTS_PER_CHUNK);
+        (chunk, last_checkpoint)
+    });
 
-    let previous_votes = last_checkpoint.as_ref().map_or(0, |cp| cp.votes);
+    let previous_votes = latest.as_ref().map_or(0, |(_, cp)| cp.votes);
     let votes = apply_checkpoint_op(e, previous_votes, op, delta);
     let checkpoint = Checkpoint { ledger, votes };
 
-    // Check if we can update the last checkpoint (same ledger sequence number)
-    if last_checkpoint.is_some_and(|cp| cp.ledger == ledger) {
-        chunk.set(chunk.len() - 1, checkpoint);
-        let key = chunk_storage_key(checkpoint_type, (num - 1) / CHECKPOINTS_PER_CHUNK);
-        e.storage().persistent().set(&key, &chunk);
-        return (previous_votes, votes);
-    }
+    let new_num = match latest {
+        // Same ledger sequence number: update the latest checkpoint in place
+        Some((mut chunk, last_checkpoint)) if last_checkpoint.ledger == ledger => {
+            chunk.set((num - 1) % CHECKPOINTS_PER_CHUNK, checkpoint);
+            let key = chunk_storage_key(checkpoint_type, (num - 1) / CHECKPOINTS_PER_CHUNK);
+            e.storage().persistent().set(&key, &chunk);
+            num
+        }
+        // Otherwise add checkpoint `num`, starting a new chunk if the latest
+        // one is full
+        latest => {
+            let chunk = match latest {
+                Some((mut chunk, _)) if !num.is_multiple_of(CHECKPOINTS_PER_CHUNK) => {
+                    chunk.set(num % CHECKPOINTS_PER_CHUNK, checkpoint);
+                    chunk
+                }
+                _ => new_chunk(e, checkpoint),
+            };
+            let key = chunk_storage_key(checkpoint_type, num / CHECKPOINTS_PER_CHUNK);
+            e.storage().persistent().set(&key, &chunk);
+            num + 1
+        }
+    };
 
-    // Create new checkpoint at index `num`, starting a new chunk if the latest
-    // one is full
-    if num.is_multiple_of(CHECKPOINTS_PER_CHUNK) {
-        chunk = Vec::from_array(e, [checkpoint]);
-    } else {
-        chunk.push_back(checkpoint);
-    }
-    let key = chunk_storage_key(checkpoint_type, num / CHECKPOINTS_PER_CHUNK);
-    e.storage().persistent().set(&key, &chunk);
-
-    // Update checkpoint count
+    // Written even when unchanged, so both paths write the same entries
     match checkpoint_type {
         CheckpointType::TotalSupply => {
             let num_key = VotesStorageKey::NumTotalSupplyCheckpoints;
-            e.storage().instance().set(&num_key, &(num + 1));
+            e.storage().instance().set(&num_key, &new_num);
         }
         CheckpointType::Account(account) => {
             let num_key = VotesStorageKey::NumCheckpoints(account.clone());
-            e.storage().persistent().set(&num_key, &(num + 1));
+            e.storage().persistent().set(&num_key, &new_num);
         }
     }
 

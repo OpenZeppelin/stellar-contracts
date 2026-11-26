@@ -3,7 +3,7 @@ extern crate std;
 use std::vec::Vec as StdVec;
 
 use soroban_sdk::{
-    contract,
+    contract, contractimpl,
     testutils::{storage::Persistent as _, Address as _, Events, Ledger},
     Address, Env,
 };
@@ -17,6 +17,20 @@ use crate::votes::{
 
 #[contract]
 struct MockContract;
+
+#[contract]
+struct VotesContract;
+
+#[contractimpl]
+impl VotesContract {
+    pub fn mint(e: &Env, to: Address, amount: u128) {
+        transfer_voting_units(e, None, Some(&to), amount);
+    }
+
+    pub fn transfer(e: &Env, from: Address, to: Address, amount: u128) {
+        transfer_voting_units(e, Some(&from), Some(&to), amount);
+    }
+}
 
 fn setup_env() -> (Env, Address) {
     let e = Env::default();
@@ -836,7 +850,8 @@ fn chunks_read(e: &Env, cp_type: &CheckpointType, f: impl FnOnce()) -> StdVec<u3
 fn historical_reads_touch_the_same_chunks_while_the_latest_chunk_grows() {
     // One snapshot in the first chunk (binary search) and one in the latest
     // chunk (fast path)
-    for (snapshot, votes) in [(55, 5), (10 * (2 * CHECKPOINTS_PER_CHUNK + 2) + 5, 34)] {
+    let latest = 2 * CHECKPOINTS_PER_CHUNK + 2;
+    for (snapshot, votes) in [(55, 5), (10 * latest + 5, u128::from(latest))] {
         let (e, contract_address) = setup_env();
         let alice = Address::generate(&e);
         let account = CheckpointType::Account(alice.clone());
@@ -1000,4 +1015,57 @@ fn same_ledger_update_when_the_latest_chunk_is_full() {
         assert_eq!(num_checkpoints(&e, &alice), count + 5);
         assert_eq!(get_checkpoint(&e, &cp_type, count + 4).votes, u128::from(count) + 20);
     });
+}
+
+#[test]
+fn writes_store_the_same_number_of_bytes_however_full_the_chunk_is() {
+    // A third party adding checkpoints between simulation and execution must
+    // not raise the bytes a prepared write stores, since those are capped by
+    // the write-bytes limit recorded at simulation.
+    let write_bytes = |count: u32, same_ledger: bool| {
+        let e = Env::default();
+        e.mock_all_auths();
+        let contract_address = e.register(VotesContract, ());
+        let client = VotesContractClient::new(&e, &contract_address);
+        let alice = Address::generate(&e);
+        e.as_contract(&contract_address, || build_history(&e, &alice, count));
+        if !same_ledger {
+            e.ledger().set_sequence_number(e.ledger().sequence() + 1);
+        }
+        client.mint(&alice, &1);
+        e.cost_estimate().resources().write_bytes
+    };
+
+    // A mint to a self-delegated account writes its delegate's and the total
+    // supply's chunk and count, from an almost empty to a full latest chunk,
+    // and when it starts a new chunk
+    let expected = write_bytes(1, false);
+    for count in 2..=2 * CHECKPOINTS_PER_CHUNK {
+        assert_eq!(write_bytes(count, false), expected, "{count} checkpoints");
+        // Updating the latest checkpoint in the same ledger writes as much
+        assert_eq!(write_bytes(count, true), expected, "{count} checkpoints, same ledger");
+    }
+}
+
+#[test]
+fn transferring_a_full_balance_writes_as_many_bytes_as_a_partial_one() {
+    // Alice transfers 100 units to bob. If a third party sends her 1 unit
+    // after simulation, the transfer no longer empties her balance, and it
+    // must not write more bytes than when it did.
+    let write_bytes = |balance: u128| {
+        let e = Env::default();
+        e.mock_all_auths();
+        let contract_address = e.register(VotesContract, ());
+        let client = VotesContractClient::new(&e, &contract_address);
+        let alice = Address::generate(&e);
+        let bob = Address::generate(&e);
+        e.as_contract(&contract_address, || {
+            transfer_voting_units(&e, None, Some(&alice), balance);
+            transfer_voting_units(&e, None, Some(&bob), 1);
+        });
+        client.transfer(&alice, &bob, &100);
+        e.cost_estimate().resources().write_bytes
+    };
+
+    assert_eq!(write_bytes(100), write_bytes(101));
 }
