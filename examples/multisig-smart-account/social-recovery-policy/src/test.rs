@@ -24,7 +24,6 @@ use crate::contract::{SocialRecoveryPolicyContract, SocialRecoveryPolicyContract
 /// The error a [`MockVerifier`] in [`VerifierMode::Fail`] panics with.
 const VERIFIER_FAILURE: u32 = 99;
 
-#[allow(clippy::large_enum_variant)]
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum VerifierMode {
@@ -32,9 +31,6 @@ enum VerifierMode {
     Canonical,
     /// Panics with [`VERIFIER_FAILURE`].
     Fail,
-    /// Calls `approve(guardian, 1, [Delegated(guardian)], RULE_ID,
-    /// smart_account)` on the policy.
-    CallPolicy(Address, Address, Address),
 }
 
 #[contract]
@@ -54,18 +50,33 @@ impl MockVerifier {
             VerifierMode::Fail => {
                 panic_with_error!(e, Error::from_contract_error(VERIFIER_FAILURE))
             }
-            VerifierMode::CallPolicy(policy, guardian, smart_account) => {
-                let signers = vec![e, Signer::Delegated(guardian.clone())];
-                SocialRecoveryPolicyContractClient::new(e, &policy).approve(
-                    &guardian,
-                    &1,
-                    &signers,
-                    &RULE_ID,
-                    &smart_account,
-                );
-                Vec::from_iter(e, key_data.iter().map(|key| Bytes::try_from_val(e, &key).unwrap()))
-            }
         }
+    }
+}
+
+/// A verifier that calls `approve(guardian, 1, [Delegated(guardian)],
+/// RULE_ID, smart_account)` on the policy.
+#[contract]
+struct CallingVerifier;
+
+#[contractimpl]
+impl CallingVerifier {
+    pub fn __constructor(e: &Env, policy: Address, guardian: Address, smart_account: Address) {
+        e.storage().instance().set(&symbol_short!("call"), &(policy, guardian, smart_account));
+    }
+
+    pub fn batch_canonicalize_key(e: &Env, key_data: Vec<Val>) -> Vec<Bytes> {
+        let (policy, guardian, smart_account): (Address, Address, Address) =
+            e.storage().instance().get(&symbol_short!("call")).unwrap();
+        let signers = vec![e, Signer::Delegated(guardian.clone())];
+        SocialRecoveryPolicyContractClient::new(e, &policy).approve(
+            &guardian,
+            &1,
+            &signers,
+            &RULE_ID,
+            &smart_account,
+        );
+        Vec::from_iter(e, key_data.iter().map(|key| Bytes::try_from_val(e, &key).unwrap()))
     }
 }
 
@@ -455,8 +466,8 @@ fn failed_call_emits_no_events() {
 fn unusable_verifiers_fail_approval() {
     let f = Fixture::installed();
     let failing = f.e.register(MockVerifier, (VerifierMode::Fail,));
-    let mode = VerifierMode::CallPolicy(f.policy.clone(), f.dave.clone(), f.account.clone());
-    let calling_policy = f.e.register(MockVerifier, (mode,));
+    let calling_policy =
+        f.e.register(CallingVerifier, (f.policy.clone(), f.dave.clone(), f.account.clone()));
     let cases = [
         ("failing verifier", failing, contract_error(VERIFIER_FAILURE)),
         ("policy as verifier", f.policy.clone(), host_error()),
@@ -532,8 +543,8 @@ fn policy_as_verifier_panics() {
 #[should_panic(expected = "Contract re-entry is not allowed")]
 fn verifier_calling_policy_panics() {
     let f = Fixture::installed();
-    let mode = VerifierMode::CallPolicy(f.policy.clone(), f.dave.clone(), f.account.clone());
-    let verifier = f.e.register(MockVerifier, (mode,));
+    let verifier =
+        f.e.register(CallingVerifier, (f.policy.clone(), f.dave.clone(), f.account.clone()));
     f.client.approve(&f.bob, &1, &f.signers_on(&verifier), &RULE_ID, &f.account);
 }
 
