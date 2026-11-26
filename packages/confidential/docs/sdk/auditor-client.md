@@ -12,6 +12,8 @@ An implementation MUST squeeze the sender / owner channel three-wide and MUST NO
 
 **Clawback witness.** In a deployment that enables seizure ([Clawback](../compliance.md#clawback)), the clawback witness is the auditor secret key together with the pair of openings the client already maintains — the standing sender-channel opening of $$C\_{\text{spend}}$$ and the recipient-channel opening of $$C\_{\text{receive}}$$ ([Roles and Separation](../compliance.md#roles-and-separation), [Circuit](../compliance.md#circuit)). An implementation MUST verify both against the on-chain commitments before proving, MUST read the account's current `clawback_nonce` into the public inputs ([Circuit](../compliance.md#circuit)), and on a `Clawback` event MUST advance the standing opening by the `Merge` rule and the event's public `amount` ([Wallet and Auditor Consequences](../compliance.md#wallet-and-auditor-consequences)).
 
+**Recovery witness.** In an RWA deployment ([Recovery](../compliance.md#recovery)), the recover witness is the same pair of openings and a fresh ephemeral scalar. An implementation MUST verify both openings against the on-chain commitments before proving, and on a `Recovered` event MUST credit `to` as on a `Transfer` received and reset its standing openings of `from` to $$(0, 0)$$.
+
 An auditor facade MUST NOT be able to construct a spending witness. It can open the spendable balance past a merge — the inbound $$r\_{\text{transfer}}$$ reaches the same key on the recipient channel — so a facade that exposes openings exposes them for the account's whole history under the active key.
 
 ---

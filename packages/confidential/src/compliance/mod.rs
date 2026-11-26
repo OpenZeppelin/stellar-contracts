@@ -24,9 +24,10 @@
 //!
 //! A regulated deployment wires [`RwaHooks`] instead of [`ComplianceHooks`]
 //! and implements [`ConfidentialRwa`]. The profile adds a designated auditor
-//! every account must bind to and an optional approver whose authorization
-//! every value-moving operation additionally requires. See
-//! `docs/compliance.md#rwa-profile`.
+//! every account must bind to, an optional approver whose authorization
+//! every value-moving operation additionally requires, and the recovery of a
+//! frozen account's whole balance into another account without revealing it.
+//! See `docs/compliance.md#rwa-profile`.
 //!
 //! Deployments that never write a configuration pay one instance-storage read
 //! per operation: [`ComplianceHooks`] returns early when
@@ -39,9 +40,11 @@ mod test;
 
 use soroban_sdk::{
     contractclient, contracterror, contractevent, contracttrait, panic_with_error, Address, Bytes,
-    Env,
+    BytesN, Env,
 };
-pub use storage::{ClawbackData, ComplianceConfig, ComplianceStorageKey, RwaConfig};
+pub use storage::{
+    ClawbackData, ComplianceConfig, ComplianceStorageKey, RecoverData, RecoverPayload, RwaConfig,
+};
 
 use crate::{
     ConfidentialToken, Hooks, RegisterPayload, SetSpenderPayload, SpenderTransferPayload,
@@ -370,6 +373,40 @@ pub trait ConfidentialRwa: ConfidentialCompliance {
     fn rwa_config(e: &Env) -> Option<RwaConfig> {
         storage::rwa_config(e)
     }
+
+    /// Moves the whole committed balance of the frozen `from` to `to`, whose
+    /// owner opens it as an incoming transfer. The amount is not revealed.
+    ///
+    /// Recovers a holder that lost its spending key into an account
+    /// registered under a new one. The approver must authorize
+    /// `(from, to, payload)`; deployments without an approver cannot recover.
+    /// Escrowed allowances stay with `from`'s delegations: revoke them with
+    /// [`ConfidentialClawback::force_revoke_spender`] first.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The frozen account whose balance moves.
+    /// * `to` - The registered account credited with it.
+    /// * `data` - XDR-encoded [`RecoverData`].
+    /// * `operator` - The address authorizing this call.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`crate::storage::decode_data`] errors.
+    /// * refer to [`storage::recover`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["recovered", from: Address, to: Address]`
+    /// * data - `[r_e_point, v_tilde, sigma, v_tilde_aud_r, r_tilde_aud_r]`
+    ///
+    /// # Security Warning
+    ///
+    /// Implementations MUST authorize `operator` before calling
+    /// [`storage::recover`]. The method has no default body because the trait
+    /// does not prescribe an access-control model.
+    fn recover(e: &Env, from: Address, to: Address, data: Bytes, operator: Address);
 }
 
 // ################## HOOKS IMPL ##################
@@ -656,6 +693,8 @@ pub enum ComplianceError {
     /// Indicates a compliance configuration of an RWA deployment has neither
     /// a policy nor SAC passthrough.
     EligibilityRequired = 3612,
+    /// Indicates a recovery in a deployment that has no approver.
+    RecoveryRequiresApprover = 3613,
 }
 
 // ################## CONSTANTS ##################
@@ -736,4 +775,35 @@ pub struct RwaConfigChanged {
 /// Emits an [`RwaConfigChanged`] event.
 pub fn emit_rwa_config_changed(e: &Env, auditor_id: u32, approver: &Option<Address>) {
     RwaConfigChanged { auditor_id, approver: approver.clone() }.publish(e);
+}
+
+/// Event emitted when a frozen account's balance is recovered into another
+/// account. The recipient and its auditor read the data as that of an
+/// incoming `Transfer`.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Recovered {
+    #[topic]
+    pub from: Address,
+    #[topic]
+    pub to: Address,
+    pub r_e_point: BytesN<64>,
+    pub v_tilde: BytesN<32>,
+    pub sigma: BytesN<32>,
+    pub v_tilde_aud_r: BytesN<32>,
+    pub r_tilde_aud_r: BytesN<32>,
+}
+
+/// Emits a [`Recovered`] event.
+pub fn emit_recovered(e: &Env, from: &Address, to: &Address, payload: &RecoverPayload) {
+    Recovered {
+        from: from.clone(),
+        to: to.clone(),
+        r_e_point: payload.r_e_point.clone(),
+        v_tilde: payload.v_tilde.clone(),
+        sigma: payload.sigma.clone(),
+        v_tilde_aud_r: payload.v_tilde_aud_r.clone(),
+        r_tilde_aud_r: payload.r_tilde_aud_r.clone(),
+    }
+    .publish(e);
 }

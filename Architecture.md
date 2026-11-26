@@ -442,7 +442,7 @@ packages/<package>/circuits/
 The `main.nr` files in `gadgets/` and `<operation>/` are both Noir circuit entry points, but they serve very different purposes:
 
 - **Gadget `main`s** are measurement-only. Each one wraps a single lib primitive in the smallest circuit that exercises it, so `nargo info` can report per-primitive constraint costs. A Noir `bin` package has exactly one `fn main`, and `nargo info` only measures `main`. Per-primitive constraint counts therefore require one `bin` package per primitive. The alternative (one gadget that calls every primitive in sequence) collapses everything into a single combined number and loses the per-primitive breakdown the constraint baseline depends on.
-- **Operation `main`s** *are* the production circuits — one per proof type (in `confidential/`: register, withdraw, transfer, set_spender, spender_transfer, clawback). They consume on-chain state as public inputs and enforce the constraint set that the wrapper contract relies on.
+- **Operation `main`s** *are* the production circuits — one per proof type (in `confidential/`: register, withdraw, transfer, set_spender, spender_transfer, clawback, recover). They consume on-chain state as public inputs and enforce the constraint set that the wrapper contract relies on.
 
 ### Commands
 

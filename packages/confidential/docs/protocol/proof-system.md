@@ -2,7 +2,7 @@
 
 ## Circuits
 
-All proof logic is written in Noir, compiled to UltraHonk circuits. The system uses six circuits, the last belonging to the optional compliance extension:
+All proof logic is written in Noir, compiled to UltraHonk circuits. The system uses seven circuits, the last two belonging to the optional compliance extension:
 
 ```rust
 #[contracttype]
@@ -14,6 +14,7 @@ pub enum CircuitType {
     SpenderTransfer = 3,
     SetSpender = 4,
     Clawback = 100,
+    Recover = 101,
 }
 ```
 
@@ -29,6 +30,7 @@ pub enum CircuitType {
 | `SpenderTransfer` | Allowance sufficiency; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; owner auditor: amount + allowance + `lane[2]` escrow of the new allowance blinding); deterministic randomness for new allowance; encrypted allowance scalar; spender key ownership; contract-bound indirectly via $$C\_a$$ chain ([Spender Transfer](operations/spender-transfer.md)) |
 | `SetSpender` | Balance split; $$dvk\_i$$ derivation; ECDH escrow of $$dvk\_i$$ to the spender and of the allowance blinding to the owner's auditor; allowance commitment with deterministic randomness; encrypted balance and allowance scalars; owner-auditor ECDH ciphertexts (escrow amount + balance checkpoint + `lane[2]` escrow of the new spendable blinding); owner key ownership; contract-bound via $$vk$$ derivation |
 | `Clawback` | Knowledge of the openings of the target's $$C\_{\text{spend}}$$ and $$C\_{\text{receive}}$$; public seize amount bounded by their sum, remainder in range; auditor key ownership; no ephemeral ([Circuit](../compliance.md#circuit)) |
+| `Recover` | Knowledge of the openings of the source's $$C\_{\text{spend}}$$ and $$C\_{\text{receive}}$$; their total, in range, re-committed under the ECDH-derived blinding for the recipient, with encrypted amount and recipient-auditor channel ([Recovery Circuit](../compliance.md#recovery-circuit)) |
 
 ## Circuit Cost Analysis
 
@@ -44,6 +46,7 @@ The dominant cost in Noir circuits is elliptic curve scalar multiplication. With
 | `SpenderTransfer` | 8 | $$Y\_{\text{op}}$$ (O1), $$C\_a$$ opening (O2), recipient ECDH (O5), $$R\_e$$ (O6), $$C\_{\text{transfer}}$$ (O8), $$C\_a'$$ (O11), recipient-auditor ECDH (O\_a1), owner-auditor ECDH (O\_a5) |
 | `SetSpender` | 7 | $$Y$$ (S1), $$C\_{\text{spend}}$$ opening (S3), $$C\_a$$ (S7), $$C\_{\text{spend}}'$$ (S10), $$R\_e$$ (S\_a1), $$dvk\_i$$ escrow ECDH (S12, [Delegation Key Escrow](operations/set-spender.md#delegation-key-escrow)), owner-auditor ECDH (S\_a2) |
 | `Clawback` | 3 | $$K\_{\text{aud}}$$ (CB1), $$C\_{\text{spend}}$$ opening (CB2), $$C\_{\text{receive}}$$ opening (CB3) |
+| `Recover` | 6 | $$C\_{\text{spend}}$$ opening (RV1), $$C\_{\text{receive}}$$ opening (RV2), $$R\_e$$ (RV4), recipient ECDH (RV5), $$C\_{\text{transfer}}$$ (RV7), recipient-auditor ECDH (RV\_a1) |
 
 `SetSpender` is the one circuit with a third ECDH beyond the auditor channel: the $$dvk\_i$$ handoff of [Delegation Key Escrow](operations/set-spender.md#delegation-key-escrow) reuses $$r\_e$$ but multiplies it against $$Y\_{\text{op}}$$, so it is a separate call, not a reuse of the S\_a2 shared secret. The auditor-side escrow of the allowance blinding $$r\_a$$ (S14) reuses the S\_a2 shared scalar and adds one Poseidon evaluation. The `lane[2]` escrows (W\_a5, T\_a9, S\_a6, O\_a9) read `lane[2]` of a permutation each circuit already computes and cost one field addition apiece. The ordering these totals imply is consistent with the committed ACIR opcode counts in `circuits/constraints.baseline`.
 

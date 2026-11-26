@@ -2,7 +2,7 @@
 
 ## Witness Assembly
 
-An implementation MUST provide witness assembly for each circuit it supports, covering the six circuits of [Circuits](../protocol/proof-system.md#circuits): the five core circuits `Register`, `Withdraw`, `Transfer`, `SpenderTransfer`, `SetSpender`, and `Clawback`, which the auditor role proves in a deployment that enables the compliance extension ([Auditor Client](auditor-client.md), [Circuit](../compliance.md#circuit)).
+An implementation MUST provide witness assembly for each circuit it supports, covering the seven circuits of [Circuits](../protocol/proof-system.md#circuits): the five core circuits `Register`, `Withdraw`, `Transfer`, `SpenderTransfer` and `SetSpender`, and `Clawback` and `Recover`, which the auditor role proves in a deployment that enables the compliance extension ([Auditor Client](auditor-client.md), [Circuit](../compliance.md#circuit), [Recovery Circuit](../compliance.md#recovery-circuit)).
 
 **Public-input order is a wire contract.** The verifier sees an ordered vector of field elements with no knowledge of what they denote ([Public Input Sources](../protocol/operations/README.md#public-input-sources)), so a permutation of two same-typed inputs produces a well-formed vector that verifies a different statement. Each builder MUST assemble public inputs in exactly the order the contract assembles them, and MUST cite the contract function it mirrors at the site of the ordering. The per-operation public-input tables in the [operation specifications](../protocol/operations/README.md) are authoritative for *membership*; the contract's assembly is authoritative for *order*.
 

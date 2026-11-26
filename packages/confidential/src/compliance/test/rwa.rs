@@ -12,23 +12,23 @@ use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 use crate::{
     compliance::{
         storage::{
-            compliance_config, deposit_approval_args, freeze, rwa_config, set_compliance_config,
-            set_rwa_config, spender_transfer_approval_args, transfer_approval_args, unfreeze,
-            withdraw_approval_args,
+            self, compliance_config, deposit_approval_args, freeze, recover_approval_args,
+            rwa_config, set_compliance_config, set_rwa_config, spender_transfer_approval_args,
+            transfer_approval_args, unfreeze, withdraw_approval_args,
         },
         ComplianceConfig, ComplianceError, ComplianceStorageKey, ConfidentialCompliance,
-        ConfidentialComplianceClient, ConfidentialRwa, ConfidentialRwaClient, Policy, RwaConfig,
-        RwaConfigChanged, RwaHooks,
+        ConfidentialComplianceClient, ConfidentialRwa, ConfidentialRwaClient, Policy, RecoverData,
+        RecoverPayload, Recovered, RwaConfig, RwaConfigChanged, RwaHooks,
     },
     storage::{
-        get_account, get_auditor, set_address_as_field_element, set_auditor, set_underlying_asset,
-        set_verifier,
+        decode_data, get_account, get_address_as_field_element, get_auditor,
+        set_address_as_field_element, set_auditor, set_underlying_asset, set_verifier,
     },
     verifier::CircuitType,
-    ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, ConfidentialTokenStorageKey,
-    Hooks, RegisterData, RegisterPayload, SetSpenderData, SetSpenderPayload, SpenderDelegation,
-    SpenderTransferData, SpenderTransferPayload, TransferData, TransferPayload, WithdrawData,
-    WithdrawPayload,
+    ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, ConfidentialTokenError,
+    ConfidentialTokenStorageKey, Hooks, RegisterData, RegisterPayload, SetSpenderData,
+    SetSpenderPayload, SpenderDelegation, SpenderTransferData, SpenderTransferPayload,
+    TransferData, TransferPayload, WithdrawData, WithdrawPayload,
 };
 
 // ################## MOCK CONTRACTS ##################
@@ -75,6 +75,12 @@ impl ConfidentialRwa for RwaHost {
         admin.require_auth();
         set_rwa_config(e, auditor_id, &approver);
     }
+
+    fn recover(e: &Env, from: Address, to: Address, data: Bytes, admin: Address) {
+        admin.require_auth();
+        let decoded: RecoverData = decode_data(e, &data);
+        storage::recover(e, &from, &to, &decoded.payload, &decoded.proof);
+    }
 }
 
 /// Authorizes every address except the one set through `block`.
@@ -118,6 +124,38 @@ impl crate::verifier::ConfidentialVerifier for AcceptingVerifier {
 
     fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
         true
+    }
+}
+
+/// Accepts every proof and records the last circuit type and public-input
+/// blob it was asked to verify.
+#[contract]
+struct RecordingVerifier;
+
+#[contractimpl(contracttrait)]
+impl crate::verifier::ConfidentialVerifier for RecordingVerifier {
+    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn verify_proof(e: &Env, ct: CircuitType, pi: Bytes, _proof: Bytes) -> bool {
+        e.storage().instance().set(&symbol_short!("last"), &(ct, pi));
+        true
+    }
+}
+
+/// Rejects every proof.
+#[contract]
+struct RejectingVerifier;
+
+#[contractimpl(contracttrait)]
+impl crate::verifier::ConfidentialVerifier for RejectingVerifier {
+    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
+        false
     }
 }
 
@@ -2068,4 +2106,252 @@ fn disabling_the_approver_emits_rwa_config_changed_without_approver() {
         &RwaConfigChanged { auditor_id: AUDITOR, approver: None }.to_xdr(&h.e, &h.host),
     );
     assert_eq!(client.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR, approver: None }));
+} // ################## P6: RECOVERY ##################
+  //
+  // `recover` moves a frozen account's whole committed balance to another
+  // account under the approver's authorization.
+
+fn recover_payload(e: &Env) -> RecoverPayload {
+    RecoverPayload {
+        c_transfer: g_times(e, 500),
+        r_e_point: g_times(e, 11),
+        v_tilde: field(e, 1),
+        sigma: field(e, 2),
+        v_tilde_aud_r: field(e, 3),
+        r_tilde_aud_r: field(e, 4),
+    }
+}
+
+fn recover_data(e: &Env) -> Bytes {
+    RecoverData { payload: recover_payload(e), proof: Bytes::new(e) }.to_xdr(e)
+}
+
+/// A frozen `lost` holding 300 spendable and 200 receiving, and a registered
+/// `fresh` holding 7 receiving.
+struct Recovery<'a> {
+    h: Harness<'a>,
+    approver: Address,
+    lost: Address,
+    fresh: Address,
+}
+
+fn recovery_with(h: Harness<'_>, approver: Option<Address>) -> Recovery<'_> {
+    configure(&h, approver.clone());
+    let lost = Address::generate(&h.e);
+    let fresh = Address::generate(&h.e);
+    store_account(&h, &lost, AUDITOR, 300, 200);
+    store_account(&h, &fresh, AUDITOR, 0, 7);
+    freeze_account(&h, &lost);
+    let approver = approver.unwrap_or_else(|| Address::generate(&h.e));
+    Recovery { h, approver, lost, fresh }
+}
+
+fn recovery<'a>() -> Recovery<'a> {
+    let h = setup();
+    let approver = Address::generate(&h.e);
+    recovery_with(h, Some(approver))
+}
+
+fn try_recover_into(r: &Recovery, to: &Address) -> Result<(), Error> {
+    let e = &r.h.e;
+    let payload = recover_payload(e);
+    try_in_host(&r.h, || storage::recover(e, &r.lost, to, &payload, &Bytes::new(e)))
+}
+
+fn try_recover(r: &Recovery) -> Result<(), Error> {
+    try_recover_into(r, &r.fresh)
+}
+
+fn token_err(code: ConfidentialTokenError) -> Result<(), Error> {
+    Err(Error::from_contract_error(code as u32))
+}
+
+#[test]
+fn recover_moves_the_whole_balance_and_emits() {
+    let r = recovery();
+    let e = &r.h.e;
+    ConfidentialRwaClient::new(e, &r.h.host).recover(
+        &r.lost,
+        &r.fresh,
+        &recover_data(e),
+        &r.h.admin,
+    );
+
+    assert!(e.auths().iter().any(|(addr, _)| addr == &r.approver));
+    let event = Recovered {
+        from: r.lost.clone(),
+        to: r.fresh.clone(),
+        r_e_point: g_times(e, 11),
+        v_tilde: field(e, 1),
+        sigma: field(e, 2),
+        v_tilde_aud_r: field(e, 3),
+        r_tilde_aud_r: field(e, 4),
+    };
+    let events = e.events().all();
+    assert_eq!(events.events().last().unwrap(), &event.to_xdr(e, &r.h.host));
+    e.as_contract(&r.h.host, || {
+        let lost = get_account(e, &r.lost);
+        assert_eq!(lost.spendable_commitment, Grumpkin::identity(e));
+        assert_eq!(lost.receiving_commitment, Grumpkin::identity(e));
+        let fresh = get_account(e, &r.fresh);
+        assert_eq!(fresh.spendable_commitment, Grumpkin::identity(e));
+        assert_eq!(fresh.receiving_commitment, g_times(e, 507));
+    });
+}
+
+#[test]
+fn recover_binds_the_documented_public_inputs() {
+    let h = setup_with(|e| e.register(RecordingVerifier, ()));
+    let approver = Address::generate(&h.e);
+    let r = recovery_with(h, Some(approver));
+    let e = &r.h.e;
+    let pvk = g_times(e, 13);
+    e.as_contract(&r.h.host, || {
+        let key = ConfidentialTokenStorageKey::Account(r.fresh.clone());
+        let mut fresh: ConfidentialAccount = e.storage().persistent().get(&key).unwrap();
+        fresh.viewing_public_key = pvk.clone();
+        e.storage().persistent().set(&key, &fresh);
+    });
+    assert_eq!(try_recover(&r), Ok(()));
+
+    let addr_f = e.as_contract(&r.h.host, || get_address_as_field_element(e));
+    let payload = recover_payload(e);
+    let mut expected = Bytes::new(e);
+    for chunk in [
+        Bytes::from(g_times(e, 300)),
+        Bytes::from(g_times(e, 200)),
+        Bytes::from(pvk),
+        Bytes::from(addr_f),
+        Bytes::from(Grumpkin::generator(e)),
+        Bytes::from(payload.c_transfer),
+        Bytes::from(payload.r_e_point),
+        Bytes::from(payload.v_tilde),
+        Bytes::from(payload.sigma),
+        Bytes::from(payload.v_tilde_aud_r),
+        Bytes::from(payload.r_tilde_aud_r),
+    ] {
+        expected.append(&chunk);
+    }
+    let (circuit, pi): (CircuitType, Bytes) = e
+        .as_contract(&r.h.verifier, || e.storage().instance().get(&symbol_short!("last")).unwrap());
+    assert_eq!(circuit, CircuitType::Recover);
+    assert_eq!(pi.len(), 17 * 32);
+    assert_eq!(pi, expected);
+}
+
+#[test]
+fn recover_requires_an_approver() {
+    let r = recovery_with(setup(), None);
+    assert_eq!(try_recover(&r), err(ComplianceError::RecoveryRequiresApprover));
+}
+
+#[test]
+fn recover_requires_the_rwa_config() {
+    let r = recovery();
+    r.h.e.as_contract(&r.h.host, || {
+        r.h.e.storage().instance().remove(&ComplianceStorageKey::RwaConfig);
+    });
+    assert_eq!(try_recover(&r), err(ComplianceError::RwaNotConfigured));
+}
+
+#[test]
+fn recover_requires_a_frozen_source() {
+    let r = recovery();
+    r.h.e.as_contract(&r.h.host, || unfreeze(&r.h.e, &r.lost));
+    assert_eq!(try_recover(&r), err(ComplianceError::AccountNotFrozen));
+}
+
+#[test]
+fn recover_into_the_source_itself_fails() {
+    let r = recovery();
+    assert_eq!(try_recover_into(&r, &r.lost), err(ComplianceError::AccountFrozen));
+}
+
+#[test]
+fn recover_into_a_policy_denied_account_fails() {
+    let r = recovery();
+    ListPolicyClient::new(&r.h.e, &r.h.policy).block(&r.fresh);
+    assert_eq!(try_recover(&r), err(ComplianceError::NotAuthorizedByPolicy));
+}
+
+#[test]
+fn recover_into_an_unregistered_account_fails() {
+    let r = recovery();
+    let stranger = Address::generate(&r.h.e);
+    assert_eq!(
+        try_recover_into(&r, &stranger),
+        token_err(ConfidentialTokenError::AccountNotRegistered)
+    );
+}
+
+#[test]
+fn recover_rejects_the_approver_as_recipient() {
+    let r = recovery();
+    store_account(&r.h, &r.approver, AUDITOR, 0, 0);
+    assert_eq!(try_recover_into(&r, &r.approver), err(ComplianceError::ApproverIsParty));
+}
+
+#[test]
+fn recover_with_a_rejected_proof_fails() {
+    let h = setup_with(|e| e.register(RejectingVerifier, ()));
+    let approver = Address::generate(&h.e);
+    let r = recovery_with(h, Some(approver));
+    assert_eq!(try_recover(&r), token_err(ConfidentialTokenError::InvalidProof));
+}
+
+fn recover_with(r: &Recovery, approval: Option<Vec<Val>>) {
+    let e = &r.h.e;
+    let data = recover_data(e);
+    let operator = invoke(
+        &r.h.host,
+        "recover",
+        (r.lost.clone(), r.fresh.clone(), data.clone(), r.h.admin.clone()).into_val(e),
+        &[],
+    );
+    let client = ConfidentialRwaClient::new(e, &r.h.host);
+    match approval {
+        None => {
+            client
+                .mock_auths(&[MockAuth { address: &r.h.admin, invoke: &operator }])
+                .recover(&r.lost, &r.fresh, &data, &r.h.admin);
+        }
+        Some(args) => {
+            let approval = invoke(&r.h.host, "recover", args, &[]);
+            client
+                .mock_auths(&[
+                    MockAuth { address: &r.h.admin, invoke: &operator },
+                    MockAuth { address: &r.approver, invoke: &approval },
+                ])
+                .recover(&r.lost, &r.fresh, &data, &r.h.admin);
+        }
+    }
+}
+
+#[test]
+fn recover_with_exact_approval_succeeds() {
+    let r = recovery();
+    let e = &r.h.e;
+    let args = e.as_contract(&r.h.host, || {
+        recover_approval_args(e, &r.lost, &r.fresh, &recover_payload(e))
+    });
+    recover_with(&r, Some(args));
+    assert_eq!(e.auths().len(), 2);
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn recover_without_approval_fails() {
+    let r = recovery();
+    recover_with(&r, None);
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn recover_approval_for_another_recipient_fails() {
+    let r = recovery();
+    let e = &r.h.e;
+    let other = account(&r.h, AUDITOR);
+    let args =
+        e.as_contract(&r.h.host, || recover_approval_args(e, &r.lost, &other, &recover_payload(e)));
+    recover_with(&r, Some(args));
 }

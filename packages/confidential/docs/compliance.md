@@ -263,24 +263,11 @@ Commitment equality is not freshness. A seizure of `alpha` from `(C, O)` leaves 
 
 `Clawback` is a receiving-side reset and a `T_0` anchor, alongside `Merge` ([Recovery](protocol/wallet-state.md#recovery); [Terminology](indexer.md#terminology)). It is not a checkpoint: it carries no `b_tilde`, so its effect on the spendable side is absorbed into the next owner-initiated proof operation. The owner applies the `Merge` row of [Wallet State and Recovery](protocol/wallet-state.md) followed by `W_spend.v -= amount`; the auditor advances its standing opening identically ([Sender-auditor opening capability](protocol/auditing.md#sender-auditor-opening-capability)). A `RevokeSpender` emitted by `force_revoke_spender` is indistinguishable from an owner-initiated one for both consumers.
 
-
-### Account Recovery
-
-A holder who has lost its spending key holds a balance no owner proof can move. The issuer moves it to an account the holder registers under a new key, with entry points that already exist:
-
-1. `freeze(lost)`, then `force_revoke_spender(lost, s)` for every delegation of `lost`, including expired ones, which the contract cannot enumerate and the operator takes from the event archive ([Forced Revocation](#forced-revocation)).
-2. `clawback(lost, amount, Some(treasury))` for the full balance, which the auditor knows from its ledger. The underlying moves to `treasury`.
-3. `deposit(treasury, fresh, amount)`. `fresh` is credited with zero blinding, as by any deposit.
-
-`treasury` is an issuer-controlled address that passes the deposit's gates, and under the [Approval Gate](#approval-gate) the deposit needs the approver's authorization like any other. The amount is public in both steps. Between the two transactions the value sits in `treasury`; nothing on-chain links the deposit to the seizure.
-
-The clawback proof has the auditor's secret key as a witness, and the verifier accepts only non-zero-knowledge proofs today ([Zero-knowledge setting](../README.md#zero-knowledge-setting)): neither clawback nor this recovery should be used on a public network until that changes.
-
 ---
 
 ## RWA Profile
 
-The RWA profile is the configuration for regulated assets whose issuer must see every balance and may have to enforce rules on them. It is delivered as `RwaHooks`, a `Hooks` implementation a deployment wires instead of `ComplianceHooks`, plus the `ConfidentialRwa` trait. It adds no circuit and changes no core entry point.
+The RWA profile is the configuration for regulated assets whose issuer must see every balance and may have to enforce rules on them. It is delivered as `RwaHooks`, a `Hooks` implementation a deployment wires instead of `ComplianceHooks`, plus the `ConfidentialRwa` trait. It adds one circuit, for [Recovery](#recovery), and changes no core entry point.
 
 The profile splits compliance by what the chain can see. Rules over public addresses (eligibility, freeze) run on-chain. Rules over hidden balances and amounts are evaluated off-chain by the issuer's compliance service, which holds the designated auditor key and therefore decrypts every operation; it either monitors and remediates, or, when configured as the approver, authorizes each value-moving operation before it settles.
 
@@ -312,10 +299,11 @@ When `RwaConfig.approver` is set, `deposit`, `withdraw`, `confidential_transfer`
 | `withdraw` | `(from, to, amount, payload)` |
 | `confidential_transfer` | `(from, to, payload)` |
 | `confidential_transfer_from` | `(spender, from, to, payload)` |
+| `recover` | `(from, to, payload)` |
 
 `payload` is the operation's decoded payload ([Interface](protocol/interface.md)), so an authorization covers one statement: any valid proof of it is acceptable, and no other payload is. The approver obtains the amount of a transfer from the recipient-auditor ciphertexts in that payload ([Per-Transfer Auditor Ciphertexts](protocol/auditing.md#per-transfer-auditor-ciphertexts)).
 
-The approval is additional. The operation's own authorizer, its proof and every other gate are still required, and an approver cannot move, create or destroy value. `set_spender`, `merge` and `revoke_spender` change no ownership and require no approval. `clawback` is an administrative override and requires none either.
+The approval is additional. The operation's own authorizer, its proof and every other gate are still required, and an approver cannot move, create or destroy value. `set_spender`, `merge` and `revoke_spender` change no ownership and require no approval. `clawback` is an administrative override and requires none either. `recover` requires it unconditionally ([Recovery](#recovery)).
 
 **Revocation.** The contract keeps no approval state: an authorization is spent by its nonce and lapses at its expiry ledger, both chosen by the approver. To void outstanding authorizations before they lapse, the deployment replaces the approver through `set_rwa_config`, or the approver rotates the key its authorizations are checked against, since the host checks them against the approver's signers when the operation executes. Disabling and re-enabling the same approver does not void them. A change of the compliance configuration voids nothing either; the freeze, policy and SAC gates are evaluated at execution.
 
@@ -326,6 +314,61 @@ The approval is additional. The operation's own authorizer, its proof and every 
 - A contract approver that itself invokes the token is authorized without `args` being matched and without its `__check_auth` running. Any path through which that contract calls the token must itself check the token address, the entry point and the full `args`; a generic forwarding function, even one gated by the contract's own authorization, approves whatever it forwards.
 
 The approver signing key, the designated auditor's decryption key and the admin roles belong in separate custody, so that the approver's decisions are visible to someone who does not hold its key. While the approver is unavailable, the gated operations stop; the deployment's `set_rwa_config` role can replace the approver or disable the gate.
+
+### Recovery
+
+A holder that has lost its spending key holds a balance no owner proof can move. `recover(from, to, data, operator)` moves the whole committed balance of a frozen `from` into `to`, an account the holder registered under a new key, without revealing it: `to` is credited with a commitment to the same value under a blinding it derives as for an incoming transfer. No underlying moves, and the sum of claims is unchanged.
+
+The operator first freezes `from` and runs `force_revoke_spender` for each of its delegations, including expired ones, which the contract cannot enumerate and the operator takes from the event archive ([Forced Revocation](#forced-revocation)); an allowance left in escrow stays with `from` for a later `recover`. The designated auditor builds the proof from the openings it holds by the standing capability of [Per-Transfer Auditor Ciphertexts](protocol/auditing.md#per-transfer-auditor-ciphertexts).
+
+The proof authorizes nothing. Anyone holding the openings can build it, which for an account with zero blinding is anyone ([Roles and Separation](#roles-and-separation)), so the decision rests with the operator and the approver: `recover` reverts with `RecoveryRequiresApprover` in a deployment without an approver, and the approver authorizes `(from, to, payload)` as at the [Approval Gate](#approval-gate). A replay needs the same source commitments and a fresh approval, and moves the same value to the same recipient.
+
+#### Recovery Circuit
+
+The recover circuit proves that `C_transfer` commits to the source's committed total under the blinding the recipient derives, and that the recipient and its auditor can decrypt it. It is the recipient half of the transfer circuit (T5–T9, T13, T_a1–T_a4, [Transfer](protocol/operations/transfer.md)) over the openings of both source commitments.
+
+**Circuit constraints:**
+
+| # | Constraint |
+|:--|:---|
+| RV1 | `C_spend = Com(v_s, r_s)` (prover knows the spendable opening) |
+| RV2 | `C_receive = Com(v_r, r_r)` (prover knows the receiving opening) |
+| RV3 | `v_s, v_r, v_s + v_r ∈ [0, 2^127)` (range validity, [Integer Embedding and Range Proofs](protocol/primitives.md#integer-embedding-and-range-proofs)) |
+| RV4 | `R_e = r_e · H` |
+| RV5 | `s = ECDH(r_e, PVK_B)` |
+| RV6 | `r_transfer = Poseidon2(delta_transfer_blind, s, sigma)` ([Anti-Poisoning Constraint](protocol/keys-and-commitments.md#anti-poisoning-constraint)) |
+| RV7 | `C_transfer = Com(v_s + v_r, r_transfer)` |
+| RV8 | `v_tilde = v_s + v_r + Poseidon2(delta_transfer_amount, s, sigma)` |
+| RV9 | `r_e ≠ 0` |
+| RV_a1–RV_a4 | `v_tilde_aud_r` and `r_tilde_aud_r` encrypt `v_s + v_r` and `r_transfer` on the recipient-auditor channel ([Per-Transfer Auditor Ciphertexts](protocol/auditing.md#per-transfer-auditor-ciphertexts)) |
+
+**Public inputs (17 fields):**
+
+| Input | Notes |
+|:---|:---|
+| `C_spend`, `C_receive` | Loaded from `from`'s `spendable_commitment` and `receiving_commitment`, in this order |
+| `PVK_B` | Loaded from `to`'s `viewing_public_key` |
+| `addr_f` | Loaded from instance storage ([Address-to-Field Encoding](protocol/primitives.md#address-to-field-encoding)) |
+| `K_aud_r` | Fetched from the auditor registry under `to`'s `auditor_id` |
+| `C_transfer`, `R_e`, `v_tilde`, `sigma`, `v_tilde_aud_r`, `r_tilde_aud_r` | Prover-supplied as `RecoverPayload`, in this order |
+
+`addr_f` is referenced by no gate; its membership binds the proof to one contract, on the `register` / `acct_f` precedent ([Registration](protocol/operations/register.md)).
+
+**Private witnesses:** `v_s`, `r_s`, `v_r`, `r_r`, `r_e`. The witness holds no long-term key; its amount and openings are of the kind every transfer proof witnesses ([Zero-knowledge setting](../README.md#zero-knowledge-setting)).
+
+#### Recovery Flow
+
+`recover(from, to, data, operator)` runs, after the deployment's access-control check on `operator`:
+
+1. **Preconditions.** Both configurations are set and keep an eligibility gate, as for `RwaHooks` ([RWA Profile](#rwa-profile)); an approver is configured, else `RecoveryRequiresApprover`; `is_frozen(from)`, else `AccountNotFrozen`; `to` passes the freeze, policy and SAC gates, which also rejects `to = from`; the approver authorizes `(from, to, payload)` and is neither `from` nor `to`, else `ApproverIsParty`.
+2. **Public inputs.** Assembled in the [Recovery Circuit](#recovery-circuit) order through `append_point` / `append_field`. `data` decodes to `RecoverData { payload, proof }`.
+3. **Verification** against `CircuitType::Recover`.
+4. **State update.** `from`: `C_spend <- O` and `C_receive <- O`. `to`: `C_receive <- C_receive + C_transfer`.
+5. **Event.** `Recovered { from, to, r_e_point, v_tilde, sigma, v_tilde_aud_r, r_tilde_aud_r }` ([Events](#events)).
+
+Like `clawback`, it invokes no `Hooks` callback.
+
+`to`'s owner and auditor apply the event as a `Transfer` received ([Wallet State and Recovery](protocol/wallet-state.md#update-rules)). `from`'s openings become `(0, 0)` on both sides, and its history restarts at the event as at `Register` ([Recovery](protocol/wallet-state.md#recovery)).
 
 ---
 
@@ -358,6 +401,8 @@ impl Token {
     // RWA profile, via ConfidentialRwa (admin auth per Admin Authority)
     fn set_rwa_config(e: Env, auditor_id: u32, approver: Option<Address>, operator: Address);
     fn rwa_config(e: Env) -> Option<RwaConfig>;
+    fn recover(e: Env, from: Address, to: Address,
+               data: Bytes /* XDR RecoverData { payload, proof } */, operator: Address);
 }
 ```
 
@@ -372,6 +417,7 @@ impl Token {
 | `Clawback` | `account` (topic), `amount`, `destination` |
 | `RevokeSpender` | as [Event Schema](protocol/interface.md#event-schema), when emitted by `force_revoke_spender` |
 | `RwaConfigChanged` | `auditor_id`, `approver` |
+| `Recovered` | `from`, `to` (topics), `r_e_point`, `v_tilde`, `sigma`, `v_tilde_aud_r`, `r_tilde_aud_r` |
 
 ### Errors
 
@@ -379,7 +425,7 @@ The seizure entry points add three variants to `ComplianceError`:
 
 | Error | Code | Raised when |
 |:---|:--|:---|
-| `AccountNotFrozen` | 3604 | the target of `clawback` or `force_revoke_spender` is not frozen |
+| `AccountNotFrozen` | 3604 | the target of `clawback` or `force_revoke_spender`, or the source of `recover`, is not frozen |
 | `InvalidClawbackAmount` | 3605 | `amount <= 0` |
 | `InvalidClawbackDestination` | 3606 | `destination` is `Some` naming the contract's own address |
 
@@ -393,6 +439,7 @@ The RWA profile adds:
 | `InvalidApprover` | 3610 | the approver is the contract's own address |
 | `ApproverIsParty` | 3611 | the approver is `from`, `to` or `spender` of the operation |
 | `EligibilityRequired` | 3612 | the compliance configuration of an RWA deployment has neither a policy nor SAC passthrough |
+| `RecoveryRequiresApprover` | 3613 | `recover` runs in a deployment without an approver |
 
 ---
 

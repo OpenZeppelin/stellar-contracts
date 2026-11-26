@@ -7,6 +7,7 @@ members = [
     "set_spender",
     "spender_transfer",
     "clawback",
+    "recover",
     "gadgets/assert_on_curve",
     "gadgets/commit",
     "gadgets/ecdh",

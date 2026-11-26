@@ -12,7 +12,7 @@ The suite consists of 5 contracts plus the underlying asset; `rwa-token/` is an 
 | `auditor/`          | `ConfidentialAuditorContract`  | Registry of Grumpkin auditor public keys, indexed by `auditor_id`                                            |
 | `allowlist-policy/` | `AllowlistPolicyContract`      | `Policy` contract that authorizes only the accounts a `manager` has listed                                   |
 | `compliant-token/`  | `CompliantTokenContract`       | Confidential token wired with `ComplianceHooks`: freeze, policy and SAC gates, config rotation, and clawback |
-| `rwa-token/`        | `RwaTokenContract`             | Confidential token wired with `RwaHooks`: the RWA profile (designated auditor, approval gate); not part of the walkthrough below, see [RWA Profile](../../packages/confidential/docs/compliance.md#rwa-profile) |
+| `rwa-token/`        | `RwaTokenContract`             | Confidential token wired with `RwaHooks`: the RWA profile (designated auditor, approval gate, recovery); not part of the walkthrough below, see [RWA Profile](../../packages/confidential/docs/compliance.md#rwa-profile) |
 | `factory/`          | `ConfidentialFactoryContract`  | Permissionless factory that deploys the allowlist and the token at addresses bound to their constructor args |
 
 ```text
@@ -99,7 +99,7 @@ stellar contract deploy --alias verifier \
 
 #### Register the Verification Keys
 
-Register the six pinned VKs from [`packages/confidential/circuits/vks`](../../packages/confidential/circuits/vks). Each circuit is identified by its `CircuitType` value:
+Register the seven pinned VKs from [`packages/confidential/circuits/vks`](../../packages/confidential/circuits/vks). Each circuit is identified by its `CircuitType` value:
 
 | Circuit            | `CircuitType` | Token entry point                      |
 | ------------------ | ------------- | -------------------------------------- |
@@ -109,6 +109,7 @@ Register the six pinned VKs from [`packages/confidential/circuits/vks`](../../pa
 | `spender_transfer` | `3`           | `confidential_transfer_from`           |
 | `set_spender`      | `4`           | `set_spender`                          |
 | `clawback`         | `100`         | `clawback` (compliance extension only) |
+| `recover`          | `101`         | `recover` (RWA profile only)           |
 
 The `--verification_key-file-path` form passes the file's raw bytes, which must be the packed binary `.vk.bin`, not the review-friendly `.vk.json`:
 
@@ -127,6 +128,7 @@ register_vk transfer 2
 register_vk spender_transfer 3
 register_vk set_spender 4
 register_vk clawback 100
+register_vk recover 101
 ```
 
 Each circuit accepts exactly one registration. Verify a key round-trips:

@@ -6,9 +6,10 @@ use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 use crate::{
     auditor::ConfidentialAuditorClient,
     compliance::{
-        emit_clawback, emit_compliance_config_changed, emit_frozen, emit_rwa_config_changed,
-        emit_unfrozen, ComplianceError, PolicyClient, CLAWBACK_NONCE_EXTEND_AMOUNT,
-        CLAWBACK_NONCE_TTL_THRESHOLD, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
+        emit_clawback, emit_compliance_config_changed, emit_frozen, emit_recovered,
+        emit_rwa_config_changed, emit_unfrozen, ComplianceError, PolicyClient,
+        CLAWBACK_NONCE_EXTEND_AMOUNT, CLAWBACK_NONCE_TTL_THRESHOLD, FROZEN_EXTEND_AMOUNT,
+        FROZEN_TTL_THRESHOLD,
     },
     storage::{
         address_to_field, append_amount, append_field, append_point, get_account,
@@ -45,6 +46,30 @@ pub struct ComplianceConfig {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClawbackData {
+    pub proof: Bytes,
+}
+
+/// Prover-supplied public inputs of
+/// [`crate::compliance::ConfidentialRwa::recover`]
+/// (`docs/compliance.md#recovery-circuit`). Every field except `c_transfer`
+/// is emitted in the [`crate::compliance::Recovered`] event.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RecoverPayload {
+    pub c_transfer: BytesN<64>,
+    pub r_e_point: BytesN<64>,
+    pub v_tilde: BytesN<32>,
+    pub sigma: BytesN<32>,
+    pub v_tilde_aud_r: BytesN<32>,
+    pub r_tilde_aud_r: BytesN<32>,
+}
+
+/// Envelope decoded from the `data: Bytes` argument of
+/// [`crate::compliance::ConfidentialRwa::recover`].
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RecoverData {
+    pub payload: RecoverPayload,
     pub proof: Bytes,
 }
 
@@ -481,6 +506,94 @@ pub fn set_rwa_config(e: &Env, auditor_id: u32, approver: &Option<Address>) {
     emit_rwa_config_changed(e, auditor_id, approver);
 }
 
+/// Moves the whole committed balance of the frozen `from` to `to` without
+/// revealing it, and resets `from` to the identity on both sides.
+///
+/// `to` is credited with `C_transfer`, which the proof shows holds `from`'s
+/// committed total under a blinding `to` derives as for an incoming transfer
+/// (`docs/compliance.md#recovery`).
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `from` - The frozen account whose balance moves.
+/// * `to` - The registered account credited with it.
+/// * `payload` - The decoded [`RecoverPayload`].
+/// * `proof` - The raw UltraHonk proof bytes.
+///
+/// # Errors
+///
+/// * [`ComplianceError::RecoveryRequiresApprover`] - When the [`RwaConfig`] has
+///   no approver.
+/// * [`ComplianceError::AccountNotFrozen`] - When `from` is not frozen.
+/// * refer to [`rwa_context`] errors.
+/// * refer to [`gate_account`] errors.
+/// * refer to [`require_approval`] errors.
+/// * refer to [`crate::storage::get_account`] errors.
+/// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors.
+/// * [`crate::ConfidentialTokenError::NonCanonicalEncoding`] - When a point
+///   coordinate or field is not a canonical `Bn254Fr` value.
+/// * [`crate::ConfidentialTokenError::InvalidProof`] - When the proof fails
+///   verification.
+///
+/// # Events
+///
+/// * topics - `["recovered", from: Address, to: Address]`
+/// * data - `[r_e_point, v_tilde, sigma, v_tilde_aud_r, r_tilde_aud_r]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses the operator's authorization. The
+/// trait entry point [`crate::compliance::ConfidentialRwa::recover`] is
+/// responsible for authorizing `operator`.
+pub fn recover(e: &Env, from: &Address, to: &Address, payload: &RecoverPayload, proof: &Bytes) {
+    let (config, rwa) = rwa_context(e);
+    if rwa.approver.is_none() {
+        panic_with_error!(e, ComplianceError::RecoveryRequiresApprover);
+    }
+    if !is_frozen(e, from) {
+        panic_with_error!(e, ComplianceError::AccountNotFrozen);
+    }
+    // Also rejects `to == from`, which is frozen.
+    gate_account(e, to, &config);
+    require_approval(e, &rwa, &[from, to], recover_approval_args(e, from, to, payload));
+
+    let source = get_account(e, from);
+    let recipient = get_account(e, to);
+    let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
+    let k_aud_r = auditor.get_key(&recipient.auditor_id);
+    let addr_f = get_address_as_field_element(e);
+
+    // PI order (docs/compliance.md#recovery-circuit):
+    //   C_spend, C_receive, PVK_B, addr_f, K_aud_r, C_transfer, R_e, v_tilde,
+    //   sigma, v_tilde_aud_r, r_tilde_aud_r
+    let mut pi = Bytes::new(e);
+    append_point(&mut pi, &source.spendable_commitment);
+    append_point(&mut pi, &source.receiving_commitment);
+    append_point(&mut pi, &recipient.viewing_public_key);
+    append_field(&mut pi, &addr_f);
+    append_point(&mut pi, &k_aud_r);
+    append_point(&mut pi, &payload.c_transfer);
+    append_point(&mut pi, &payload.r_e_point);
+    append_field(&mut pi, &payload.v_tilde);
+    append_field(&mut pi, &payload.sigma);
+    append_field(&mut pi, &payload.v_tilde_aud_r);
+    append_field(&mut pi, &payload.r_tilde_aud_r);
+
+    verify(e, CircuitType::Recover, &pi, proof);
+
+    let identity = Grumpkin::identity(e);
+    set_commitments(e, from, &identity, &identity);
+    set_commitments(
+        e,
+        to,
+        &recipient.spendable_commitment,
+        &Grumpkin::add(e, &recipient.receiving_commitment, &payload.c_transfer),
+    );
+
+    emit_recovered(e, from, to, payload);
+}
+
 // ################## LOW-LEVEL HELPERS ##################
 
 /// Returns both configurations of an RWA deployment, reverting unless the
@@ -613,6 +726,24 @@ pub fn spender_transfer_approval_args(
     payload: &SpenderTransferPayload,
 ) -> Vec<Val> {
     (spender.clone(), from.clone(), to.clone(), payload.clone()).into_val(e)
+}
+
+/// Approval arguments of a `recover`: `(from, to, payload)`. See
+/// [`deposit_approval_args`].
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `from` - The frozen account whose balance moves.
+/// * `to` - The credited account.
+/// * `payload` - The decoded recover payload.
+pub fn recover_approval_args(
+    e: &Env,
+    from: &Address,
+    to: &Address,
+    payload: &RecoverPayload,
+) -> Vec<Val> {
+    (from.clone(), to.clone(), payload.clone()).into_val(e)
 }
 
 /// Returns whether `config` keeps an eligibility gate: an external policy or

@@ -9,7 +9,9 @@
 //! `revoke_spender` does not gate the spender), and — when an approver is
 //! configured — requires its authorization for every value-moving
 //! operation. The contract implements [`ConfidentialCompliance`],
-//! [`ConfidentialClawback`] and [`ConfidentialRwa`] on top.
+//! [`ConfidentialClawback`] and [`ConfidentialRwa`] on top. `recover`, which
+//! moves a frozen account's whole balance into a new account without
+//! revealing it, requires an approver.
 //!
 //! Wiring [`RwaHooks`] is what satisfies the deployment obligation of
 //! [`ConfidentialClawback`]: a frozen account cannot move its balance between
@@ -23,7 +25,7 @@
 //! |:---|:---|
 //! | `freezer` | `freeze`, `unfreeze` |
 //! | `config_manager` | `set_compliance_config`, `set_rwa_config` |
-//! | `clawback` | `clawback`, `force_revoke_spender` |
+//! | `clawback` | `clawback`, `force_revoke_spender`, `recover` |
 //!
 //! The constructor grants none of them; the admin grants each role after
 //! deployment. The approver is not a role: it is the address set through
@@ -38,7 +40,7 @@ use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_confidential::{
     compliance::{
         storage as compliance, ClawbackData, ComplianceConfig, ConfidentialClawback,
-        ConfidentialCompliance, ConfidentialRwa, RwaConfig, RwaHooks,
+        ConfidentialCompliance, ConfidentialRwa, RecoverData, RwaConfig, RwaHooks,
     },
     storage as confidential, ConfidentialAccount, ConfidentialToken, SpenderDelegation,
 };
@@ -119,6 +121,12 @@ impl ConfidentialRwa for RwaTokenContract {
     #[only_role(operator, "config_manager")]
     fn set_rwa_config(e: &Env, auditor_id: u32, approver: Option<Address>, operator: Address) {
         compliance::set_rwa_config(e, auditor_id, &approver);
+    }
+
+    #[only_role(operator, "clawback")]
+    fn recover(e: &Env, from: Address, to: Address, data: Bytes, operator: Address) {
+        let decoded: RecoverData = confidential::decode_data(e, &data);
+        compliance::recover(e, &from, &to, &decoded.payload, &decoded.proof);
     }
 }
 

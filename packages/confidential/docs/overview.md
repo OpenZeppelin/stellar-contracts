@@ -181,7 +181,7 @@ The wallet must:
 | **Token contract** | The main Soroban contract that holds SEP-41 tokens and manages encrypted account state. |
 | **Verifier contract** | Validates zero-knowledge proofs on-chain. Stores one verification key per operation type. |
 | **Auditor contract** | Manages auditor public keys. Shared across tokens. |
-| **Noir circuits** | Six proof circuits (register, withdraw, transfer, spender transfer, set spender, and the compliance extension's clawback). Written in Noir, compiled to UltraHonk. |
+| **Noir circuits** | Seven proof circuits (register, withdraw, transfer, spender transfer, set spender, and the compliance extension's clawback and recover). Written in Noir, compiled to UltraHonk. |
 | **Client library** | SDK for wallets: key management, proof generation, event processing, balance tracking, encryption/decryption. Specified in [SDK](sdk/README.md). |
 
 ---

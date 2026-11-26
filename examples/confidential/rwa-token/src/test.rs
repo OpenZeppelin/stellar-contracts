@@ -5,13 +5,14 @@ use soroban_sdk::{
     testutils::{Address as _, MockAuth, MockAuthInvoke},
     token::StellarAssetClient,
     xdr::ToXdr,
-    Address, Bytes, BytesN, Env, Error, IntoVal, Symbol,
+    Address, Bytes, BytesN, Env, Error, IntoVal, Symbol, Val, Vec,
 };
 use stellar_access::access_control::AccessControlError;
 use stellar_confidential::{
     auditor::{storage as auditor_storage, ConfidentialAuditor, ConfidentialAuditorClient},
     compliance::{
-        storage::transfer_approval_args, ClawbackData, ComplianceConfig, ComplianceError, Policy,
+        storage::{recover_approval_args, transfer_approval_args},
+        ClawbackData, ComplianceConfig, ComplianceError, Policy, RecoverData, RecoverPayload,
         RwaConfig,
     },
     verifier::{CircuitType, ConfidentialVerifier},
@@ -195,6 +196,25 @@ fn proof_data(e: &Env) -> Bytes {
     ClawbackData { proof: Bytes::new(e) }.to_xdr(e)
 }
 
+fn g_times(e: &Env, n: u128) -> BytesN<64> {
+    Grumpkin::mul(e, &Grumpkin::generator(e), n)
+}
+
+fn recover_payload(e: &Env) -> RecoverPayload {
+    RecoverPayload {
+        c_transfer: g_times(e, 300),
+        r_e_point: Grumpkin::generator(e),
+        v_tilde: field(e, 1),
+        sigma: field(e, 2),
+        v_tilde_aud_r: field(e, 3),
+        r_tilde_aud_r: field(e, 4),
+    }
+}
+
+fn recover_data(e: &Env) -> Bytes {
+    RecoverData { payload: recover_payload(e), proof: Bytes::new(e) }.to_xdr(e)
+}
+
 fn contract_error(code: u32) -> Error {
     Error::from_contract_error(code)
 }
@@ -249,6 +269,15 @@ fn rwa_entry_points_require_their_roles() {
     // A role does not extend to another duty.
     assert_eq!(
         h.token.try_set_rwa_config(&AUDITOR_ID, &None, &h.freezer).unwrap_err().unwrap(),
+        unauthorized
+    );
+    let (a, b) = (h.investor(), h.investor());
+    assert_eq!(
+        h.token.try_recover(&a, &b, &recover_data(&h.e), &outsider).unwrap_err().unwrap(),
+        unauthorized
+    );
+    assert_eq!(
+        h.token.try_recover(&a, &b, &recover_data(&h.e), &h.config_manager).unwrap_err().unwrap(),
         unauthorized
     );
 }
@@ -382,29 +411,15 @@ fn registration_under_another_auditor_is_rejected() {
 }
 
 #[test]
-fn lost_account_is_recovered_by_clawback_and_deposit() {
+fn recovery_requires_an_approver() {
     let h = setup(None);
-    h.onboard(&h.treasury);
     let lost = h.investor();
-    h.sac.mint(&lost, &300);
-    h.token.deposit(&lost, &lost, &300);
     let fresh = h.investor();
-
-    // Seize the full balance of the frozen account to the treasury...
     h.token.freeze(&lost, &h.freezer);
-    h.token.clawback(&lost, &300, &Some(h.treasury.clone()), &proof_data(&h.e), &h.clawback);
-    assert_eq!(h.sac.balance(&h.treasury), 300);
-    // ...and deposit it into the holder's new account.
-    h.token.deposit(&h.treasury, &fresh, &300);
-
-    assert_eq!(h.token.confidential_balance(&lost).spendable_commitment, Grumpkin::identity(&h.e));
-    assert_eq!(h.token.confidential_balance(&lost).receiving_commitment, Grumpkin::identity(&h.e));
     assert_eq!(
-        h.token.confidential_balance(&fresh).receiving_commitment,
-        Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 300)
+        h.token.try_recover(&lost, &fresh, &recover_data(&h.e), &h.clawback).unwrap_err().unwrap(),
+        contract_error(ComplianceError::RecoveryRequiresApprover as u32)
     );
-    assert_eq!(h.sac.balance(&h.treasury), 0);
-    assert_eq!(h.sac.balance(&h.token.address), 300);
 }
 
 // ################## TIER 1: APPROVAL GATE ##################
@@ -504,6 +519,71 @@ fn approval_is_void_after_the_approver_is_replaced() {
         .confidential_transfer(&h.treasury, &alice, &data);
 }
 
+/// Submits `recover(lost, fresh, data)` with the clawback holder's
+/// authorization and the approver's authorization over `approval_args`.
+fn submit_recover(
+    h: &Harness,
+    approver: &Address,
+    lost: &Address,
+    fresh: &Address,
+    approval_args: Vec<Val>,
+) {
+    let e = &h.e;
+    let data = recover_data(e);
+    let operator = MockAuthInvoke {
+        contract: &h.token.address,
+        fn_name: "recover",
+        args: (lost.clone(), fresh.clone(), data.clone(), h.clawback.clone()).into_val(e),
+        sub_invokes: &[],
+    };
+    let approval = MockAuthInvoke {
+        contract: &h.token.address,
+        fn_name: "recover",
+        args: approval_args,
+        sub_invokes: &[],
+    };
+    h.token
+        .mock_auths(&[
+            MockAuth { address: &h.clawback, invoke: &operator },
+            MockAuth { address: approver, invoke: &approval },
+        ])
+        .recover(lost, fresh, &data, &h.clawback);
+}
+
+#[test]
+fn lost_account_is_recovered_without_revealing_the_amount() {
+    let (h, approver, lost) = approved_deployment();
+    h.sac.mint(&lost, &300);
+    h.token.deposit(&lost, &lost, &300);
+    h.token.merge(&lost);
+    let fresh = h.investor();
+
+    h.token.freeze(&lost, &h.freezer);
+    let args = h.e.as_contract(&h.token.address, || {
+        recover_approval_args(&h.e, &lost, &fresh, &recover_payload(&h.e))
+    });
+    submit_recover(&h, &approver, &lost, &fresh, args);
+
+    assert_eq!(h.token.confidential_balance(&lost).spendable_commitment, Grumpkin::identity(&h.e));
+    assert_eq!(h.token.confidential_balance(&lost).receiving_commitment, Grumpkin::identity(&h.e));
+    assert_eq!(h.token.confidential_balance(&fresh).receiving_commitment, g_times(&h.e, 300));
+    // No underlying moves.
+    assert_eq!(h.sac.balance(&h.token.address), 1_300);
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn recovery_approval_for_another_account_fails() {
+    let (h, approver, lost) = approved_deployment();
+    let fresh = h.investor();
+    let other = h.investor();
+    h.token.freeze(&lost, &h.freezer);
+    let args = h.e.as_contract(&h.token.address, || {
+        recover_approval_args(&h.e, &lost, &other, &recover_payload(&h.e))
+    });
+    submit_recover(&h, &approver, &lost, &fresh, args);
+}
+
 #[test]
 fn admin_is_not_the_approver() {
     // Holding every role does not satisfy the approval gate.
@@ -578,6 +658,7 @@ fn role_holders_must_authorize() {
     assert_auth_failure("force_revoke_spender", || {
         unsigned.force_revoke_spender(&a, &b, &h.clawback)
     });
+    assert_auth_failure("recover", || unsigned.recover(&a, &b, &recover_data(&h.e), &h.clawback));
 
     h.e.mock_all_auths();
     assert!(h.token.is_frozen(&a));

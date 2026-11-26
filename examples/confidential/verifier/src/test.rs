@@ -21,6 +21,7 @@ const TRANSFER_VK: &[u8; 1760] = vk_bin!("transfer");
 const SET_SPENDER_VK: &[u8; 1760] = vk_bin!("set_spender");
 const SPENDER_TRANSFER_VK: &[u8; 1760] = vk_bin!("spender_transfer");
 const CLAWBACK_VK: &[u8; 1760] = vk_bin!("clawback");
+const RECOVER_VK: &[u8; 1760] = vk_bin!("recover");
 
 fn create_client<'a>(
     e: &Env,
@@ -85,6 +86,7 @@ fn every_committed_vk_parses_under_the_backend() {
         (CircuitType::SetSpender, SET_SPENDER_VK),
         (CircuitType::SpenderTransfer, SPENDER_TRANSFER_VK),
         (CircuitType::Clawback, CLAWBACK_VK),
+        (CircuitType::Recover, RECOVER_VK),
     ] {
         client.register_verification_key(&circuit, &Bytes::from_array(&e, vk), &manager);
         assert!(!client.verify_proof(&circuit, &junk, &junk));

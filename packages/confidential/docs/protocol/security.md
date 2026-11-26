@@ -37,6 +37,7 @@ This invariant is maintained by:
 - **Spender transfer** decreases $$v\_{\text{allowance}\_i}$$ and increases recipient's $$v\_{\text{receive}}$$ by $$v\_{\text{transfer}}$$; enforced by O2–O8.
 - **Revoke** moves remaining $$v\_{\text{allowance}\_i}$$ back to $$v\_{\text{spend}}$$ (Proposition 1); the sum is unchanged.
 - **Clawback** (compliance extension) removes a public amount from $$v\_{\text{spend}} + v\_{\text{receive}}$$ without a withdrawal, enforced by CB2–CB4; in a deployment that enables it, seized amounts count alongside $$w\_k$$ on the left-hand side ([Contract Flow](../compliance.md#contract-flow)).
+- **Recover** (compliance extension) moves $$v\_{\text{spend}} + v\_{\text{receive}}$$ of one account to another's $$v\_{\text{receive}}$$, enforced by RV1–RV3 and RV7 ([Recovery Circuit](../compliance.md#recovery-circuit)); the sum is unchanged.
 
 ## Privacy Properties
 
