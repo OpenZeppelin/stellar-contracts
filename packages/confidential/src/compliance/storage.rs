@@ -12,13 +12,12 @@ use crate::{
         FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
     storage::{
-        account_exists, add_to_receiving, address_to_field, append_amount, append_field,
-        append_point, forced_destination_to_field, get_account, get_address_as_field_element,
-        get_auditor, get_underlying_asset, revoke_spender, set_commitments, verify,
+        add_to_receiving, address_to_field, append_amount, append_field, append_point,
+        forced_destination_to_field, get_account, get_address_as_field_element, get_auditor,
+        get_underlying_asset, revoke_spender, set_commitments, verify,
     },
     verifier::CircuitType,
-    ConfidentialAccount, ConfidentialTokenStorageKey, SpenderTransferPayload, TransferPayload,
-    WithdrawPayload,
+    ConfidentialAccount, SpenderTransferPayload, TransferPayload, WithdrawPayload,
 };
 
 // ################## TYPES ##################
@@ -157,54 +156,6 @@ pub fn rwa_config(e: &Env) -> Option<RwaConfig> {
 /// * `e` - Access to the Soroban environment.
 pub fn approval_epoch(e: &Env) -> u32 {
     e.storage().instance().get(&ComplianceStorageKey::ApprovalEpoch).unwrap_or(0)
-}
-
-/// Returns whether `account` is publicly eligible to take part in
-/// value-moving operations of an RWA deployment: both configurations are
-/// set with an eligibility gate, and `account` is registered, bound to the
-/// designated auditor, not frozen, and authorized by the policy and the SAC
-/// (where configured).
-///
-/// This is an eligibility predicate, not a settlement guarantee: it says
-/// nothing about approval, proof validity or balances. It raises no contract
-/// error: a missing configuration, a missing account, a rejection, or a
-/// recoverable failure of the policy or SAC call all yield `false`.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `account` - The address to query.
-pub fn can_transact(e: &Env, account: &Address) -> bool {
-    let (Some(config), Some(rwa)) = (compliance_config(e), rwa_config(e)) else {
-        return false;
-    };
-    if !has_eligibility_gate(&config) || !account_exists(e, account) {
-        return false;
-    }
-    if get_account(e, account).auditor_id != rwa.auditor_id || is_frozen(e, account) {
-        return false;
-    }
-    if let Some(policy_addr) = &config.policy {
-        let policy = PolicyClient::new(e, policy_addr);
-        if !matches!(policy.try_is_authorized(account, &e.current_contract_address()), Ok(Ok(true)))
-        {
-            return false;
-        }
-    }
-    if config.sac_passthrough {
-        // Read the underlying asset without `get_underlying_asset`, which
-        // raises a contract error when the entry is missing.
-        let Some(underlying) =
-            e.storage().instance().get::<_, Address>(&ConfidentialTokenStorageKey::UnderlyingAsset)
-        else {
-            return false;
-        };
-        let sac = token::StellarAssetClient::new(e, &underlying);
-        if !matches!(sac.try_authorized(account), Ok(Ok(true))) {
-            return false;
-        }
-    }
-    true
 }
 
 // ################## CHANGE STATE ##################

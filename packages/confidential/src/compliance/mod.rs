@@ -403,30 +403,6 @@ pub trait ConfidentialRwa: ConfidentialCompliance {
     fn approval_epoch(e: &Env) -> u32 {
         storage::approval_epoch(e)
     }
-
-    /// Returns whether `account` is publicly eligible to send. Mirrors
-    /// ERC-8424 `canSend`: an eligibility predicate that encodes no
-    /// quantitative rule and raises no contract error. See
-    /// [`storage::can_transact`].
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `account` - The confidential account to query.
-    fn can_send(e: &Env, account: Address) -> bool {
-        storage::can_transact(e, &account)
-    }
-
-    /// Returns whether `account` is publicly eligible to receive. Mirrors
-    /// ERC-8424 `canReceive`. See [`storage::can_transact`].
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `account` - The confidential account to query.
-    fn can_receive(e: &Env, account: Address) -> bool {
-        storage::can_transact(e, &account)
-    }
 }
 
 /// Opt-in forced transfer between confidential accounts

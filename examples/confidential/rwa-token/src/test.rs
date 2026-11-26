@@ -331,14 +331,14 @@ fn freeze_clawback_and_unfreeze_by_their_roles() {
     h.token.deposit(&account, &account, &100);
 
     h.token.freeze(&account, &h.freezer);
-    assert!(!h.token.can_receive(&account));
+    assert!(h.token.is_frozen(&account));
     h.token.clawback(&account, &40, &None, &proof_data(&h.e), &h.clawback);
     assert_eq!(
         h.token.confidential_balance(&account).spendable_commitment,
         Grumpkin::mul(&h.e, &Grumpkin::generator(&h.e), 60)
     );
     h.token.unfreeze(&account, &h.freezer);
-    assert!(h.token.can_receive(&account));
+    assert!(!h.token.is_frozen(&account));
 }
 
 #[test]
@@ -395,8 +395,6 @@ fn issuance_and_transfer_between_verified_investors() {
     h.issue_to_treasury(1_000);
     let alice = h.investor();
 
-    assert!(h.token.can_send(&h.treasury));
-    assert!(h.token.can_receive(&alice));
     h.token.confidential_transfer(&h.treasury, &alice, &transfer_data(&h.e));
 
     assert_eq!(
@@ -415,7 +413,6 @@ fn unverified_address_cannot_register_or_receive() {
         h.token.try_register(&stranger, &AUDITOR_ID, &register_data(&h.e)).unwrap_err().unwrap(),
         contract_error(ComplianceError::NotAuthorizedByPolicy as u32)
     );
-    assert!(!h.token.can_receive(&stranger));
     assert_eq!(
         h.token
             .try_confidential_transfer(&h.treasury, &stranger, &transfer_data(&h.e))
@@ -672,7 +669,6 @@ fn frozen_investor_is_immobile_until_unfrozen() {
 
     h.token.freeze(&h.treasury, &h.freezer);
     assert!(h.token.is_frozen(&h.treasury));
-    assert!(!h.token.can_send(&h.treasury));
     assert_eq!(
         h.token
             .try_confidential_transfer(&h.treasury, &alice, &transfer_data(&h.e))

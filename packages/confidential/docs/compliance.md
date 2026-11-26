@@ -378,16 +378,12 @@ impl Token {
     fn bump_approval_epoch(e: Env, operator: Address);
     fn rwa_config(e: Env) -> Option<RwaConfig>;
     fn approval_epoch(e: Env) -> u32;
-    fn can_send(e: Env, account: Address) -> bool;
-    fn can_receive(e: Env, account: Address) -> bool;
 
     // Forced transfer, opt-in via ConfidentialForcedTransfer
     fn forced_transfer(e: Env, from: Address, to: Address, amount: i128,
                        data: Bytes /* XDR ClawbackData { proof } */, operator: Address);
 }
 ```
-
-`can_send` and `can_receive` are the same predicate: both configurations are set with an eligibility gate, and `account` is registered, bound to the designated auditor, not frozen, and passes the policy and SAC gates. They describe public eligibility of a confidential account, not whether an operation will settle, and they return `false` instead of raising a contract error, including when the policy or SAC call fails recoverably.
 
 `operator` is the address whose authorization the deployment's access-control module checks ([Admin Authority](#admin-authority)).
 

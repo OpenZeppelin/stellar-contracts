@@ -12,7 +12,7 @@ use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 use crate::{
     compliance::{
         storage::{
-            approval_epoch, bump_approval_epoch, can_transact, clawback, compliance_config,
+            approval_epoch, bump_approval_epoch, clawback, compliance_config,
             deposit_approval_args, force_revoke_spender, forced_transfer, freeze, rwa_config,
             set_compliance_config, set_rwa_config, spender_transfer_approval_args,
             transfer_approval_args, unfreeze, withdraw_approval_args,
@@ -1023,80 +1023,6 @@ fn on_spender_transfer_rejects_legacy_recipient() {
     h.e.as_contract(&h.host, || {
         RwaHooks::on_spender_transfer(&h.e, &spender, &owner, &to, &spender_transfer_payload(&h.e));
     });
-}
-
-#[test]
-fn can_send_and_can_receive_follow_public_eligibility() {
-    let h = configured(None);
-    let client = ConfidentialRwaClient::new(&h.e, &h.host);
-    let ok = account(&h, AUDITOR);
-    let unregistered = Address::generate(&h.e);
-    let legacy = account(&h, LEGACY_AUDITOR);
-    let frozen = account(&h, AUDITOR);
-    freeze_account(&h, &frozen);
-    let denied = account(&h, AUDITOR);
-    ListPolicyClient::new(&h.e, &h.policy).block(&denied);
-
-    assert!(client.can_send(&ok));
-    assert!(client.can_receive(&ok));
-    for a in [&unregistered, &legacy, &frozen, &denied] {
-        assert!(!client.can_send(a));
-        assert!(!client.can_receive(a));
-    }
-}
-
-#[test]
-fn can_transact_is_false_when_unconfigured() {
-    let h = setup();
-    let a = account(&h, AUDITOR);
-    h.e.as_contract(&h.host, || assert!(!can_transact(&h.e, &a)));
-
-    h.e.as_contract(&h.host, || set_compliance_config(&h.e, &policy_config(&h)));
-    h.e.as_contract(&h.host, || assert!(!can_transact(&h.e, &a)));
-}
-
-#[test]
-fn can_transact_is_false_when_policy_call_fails() {
-    let h = setup();
-    let failing = h.e.register(PanicPolicy, ());
-    h.e.as_contract(&h.host, || {
-        set_compliance_config(
-            &h.e,
-            &ComplianceConfig { policy: Some(failing.clone()), sac_passthrough: false },
-        );
-        set_rwa_config(&h.e, AUDITOR, &None);
-    });
-    let a = account(&h, AUDITOR);
-    assert!(!ConfidentialRwaClient::new(&h.e, &h.host).can_send(&a));
-}
-
-#[test]
-fn can_transact_follows_sac_authorization() {
-    let h = setup();
-    h.e.as_contract(&h.host, || {
-        set_compliance_config(&h.e, &ComplianceConfig { policy: None, sac_passthrough: true });
-        set_rwa_config(&h.e, AUDITOR, &None);
-    });
-    let a = account(&h, AUDITOR);
-    let client = ConfidentialRwaClient::new(&h.e, &h.host);
-    assert!(client.can_receive(&a));
-
-    h.sac.set_authorized(&a, &false);
-    assert!(!client.can_receive(&a));
-}
-
-#[test]
-fn can_transact_is_false_when_underlying_asset_is_missing() {
-    let h = setup();
-    h.e.as_contract(&h.host, || {
-        set_compliance_config(&h.e, &ComplianceConfig { policy: None, sac_passthrough: true });
-        set_rwa_config(&h.e, AUDITOR, &None);
-    });
-    let a = account(&h, AUDITOR);
-    h.e.as_contract(&h.host, || {
-        h.e.storage().instance().remove(&ConfidentialTokenStorageKey::UnderlyingAsset);
-    });
-    assert!(!ConfidentialRwaClient::new(&h.e, &h.host).can_send(&a));
 }
 
 #[test]
@@ -2847,8 +2773,8 @@ impl PlainToken {
     }
 }
 
-// Pins branch: can_transact, check_sac / sac_passthrough over a token with
-//   no `authorized` / the views return false and every hook traps
+// Pins branch: check_sac / sac_passthrough over a token with no
+//   `authorized` / every hook traps
 // Verifies: INV-16, INV-20
 #[test]
 fn sac_passthrough_over_a_non_sac_underlying_fails_closed() {
@@ -2859,10 +2785,6 @@ fn sac_passthrough_over_a_non_sac_underlying_fails_closed() {
         set_compliance_config(&h.e, &ComplianceConfig { policy: None, sac_passthrough: true });
         set_rwa_config(&h.e, AUDITOR, &None);
     });
-    let a = account(&h, AUDITOR);
-    let client = ConfidentialRwaClient::new(&h.e, &h.host);
-    assert!(!client.can_send(&a));
-    assert!(!client.can_receive(&a));
     for op in OPS {
         let p = parties(&h);
         assert!(try_hook(&h, op, &p).is_err(), "{op:?} passed over a non-SAC underlying");
@@ -3173,7 +3095,7 @@ fn hooks_reject_unregistered_confidential_parties() {
 }
 
 // Pins branch: on_register / the address carries a frozen flag / it
-//   registers; can_receive is false afterwards
+//   registers and cannot receive afterwards
 // Verifies: INV-16
 #[test]
 fn frozen_address_can_register_but_not_transact() {
@@ -3185,77 +3107,14 @@ fn frozen_address_can_register_but_not_transact() {
         Ok(())
     );
     store_account(&h, &a, AUDITOR, 0, 0);
-    assert!(!ConfidentialRwaClient::new(&h.e, &h.host).can_receive(&a));
+    let from = account(&h, AUDITOR);
+    assert_eq!(
+        try_in_host(&h, || RwaHooks::on_transfer(&h.e, &from, &a, &transfer_payload(&h.e))),
+        err(ComplianceError::AccountFrozen)
+    );
 }
 
-// ################## P6: can_transact ##################
-
-// Pins branch: can_transact / the policy address is not a contract / false
-// Verifies: INV-20
-#[test]
-fn can_transact_is_false_when_the_policy_is_not_a_contract() {
-    let h = setup();
-    let missing = Address::generate(&h.e);
-    h.e.as_contract(&h.host, || {
-        set_compliance_config(
-            &h.e,
-            &ComplianceConfig { policy: Some(missing.clone()), sac_passthrough: false },
-        );
-        set_rwa_config(&h.e, AUDITOR, &None);
-    });
-    let a = account(&h, AUDITOR);
-    assert!(!ConfidentialRwaClient::new(&h.e, &h.host).can_send(&a));
-}
-
-// Pins branch: can_transact / policy and SAC both configured / true only
-//   when both authorize
-// Verifies: INV-16
-#[test]
-fn can_transact_requires_both_gates_when_both_are_configured() {
-    let h = setup();
-    h.e.as_contract(&h.host, || {
-        set_compliance_config(
-            &h.e,
-            &ComplianceConfig { policy: Some(h.policy.clone()), sac_passthrough: true },
-        );
-        set_rwa_config(&h.e, AUDITOR, &None);
-    });
-    let client = ConfidentialRwaClient::new(&h.e, &h.host);
-    let ok = account(&h, AUDITOR);
-    let denied_by_policy = account(&h, AUDITOR);
-    ListPolicyClient::new(&h.e, &h.policy).block(&denied_by_policy);
-    let denied_by_sac = account(&h, AUDITOR);
-    h.sac.set_authorized(&denied_by_sac, &false);
-
-    assert!(client.can_send(&ok));
-    assert!(!client.can_send(&denied_by_policy));
-    assert!(!client.can_send(&denied_by_sac));
-}
-
-// Pins branch: can_transact / RwaConfig set, ComplianceConfig without a
-//   gate or absent / false
-// Verifies: INV-16
-#[test]
-fn can_transact_is_false_for_an_invalid_stored_configuration() {
-    let h = configured(None);
-    let a = account(&h, AUDITOR);
-    let client = ConfidentialRwaClient::new(&h.e, &h.host);
-    assert!(client.can_send(&a));
-
-    // An eligibility-free configuration, which no setter can write.
-    h.e.as_contract(&h.host, || {
-        h.e.storage().instance().set(
-            &ComplianceStorageKey::Config,
-            &ComplianceConfig { policy: None, sac_passthrough: false },
-        );
-    });
-    assert!(!client.can_send(&a));
-
-    h.e.as_contract(&h.host, || h.e.storage().instance().remove(&ComplianceStorageKey::Config));
-    assert!(!client.can_send(&a));
-}
-
-// ################## P7: CONFIGURATION ##################
+// ################## P6: CONFIGURATION ##################
 
 // Pins branch: set_rwa_config / auditor and approver both invalid / the
 //   auditor check wins; the token is rejected as approver on a later call
