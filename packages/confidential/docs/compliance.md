@@ -280,7 +280,7 @@ struct RwaConfig {
 
 `RwaConfig` is stored under its own key; `ComplianceConfig` is unchanged. `RwaHooks` differs from `ComplianceHooks` as follows:
 
-- **Fails closed.** Every callback reverts with `RwaNotConfigured` without an `RwaConfig`, with `NotConfigured` without a `ComplianceConfig`, and with `EligibilityRequired` when the `ComplianceConfig` has neither a policy nor SAC passthrough. While an `RwaConfig` exists, `set_compliance_config` rejects a configuration with neither.
+- **Fails closed.** Every callback reverts with `RwaNotConfigured` without an `RwaConfig`, with `NotConfigured` without a `ComplianceConfig`, and with `EligibilityRequired` when the `ComplianceConfig` has neither a policy nor SAC passthrough.
 - **Spender.** The spender of a delegated flow passes the freeze, policy and SAC gates, not the policy gate alone; under SAC passthrough it must therefore be an authorized holder of the base asset, which registration already requires. `revoke_spender` still gates only the owner.
 
 ### Designated Auditor

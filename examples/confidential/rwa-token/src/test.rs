@@ -349,18 +349,6 @@ fn config_manager_changes_the_policy_and_the_epoch_advances() {
     h.token.set_compliance_config(&config, &h.config_manager);
     assert_eq!(h.token.compliance_config(), Some(config));
     assert_eq!(h.token.approval_epoch(), 2);
-
-    // The eligibility gate cannot be removed.
-    assert_eq!(
-        h.token
-            .try_set_compliance_config(
-                &ComplianceConfig { policy: None, sac_passthrough: false },
-                &h.config_manager
-            )
-            .unwrap_err()
-            .unwrap(),
-        contract_error(ComplianceError::EligibilityRequired as u32)
-    );
 }
 
 #[test]

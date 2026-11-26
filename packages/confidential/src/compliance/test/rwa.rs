@@ -617,15 +617,6 @@ fn approval_epoch_overflow_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3614)")]
-fn set_compliance_config_cannot_remove_eligibility_gate_under_rwa() {
-    let h = configured(None);
-    h.e.as_contract(&h.host, || {
-        set_compliance_config(&h.e, &ComplianceConfig { policy: None, sac_passthrough: false });
-    });
-}
-
-#[test]
 fn set_compliance_config_advances_epoch_under_rwa() {
     let h = configured(None);
     let client = ConfidentialComplianceClient::new(&h.e, &h.host);
@@ -685,12 +676,8 @@ fn every_hook_reverts_without_eligibility_gate() {
     let h = configured(None);
     let a = account(&h, AUDITOR);
     let b = account(&h, AUDITOR);
-    h.e.as_contract(&h.host, || {
-        h.e.storage().instance().set(
-            &ComplianceStorageKey::Config,
-            &ComplianceConfig { policy: None, sac_passthrough: false },
-        );
-    });
+    let open = ComplianceConfig { policy: None, sac_passthrough: false };
+    ConfidentialComplianceClient::new(&h.e, &h.host).set_compliance_config(&open, &h.admin);
     assert_every_hook_reverts_with(&h, &a, &b, 3614);
 }
 
@@ -3011,22 +2998,14 @@ fn disabling_the_approver_emits_rwa_config_changed_without_approver() {
 }
 
 // Pins branch: set_compliance_config, set_rwa_config / rejected with
-//   EligibilityRequired #3614 or ApprovalEpochOverflow #3615 / the stored
-//   configurations and the epoch are unchanged
+//   ApprovalEpochOverflow #3615 / the stored configurations and the epoch
+//   are unchanged
 // Verifies: INV-7, INV-8, INV-9
 #[test]
 fn rejected_setters_leave_configuration_and_epoch_unchanged() {
     let h = configured(None);
     let rwa = ConfidentialRwaClient::new(&h.e, &h.host);
     let compliance = ConfidentialComplianceClient::new(&h.e, &h.host);
-    let open = ComplianceConfig { policy: None, sac_passthrough: false };
-
-    assert_eq!(
-        compliance.try_set_compliance_config(&open, &h.admin).unwrap_err().unwrap(),
-        Error::from_contract_error(ComplianceError::EligibilityRequired as u32)
-    );
-    assert_eq!(compliance.compliance_config(), Some(policy_config(&h)));
-    assert_eq!(rwa.approval_epoch(), 1);
 
     // At the last epoch every setter is rejected and nothing is written.
     h.e.as_contract(&h.host, || {

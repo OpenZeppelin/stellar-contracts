@@ -172,8 +172,6 @@ pub fn approval_epoch(e: &Env) -> u32 {
 ///
 /// # Errors
 ///
-/// * [`ComplianceError::EligibilityRequired`] - When an [`RwaConfig`] exists
-///   and `config` has neither a policy nor SAC passthrough.
 /// * [`ComplianceError::ApprovalEpochOverflow`] - When an [`RwaConfig`] exists
 ///   and the approval epoch cannot advance.
 ///
@@ -190,10 +188,9 @@ pub fn approval_epoch(e: &Env) -> u32 {
 ///
 /// # Notes
 ///
-/// Without an [`RwaConfig`] the behaviour is unchanged. With one, the
-/// eligibility gate cannot be removed and every change advances the
-/// approval epoch, which voids outstanding approver authorizations
-/// (`docs/compliance.md#approval-gate`).
+/// Without an [`RwaConfig`] the behaviour is unchanged. With one, every
+/// change advances the approval epoch, which voids outstanding approver
+/// authorizations (`docs/compliance.md#approval-gate`).
 ///
 /// # Security Warning
 ///
@@ -206,9 +203,6 @@ pub fn approval_epoch(e: &Env) -> u32 {
 /// security risks as it could allow unauthorized modifications.
 pub fn set_compliance_config(e: &Env, config: &ComplianceConfig) {
     let is_rwa = rwa_config(e).is_some();
-    if is_rwa && !has_eligibility_gate(config) {
-        panic_with_error!(e, ComplianceError::EligibilityRequired);
-    }
     e.storage().instance().set(&ComplianceStorageKey::Config, config);
     emit_compliance_config_changed(e, &config.policy, config.sac_passthrough);
     if is_rwa {
