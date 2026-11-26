@@ -551,7 +551,9 @@ impl Hooks for ComplianceHooks {
 /// 2. **Designated auditor.** `on_register` accepts only the designated auditor
 ///    id. Because the hooks fail closed and the id is fixed, every account
 ///    registered under them is bound to it; the other callbacks do not check
-///    the binding again.
+///    the binding again. A deployment that switches to these hooks after
+///    accounts registered must freeze those bound to another auditor first
+///    (`docs/compliance.md#designated-auditor`).
 /// 3. **Approval gate.** When an approver is configured, `on_deposit`,
 ///    `on_withdraw`, `on_transfer` and `on_spender_transfer` additionally
 ///    require its authorization over the parties and the operation's payload

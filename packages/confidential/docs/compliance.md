@@ -289,7 +289,7 @@ struct RwaConfig {
 
 The compliance service can monitor, approve and seize only what it can decrypt, so every account of an RWA deployment is bound to one auditor. `RwaConfig.auditor_id` is fixed by the first `set_rwa_config` call, which requires the id to resolve in the auditor registry; a later call with another id reverts with `AuditorAlreadySet`. Auditor keys under that id still rotate ([Auditor Key Management and Rotation](protocol/auditing.md#auditor-key-management-and-rotation)).
 
-`register` reverts with `AuditorNotAllowed` for any other id. The binding is checked only there: `RwaHooks` fails closed and the id cannot change, so every account registered under it is bound to the designated auditor. An account bound to another auditor exists only where a deployment switched to `RwaHooks` after accounts had registered; its operations are not visible to the compliance service, so such a deployment drains those accounts before switching.
+`register` reverts with `AuditorNotAllowed` for any other id. The binding is checked only there: `RwaHooks` fails closed and the id cannot change, so every account registered under it is bound to the designated auditor. An account bound to another auditor exists only where a deployment switched to `RwaHooks` after accounts had registered, and the compliance service cannot decrypt its operations. Such a deployment MUST freeze every such account before its first `set_rwa_config`, while `RwaHooks` still rejects every operation, and keep it frozen; the contract cannot enumerate them, so the operator takes them from the `auditor_id` of the `Register` events in the archive. Their balances leave through `clawback` or [Recovery](#recovery).
 
 ### Approval Gate
 
