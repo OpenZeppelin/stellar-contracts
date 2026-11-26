@@ -4,14 +4,13 @@
 //! extension (`packages/confidential/docs/compliance.md#rwa-profile`).
 //! `type Hooks = RwaHooks` rejects every operation until the deployment is
 //! configured, restricts accounts to the designated auditor, runs the freeze,
-//! policy, and SAC gates on the parties of every operation (with the two
-//! exceptions listed on [`RwaHooks`]: registration skips the freeze gate and
-//! `revoke_spender` does not gate the spender), and — when an approver is
-//! configured — requires its authorization for every value-moving
-//! operation. The contract implements [`ConfidentialCompliance`],
-//! [`ConfidentialClawback`] and [`ConfidentialRwa`] on top. `recover`, which
-//! moves a frozen account's whole balance into a new account without
-//! revealing it, requires an approver.
+//! policy, and SAC gates on the parties of every operation (with two
+//! exceptions: registration skips the freeze gate and `revoke_spender` does
+//! not gate the spender), and — when an approver is configured — requires its
+//! authorization for every value-moving operation. The contract implements
+//! [`ConfidentialCompliance`], [`ConfidentialClawback`] and [`ConfidentialRwa`]
+//! on top. `recover`, which moves a frozen account's whole balance into a new
+//! account without revealing it, requires an approver.
 //!
 //! Wiring [`RwaHooks`] is what satisfies the deployment obligation of
 //! [`ConfidentialClawback`]: a frozen account cannot move its balance between
