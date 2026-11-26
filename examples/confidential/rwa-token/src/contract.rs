@@ -24,7 +24,7 @@
 //! | Role | Entry points |
 //! |:---|:---|
 //! | `freezer` | `freeze`, `unfreeze` |
-//! | `config_manager` | `set_compliance_config`, `set_rwa_config`, `bump_approval_epoch` |
+//! | `config_manager` | `set_compliance_config`, `set_rwa_config` |
 //! | `clawback` | `clawback`, `force_revoke_spender` |
 //! | `forced_transfer` | `forced_transfer` |
 //!
@@ -123,11 +123,6 @@ impl ConfidentialRwa for RwaTokenContract {
     #[only_role(operator, "config_manager")]
     fn set_rwa_config(e: &Env, auditor_id: u32, approver: Option<Address>, operator: Address) {
         compliance::set_rwa_config(e, auditor_id, &approver);
-    }
-
-    #[only_role(operator, "config_manager")]
-    fn bump_approval_epoch(e: &Env, operator: Address) {
-        compliance::bump_approval_epoch(e);
     }
 }
 

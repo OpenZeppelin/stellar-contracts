@@ -295,22 +295,22 @@ When `RwaConfig.approver` is set, `deposit`, `withdraw`, `confidential_transfer`
 
 | Entry point | `args` |
 |:---|:---|
-| `deposit` | `(epoch, from, to, amount)` |
-| `withdraw` | `(epoch, from, to, amount, payload)` |
-| `confidential_transfer` | `(epoch, from, to, payload)` |
-| `confidential_transfer_from` | `(epoch, spender, from, to, payload)` |
+| `deposit` | `(from, to, amount)` |
+| `withdraw` | `(from, to, amount, payload)` |
+| `confidential_transfer` | `(from, to, payload)` |
+| `confidential_transfer_from` | `(spender, from, to, payload)` |
 
 `payload` is the operation's decoded payload ([Interface](protocol/interface.md)), so an authorization covers one statement: any valid proof of it is acceptable, and no other payload is. The approver obtains the amount of a transfer from the recipient-auditor ciphertexts in that payload ([Per-Transfer Auditor Ciphertexts](protocol/auditing.md#per-transfer-auditor-ciphertexts)).
 
 The approval is additional. The operation's own authorizer, its proof and every other gate are still required, and an approver cannot move, create or destroy value. `set_spender`, `merge` and `revoke_spender` change no ownership and require no approval. `clawback` and `forced_transfer` are administrative overrides and require none either.
 
-**Epoch.** `epoch` is a contract-managed `u32` that only increases: `set_rwa_config`, `bump_approval_epoch`, and `set_compliance_config` while an `RwaConfig` exists each advance it, and it reverts with `ApprovalEpochOverflow` instead of wrapping. An authorization names the epoch it was issued for, so removing or replacing the approver, swapping the policy, or an explicit bump voids every outstanding one; disabling and re-enabling the approver does not return to an earlier epoch.
+**Revocation.** The contract keeps no approval state: an authorization is spent by its nonce and lapses at its expiry ledger, both chosen by the approver. To void outstanding authorizations before they lapse, the deployment replaces the approver through `set_rwa_config`, or the approver rotates the key its authorizations are checked against, since the host checks them against the approver's signers when the operation executes. Disabling and re-enabling the same approver does not void them. A change of the compliance configuration voids nothing either; the freeze, policy and SAC gates are evaluated at execution.
 
 **Who the approver may be.** The approver must not be a party to the operation it approves (`from`, `to`, or `spender` for a delegated transfer): the hook reverts with `ApproverIsParty`. A party approving its own operation gives no independent check, and an approver that also authorized the invocation would authorize it twice. `set_rwa_config` rejects this contract's own address with `InvalidApprover`. Three host behaviours bound the guarantee above:
 
 - A detached address credential binds `args`, a nonce and an expiry ledger. This is the form an approver service should issue.
 - A transaction whose source account is the approver satisfies the gate through that account's signature on the envelope. The entry still carries `args`, but has no expiry of its own; such envelopes need time bounds.
-- A contract approver that itself invokes the token is authorized without `args` being matched and without its `__check_auth` running. Any path through which that contract calls the token must itself check the token address, the expected epoch, the entry point and the full `args`; a generic forwarding function, even one gated by the contract's own authorization, carries no epoch and is not voided by a bump.
+- A contract approver that itself invokes the token is authorized without `args` being matched and without its `__check_auth` running. Any path through which that contract calls the token must itself check the token address, the entry point and the full `args`; a generic forwarding function, even one gated by the contract's own authorization, approves whatever it forwards.
 
 The approver signing key, the designated auditor's decryption key and the admin roles belong in separate custody, so that the approver's decisions are visible to someone who does not hold its key. While the approver is unavailable, the gated operations stop; the deployment's `set_rwa_config` role can replace the approver or disable the gate.
 
@@ -372,9 +372,7 @@ impl Token {
 
     // RWA profile, via ConfidentialRwa (admin auth per Admin Authority)
     fn set_rwa_config(e: Env, auditor_id: u32, approver: Option<Address>, operator: Address);
-    fn bump_approval_epoch(e: Env, operator: Address);
     fn rwa_config(e: Env) -> Option<RwaConfig>;
-    fn approval_epoch(e: Env) -> u32;
 
     // Forced transfer, opt-in via ConfidentialForcedTransfer
     fn forced_transfer(e: Env, from: Address, to: Address, amount: i128,
@@ -392,8 +390,7 @@ impl Token {
 | `ComplianceConfigChanged` | `policy`, `sac_passthrough` |
 | `Clawback` | `account` (topic), `amount`, `destination` |
 | `RevokeSpender` | as [Event Schema](protocol/interface.md#event-schema), when emitted by `force_revoke_spender` |
-| `RwaConfigChanged` | `auditor_id`, `approver`, `epoch` |
-| `ApprovalEpochBumped` | `epoch`; also emitted after `ComplianceConfigChanged` while an `RwaConfig` exists |
+| `RwaConfigChanged` | `auditor_id`, `approver` |
 | `ForcedTransfer` | `from` (topic), `to` (topic), `amount`, `nonce` |
 
 ### Errors
@@ -418,8 +415,7 @@ The RWA profile adds:
 | `InvalidForcedTransferAmount` | 3612 | `amount <= 0` |
 | `InvalidForcedTransferDestination` | 3613 | `to` is `from` or the contract's own address, or its `dest_f` is zero |
 | `EligibilityRequired` | 3614 | the compliance configuration of an RWA deployment has neither a policy nor SAC passthrough |
-| `ApprovalEpochOverflow` | 3615 | the approval epoch is `u32::MAX` |
-| `NonceOverflow` | 3616 | the clawback nonce is `u32::MAX` in `forced_transfer` |
+| `NonceOverflow` | 3615 | the clawback nonce is `u32::MAX` in `forced_transfer` |
 
 ---
 

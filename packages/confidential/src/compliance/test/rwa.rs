@@ -12,16 +12,16 @@ use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 use crate::{
     compliance::{
         storage::{
-            approval_epoch, bump_approval_epoch, clawback, compliance_config,
-            deposit_approval_args, force_revoke_spender, forced_transfer, freeze, rwa_config,
-            set_compliance_config, set_rwa_config, spender_transfer_approval_args,
-            transfer_approval_args, unfreeze, withdraw_approval_args,
+            clawback, compliance_config, deposit_approval_args, force_revoke_spender,
+            forced_transfer, freeze, rwa_config, set_compliance_config, set_rwa_config,
+            spender_transfer_approval_args, transfer_approval_args, unfreeze,
+            withdraw_approval_args,
         },
-        ApprovalEpochBumped, ClawbackData, ComplianceConfig, ComplianceConfigChanged,
-        ComplianceError, ComplianceStorageKey, ConfidentialClawback, ConfidentialClawbackClient,
-        ConfidentialCompliance, ConfidentialComplianceClient, ConfidentialForcedTransfer,
-        ConfidentialForcedTransferClient, ConfidentialRwa, ConfidentialRwaClient, ForcedTransfer,
-        Policy, RwaConfig, RwaConfigChanged, RwaHooks,
+        ClawbackData, ComplianceConfig, ComplianceError, ComplianceStorageKey,
+        ConfidentialClawback, ConfidentialClawbackClient, ConfidentialCompliance,
+        ConfidentialComplianceClient, ConfidentialForcedTransfer, ConfidentialForcedTransferClient,
+        ConfidentialRwa, ConfidentialRwaClient, ForcedTransfer, Policy, RwaConfig,
+        RwaConfigChanged, RwaHooks,
     },
     storage::{
         address_to_field, decode_data, forced_destination_to_field, get_account,
@@ -99,11 +99,6 @@ impl ConfidentialRwa for RwaHost {
     fn set_rwa_config(e: &Env, auditor_id: u32, approver: Option<Address>, admin: Address) {
         admin.require_auth();
         set_rwa_config(e, auditor_id, &approver);
-    }
-
-    fn bump_approval_epoch(e: &Env, admin: Address) {
-        admin.require_auth();
-        bump_approval_epoch(e);
     }
 }
 
@@ -542,14 +537,13 @@ fn set_rwa_config_rejects_token_as_approver() {
 }
 
 #[test]
-fn set_rwa_config_stores_emits_and_advances_epoch() {
+fn set_rwa_config_stores_and_emits() {
     let h = setup();
     let approver = Address::generate(&h.e);
     let client = ConfidentialRwaClient::new(&h.e, &h.host);
     ConfidentialComplianceClient::new(&h.e, &h.host)
         .set_compliance_config(&policy_config(&h), &h.admin);
     assert_eq!(client.rwa_config(), None);
-    assert_eq!(client.approval_epoch(), 0);
 
     client.set_rwa_config(&AUDITOR, &Some(approver.clone()), &h.admin);
 
@@ -557,84 +551,25 @@ fn set_rwa_config_stores_emits_and_advances_epoch() {
     assert_eq!(events.events().len(), 1);
     assert_eq!(
         events.events().first().unwrap(),
-        &RwaConfigChanged { auditor_id: AUDITOR, approver: Some(approver.clone()), epoch: 1 }
+        &RwaConfigChanged { auditor_id: AUDITOR, approver: Some(approver.clone()) }
             .to_xdr(&h.e, &h.host),
     );
     assert_eq!(
         client.rwa_config(),
         Some(RwaConfig { auditor_id: AUDITOR, approver: Some(approver) })
     );
-    assert_eq!(client.approval_epoch(), 1);
 }
 
 #[test]
-fn approver_can_be_changed_and_disabled_and_epoch_never_repeats() {
+fn approver_can_be_changed_and_disabled() {
     let h = configured(None);
     let client = ConfidentialRwaClient::new(&h.e, &h.host);
     let a = Address::generate(&h.e);
-    assert_eq!(client.approval_epoch(), 1);
 
     client.set_rwa_config(&AUDITOR, &Some(a.clone()), &h.admin);
-    assert_eq!(client.approval_epoch(), 2);
+    assert_eq!(client.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR, approver: Some(a) }));
     client.set_rwa_config(&AUDITOR, &None, &h.admin);
-    assert_eq!(client.approval_epoch(), 3);
-    // Re-enabling the same approver does not return to the epoch it was
-    // enabled under before.
-    client.set_rwa_config(&AUDITOR, &Some(a), &h.admin);
-    assert_eq!(client.approval_epoch(), 4);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3607)")]
-fn bump_approval_epoch_requires_rwa_config() {
-    let h = setup();
-    h.e.as_contract(&h.host, || bump_approval_epoch(&h.e));
-}
-
-#[test]
-fn bump_approval_epoch_increments_and_emits() {
-    let h = configured(None);
-    let client = ConfidentialRwaClient::new(&h.e, &h.host);
-    client.bump_approval_epoch(&h.admin);
-
-    let events = h.e.events().all();
-    assert_eq!(events.events().len(), 1);
-    assert_eq!(
-        events.events().first().unwrap(),
-        &ApprovalEpochBumped { epoch: 2 }.to_xdr(&h.e, &h.host),
-    );
-    assert_eq!(client.approval_epoch(), 2);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3615)")]
-fn approval_epoch_overflow_panics() {
-    let h = configured(None);
-    h.e.as_contract(&h.host, || {
-        h.e.storage().instance().set(&ComplianceStorageKey::ApprovalEpoch, &u32::MAX);
-        bump_approval_epoch(&h.e);
-    });
-}
-
-#[test]
-fn set_compliance_config_advances_epoch_under_rwa() {
-    let h = configured(None);
-    let client = ConfidentialComplianceClient::new(&h.e, &h.host);
-    let config = ComplianceConfig { policy: Some(h.policy.clone()), sac_passthrough: true };
-    client.set_compliance_config(&config, &h.admin);
-
-    let events = h.e.events().all();
-    assert_eq!(events.events().len(), 2);
-    assert_eq!(
-        events.events().first().unwrap(),
-        &ComplianceConfigChanged { policy: Some(h.policy.clone()), sac_passthrough: true }
-            .to_xdr(&h.e, &h.host),
-    );
-    assert_eq!(
-        events.events().get(1).unwrap(),
-        &ApprovalEpochBumped { epoch: 2 }.to_xdr(&h.e, &h.host),
-    );
-    h.e.as_contract(&h.host, || assert_eq!(approval_epoch(&h.e), 2));
+    assert_eq!(client.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR, approver: None }));
 }
 
 #[test]
@@ -647,7 +582,6 @@ fn set_compliance_config_is_unchanged_without_rwa_config() {
     assert_eq!(h.e.events().all().events().len(), 1);
     h.e.as_contract(&h.host, || {
         assert_eq!(compliance_config(&h.e), Some(open.clone()));
-        assert_eq!(approval_epoch(&h.e), 0);
     });
 }
 
@@ -1059,31 +993,15 @@ fn deposit_approval_for_other_recipient_fails() {
 
 #[test]
 #[should_panic(expected = "Error(Auth, InvalidAction)")]
-fn approval_does_not_survive_epoch_bump() {
+fn approval_does_not_survive_approver_replacement() {
     let f = approval_flow();
     let stale = current_deposit_args(&f, 100);
-    ConfidentialRwaClient::new(&f.h.e, &f.h.host).bump_approval_epoch(&f.h.admin);
-    deposit_with(&f, 100, Some(stale));
-}
-
-#[test]
-#[should_panic(expected = "Error(Auth, InvalidAction)")]
-fn approval_does_not_survive_disable_and_reenable() {
-    let f = approval_flow();
-    let stale = current_deposit_args(&f, 100);
-    let client = ConfidentialRwaClient::new(&f.h.e, &f.h.host);
-    client.set_rwa_config(&AUDITOR, &None, &f.h.admin);
-    client.set_rwa_config(&AUDITOR, &Some(f.approver.clone()), &f.h.admin);
-    deposit_with(&f, 100, Some(stale));
-}
-
-#[test]
-#[should_panic(expected = "Error(Auth, InvalidAction)")]
-fn approval_does_not_survive_policy_change() {
-    let f = approval_flow();
-    let stale = current_deposit_args(&f, 100);
-    let config = ComplianceConfig { policy: Some(f.h.policy.clone()), sac_passthrough: true };
-    ConfidentialComplianceClient::new(&f.h.e, &f.h.host).set_compliance_config(&config, &f.h.admin);
+    let replacement = Some(Address::generate(&f.h.e));
+    ConfidentialRwaClient::new(&f.h.e, &f.h.host).set_rwa_config(
+        &AUDITOR,
+        &replacement,
+        &f.h.admin,
+    );
     deposit_with(&f, 100, Some(stale));
 }
 
@@ -1092,7 +1010,7 @@ fn approval_does_not_survive_policy_change() {
 fn withdraw_approval_under_another_function_name_fails() {
     // The exact `withdraw` tuple, authorized for `deposit`: only the
     // function name differs from the passing case
-    // (`withdraw_approval_tuple_is_epoch_from_to_amount_payload`).
+    // (`withdraw_approval_tuple_is_from_to_amount_payload`).
     let f = approval_flow();
     let e = &f.h.e;
     let data = withdraw_data(e);
@@ -1102,14 +1020,8 @@ fn withdraw_approval_under_another_function_name_fails() {
         (f.alice.clone(), f.alice.clone(), 100i128, data.clone()).into_val(e),
         &[],
     );
-    let args: Vec<Val> = (
-        ConfidentialRwaClient::new(e, &f.h.host).approval_epoch(),
-        f.alice.clone(),
-        f.alice.clone(),
-        100i128,
-        withdraw_payload(e),
-    )
-        .into_val(e);
+    let args: Vec<Val> =
+        (f.alice.clone(), f.alice.clone(), 100i128, withdraw_payload(e)).into_val(e);
     let approval = invoke(&f.h.host, "deposit", args, &[]);
     ConfidentialTokenClient::new(e, &f.h.host)
         .mock_auths(&[
@@ -1222,7 +1134,7 @@ fn spender_transfer_approval_under_another_function_name_fails() {
     // The exact `confidential_transfer_from` tuple, authorized for
     // `confidential_transfer`: only the function name differs from the
     // passing case
-    // (`spender_transfer_approval_tuple_is_epoch_spender_from_to_payload`).
+    // (`spender_transfer_approval_tuple_is_spender_from_to_payload`).
     let f = approval_flow();
     let e = &f.h.e;
     let spender = account(&f.h, AUDITOR);
@@ -1234,14 +1146,8 @@ fn spender_transfer_approval_under_another_function_name_fails() {
         (spender.clone(), f.alice.clone(), f.bob.clone(), data.clone()).into_val(e),
         &[],
     );
-    let args: Vec<Val> = (
-        ConfidentialRwaClient::new(e, &f.h.host).approval_epoch(),
-        spender.clone(),
-        f.alice.clone(),
-        f.bob.clone(),
-        spender_transfer_payload(e),
-    )
-        .into_val(e);
+    let args: Vec<Val> =
+        (spender.clone(), f.alice.clone(), f.bob.clone(), spender_transfer_payload(e)).into_val(e);
     let approval = invoke(&f.h.host, "confidential_transfer", args, &[]);
     ConfidentialTokenClient::new(e, &f.h.host)
         .mock_auths(&[
@@ -1278,11 +1184,6 @@ fn spender_transfer_with_exact_approval_succeeds() {
     e.as_contract(&f.h.host, || {
         assert_eq!(get_account(e, &f.bob).receiving_commitment, point(e));
     });
-}
-
-/// The current approval epoch, read through the public getter.
-fn epoch(f: &Flow) -> u32 {
-    ConfidentialRwaClient::new(&f.h.e, &f.h.host).approval_epoch()
 }
 
 /// Runs `withdraw(alice, alice, 100, data)` with the sender's authorization
@@ -1337,38 +1238,36 @@ fn delegated_flow<'a>() -> (Flow<'a>, Address) {
 // of each tuple is pinned independently of the library's own helpers.
 
 #[test]
-fn deposit_approval_tuple_is_epoch_from_to_amount() {
+fn deposit_approval_tuple_is_from_to_amount() {
     let f = approval_flow();
     let e = &f.h.e;
-    let args: Vec<Val> = (epoch(&f), f.alice.clone(), f.bob.clone(), 100i128).into_val(e);
+    let args: Vec<Val> = (f.alice.clone(), f.bob.clone(), 100i128).into_val(e);
     deposit_with(&f, 100, Some(args));
 }
 
 #[test]
-fn withdraw_approval_tuple_is_epoch_from_to_amount_payload() {
+fn withdraw_approval_tuple_is_from_to_amount_payload() {
     let f = approval_flow();
     let e = &f.h.e;
     let args: Vec<Val> =
-        (epoch(&f), f.alice.clone(), f.alice.clone(), 100i128, withdraw_payload(e)).into_val(e);
+        (f.alice.clone(), f.alice.clone(), 100i128, withdraw_payload(e)).into_val(e);
     withdraw_with(&f, args);
 }
 
 #[test]
-fn transfer_approval_tuple_is_epoch_from_to_payload() {
+fn transfer_approval_tuple_is_from_to_payload() {
     let f = approval_flow();
     let e = &f.h.e;
-    let args: Vec<Val> =
-        (epoch(&f), f.alice.clone(), f.bob.clone(), transfer_payload(e)).into_val(e);
+    let args: Vec<Val> = (f.alice.clone(), f.bob.clone(), transfer_payload(e)).into_val(e);
     transfer_with(&f, Some(args));
 }
 
 #[test]
-fn spender_transfer_approval_tuple_is_epoch_spender_from_to_payload() {
+fn spender_transfer_approval_tuple_is_spender_from_to_payload() {
     let (f, spender) = delegated_flow();
     let e = &f.h.e;
     let args: Vec<Val> =
-        (epoch(&f), spender.clone(), f.alice.clone(), f.bob.clone(), spender_transfer_payload(e))
-            .into_val(e);
+        (spender.clone(), f.alice.clone(), f.bob.clone(), spender_transfer_payload(e)).into_val(e);
     spender_transfer_with(&f, &spender, args);
 }
 
@@ -1378,7 +1277,7 @@ fn withdraw_approval_for_other_amount_fails() {
     let f = approval_flow();
     let e = &f.h.e;
     let args: Vec<Val> =
-        (epoch(&f), f.alice.clone(), f.alice.clone(), 99i128, withdraw_payload(e)).into_val(e);
+        (f.alice.clone(), f.alice.clone(), 99i128, withdraw_payload(e)).into_val(e);
     withdraw_with(&f, args);
 }
 
@@ -1387,8 +1286,7 @@ fn withdraw_approval_for_other_amount_fails() {
 fn withdraw_approval_for_other_recipient_fails() {
     let f = approval_flow();
     let e = &f.h.e;
-    let args: Vec<Val> =
-        (epoch(&f), f.alice.clone(), f.bob.clone(), 100i128, withdraw_payload(e)).into_val(e);
+    let args: Vec<Val> = (f.alice.clone(), f.bob.clone(), 100i128, withdraw_payload(e)).into_val(e);
     withdraw_with(&f, args);
 }
 
@@ -1399,7 +1297,7 @@ fn withdraw_approval_for_other_payload_fails() {
     let e = &f.h.e;
     let mut other = withdraw_payload(e);
     other.c_spend_new = g_times(e, 2);
-    let args: Vec<Val> = (epoch(&f), f.alice.clone(), f.alice.clone(), 100i128, other).into_val(e);
+    let args: Vec<Val> = (f.alice.clone(), f.alice.clone(), 100i128, other).into_val(e);
     withdraw_with(&f, args);
 }
 
@@ -1408,17 +1306,7 @@ fn withdraw_approval_for_other_payload_fails() {
 fn withdraw_approval_without_payload_fails() {
     let f = approval_flow();
     let e = &f.h.e;
-    let args: Vec<Val> = (epoch(&f), f.alice.clone(), f.alice.clone(), 100i128).into_val(e);
-    withdraw_with(&f, args);
-}
-
-#[test]
-#[should_panic(expected = "Error(Auth, InvalidAction)")]
-fn withdraw_approval_for_stale_epoch_fails() {
-    let f = approval_flow();
-    let e = &f.h.e;
-    let args: Vec<Val> =
-        (epoch(&f) - 1, f.alice.clone(), f.alice.clone(), 100i128, withdraw_payload(e)).into_val(e);
+    let args: Vec<Val> = (f.alice.clone(), f.alice.clone(), 100i128).into_val(e);
     withdraw_with(&f, args);
 }
 
@@ -1429,7 +1317,7 @@ fn spender_transfer_approval_for_other_spender_fails() {
     let e = &f.h.e;
     let other = account(&f.h, AUDITOR);
     let args: Vec<Val> =
-        (epoch(&f), other, f.alice.clone(), f.bob.clone(), spender_transfer_payload(e)).into_val(e);
+        (other, f.alice.clone(), f.bob.clone(), spender_transfer_payload(e)).into_val(e);
     spender_transfer_with(&f, &spender, args);
 }
 
@@ -1440,7 +1328,7 @@ fn spender_transfer_approval_for_other_owner_fails() {
     let e = &f.h.e;
     let other = account(&f.h, AUDITOR);
     let args: Vec<Val> =
-        (epoch(&f), spender.clone(), other, f.bob.clone(), spender_transfer_payload(e)).into_val(e);
+        (spender.clone(), other, f.bob.clone(), spender_transfer_payload(e)).into_val(e);
     spender_transfer_with(&f, &spender, args);
 }
 
@@ -1451,8 +1339,7 @@ fn spender_transfer_approval_for_other_recipient_fails() {
     let e = &f.h.e;
     let other = account(&f.h, AUDITOR);
     let args: Vec<Val> =
-        (epoch(&f), spender.clone(), f.alice.clone(), other, spender_transfer_payload(e))
-            .into_val(e);
+        (spender.clone(), f.alice.clone(), other, spender_transfer_payload(e)).into_val(e);
     spender_transfer_with(&f, &spender, args);
 }
 
@@ -1463,24 +1350,7 @@ fn spender_transfer_approval_for_other_payload_fails() {
     let e = &f.h.e;
     let mut other = spender_transfer_payload(e);
     other.c_transfer = g_times(e, 2);
-    let args: Vec<Val> =
-        (epoch(&f), spender.clone(), f.alice.clone(), f.bob.clone(), other).into_val(e);
-    spender_transfer_with(&f, &spender, args);
-}
-
-#[test]
-#[should_panic(expected = "Error(Auth, InvalidAction)")]
-fn spender_transfer_approval_for_stale_epoch_fails() {
-    let (f, spender) = delegated_flow();
-    let e = &f.h.e;
-    let args: Vec<Val> = (
-        epoch(&f) - 1,
-        spender.clone(),
-        f.alice.clone(),
-        f.bob.clone(),
-        spender_transfer_payload(e),
-    )
-        .into_val(e);
+    let args: Vec<Val> = (spender.clone(), f.alice.clone(), f.bob.clone(), other).into_val(e);
     spender_transfer_with(&f, &spender, args);
 }
 
@@ -1490,7 +1360,7 @@ fn transfer_approval_for_other_sender_fails() {
     let f = approval_flow();
     let e = &f.h.e;
     let other = account(&f.h, AUDITOR);
-    let args: Vec<Val> = (epoch(&f), other, f.bob.clone(), transfer_payload(e)).into_val(e);
+    let args: Vec<Val> = (other, f.bob.clone(), transfer_payload(e)).into_val(e);
     transfer_with(&f, Some(args));
 }
 
@@ -1500,7 +1370,7 @@ fn transfer_approval_for_other_recipient_fails() {
     let f = approval_flow();
     let e = &f.h.e;
     let other = account(&f.h, AUDITOR);
-    let args: Vec<Val> = (epoch(&f), f.alice.clone(), other, transfer_payload(e)).into_val(e);
+    let args: Vec<Val> = (f.alice.clone(), other, transfer_payload(e)).into_val(e);
     transfer_with(&f, Some(args));
 }
 
@@ -1510,7 +1380,7 @@ fn deposit_approval_for_other_depositor_fails() {
     let f = approval_flow();
     let e = &f.h.e;
     let other = Address::generate(e);
-    let args: Vec<Val> = (epoch(&f), other, f.bob.clone(), 100i128).into_val(e);
+    let args: Vec<Val> = (other, f.bob.clone(), 100i128).into_val(e);
     deposit_with(&f, 100, Some(args));
 }
 
@@ -1675,7 +1545,7 @@ fn approver_may_take_part_in_operations_outside_the_gate() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3616)")]
+#[should_panic(expected = "Error(Contract, #3615)")]
 fn forced_transfer_nonce_overflow_panics() {
     let f = forced_flow(None);
     let e = &f.h.e;
@@ -2216,8 +2086,7 @@ fn withdraw_to_another_address_binds_from_then_to() {
     let f = approval_flow();
     let e = &f.h.e;
     let carol = Address::generate(e);
-    let args: Vec<Val> =
-        (epoch(&f), f.alice.clone(), carol.clone(), 100i128, withdraw_payload(e)).into_val(e);
+    let args: Vec<Val> = (f.alice.clone(), carol.clone(), 100i128, withdraw_payload(e)).into_val(e);
     withdraw_to_with(&f, &carol, args);
     assert_eq!(StellarAssetClient::new(e, &f.h.sac_addr).balance(&carol), 100);
 }
@@ -2228,8 +2097,7 @@ fn withdraw_approval_with_from_and_to_swapped_fails() {
     let f = approval_flow();
     let e = &f.h.e;
     let carol = Address::generate(e);
-    let args: Vec<Val> =
-        (epoch(&f), carol.clone(), f.alice.clone(), 100i128, withdraw_payload(e)).into_val(e);
+    let args: Vec<Val> = (carol.clone(), f.alice.clone(), 100i128, withdraw_payload(e)).into_val(e);
     withdraw_to_with(&f, &carol, args);
 }
 
@@ -2238,7 +2106,7 @@ fn withdraw_approval_with_from_and_to_swapped_fails() {
 fn deposit_approval_with_from_and_to_swapped_fails() {
     let f = approval_flow();
     let e = &f.h.e;
-    let args: Vec<Val> = (epoch(&f), f.bob.clone(), f.alice.clone(), 100i128).into_val(e);
+    let args: Vec<Val> = (f.bob.clone(), f.alice.clone(), 100i128).into_val(e);
     deposit_with(&f, 100, Some(args));
 }
 
@@ -2247,8 +2115,7 @@ fn deposit_approval_with_from_and_to_swapped_fails() {
 fn transfer_approval_with_from_and_to_swapped_fails() {
     let f = approval_flow();
     let e = &f.h.e;
-    let args: Vec<Val> =
-        (epoch(&f), f.bob.clone(), f.alice.clone(), transfer_payload(e)).into_val(e);
+    let args: Vec<Val> = (f.bob.clone(), f.alice.clone(), transfer_payload(e)).into_val(e);
     transfer_with(&f, Some(args));
 }
 
@@ -2258,8 +2125,7 @@ fn spender_transfer_approval_with_spender_and_owner_swapped_fails() {
     let (f, spender) = delegated_flow();
     let e = &f.h.e;
     let args: Vec<Val> =
-        (epoch(&f), f.alice.clone(), spender.clone(), f.bob.clone(), spender_transfer_payload(e))
-            .into_val(e);
+        (f.alice.clone(), spender.clone(), f.bob.clone(), spender_transfer_payload(e)).into_val(e);
     spender_transfer_with(&f, &spender, args);
 }
 
@@ -2974,11 +2840,10 @@ fn set_rwa_config_checks_the_auditor_before_the_approver() {
         Error::from_contract_error(ComplianceError::InvalidApprover as u32)
     );
     assert_eq!(client.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR, approver: None }));
-    assert_eq!(client.approval_epoch(), 1);
 }
 
 // Pins branch: set_rwa_config / later call, approver None / exactly one
-//   RwaConfigChanged without an approver, carrying the new epoch
+//   RwaConfigChanged without an approver
 // Verifies: INV-22
 #[test]
 fn disabling_the_approver_emits_rwa_config_changed_without_approver() {
@@ -2992,66 +2857,9 @@ fn disabling_the_approver_emits_rwa_config_changed_without_approver() {
     assert_eq!(events.events().len(), 1);
     assert_eq!(
         events.events().first().unwrap(),
-        &RwaConfigChanged { auditor_id: AUDITOR, approver: None, epoch: 2 }.to_xdr(&h.e, &h.host),
+        &RwaConfigChanged { auditor_id: AUDITOR, approver: None }.to_xdr(&h.e, &h.host),
     );
     assert_eq!(client.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR, approver: None }));
-}
-
-// Pins branch: set_compliance_config, set_rwa_config / rejected with
-//   ApprovalEpochOverflow #3615 / the stored configurations and the epoch
-//   are unchanged
-// Verifies: INV-7, INV-8, INV-9
-#[test]
-fn rejected_setters_leave_configuration_and_epoch_unchanged() {
-    let h = configured(None);
-    let rwa = ConfidentialRwaClient::new(&h.e, &h.host);
-    let compliance = ConfidentialComplianceClient::new(&h.e, &h.host);
-
-    // At the last epoch every setter is rejected and nothing is written.
-    h.e.as_contract(&h.host, || {
-        h.e.storage().instance().set(&ComplianceStorageKey::ApprovalEpoch, &u32::MAX);
-    });
-    let overflow = Error::from_contract_error(ComplianceError::ApprovalEpochOverflow as u32);
-    let rotated = ComplianceConfig { policy: Some(h.policy.clone()), sac_passthrough: true };
-    assert_eq!(
-        compliance.try_set_compliance_config(&rotated, &h.admin).unwrap_err().unwrap(),
-        overflow
-    );
-    assert_eq!(compliance.compliance_config(), Some(policy_config(&h)));
-    let approver = Address::generate(&h.e);
-    assert_eq!(
-        rwa.try_set_rwa_config(&AUDITOR, &Some(approver), &h.admin).unwrap_err().unwrap(),
-        overflow
-    );
-    assert_eq!(rwa.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR, approver: None }));
-    assert_eq!(rwa.approval_epoch(), u32::MAX);
-}
-
-// Pins branch: advance_approval_epoch / epoch == u32::MAX - 1 / the bump
-//   succeeds and the epoch reads u32::MAX
-// Verifies: INV-7
-#[test]
-fn approval_epoch_reaches_u32_max() {
-    let h = configured(None);
-    h.e.as_contract(&h.host, || {
-        h.e.storage().instance().set(&ComplianceStorageKey::ApprovalEpoch, &(u32::MAX - 1));
-    });
-    let client = ConfidentialRwaClient::new(&h.e, &h.host);
-    client.bump_approval_epoch(&h.admin);
-    assert_eq!(client.approval_epoch(), u32::MAX);
-}
-
-// Pins branch: set_compliance_config / RwaConfig set, SAC passthrough as
-//   the only gate / stored; epoch advances
-// Verifies: INV-8, INV-9
-#[test]
-fn set_compliance_config_under_rwa_accepts_sac_passthrough_alone() {
-    let h = configured(None);
-    let client = ConfidentialComplianceClient::new(&h.e, &h.host);
-    let sac_only = ComplianceConfig { policy: None, sac_passthrough: true };
-    client.set_compliance_config(&sac_only, &h.admin);
-    assert_eq!(client.compliance_config(), Some(sac_only));
-    assert_eq!(ConfidentialRwaClient::new(&h.e, &h.host).approval_epoch(), 2);
 }
 
 #[test]

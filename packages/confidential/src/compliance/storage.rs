@@ -6,10 +6,10 @@ use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 use crate::{
     auditor::ConfidentialAuditorClient,
     compliance::{
-        emit_approval_epoch_bumped, emit_clawback, emit_compliance_config_changed,
-        emit_forced_transfer, emit_frozen, emit_rwa_config_changed, emit_unfrozen, ComplianceError,
-        PolicyClient, CLAWBACK_NONCE_EXTEND_AMOUNT, CLAWBACK_NONCE_TTL_THRESHOLD,
-        FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
+        emit_clawback, emit_compliance_config_changed, emit_forced_transfer, emit_frozen,
+        emit_rwa_config_changed, emit_unfrozen, ComplianceError, PolicyClient,
+        CLAWBACK_NONCE_EXTEND_AMOUNT, CLAWBACK_NONCE_TTL_THRESHOLD, FROZEN_EXTEND_AMOUNT,
+        FROZEN_TTL_THRESHOLD,
     },
     storage::{
         add_to_receiving, address_to_field, append_amount, append_field, append_point,
@@ -76,9 +76,6 @@ pub enum ComplianceStorageKey {
     ClawbackNonce(Address),
     /// Singleton [`RwaConfig`]. Instance storage.
     RwaConfig,
-    /// Approval epoch, a `u32` that only increases. Instance storage; absent
-    /// until the first bump and read as `0`.
-    ApprovalEpoch,
 }
 
 // ################## QUERY STATE ##################
@@ -147,17 +144,6 @@ pub fn rwa_config(e: &Env) -> Option<RwaConfig> {
     e.storage().instance().get(&ComplianceStorageKey::RwaConfig)
 }
 
-/// Returns the current approval epoch. Every approver authorization binds
-/// the epoch it was issued for, so an authorization issued for an earlier
-/// epoch no longer matches (`docs/compliance.md#approval-gate`).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-pub fn approval_epoch(e: &Env) -> u32 {
-    e.storage().instance().get(&ComplianceStorageKey::ApprovalEpoch).unwrap_or(0)
-}
-
 // ################## CHANGE STATE ##################
 
 /// Writes `config` into instance storage, overwriting any prior value. The
@@ -170,27 +156,11 @@ pub fn approval_epoch(e: &Env) -> u32 {
 /// * `e` - Access to the Soroban environment.
 /// * `config` - The new [`ComplianceConfig`].
 ///
-/// # Errors
-///
-/// * [`ComplianceError::ApprovalEpochOverflow`] - When an [`RwaConfig`] exists
-///   and the approval epoch cannot advance.
-///
 /// # Events
 ///
 /// * topics - `["compliance_config_changed"]`
 /// * data - `[policy: Option<Address>, sac_passthrough: bool]` (`policy` is
 ///   left out of the data when it is `None`)
-///
-/// When an [`RwaConfig`] exists, additionally:
-///
-/// * topics - `["approval_epoch_bumped"]`
-/// * data - `[epoch: u32]`
-///
-/// # Notes
-///
-/// Without an [`RwaConfig`] the behaviour is unchanged. With one, every
-/// change advances the approval epoch, which voids outstanding approver
-/// authorizations (`docs/compliance.md#approval-gate`).
 ///
 /// # Security Warning
 ///
@@ -202,15 +172,8 @@ pub fn approval_epoch(e: &Env) -> u32 {
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
 pub fn set_compliance_config(e: &Env, config: &ComplianceConfig) {
-    let is_rwa = rwa_config(e).is_some();
     e.storage().instance().set(&ComplianceStorageKey::Config, config);
     emit_compliance_config_changed(e, &config.policy, config.sac_passthrough);
-    if is_rwa {
-        // An approval issued under the previous configuration must not
-        // execute under this one.
-        let epoch = advance_approval_epoch(e);
-        emit_approval_epoch_bumped(e, epoch);
-    }
 }
 
 /// Marks `account` as frozen.
@@ -436,7 +399,7 @@ pub fn force_revoke_spender(e: &Env, account: &Address, spender: &Address) {
     revoke_spender(e, account, spender);
 }
 
-/// Writes the RWA profile configuration and advances the approval epoch.
+/// Writes the RWA profile configuration.
 ///
 /// The first call fixes the designated auditor; later calls may only change
 /// the approver.
@@ -458,16 +421,14 @@ pub fn force_revoke_spender(e: &Env, account: &Address, spender: &Address) {
 ///   `auditor_id` differs from the stored one.
 /// * [`ComplianceError::InvalidApprover`] - When `approver` is this contract's
 ///   own address.
-/// * [`ComplianceError::ApprovalEpochOverflow`] - When the approval epoch
-///   cannot advance.
 /// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors (first
 ///   call only).
 ///
 /// # Events
 ///
 /// * topics - `["rwa_config_changed"]`
-/// * data - `[auditor_id: u32, approver: Option<Address>, epoch: u32]`
-///   (`approver` is left out of the data when it is `None`)
+/// * data - `[auditor_id: u32, approver: Option<Address>]` (`approver` is left
+///   out of the data when it is `None`)
 ///
 /// # Security Warning
 ///
@@ -502,39 +463,7 @@ pub fn set_rwa_config(e: &Env, auditor_id: u32, approver: &Option<Address>) {
 
     let rwa = RwaConfig { auditor_id, approver: approver.clone() };
     e.storage().instance().set(&ComplianceStorageKey::RwaConfig, &rwa);
-    let epoch = advance_approval_epoch(e);
-    emit_rwa_config_changed(e, auditor_id, approver, epoch);
-}
-
-/// Advances the approval epoch, voiding every outstanding approver
-/// authorization.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-///
-/// # Errors
-///
-/// * [`ComplianceError::RwaNotConfigured`] - When [`rwa_config`] returns
-///   `None`.
-/// * [`ComplianceError::ApprovalEpochOverflow`] - When the epoch is `u32::MAX`.
-///
-/// # Events
-///
-/// * topics - `["approval_epoch_bumped"]`
-/// * data - `[epoch: u32]`
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks and should
-/// only be used in admin functions that implement their own authorization
-/// logic.
-pub fn bump_approval_epoch(e: &Env) {
-    if rwa_config(e).is_none() {
-        panic_with_error!(e, ComplianceError::RwaNotConfigured);
-    }
-    let epoch = advance_approval_epoch(e);
-    emit_approval_epoch_bumped(e, epoch);
+    emit_rwa_config_changed(e, auditor_id, approver);
 }
 
 /// Moves the public `amount` from the frozen account `from` to the
@@ -682,8 +611,8 @@ pub fn rwa_context(e: &Env) -> (ComplianceConfig, RwaConfig) {
 /// `args`. A no-op when `rwa.approver` is `None`.
 ///
 /// The host binds the authorization to this contract and to the entry point
-/// being executed; `args` bind the approval epoch, the parties and the
-/// operation's payload (`docs/compliance.md#approval-gate`).
+/// being executed; `args` bind the parties and the operation's payload
+/// (`docs/compliance.md#approval-gate`).
 ///
 /// # Arguments
 ///
@@ -707,7 +636,7 @@ pub fn require_approval(e: &Env, rwa: &RwaConfig, parties: &[&Address], args: Ve
     }
 }
 
-/// Approval arguments of a `deposit`: `(epoch, from, to, amount)`.
+/// Approval arguments of a `deposit`: `(from, to, amount)`.
 ///
 /// The tuple is a wire contract with the approver, which signs exactly
 /// these values (`docs/compliance.md#approval-gate`).
@@ -719,10 +648,10 @@ pub fn require_approval(e: &Env, rwa: &RwaConfig, parties: &[&Address], args: Ve
 /// * `to` - The credited confidential account.
 /// * `amount` - The public amount.
 pub fn deposit_approval_args(e: &Env, from: &Address, to: &Address, amount: i128) -> Vec<Val> {
-    (approval_epoch(e), from.clone(), to.clone(), amount).into_val(e)
+    (from.clone(), to.clone(), amount).into_val(e)
 }
 
-/// Approval arguments of a `withdraw`: `(epoch, from, to, amount, payload)`.
+/// Approval arguments of a `withdraw`: `(from, to, amount, payload)`.
 /// See [`deposit_approval_args`].
 ///
 /// # Arguments
@@ -739,11 +668,11 @@ pub fn withdraw_approval_args(
     amount: i128,
     payload: &WithdrawPayload,
 ) -> Vec<Val> {
-    (approval_epoch(e), from.clone(), to.clone(), amount, payload.clone()).into_val(e)
+    (from.clone(), to.clone(), amount, payload.clone()).into_val(e)
 }
 
 /// Approval arguments of a `confidential_transfer`:
-/// `(epoch, from, to, payload)`. See [`deposit_approval_args`].
+/// `(from, to, payload)`. See [`deposit_approval_args`].
 ///
 /// # Arguments
 ///
@@ -757,11 +686,11 @@ pub fn transfer_approval_args(
     to: &Address,
     payload: &TransferPayload,
 ) -> Vec<Val> {
-    (approval_epoch(e), from.clone(), to.clone(), payload.clone()).into_val(e)
+    (from.clone(), to.clone(), payload.clone()).into_val(e)
 }
 
 /// Approval arguments of a `confidential_transfer_from`:
-/// `(epoch, spender, from, to, payload)`. See [`deposit_approval_args`].
+/// `(spender, from, to, payload)`. See [`deposit_approval_args`].
 ///
 /// # Arguments
 ///
@@ -777,26 +706,13 @@ pub fn spender_transfer_approval_args(
     to: &Address,
     payload: &SpenderTransferPayload,
 ) -> Vec<Val> {
-    (approval_epoch(e), spender.clone(), from.clone(), to.clone(), payload.clone()).into_val(e)
+    (spender.clone(), from.clone(), to.clone(), payload.clone()).into_val(e)
 }
 
 /// Returns whether `config` keeps an eligibility gate: an external policy or
 /// the SAC `authorized()` passthrough.
 fn has_eligibility_gate(config: &ComplianceConfig) -> bool {
     config.policy.is_some() || config.sac_passthrough
-}
-
-/// Increments the approval epoch and returns the new value.
-///
-/// # Errors
-///
-/// * [`ComplianceError::ApprovalEpochOverflow`] - When the epoch is `u32::MAX`.
-fn advance_approval_epoch(e: &Env) -> u32 {
-    let Some(epoch) = approval_epoch(e).checked_add(1) else {
-        panic_with_error!(e, ComplianceError::ApprovalEpochOverflow);
-    };
-    e.storage().instance().set(&ComplianceStorageKey::ApprovalEpoch, &epoch);
-    epoch
 }
 
 /// Assembles the public inputs of the clawback circuit

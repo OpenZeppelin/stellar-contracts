@@ -219,7 +219,6 @@ fn contract_error(code: u32) -> Error {
 fn constructor_writes_both_configurations() {
     let h = setup(None);
     assert_eq!(h.token.rwa_config(), Some(RwaConfig { auditor_id: AUDITOR_ID, approver: None }));
-    assert_eq!(h.token.approval_epoch(), 1);
     assert!(h.token.compliance_config().is_some());
 }
 
@@ -261,7 +260,6 @@ fn rwa_entry_points_require_their_roles() {
         h.token.try_set_rwa_config(&AUDITOR_ID, &None, &outsider).unwrap_err().unwrap(),
         unauthorized
     );
-    assert_eq!(h.token.try_bump_approval_epoch(&outsider).unwrap_err().unwrap(), unauthorized);
     assert_eq!(
         h.token
             .try_forced_transfer(&outsider, &outsider, &1, &proof_data(&h.e), &outsider)
@@ -270,7 +268,10 @@ fn rwa_entry_points_require_their_roles() {
         unauthorized
     );
     // A role does not extend to another duty.
-    assert_eq!(h.token.try_bump_approval_epoch(&h.freezer).unwrap_err().unwrap(), unauthorized);
+    assert_eq!(
+        h.token.try_set_rwa_config(&AUDITOR_ID, &None, &h.freezer).unwrap_err().unwrap(),
+        unauthorized
+    );
     assert_eq!(
         h.token
             .try_forced_transfer(&outsider, &outsider, &1, &proof_data(&h.e), &h.config_manager)
@@ -342,13 +343,12 @@ fn freeze_clawback_and_unfreeze_by_their_roles() {
 }
 
 #[test]
-fn config_manager_changes_the_policy_and_the_epoch_advances() {
+fn config_manager_changes_the_policy() {
     let h = setup(None);
     let config =
         ComplianceConfig { policy: Some(h.allowlist.address.clone()), sac_passthrough: true };
     h.token.set_compliance_config(&config, &h.config_manager);
     assert_eq!(h.token.compliance_config(), Some(config));
-    assert_eq!(h.token.approval_epoch(), 2);
 }
 
 #[test]
@@ -360,10 +360,6 @@ fn config_manager_rotates_the_approver() {
         h.token.rwa_config(),
         Some(RwaConfig { auditor_id: AUDITOR_ID, approver: Some(approver) })
     );
-    assert_eq!(h.token.approval_epoch(), 2);
-
-    h.token.bump_approval_epoch(&h.config_manager);
-    assert_eq!(h.token.approval_epoch(), 3);
 }
 
 #[test]
@@ -529,15 +525,15 @@ fn transfer_fails_without_the_approver_authorization() {
 
 #[test]
 #[should_panic(expected = "Error(Auth, InvalidAction)")]
-fn approval_is_void_after_an_epoch_bump() {
+fn approval_is_void_after_the_approver_is_replaced() {
     let (h, approver, alice) = approved_deployment();
     let e = &h.e;
-    // The approval is built for the current epoch...
+    // The current approver signs the approval...
     let stale_args = e.as_contract(&h.token.address, || {
         transfer_approval_args(e, &h.treasury, &alice, &transfer_payload(e))
     });
-    // ...and the issuer voids outstanding approvals before it is used.
-    h.token.bump_approval_epoch(&h.config_manager);
+    // ...and the issuer replaces the approver before it is used.
+    h.token.set_rwa_config(&AUDITOR_ID, &Some(Address::generate(e)), &h.config_manager);
 
     let data = transfer_data(e);
     let sender = MockAuthInvoke {
@@ -628,7 +624,6 @@ fn role_holders_must_authorize() {
     assert_auth_failure("set_rwa_config", || {
         unsigned.set_rwa_config(&AUDITOR_ID, &None, &h.config_manager)
     });
-    assert_auth_failure("bump_approval_epoch", || unsigned.bump_approval_epoch(&h.config_manager));
     assert_auth_failure("clawback", || {
         unsigned.clawback(&a, &1, &None, &proof_data(&h.e), &h.clawback)
     });
@@ -642,7 +637,6 @@ fn role_holders_must_authorize() {
     h.e.mock_all_auths();
     assert!(h.token.is_frozen(&a));
     assert!(!h.token.is_frozen(&b));
-    assert_eq!(h.token.approval_epoch(), 1);
 }
 
 // Pins branch: ConfidentialToken entry points of the example / the
@@ -745,5 +739,8 @@ fn constructor_stores_the_approver_and_grants_no_role() {
         assert_eq!(h.token.has_role(&h.admin, &Symbol::new(&h.e, role)), None, "{role}");
     }
     assert_eq!(h.token.try_freeze(&h.treasury, &h.admin).unwrap_err().unwrap(), unauthorized);
-    assert_eq!(h.token.try_bump_approval_epoch(&h.admin).unwrap_err().unwrap(), unauthorized);
+    assert_eq!(
+        h.token.try_set_rwa_config(&AUDITOR_ID, &None, &h.admin).unwrap_err().unwrap(),
+        unauthorized
+    );
 }

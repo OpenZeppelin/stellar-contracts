@@ -322,12 +322,12 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
 /// on its [`ConfidentialToken`] impl: the configuration written here is
 /// enforced only by [`RwaHooks`].
 ///
-/// The implementor supplies the bodies of the two admin entry points and
-/// thereby the access-control model, as for [`ConfidentialCompliance`].
+/// The implementor supplies the body of the admin entry point and thereby
+/// the access-control model, as for [`ConfidentialCompliance`].
 #[contracttrait]
 pub trait ConfidentialRwa: ConfidentialCompliance {
-    /// Sets the designated auditor and the approver, and advances the
-    /// approval epoch. The designated auditor is fixed by the first call.
+    /// Sets the designated auditor and the approver. The designated auditor is
+    /// fixed by the first call.
     ///
     /// # Arguments
     ///
@@ -345,14 +345,14 @@ pub trait ConfidentialRwa: ConfidentialCompliance {
     /// # Events
     ///
     /// * topics - `["rwa_config_changed"]`
-    /// * data - `[auditor_id: u32, approver: Option<Address>, epoch: u32]`
+    /// * data - `[auditor_id: u32, approver: Option<Address>]`
     ///
     /// # Notes
     ///
     /// A contract approver is authorized automatically whenever it invokes
     /// the token itself, without its `__check_auth` running. It must expose
     /// no path through which a third party can make it call the token, and
-    /// any such path of its own must check the approval epoch
+    /// any such path of its own must check the full approval arguments
     /// (`docs/compliance.md#approval-gate`).
     ///
     /// # Security Warning
@@ -362,29 +362,6 @@ pub trait ConfidentialRwa: ConfidentialCompliance {
     /// the trait does not prescribe an access-control model.
     fn set_rwa_config(e: &Env, auditor_id: u32, approver: Option<Address>, operator: Address);
 
-    /// Advances the approval epoch, voiding every outstanding approver
-    /// authorization.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `operator` - The address authorizing this call.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`storage::bump_approval_epoch`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["approval_epoch_bumped"]`
-    /// * data - `[epoch: u32]`
-    ///
-    /// # Security Warning
-    ///
-    /// Implementations MUST authorize `operator` before calling
-    /// [`storage::bump_approval_epoch`].
-    fn bump_approval_epoch(e: &Env, operator: Address);
-
     /// Returns the active [`RwaConfig`], or `None` when the profile has not
     /// been configured.
     ///
@@ -393,15 +370,6 @@ pub trait ConfidentialRwa: ConfidentialCompliance {
     /// * `e` - Access to the Soroban environment.
     fn rwa_config(e: &Env) -> Option<RwaConfig> {
         storage::rwa_config(e)
-    }
-
-    /// Returns the current approval epoch.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    fn approval_epoch(e: &Env) -> u32 {
-        storage::approval_epoch(e)
     }
 }
 
@@ -608,8 +576,8 @@ impl Hooks for ComplianceHooks {
 ///    the binding again.
 /// 3. **Approval gate.** When an approver is configured, `on_deposit`,
 ///    `on_withdraw`, `on_transfer` and `on_spender_transfer` additionally
-///    require its authorization over the approval epoch, the parties and the
-///    operation's payload (see [`storage::require_approval`]).
+///    require its authorization over the parties and the operation's payload
+///    (see [`storage::require_approval`]).
 /// 4. **Spender.** The spender of a delegated flow passes the freeze, policy
 ///    and SAC gates, not the policy gate alone: a frozen or unauthorized party
 ///    must not direct regulated value. `on_revoke_spender` still gates only the
@@ -751,10 +719,8 @@ pub enum ComplianceError {
     /// Indicates a compliance configuration of an RWA deployment has neither
     /// a policy nor SAC passthrough.
     EligibilityRequired = 3614,
-    /// Indicates the approval epoch cannot advance past `u32::MAX`.
-    ApprovalEpochOverflow = 3615,
     /// Indicates the account's clawback nonce cannot advance past `u32::MAX`.
-    NonceOverflow = 3616,
+    NonceOverflow = 3615,
 }
 
 // ################## CONSTANTS ##################
@@ -824,32 +790,17 @@ pub fn emit_compliance_config_changed(e: &Env, policy: &Option<Address>, sac_pas
 }
 
 /// Event emitted when the RWA profile configuration is set or changed.
-/// `approver` is `None` when the approval gate is disabled. `epoch` is the
-/// approval epoch in force after the change.
+/// `approver` is `None` when the approval gate is disabled.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RwaConfigChanged {
     pub auditor_id: u32,
     pub approver: Option<Address>,
-    pub epoch: u32,
 }
 
 /// Emits an [`RwaConfigChanged`] event.
-pub fn emit_rwa_config_changed(e: &Env, auditor_id: u32, approver: &Option<Address>, epoch: u32) {
-    RwaConfigChanged { auditor_id, approver: approver.clone(), epoch }.publish(e);
-}
-
-/// Event emitted when the approval epoch advances without a change of the
-/// [`RwaConfig`]. Authorizations issued for an earlier epoch are void.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ApprovalEpochBumped {
-    pub epoch: u32,
-}
-
-/// Emits an [`ApprovalEpochBumped`] event.
-pub fn emit_approval_epoch_bumped(e: &Env, epoch: u32) {
-    ApprovalEpochBumped { epoch }.publish(e);
+pub fn emit_rwa_config_changed(e: &Env, auditor_id: u32, approver: &Option<Address>) {
+    RwaConfigChanged { auditor_id, approver: approver.clone() }.publish(e);
 }
 
 /// Event emitted when a public amount is moved between two confidential
