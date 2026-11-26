@@ -29,7 +29,7 @@ The `vesting` module implements a trustless vesting contract. A SEP-41 token sen
 - **Receiver**: the `Ownable` owner of the vesting contract. Ownership can be transferred in two steps; the examples disable renouncing.
 - **Release**: `release(token)` is permissionless and always pays the current owner.
 - **Supported tokens**: every Stellar Asset Contract and standard SEP-41 token. Not supported: tokens that take more than the sent amount from the sender (a fee charged on top), and tokens whose balances can be moved through more than one contract address. See "Token behavior" in the `vesting` module docs.
-- **Custom schedules**: overriding the single `vesting_curve` method; the library still applies the cliff, the end, and the bounds checks.
+- **Custom schedules**: overriding the single `vesting_curve` method of the `VestingCurve` trait; the library still applies the cliff, the end, and the bounds checks.
 
 #### How a vesting contract works
 
@@ -46,9 +46,7 @@ The `vesting` module implements a trustless vesting contract. A SEP-41 token sen
 ```rust
 use soroban_sdk::{contract, contracterror, contractimpl, panic_with_error, Address, Env};
 use stellar_access::ownable::{set_owner, Ownable};
-// `VestingSchedule` must be in scope: the generated `vesting_curve` contract
-// function takes it as a parameter.
-use stellar_finance::vesting::{set_schedule, VestingSchedule, VestingWallet};
+use stellar_finance::vesting::{set_schedule, VestingCurve, VestingWallet};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -67,6 +65,9 @@ impl VestingWalletContract {
         set_schedule(e, start, duration, cliff_duration);
     }
 }
+
+// The default (linear) curve.
+impl VestingCurve for VestingWalletContract {}
 
 #[contractimpl(contracttrait)]
 impl VestingWallet for VestingWalletContract {}

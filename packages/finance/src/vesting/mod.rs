@@ -3,7 +3,7 @@
 //! A vesting contract holds SEP-41 tokens and releases them to a single
 //! receiver following one fixed schedule (`start`, `cliff`, `end`). The
 //! schedule is linear by default; a custom schedule is made by overriding
-//! [`VestingWallet::vesting_curve`].
+//! [`VestingCurve::vesting_curve`].
 //!
 //! ## Roles and where the tokens live
 //!
@@ -76,7 +76,7 @@
 //!
 //! - before `cliff`, nothing is vested;
 //! - from `cliff` until `end`, the vested amount is
-//!   [`VestingWallet::vesting_curve`] (linear by default);
+//!   [`VestingCurve::vesting_curve`] (linear by default);
 //! - from `end` on, everything is vested.
 //!
 //! A `start` in the past is accepted; a vesting contract deployed after `end`
@@ -88,9 +88,13 @@
 //!
 //! ## Custom schedules
 //!
-//! Overriding [`VestingWallet::vesting_curve`] replaces the linear curve. The
-//! override is only called for `cliff <= timestamp < end`, and its result is
-//! checked by [`VestingWallet::vested_amount`]:
+//! The curve lives in its own trait, [`VestingCurve`], which every vesting
+//! contract implements next to [`VestingWallet`]. An empty
+//! `impl VestingCurve for MyContract {}` keeps the linear curve; overriding
+//! [`VestingCurve::vesting_curve`] in that impl replaces it.
+//!
+//! The override is only called for `cliff <= timestamp < end`, and its result
+//! is checked by [`VestingWallet::vested_amount`]:
 //! - a value below 0 or above `total_allocation` panics with
 //!   [`VestingError::CurveOutOfBounds`];
 //! - a curve that decreases below the amount already released makes `release`
@@ -102,9 +106,7 @@
 //! responsibility. Likewise, at a fixed timestamp, adding `d` tokens to the
 //! allocation must raise the vested amount by at most `d`; otherwise a top-up
 //! unlocks part of the original allocation early. The linear curve and the
-//! monthly-steps example both satisfy this. `vesting_curve` is exported as a
-//! contract function only because every `#[contracttrait]` method is; it is not
-//! meant to be called on its own.
+//! monthly-steps example both satisfy this.
 //!
 //! See `examples/vesting-wallet/monthly-steps` for an override.
 //!
@@ -204,15 +206,60 @@ pub use crate::vesting::storage::{
     total_allocation, VestingSchedule, VestingStorageKey,
 };
 
+/// The vesting curve of a vesting contract: the shape of its schedule between
+/// `cliff` and `end`.
+///
+/// Called by [`VestingWallet::vested_amount`] to compute the amount vested at a
+/// given timestamp. The default is linear, but a vesting contract can override
+/// it to implement a custom curve. See `examples/vesting-wallet/monthly-steps`
+/// for an example of a custom curve.
+///
+/// `impl VestingCurve for MyContract {}` keeps the linear curve; overriding
+/// [`VestingCurve::vesting_curve`] in that impl gives a custom one.
+pub trait VestingCurve {
+    /// Returns the amount vested at `timestamp` out of `total_allocation`.
+    /// Default: linear, see [`linear_vesting_curve`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `schedule` - The vesting schedule.
+    /// * `total_allocation` - The vesting contract's balance plus the amount
+    ///   already released.
+    /// * `timestamp` - The timestamp (in seconds) to compute the amount for.
+    ///
+    /// # Notes
+    ///
+    /// Rules for an override:
+    /// * It is only called with `cliff <= timestamp < end`, so `duration > 0`.
+    /// * It must return a value in `[0, total_allocation]`; otherwise
+    ///   [`VestingWallet::vested_amount`] panics with
+    ///   [`VestingError::CurveOutOfBounds`].
+    /// * It must never decrease as `timestamp` grows. A decrease below the
+    ///   amount already released makes `release` panic with
+    ///   [`VestingError::ClawbackOrDecreasingCurve`]; a smaller decrease is not
+    ///   detected.
+    /// * At a fixed `timestamp`, adding `d` to `total_allocation` must raise
+    ///   the result by at most `d`. Otherwise a top-up unlocks part of the
+    ///   original allocation early.
+    fn vesting_curve(
+        e: &Env,
+        schedule: &VestingSchedule,
+        total_allocation: i128,
+        timestamp: u64,
+    ) -> i128 {
+        storage::linear_vesting_curve(e, schedule, total_allocation, timestamp)
+    }
+}
+
 /// Vesting of SEP-41 tokens on a single schedule, released to the `Ownable`
 /// owner.
 ///
-/// Every method has a default body; `impl VestingWallet for MyContract {}`
-/// gives the linear schedule. Overriding [`VestingWallet::vesting_curve`]
-/// gives a custom one. The other methods apply the vesting rules and are not
-/// meant to be overridden.
+/// Every method has a default body and applies the vesting rules; none is
+/// meant to be overridden. A vesting contract also implements
+/// [`VestingCurve`], which sets the shape of the schedule.
 #[contracttrait]
-pub trait VestingWallet {
+pub trait VestingWallet: VestingCurve {
     /// Returns the timestamp (in seconds) at which vesting starts.
     ///
     /// # Arguments
@@ -288,7 +335,7 @@ pub trait VestingWallet {
     ///
     /// - before `cliff`: `0` (the balance is not read);
     /// - from `end` on: the total allocation (`balance + released`);
-    /// - otherwise: [`VestingWallet::vesting_curve`], checked to be within `[0,
+    /// - otherwise: [`VestingCurve::vesting_curve`], checked to be within `[0,
     ///   total allocation]`.
     ///
     /// # Arguments
@@ -322,7 +369,7 @@ pub trait VestingWallet {
         }
 
         // Here `cliff <= timestamp < end`, so `duration > 0` inside the curve.
-        let vested = Self::vesting_curve(e, schedule, total, timestamp);
+        let vested = Self::vesting_curve(e, &schedule, total, timestamp);
 
         // A custom curve could return anything; keep it within the allocation.
         if vested < 0 || vested > total {
@@ -414,46 +461,6 @@ pub trait VestingWallet {
             panic_with_error!(e, VestingError::OwnerRenounced);
         };
         storage::release(e, &token, &owner, amount)
-    }
-
-    /// The vesting curve: the amount of `token` vested at `timestamp` out of
-    /// `total_allocation`. This is the override point for custom schedules.
-    /// Default: linear, see [`linear_vesting_curve`].
-    ///
-    /// Not meant to be called on its own. It is exposed as a contract function
-    /// only because every `#[contracttrait]` method is, and its result is
-    /// unchecked. Use [`VestingWallet::vested_amount`], which applies the
-    /// cliff, the end, and the bounds checks.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `schedule` - The vesting schedule.
-    /// * `total_allocation` - The vesting contract's balance plus the amount
-    ///   already released.
-    /// * `timestamp` - The timestamp (in seconds) to compute the amount for.
-    ///
-    /// # Notes
-    ///
-    /// Rules for an override:
-    /// * It is only called with `cliff <= timestamp < end`, so `duration > 0`.
-    /// * It must return a value in `[0, total_allocation]`; otherwise
-    ///   [`VestingWallet::vested_amount`] panics with
-    ///   [`VestingError::CurveOutOfBounds`].
-    /// * It must never decrease as `timestamp` grows. A decrease below the
-    ///   amount already released makes `release` panic with
-    ///   [`VestingError::ClawbackOrDecreasingCurve`]; a smaller decrease is not
-    ///   detected.
-    /// * At a fixed `timestamp`, adding `d` to `total_allocation` must raise
-    ///   the result by at most `d`. Otherwise a top-up unlocks part of the
-    ///   original allocation early. This is not checked.
-    fn vesting_curve(
-        e: &Env,
-        schedule: VestingSchedule,
-        total_allocation: i128,
-        timestamp: u64,
-    ) -> i128 {
-        storage::linear_vesting_curve(e, &schedule, total_allocation, timestamp)
     }
 }
 

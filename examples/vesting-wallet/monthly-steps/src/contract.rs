@@ -2,15 +2,15 @@
 //!
 //! Same as the linear example, but tokens unlock in monthly pieces instead of
 //! continuously. It shows how a custom schedule is made by overriding a single
-//! method, `vesting_curve`; the library still applies the cliff, the end, and
-//! the bounds checks around it.
+//! method, `vesting_curve`, in the `VestingCurve` impl; the library still
+//! applies the cliff, the end, and the bounds checks around it.
 //!
 //! A month is a fixed 30 days (2,592,000 seconds), not a calendar month.
 
 use soroban_sdk::{contract, contracterror, contractimpl, panic_with_error, Address, Env};
 use stellar_access::ownable::{set_owner, Ownable};
 use stellar_contract_utils::math::i128_fixed_point::mul_div_floor;
-use stellar_finance::vesting::{set_schedule, VestingSchedule, VestingWallet};
+use stellar_finance::vesting::{set_schedule, VestingCurve, VestingSchedule, VestingWallet};
 
 /// A fixed 30-day month, in seconds.
 pub const MONTH: u64 = 30 * 24 * 60 * 60;
@@ -40,8 +40,8 @@ impl VestingWalletContract {
     }
 }
 
-#[contractimpl(contracttrait)]
-impl VestingWallet for VestingWalletContract {
+// Custom vesting curve: monthly steps instead of linear.
+impl VestingCurve for VestingWalletContract {
     /// Vests `total_allocation` in monthly pieces:
     /// `total_allocation * months_passed / total_months`, floored.
     ///
@@ -59,7 +59,7 @@ impl VestingWallet for VestingWalletContract {
     /// nothing before `end`, everything at `end`.
     fn vesting_curve(
         e: &Env,
-        schedule: VestingSchedule,
+        schedule: &VestingSchedule,
         total_allocation: i128,
         timestamp: u64,
     ) -> i128 {
@@ -68,6 +68,9 @@ impl VestingWallet for VestingWalletContract {
         mul_div_floor(e, &total_allocation, &(months_passed as i128), &(total_months as i128))
     }
 }
+
+#[contractimpl(contracttrait)]
+impl VestingWallet for VestingWalletContract {}
 
 #[contractimpl(contracttrait)]
 impl Ownable for VestingWalletContract {

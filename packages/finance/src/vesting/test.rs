@@ -11,8 +11,8 @@ use soroban_sdk::{
 use stellar_access::ownable::{set_owner, Ownable};
 
 use crate::vesting::{
-    get_released, linear_vesting_curve, set_schedule, Released, VestingError, VestingSchedule,
-    VestingScheduleSet, VestingStorageKey, VestingWallet, RELEASED_EXTEND_AMOUNT,
+    get_released, linear_vesting_curve, set_schedule, Released, VestingCurve, VestingError,
+    VestingSchedule, VestingScheduleSet, VestingStorageKey, VestingWallet, RELEASED_EXTEND_AMOUNT,
 };
 
 // Default timeline used by most tests: cliff at 1_100, end at 2_000.
@@ -43,6 +43,8 @@ impl VestingMock {
     }
 }
 
+impl VestingCurve for VestingMock {}
+
 #[contractimpl(contracttrait)]
 impl VestingWallet for VestingMock {}
 
@@ -52,6 +54,8 @@ impl Ownable for VestingMock {}
 /// A vesting contract whose schedule was never set.
 #[contract]
 struct NoScheduleMock;
+
+impl VestingCurve for NoScheduleMock {}
 
 #[contractimpl(contracttrait)]
 impl VestingWallet for NoScheduleMock {}
@@ -99,11 +103,10 @@ impl CurveMock {
     }
 }
 
-#[contractimpl(contracttrait)]
-impl VestingWallet for CurveMock {
+impl VestingCurve for CurveMock {
     fn vesting_curve(
         e: &Env,
-        schedule: VestingSchedule,
+        schedule: &VestingSchedule,
         total_allocation: i128,
         timestamp: u64,
     ) -> i128 {
@@ -115,17 +118,20 @@ impl VestingWallet for CurveMock {
             CurveMode::Total => total_allocation,
             CurveMode::DecreasingAt(at) if timestamp >= at => 0,
             CurveMode::DecreasingAt(_) => {
-                linear_vesting_curve(e, &schedule, total_allocation, timestamp)
+                linear_vesting_curve(e, schedule, total_allocation, timestamp)
             }
             CurveMode::Guarded => {
                 if timestamp < schedule.cliff || timestamp >= schedule.end {
                     panic!("curve called outside [cliff, end)");
                 }
-                linear_vesting_curve(e, &schedule, total_allocation, timestamp)
+                linear_vesting_curve(e, schedule, total_allocation, timestamp)
             }
         }
     }
 }
+
+#[contractimpl(contracttrait)]
+impl VestingWallet for CurveMock {}
 
 #[contracttype]
 enum StubKey {
@@ -987,16 +993,13 @@ fn junk_token_does_not_affect_real_token_works() {
 
 #[test]
 fn vesting_curve_direct_call_is_raw_works() {
-    // The exported curve is a pure computation with an
-    // unchecked result.
-    let (e, _, vesting, token) = setup();
-    let client = VestingMockClient::new(&e, &vesting);
+    // The curve is a plain Rust function (not a contract function): called
+    // directly, it is a pure computation with an unchecked result.
+    let e = Env::default();
     let schedule = VestingSchedule { start: START, duration: DURATION, cliff: CLIFF, end: END };
 
     // Past `end`, the raw linear value exceeds the allocation.
-    assert_eq!(client.vesting_curve(&schedule, &1_000, &5_000), 4_000);
+    assert_eq!(<VestingMock as VestingCurve>::vesting_curve(&e, &schedule, 1_000, 5_000), 4_000);
     // Before `start`, saturating keeps it at 0.
-    assert_eq!(client.vesting_curve(&schedule, &1_000, &0), 0);
-    assert_eq!(e.events().all().events().len(), 0);
-    assert_eq!(client.released(&token), 0);
+    assert_eq!(<VestingMock as VestingCurve>::vesting_curve(&e, &schedule, 1_000, 0), 0);
 }

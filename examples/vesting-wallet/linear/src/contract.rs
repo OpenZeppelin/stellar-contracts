@@ -10,10 +10,7 @@
 
 use soroban_sdk::{contract, contracterror, contractimpl, panic_with_error, Address, Env};
 use stellar_access::ownable::{set_owner, Ownable};
-// `VestingSchedule` must be in scope: `#[contractimpl(contracttrait)]`
-// generates the `vesting_curve` contract function here, and it takes a
-// `VestingSchedule` parameter.
-use stellar_finance::vesting::{set_schedule, VestingSchedule, VestingWallet};
+use stellar_finance::vesting::{set_schedule, VestingCurve, VestingWallet};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -39,6 +36,9 @@ impl VestingWalletContract {
         set_schedule(e, start, duration, cliff_duration);
     }
 }
+
+// The default (linear) curve.
+impl VestingCurve for VestingWalletContract {}
 
 #[contractimpl(contracttrait)]
 impl VestingWallet for VestingWalletContract {}
