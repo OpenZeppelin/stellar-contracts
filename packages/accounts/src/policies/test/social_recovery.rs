@@ -2,27 +2,61 @@ extern crate std;
 
 use soroban_sdk::{
     auth::{Context, ContractContext, ContractExecutable, CreateContractHostFnContext},
-    contract,
+    contract, contractimpl, contracttype, panic_with_error, symbol_short,
     testutils::{
         storage::{Instance as _, Persistent as _},
         Address as _, Events, Ledger,
     },
     vec,
     xdr::ContractEvent,
-    Address, Bytes, BytesN, Env, Event, IntoVal, Map, String, Symbol, Val, Vec,
+    Address, Bytes, BytesN, Env, Error, Event, IntoVal, Map, String, Symbol, TryFromVal, Val, Vec,
 };
 use stellar_test_utils::{assert_events_and_return_within, LIBRARY_HEADROOM_PERCENT};
 
 use crate::{
     policies::social_recovery::*,
-    smart_account::{
-        ContextRule, ContextRuleType, Signer, MAX_EXTERNAL_KEY_SIZE, MAX_NAME_SIZE, MAX_POLICIES,
-        MAX_SIGNERS,
-    },
+    smart_account::{ContextRule, ContextRuleType, Signer, MAX_EXTERNAL_KEY_SIZE, MAX_SIGNERS},
 };
 
 #[contract]
 struct MockContract;
+
+/// The error a [`MockVerifier`] in [`VerifierMode::Fail`] panics with.
+const VERIFIER_FAILURE: u32 = 99;
+
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum VerifierMode {
+    /// Returns each key unchanged.
+    Canonical,
+    /// Panics with [`VERIFIER_FAILURE`].
+    Fail,
+    /// Returns the same bytes for every key.
+    Collapse,
+}
+
+#[contract]
+struct MockVerifier;
+
+#[contractimpl]
+impl MockVerifier {
+    pub fn set_mode(e: &Env, mode: VerifierMode) {
+        e.storage().instance().set(&symbol_short!("mode"), &mode);
+    }
+
+    pub fn batch_canonicalize_key(e: &Env, key_data: Vec<Val>) -> Vec<Bytes> {
+        let mode = e.storage().instance().get(&symbol_short!("mode"));
+        match mode.unwrap_or(VerifierMode::Canonical) {
+            VerifierMode::Canonical => {
+                Vec::from_iter(e, key_data.iter().map(|key| Bytes::try_from_val(e, &key).unwrap()))
+            }
+            VerifierMode::Fail => {
+                panic_with_error!(e, Error::from_contract_error(VERIFIER_FAILURE))
+            }
+            VerifierMode::Collapse => Vec::from_iter(e, key_data.iter().map(|_| Bytes::new(e))),
+        }
+    }
+}
 
 const START: u32 = 1_000_000;
 const DELAY: u32 = 17_280;
@@ -59,22 +93,17 @@ fn recovery_rule(e: &Env, id: u32, account: &Address, policy: &Address) -> Conte
     }
 }
 
-fn completion_context(
-    e: &Env,
-    account: &Address,
-    template: &RecoveryTemplate,
-    signers: &Vec<Signer>,
-) -> Context {
+fn completion_context(e: &Env, account: &Address, signers: &Vec<Signer>) -> Context {
     Context::Contract(ContractContext {
         contract: account.clone(),
         fn_name: Symbol::new(e, "add_context_rule"),
         args: vec![
             e,
-            template.context_type.into_val(e),
-            template.name.into_val(e),
+            ContextRuleType::Default.into_val(e),
+            String::from_str(e, RECOVERED_RULE_NAME).into_val(e),
             None::<u32>.into_val(e),
             signers.into_val(e),
-            template.policies.into_val(e),
+            Map::<Address, Val>::new(e).into_val(e),
         ],
     })
 }
@@ -93,7 +122,7 @@ impl Fixture {
         let bob = Address::generate(&e);
         let carol = Address::generate(&e);
         let dave = Address::generate(&e);
-        let verifier = Address::generate(&e);
+        let verifier = e.register(MockVerifier, ());
         Fixture { e, policy, account, rule, bob, carol, dave, verifier }
     }
 
@@ -115,21 +144,12 @@ impl Fixture {
         f
     }
 
-    fn template(&self) -> RecoveryTemplate {
-        RecoveryTemplate {
-            context_type: ContextRuleType::Default,
-            name: String::from_str(&self.e, "owner"),
-            policies: Map::new(&self.e),
-        }
-    }
-
     fn params(&self) -> SocialRecoveryAccountParams {
         SocialRecoveryAccountParams {
             guardians: vec![&self.e, self.bob.clone(), self.carol.clone(), self.dave.clone()],
             threshold: 2,
             delay_ledgers: DELAY,
             expiry_ledgers: EXPIRY,
-            template: self.template(),
         }
     }
 
@@ -139,6 +159,10 @@ impl Fixture {
 
     fn signers(&self, keys: &[u8]) -> Vec<Signer> {
         Vec::from_iter(&self.e, keys.iter().map(|key| self.signer(*key)))
+    }
+
+    fn set_verifier_mode(&self, mode: VerifierMode) {
+        MockVerifierClient::new(&self.e, &self.verifier).set_mode(&mode);
     }
 
     fn hash(&self, signers: &Vec<Signer>) -> BytesN<32> {
@@ -202,7 +226,7 @@ impl Fixture {
     }
 
     fn completion(&self, signers: &Vec<Signer>) -> Context {
-        completion_context(&self.e, &self.account, &self.template(), signers)
+        completion_context(&self.e, &self.account, signers)
     }
 
     /// Returns a completion context for `signers(&[2])` with argument `index`
@@ -354,6 +378,16 @@ fn install_too_many_guardians_panics() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3232)")] // SocialRecoveryError::InvalidConfig
+fn install_far_too_many_guardians_panics() {
+    let f = Fixture::new();
+    let mut params = f.params();
+    params.guardians = Vec::from_iter(&f.e, (0..1_000).map(|_| Address::generate(&f.e)));
+    f.e.cost_estimate().budget().reset_default();
+    f.install(&params);
+}
+
+#[test]
 fn install_max_guardians_works() {
     let f = Fixture::new();
     let mut params = f.params();
@@ -474,90 +508,6 @@ fn install_expiry_past_ledger_headroom_panics() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #3232)")] // SocialRecoveryError::InvalidConfig
-fn install_template_for_other_contract_panics() {
-    let f = Fixture::new();
-    let mut params = f.params();
-    params.template.context_type = ContextRuleType::CallContract(Address::generate(&f.e));
-    f.install(&params);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3232)")] // SocialRecoveryError::InvalidConfig
-fn install_template_create_contract_panics() {
-    let f = Fixture::new();
-    let mut params = f.params();
-    params.template.context_type =
-        ContextRuleType::CreateContract(BytesN::from_array(&f.e, &[0; 32]));
-    f.install(&params);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3232)")] // SocialRecoveryError::InvalidConfig
-fn install_template_create_contract_external_ref_panics() {
-    let f = Fixture::new();
-    let mut params = f.params();
-    params.template.context_type = ContextRuleType::CreateContractExternalRef(
-        Address::generate(&f.e),
-        String::from_str(&f.e, "tag"),
-    );
-    f.install(&params);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3232)")] // SocialRecoveryError::InvalidConfig
-fn install_template_name_too_long_panics() {
-    let f = Fixture::new();
-    let mut params = f.params();
-    params.template.name = String::from_str(&f.e, "abcdefghijklmnopqrstu");
-    assert_eq!(params.template.name.len(), MAX_NAME_SIZE + 1);
-    f.install(&params);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3232)")] // SocialRecoveryError::InvalidConfig
-fn install_template_too_many_policies_panics() {
-    let f = Fixture::new();
-    let mut params = f.params();
-    for _ in 0..=MAX_POLICIES {
-        params.template.policies.set(Address::generate(&f.e), 1u32.into_val(&f.e));
-    }
-    f.install(&params);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3232)")] // SocialRecoveryError::InvalidConfig
-fn install_template_with_this_policy_panics() {
-    let f = Fixture::new();
-    let mut params = f.params();
-    params.template.policies.set(f.policy.clone(), 1u32.into_val(&f.e));
-    f.install(&params);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3232)")] // SocialRecoveryError::InvalidConfig
-fn install_template_with_account_policy_panics() {
-    let f = Fixture::new();
-    let mut params = f.params();
-    params.template.policies.set(f.account.clone(), 1u32.into_val(&f.e));
-    f.install(&params);
-}
-
-#[test]
-fn install_template_at_limits_works() {
-    let f = Fixture::new();
-    let mut params = f.params();
-    params.template.context_type = ContextRuleType::CallContract(f.account.clone());
-    params.template.name = String::from_str(&f.e, "abcdefghijklmnopqrst");
-    assert_eq!(params.template.name.len(), MAX_NAME_SIZE);
-    for _ in 0..MAX_POLICIES {
-        params.template.policies.set(Address::generate(&f.e), 1u32.into_val(&f.e));
-    }
-    f.install(&params);
-    assert_eq!(f.config(), params);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3232)")] // SocialRecoveryError::InvalidConfig
 fn install_on_default_rule_panics() {
     let f = Fixture::new();
     let mut rule = f.rule.clone();
@@ -605,15 +555,6 @@ fn set_config_invalid_config_panics() {
     let f = Fixture::installed();
     let mut params = f.params();
     params.threshold = 0;
-    f.set_config(&params);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3232)")] // SocialRecoveryError::InvalidConfig
-fn set_config_invalid_template_panics() {
-    let f = Fixture::installed();
-    let mut params = f.params();
-    params.template.policies.set(f.policy.clone(), 1u32.into_val(&f.e));
     f.set_config(&params);
 }
 
@@ -836,9 +777,40 @@ fn approve_self_delegated_signer_panics() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #3233)")] // SocialRecoveryError::InvalidSigners
+fn approve_policy_delegated_signer_panics() {
+    let f = Fixture::installed();
+    f.approve(&f.bob, &vec![&f.e, f.signer(2), Signer::Delegated(f.policy.clone())]);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3233)")] // SocialRecoveryError::InvalidSigners
 fn approve_duplicate_signer_panics() {
     let f = Fixture::installed();
     f.approve(&f.bob, &f.signers(&[2, 3, 2]));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3233)")] // SocialRecoveryError::InvalidSigners
+fn approve_duplicate_signer_checked_before_verifier_panics() {
+    let f = Fixture::installed();
+    f.set_verifier_mode(VerifierMode::Fail);
+    f.approve(&f.bob, &f.signers(&[2, 2]));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3007)")] // SmartAccountError::DuplicateSigner
+fn approve_canonical_duplicate_signers_panics() {
+    let f = Fixture::installed();
+    f.set_verifier_mode(VerifierMode::Collapse);
+    f.approve(&f.bob, &f.signers(&[2, 3]));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #99)")] // VERIFIER_FAILURE
+fn approve_failing_verifier_panics() {
+    let f = Fixture::installed();
+    f.set_verifier_mode(VerifierMode::Fail);
+    f.approve(&f.bob, &f.signers(&[2]));
 }
 
 #[test]
@@ -1003,6 +975,22 @@ fn revoke_keeps_collecting_attempt() {
     f.revoke(&f.carol, &signers);
     f.assert_events(&[f.approval_revoked(1, &signers, &f.carol, 1, None)]);
     assert_eq!(f.attempt(&signers), Some(attempt(&f.e, START, &[&f.bob], None)));
+}
+
+#[test]
+fn revoke_while_verifier_fails_works() {
+    let f = Fixture::ready();
+    let signers = f.signers(&[2]);
+    f.set_verifier_mode(VerifierMode::Fail);
+    let keys = vec![&f.e, Bytes::from_array(&f.e, &[2; 32]).into_val(&f.e)];
+    assert_eq!(
+        MockVerifierClient::new(&f.e, &f.verifier).try_batch_canonicalize_key(&keys).err(),
+        Some(Ok(Error::from_contract_error(VERIFIER_FAILURE)))
+    );
+
+    f.revoke(&f.bob, &signers);
+    f.assert_events(&[f.approval_revoked(1, &signers, &f.bob, 1, None)]);
+    assert_eq!(f.attempt(&signers), Some(attempt(&f.e, START, &[&f.carol], None)));
 }
 
 #[test]
@@ -1268,6 +1256,22 @@ fn enforce_wrong_name_panics() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #3238)")] // SocialRecoveryError::NotAllowed
+fn enforce_capitalized_name_panics() {
+    let f = Fixture::ready();
+    f.at(EXECUTABLE_AFTER);
+    f.enforce(&f.completion_with_arg(1, String::from_str(&f.e, "Recovered").into_val(&f.e)));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3238)")] // SocialRecoveryError::NotAllowed
+fn enforce_empty_name_panics() {
+    let f = Fixture::ready();
+    f.at(EXECUTABLE_AFTER);
+    f.enforce(&f.completion_with_arg(1, String::from_str(&f.e, "").into_val(&f.e)));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3238)")] // SocialRecoveryError::NotAllowed
 fn enforce_with_valid_until_panics() {
     let f = Fixture::ready();
     f.at(EXECUTABLE_AFTER);
@@ -1459,12 +1463,33 @@ fn writes_do_not_extend_ttl() {
     let epoch = SocialRecoveryStorageKey::Epoch(f.account.clone(), RULE_ID);
     assert_eq!(f.ttl(&config), 499);
     assert_eq!(f.ttl(&epoch), 499);
+}
 
-    // `set_config` rewrites the config without reading it, and reads the epoch
-    // before rewriting it.
+#[test]
+fn cancel_extends_config_ttl() {
+    let f = Fixture::new();
+    f.e.ledger().set_min_persistent_entry_ttl(500);
+    f.install(&f.params());
+    let config = SocialRecoveryStorageKey::Config(f.account.clone(), RULE_ID);
+    let epoch = SocialRecoveryStorageKey::Epoch(f.account.clone(), RULE_ID);
+
+    f.at(START + 100);
+    f.cancel();
+    assert_eq!(f.ttl(&config), SOCIAL_RECOVERY_EXTEND_AMOUNT);
+    assert_eq!(f.ttl(&epoch), SOCIAL_RECOVERY_EXTEND_AMOUNT);
+}
+
+#[test]
+fn set_config_extends_config_ttl() {
+    let f = Fixture::new();
+    f.e.ledger().set_min_persistent_entry_ttl(500);
+    f.install(&f.params());
+    let config = SocialRecoveryStorageKey::Config(f.account.clone(), RULE_ID);
+    let epoch = SocialRecoveryStorageKey::Epoch(f.account.clone(), RULE_ID);
+
     f.at(START + 100);
     f.set_config(&f.params());
-    assert_eq!(f.ttl(&config), 399);
+    assert_eq!(f.ttl(&config), SOCIAL_RECOVERY_EXTEND_AMOUNT);
     assert_eq!(f.ttl(&epoch), SOCIAL_RECOVERY_EXTEND_AMOUNT);
 }
 
@@ -1491,7 +1516,7 @@ fn max_signer_approval_events_fit() {
         (0..MAX_SIGNERS).map(|i| {
             let mut key = [0u8; MAX_EXTERNAL_KEY_SIZE as usize];
             key[0] = i as u8;
-            Signer::External(Address::generate(&f.e), Bytes::from_slice(&f.e, &key))
+            Signer::External(f.verifier.clone(), Bytes::from_slice(&f.e, &key))
         }),
     );
     f.approve(&f.bob, &signers);
@@ -1504,10 +1529,6 @@ fn max_guardian_install_events_fit() {
     let f = Fixture::new();
     let mut params = f.params();
     params.guardians = Vec::from_iter(&f.e, (0..MAX_GUARDIANS).map(|_| Address::generate(&f.e)));
-    params.template.name = String::from_str(&f.e, "abcdefghijklmnopqrst");
-    for _ in 0..MAX_POLICIES {
-        params.template.policies.set(Address::generate(&f.e), 1u32.into_val(&f.e));
-    }
     f.install(&params);
     assert_eq!(f.e.events().all().events().len(), 1);
     assert_events_and_return_within(&f.e, (), LIBRARY_HEADROOM_PERCENT);

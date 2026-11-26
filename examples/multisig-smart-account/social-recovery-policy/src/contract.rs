@@ -3,7 +3,7 @@
 //! A reusable policy contract that lets a quorum of guardians restore access
 //! to a smart account whose owner lost their keys. This contract can be
 //! deployed once and used by any number of smart accounts, each configuring
-//! its own guardians, threshold, delay and recovered rule per recovery rule.
+//! its own guardians, threshold, delay and expiry per recovery rule.
 //!
 //! The contract has no constructor, admin or upgrade entry point. Whoever can
 //! upgrade a deployment of this policy controls recovery for every smart

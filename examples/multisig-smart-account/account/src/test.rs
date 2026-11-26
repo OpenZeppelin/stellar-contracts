@@ -4,7 +4,7 @@ use core::cell::Cell;
 
 use soroban_sdk::{
     auth::Context,
-    contract, contractimpl, map,
+    contract, contractimpl, map, panic_with_error, symbol_short,
     testutils::{Address as _, Events, Ledger},
     vec,
     xdr::{
@@ -15,10 +15,10 @@ use soroban_sdk::{
 };
 use stellar_accounts::{
     policies::{
-        simple_threshold::{self, SimpleThresholdAccountParams},
+        simple_threshold::SimpleThresholdAccountParams,
         social_recovery::{
-            self, hash_signers, RecoveryAttempt, RecoveryAuthorized, RecoveryTemplate,
-            SocialRecoveryAccountParams,
+            self, hash_signers, RecoveryAttempt, RecoveryAuthorized, SocialRecoveryAccountParams,
+            RECOVERED_RULE_NAME,
         },
         spending_limit::{self, SpendingLimitAccountParams},
         Policy,
@@ -73,9 +73,23 @@ impl MockVerifierContract {
     }
 
     pub fn batch_canonicalize_key(e: &Env, key_data: Vec<Val>) -> Vec<Bytes> {
+        if e.storage().instance().has(&symbol_short!("failing")) {
+            panic_with_error!(e, soroban_sdk::Error::from_contract_error(VERIFIER_FAILURE))
+        }
         Vec::from_iter(e, key_data.iter().map(|key| Bytes::try_from_val(e, &key).unwrap()))
     }
+
+    pub fn set_failing(e: &Env, failing: bool) {
+        if failing {
+            e.storage().instance().set(&symbol_short!("failing"), &());
+        } else {
+            e.storage().instance().remove(&symbol_short!("failing"));
+        }
+    }
 }
+
+/// The error a failing [`MockVerifierContract`] panics with.
+const VERIFIER_FAILURE: u32 = 99;
 
 #[test]
 fn create_account() {
@@ -221,43 +235,6 @@ impl RecoveryPolicyContract {
 }
 
 #[contract]
-struct ThresholdPolicyContract;
-
-#[contractimpl]
-impl Policy for ThresholdPolicyContract {
-    type AccountParams = SimpleThresholdAccountParams;
-
-    fn enforce(
-        e: &Env,
-        context: Context,
-        authenticated_signers: Vec<Signer>,
-        context_rule: ContextRule,
-        smart_account: Address,
-    ) {
-        simple_threshold::enforce(
-            e,
-            &context,
-            &authenticated_signers,
-            &context_rule,
-            &smart_account,
-        )
-    }
-
-    fn install(
-        e: &Env,
-        install_params: Self::AccountParams,
-        context_rule: ContextRule,
-        smart_account: Address,
-    ) {
-        simple_threshold::install(e, &install_params, &context_rule, &smart_account)
-    }
-
-    fn uninstall(e: &Env, context_rule: ContextRule, smart_account: Address) {
-        simple_threshold::uninstall(e, &context_rule, &smart_account)
-    }
-}
-
-#[contract]
 struct SpendingLimitPolicyContract;
 
 #[contractimpl]
@@ -288,27 +265,23 @@ impl Policy for SpendingLimitPolicyContract {
     }
 }
 
-/// Submits a completion from a contract that catches its failure.
 #[contract]
 struct RouterContract;
 
 #[contractimpl]
 impl RouterContract {
-    pub fn try_recover(
-        e: &Env,
-        account: Address,
-        template: RecoveryTemplate,
-        signers: Vec<Signer>,
-    ) -> bool {
+    /// Submits a completion and catches its failure.
+    pub fn try_recover(e: &Env, account: Address, signers: Vec<Signer>) -> Option<ContextRule> {
         MultisigContractClient::new(e, &account)
             .try_add_context_rule(
-                &template.context_type,
-                &template.name,
+                &ContextRuleType::Default,
+                &String::from_str(e, RECOVERED_RULE_NAME),
                 &None,
                 &signers,
-                &template.policies,
+                &Map::new(e),
             )
-            .is_ok()
+            .ok()
+            .and_then(Result::ok)
     }
 }
 
@@ -379,30 +352,24 @@ impl Recovery {
         }
     }
 
-    /// An account with an owner rule and a recovery rule using the default
-    /// template.
+    /// An account with an owner rule and a recovery rule.
     fn new() -> Self {
         let r = Self::bare();
-        r.add_recovery_rule(&r.params(r.template(Map::new(&r.e))), None);
+        r.add_recovery_rule(&r.params(), None);
         r
     }
 
-    fn template(&self, policies: Map<Address, Val>) -> RecoveryTemplate {
-        RecoveryTemplate {
-            context_type: ContextRuleType::Default,
-            name: String::from_str(&self.e, "recovered"),
-            policies,
-        }
-    }
-
-    fn params(&self, template: RecoveryTemplate) -> SocialRecoveryAccountParams {
+    fn params(&self) -> SocialRecoveryAccountParams {
         SocialRecoveryAccountParams {
             guardians: vec![&self.e, self.bob.clone(), self.carol.clone(), self.dave.clone()],
             threshold: 2,
             delay_ledgers: DELAY,
             expiry_ledgers: EXPIRY,
-            template,
         }
+    }
+
+    fn recovered_name(&self) -> String {
+        String::from_str(&self.e, RECOVERED_RULE_NAME)
     }
 
     fn add_recovery_rule(
@@ -486,16 +453,22 @@ impl Recovery {
     }
 
     /// Authorizes a completion with no signatures through the recovery rule.
-    fn authorize_completion(&self, template: &RecoveryTemplate, signers: &Vec<Signer>) {
+    fn authorize_completion(&self, signers: &Vec<Signer>) {
+        self.authorize_completion_with(signers, &Map::new(&self.e));
+    }
+
+    /// Authorizes a completion that also passes `policies`, with no signatures
+    /// through the recovery rule.
+    fn authorize_completion_with(&self, signers: &Vec<Signer>, policies: &Map<Address, Val>) {
         let invocation = contract_fn(
             &self.account,
             "add_context_rule",
             &[
-                to_scval(&self.e, template.context_type.clone()),
-                to_scval(&self.e, template.name.clone()),
+                to_scval(&self.e, ContextRuleType::Default),
+                to_scval(&self.e, self.recovered_name()),
                 to_scval(&self.e, None::<u32>),
                 to_scval(&self.e, signers.clone()),
-                to_scval(&self.e, template.policies.clone()),
+                to_scval(&self.e, policies.clone()),
             ],
         );
         let rule_ids = vec![&self.e, self.rule_id.get()];
@@ -503,26 +476,26 @@ impl Recovery {
         self.e.set_auths(&[entry]);
     }
 
-    fn complete(&self, template: &RecoveryTemplate, signers: &Vec<Signer>) -> ContextRule {
-        self.authorize_completion(template, signers);
+    fn complete(&self, signers: &Vec<Signer>) -> ContextRule {
+        self.authorize_completion(signers);
         self.client.add_context_rule(
-            &template.context_type,
-            &template.name,
+            &ContextRuleType::Default,
+            &self.recovered_name(),
             &None,
             signers,
-            &template.policies,
+            &Map::new(&self.e),
         )
     }
 
-    fn try_complete(&self, template: &RecoveryTemplate, signers: &Vec<Signer>) -> bool {
-        self.authorize_completion(template, signers);
+    fn try_complete(&self, signers: &Vec<Signer>) -> bool {
+        self.authorize_completion(signers);
         self.client
             .try_add_context_rule(
-                &template.context_type,
-                &template.name,
+                &ContextRuleType::Default,
+                &self.recovered_name(),
                 &None,
                 signers,
-                &template.policies,
+                &Map::new(&self.e),
             )
             .is_ok()
     }
@@ -539,6 +512,24 @@ impl Recovery {
         let entry = self.account_entry(&self.account, signatures, rule_ids, invocation);
         self.e.set_auths(&[entry]);
     }
+
+    /// Authorizes `remove_context_rule(0)` on the account with `signatures`
+    /// selecting `context_rule_id`.
+    fn authorize_owner_rule_removal(&self, signatures: Map<Signer, Bytes>, context_rule_id: u32) {
+        let invocation =
+            contract_fn(&self.account, "remove_context_rule", &[to_scval(&self.e, 0u32)]);
+        let rule_ids = vec![&self.e, context_rule_id];
+        let entry = self.account_entry(&self.account, signatures, rule_ids, invocation);
+        self.e.set_auths(&[entry]);
+    }
+
+    /// Returns a separate verifier and a one-key signer set on it.
+    fn switchable_signers(&self) -> (MockVerifierContractClient<'static>, Vec<Signer>) {
+        let verifier = self.e.register(MockVerifierContract, ());
+        let signers =
+            vec![&self.e, Signer::External(verifier.clone(), Bytes::from_array(&self.e, &[2; 32]))];
+        (MockVerifierContractClient::new(&self.e, &verifier), signers)
+    }
 }
 
 #[test]
@@ -549,11 +540,10 @@ fn recovery_completes_through_account() {
     let recovery_rule = r.client.get_context_rule(&rule_id);
     let count = r.client.get_context_rules_count();
     let signers = r.signers(&[2]);
-    let template = r.template(Map::new(&r.e));
     r.reach_quorum(&signers);
     r.at(EXECUTABLE_AFTER);
 
-    let rule = r.complete(&template, &signers);
+    let rule = r.complete(&signers);
 
     let events = r.e.events().all();
     assert_eq!(events.events().len(), 3);
@@ -579,8 +569,8 @@ fn recovery_completes_through_account() {
         events.events().get(2).unwrap(),
         &ContextRuleAdded {
             context_rule_id: rule.id,
-            name: template.name.clone(),
-            context_type: template.context_type.clone(),
+            name: r.recovered_name(),
+            context_type: ContextRuleType::Default,
             valid_until: None,
             signer_ids: rule.signer_ids.clone(),
             policy_ids: Vec::new(&r.e),
@@ -589,7 +579,7 @@ fn recovery_completes_through_account() {
     );
 
     assert_eq!(rule.context_type, ContextRuleType::Default);
-    assert_eq!(rule.name, template.name);
+    assert_eq!(rule.name, r.recovered_name());
     assert_eq!(rule.valid_until, None);
     assert_eq!(rule.signers, signers);
     assert!(rule.policies.is_empty());
@@ -604,7 +594,7 @@ fn recovery_completes_through_account() {
 #[test]
 fn recovery_rule_valid_until_ledger_still_completes() {
     let r = Recovery::bare();
-    let params = r.params(r.template(Map::new(&r.e)));
+    let params = r.params();
     let rule = r.client.add_context_rule(
         &ContextRuleType::CallContract(r.account.clone()),
         &String::from_str(&r.e, "recovery"),
@@ -617,9 +607,9 @@ fn recovery_rule_valid_until_ledger_still_completes() {
     r.reach_quorum(&signers);
 
     r.at(EXECUTABLE_AFTER + 1);
-    assert!(!r.try_complete(&params.template, &signers));
+    assert!(!r.try_complete(&signers));
     r.at(EXECUTABLE_AFTER);
-    assert!(r.try_complete(&params.template, &signers));
+    assert!(r.try_complete(&signers));
 }
 
 #[test]
@@ -629,7 +619,7 @@ fn completion_below_threshold_panics() {
     let signers = r.signers(&[2]);
     r.approve(&r.bob, &signers);
     r.at(START + EXPIRY - 1);
-    r.complete(&r.template(Map::new(&r.e)), &signers);
+    r.complete(&signers);
 }
 
 #[test]
@@ -638,7 +628,7 @@ fn completion_with_reordered_signers_panics() {
     let r = Recovery::new();
     r.reach_quorum(&r.signers(&[2, 3]));
     r.at(EXECUTABLE_AFTER);
-    r.complete(&r.template(Map::new(&r.e)), &r.signers(&[3, 2]));
+    r.complete(&r.signers(&[3, 2]));
 }
 
 #[test]
@@ -646,67 +636,133 @@ fn completion_with_reordered_signers_panics() {
 fn completion_replay_through_account_panics() {
     let r = Recovery::new();
     let signers = r.signers(&[2]);
-    let template = r.template(Map::new(&r.e));
     r.reach_quorum(&signers);
     r.at(EXECUTABLE_AFTER);
-    r.complete(&template, &signers);
-    r.complete(&template, &signers);
+    r.complete(&signers);
+    r.complete(&signers);
 }
 
 #[test]
 fn failed_completion_consumes_nothing() {
-    let r = Recovery::bare();
-    let threshold = r.e.register(ThresholdPolicyContract, ());
-    let policies =
-        map![&r.e, (threshold, SimpleThresholdAccountParams { threshold: 2 }.into_val(&r.e))];
-    let template = r.template(policies);
-    r.add_recovery_rule(&r.params(template.clone()), None);
-    let signers = r.signers(&[2]);
+    let r = Recovery::new();
+    let (verifier, signers) = r.switchable_signers();
     r.reach_quorum(&signers);
+    verifier.set_failing(&true);
     r.at(EXECUTABLE_AFTER);
     let before = r.attempt(1, &signers);
+    assert_eq!(before.as_ref().unwrap().executable_after, Some(EXECUTABLE_AFTER));
+    let count = r.client.get_context_rules_count();
 
-    r.authorize_completion(&template, &signers);
+    r.authorize_completion(&signers);
     let result = r.client.try_add_context_rule(
-        &template.context_type,
-        &template.name,
+        &ContextRuleType::Default,
+        &r.recovered_name(),
         &None,
         &signers,
-        &template.policies,
+        &Map::new(&r.e),
     );
-    // SimpleThresholdError::InvalidThreshold
-    assert_eq!(result.err(), Some(Ok(soroban_sdk::Error::from_contract_error(3201))));
+    assert_eq!(result.err(), Some(Ok(soroban_sdk::Error::from_contract_error(VERIFIER_FAILURE))));
     assert!(r.e.events().all().events().is_empty());
     assert_eq!(r.epoch(), 1);
     assert_eq!(r.attempt(1, &signers), before);
+    assert_eq!(r.client.get_context_rules_count(), count);
 }
 
 #[test]
 fn caught_failed_completion_consumes_nothing() {
-    let r = Recovery::bare();
-    let threshold = r.e.register(ThresholdPolicyContract, ());
+    let r = Recovery::new();
     let router = RouterContractClient::new(&r.e, &r.e.register(RouterContract, ()));
-    let policies =
-        map![&r.e, (threshold, SimpleThresholdAccountParams { threshold: 2 }.into_val(&r.e))];
-    let template = r.template(policies);
-    r.add_recovery_rule(&r.params(template.clone()), None);
-    let signers = r.signers(&[2]);
+    let (verifier, signers) = r.switchable_signers();
     r.reach_quorum(&signers);
+    verifier.set_failing(&true);
     r.at(EXECUTABLE_AFTER);
     let before = r.attempt(1, &signers);
+    assert_eq!(before.as_ref().unwrap().executable_after, Some(EXECUTABLE_AFTER));
+    let count = r.client.get_context_rules_count();
 
-    r.authorize_completion(&template, &signers);
-    assert!(!router.try_recover(&r.account, &template, &signers));
+    r.authorize_completion(&signers);
+    assert_eq!(router.try_recover(&r.account, &signers), None);
     assert!(r.e.events().all().events().is_empty());
     assert_eq!(r.epoch(), 1);
     assert_eq!(r.attempt(1, &signers), before);
+    assert_eq!(r.client.get_context_rules_count(), count);
+
+    verifier.set_failing(&false);
+    r.authorize_completion(&signers);
+    let rule = router.try_recover(&r.account, &signers).unwrap();
+    assert_eq!(rule.context_type, ContextRuleType::Default);
+    assert_eq!(rule.name, r.recovered_name());
+    assert_eq!(rule.valid_until, None);
+    assert_eq!(rule.signers, signers);
+    assert!(rule.policies.is_empty());
+    assert_eq!(r.epoch(), 2);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3238)")] // SocialRecoveryError::NotAllowed
+fn completion_with_extra_policy_panics() {
+    let r = Recovery::new();
+    let signers = r.signers(&[2]);
+    r.reach_quorum(&signers);
+    r.at(EXECUTABLE_AFTER);
+    let other = r.e.register(MockPolicyContract, ());
+    let policies = map![&r.e, (other, 0u32.into_val(&r.e))];
+    r.authorize_completion_with(&signers, &policies);
+    r.client.add_context_rule(
+        &ContextRuleType::Default,
+        &r.recovered_name(),
+        &None,
+        &signers,
+        &policies,
+    );
+}
+
+#[test]
+fn recovered_rule_requires_every_signer() {
+    let r = Recovery::new();
+    let signers = r.signers(&[2, 3]);
+    r.reach_quorum(&signers);
+    r.at(EXECUTABLE_AFTER);
+    let recovered = r.complete(&signers);
+    let owner_rule = r.client.get_context_rule(&0);
+    let count = r.client.get_context_rules_count();
+    let signature = Bytes::from_array(&r.e, &[9; 64]);
+
+    let one = map![&r.e, (signers.get(0).unwrap(), signature.clone())];
+    r.authorize_owner_rule_removal(one, recovered.id);
+    assert!(r.client.try_remove_context_rule(&0).is_err());
+    assert_eq!(r.client.get_context_rule(&0), owner_rule);
+
+    let both = map![
+        &r.e,
+        (signers.get(0).unwrap(), signature.clone()),
+        (signers.get(1).unwrap(), signature)
+    ];
+    r.authorize_owner_rule_removal(both, recovered.id);
+    r.client.remove_context_rule(&0);
+    assert_eq!(r.client.get_context_rules_count(), count - 1);
+    assert!(r.client.try_get_context_rule(&0).is_err());
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3002)")] // SmartAccountError::UnvalidatedContext
+fn recovered_rule_with_one_of_two_signers_panics() {
+    let r = Recovery::new();
+    let signers = r.signers(&[2, 3]);
+    r.reach_quorum(&signers);
+    r.at(EXECUTABLE_AFTER);
+    let recovered = r.complete(&signers);
+
+    let one = map![&r.e, (signers.get(0).unwrap(), Bytes::from_array(&r.e, &[9; 64]))];
+    r.authorize_owner_rule_removal(one, recovered.id);
+    r.client.remove_context_rule(&0);
 }
 
 #[test]
 fn remove_and_readd_policy_keeps_epoch_monotonic() {
     let r = Recovery::bare();
     let other = r.e.register(MockPolicyContract, ());
-    let params = r.params(r.template(Map::new(&r.e)));
+    let params = r.params();
     let rule_id = r.add_recovery_rule(&params, Some((other, 0u32.into_val(&r.e))));
     assert_eq!(r.epoch(), 1);
 
@@ -727,7 +783,7 @@ fn remove_and_readd_policy_keeps_epoch_monotonic() {
 
     r.reach_quorum(&signers);
     r.at(EXECUTABLE_AFTER);
-    r.complete(&params.template, &signers);
+    r.complete(&signers);
     assert_eq!(r.epoch(), 4);
 }
 
@@ -735,7 +791,7 @@ fn remove_and_readd_policy_keeps_epoch_monotonic() {
 fn ready_attempt_does_not_survive_reinstall() {
     let r = Recovery::bare();
     let other = r.e.register(MockPolicyContract, ());
-    let params = r.params(r.template(Map::new(&r.e)));
+    let params = r.params();
     let rule_id = r.add_recovery_rule(&params, Some((other, 0u32.into_val(&r.e))));
     let signers = r.signers(&[2]);
     r.reach_quorum(&signers);
@@ -749,12 +805,12 @@ fn ready_attempt_does_not_survive_reinstall() {
 
     r.at(EXECUTABLE_AFTER);
     let count = r.client.get_context_rules_count();
-    assert!(!r.try_complete(&params.template, &signers));
+    assert!(!r.try_complete(&signers));
     assert_eq!(r.client.get_context_rules_count(), count);
 
     r.reach_quorum(&signers);
     r.at(EXECUTABLE_AFTER);
-    assert!(r.try_complete(&params.template, &signers));
+    assert!(r.try_complete(&signers));
     assert_eq!(r.client.get_context_rules_count(), count + 1);
     assert_eq!(r.epoch(), 3);
 }
@@ -825,7 +881,7 @@ fn policy_contract_rule_can_take_over() {
         &Map::new(&r.e),
     );
     let attacker = Address::generate(&r.e);
-    let mut params = r.params(r.template(Map::new(&r.e)));
+    let mut params = r.params();
     params.guardians = vec![&r.e, attacker.clone()];
     params.threshold = 1;
     params.delay_ledgers = 1;
@@ -846,7 +902,7 @@ fn policy_contract_rule_can_take_over() {
     let signers = r.signers(&[6]);
     r.approve(&attacker, &signers);
     r.at(START + 1);
-    let rule = r.complete(&params.template, &signers);
+    let rule = r.complete(&signers);
 
     assert_eq!(rule.context_type, ContextRuleType::Default);
     assert_eq!(rule.signers, signers);
@@ -864,7 +920,7 @@ fn smart_account_guardian_approves_through_check_auth() {
             Map::<Address, Val>::new(&r.e),
         ),
     );
-    let mut params = r.params(r.template(Map::new(&r.e)));
+    let mut params = r.params();
     params.guardians = vec![&r.e, guardian.clone(), r.carol.clone()];
     let rule_id = r.add_recovery_rule(&params, None);
     let signers = r.signers(&[2]);
@@ -903,11 +959,10 @@ fn max_signer_completion_events_fit() {
             Signer::External(r.verifier.clone(), Bytes::from_slice(&r.e, &key))
         }),
     );
-    let template = r.template(Map::new(&r.e));
     r.reach_quorum(&signers);
     r.at(EXECUTABLE_AFTER);
 
-    let rule = r.complete(&template, &signers);
+    let rule = r.complete(&signers);
     // The whole transaction is this call, so it gets the full limit.
     assert_events_and_return_within(&r.e, rule, 100);
 }

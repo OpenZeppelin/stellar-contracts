@@ -1,6 +1,6 @@
 # Social Recovery Policy Example
 
-A policy contract that lets a quorum of guardians restore access to a smart account whose owner lost their keys. One deployment serves every smart account on a network, and each account configures its own guardians, threshold, delay and the rule a recovery adds.
+A policy contract that lets a quorum of guardians restore access to a smart account whose owner lost their keys. One deployment serves every smart account on a network, and each account configures its own guardians, threshold, delay and expiry.
 
 For more information, check:
 - [`social_recovery` module documentation](../../../packages/accounts/src/policies/social_recovery.rs), which is the API reference
@@ -19,18 +19,17 @@ A.add_context_rule(CallContract(A), "recovery", None, [], { P: {
     threshold: 2,
     delay_ledgers: 17_280,     // ~1 day
     expiry_ledgers: 120_960,   // ~7 days
-    template: { context_type: Default, name: "owner", policies: {} },
 }})
 ```
 
-`P` stores the configuration for `(A, 1)` and sets its epoch to 1. The template fixes everything about the rule a recovery will add, except its signers.
+`P` stores the configuration for `(A, 1)` and sets its epoch to 1. A recovery always adds a `Default` rule named `recovered` with no policies, and the guardians choose only its signers.
 
 **Recovery.** Alice loses her phone, and her new device creates the passkey `pk2`.
 
 1. At ledger 1,000,000, Bob calls `P.approve(Bob, 1, [pk2], 1, A)`. His approval opens an attempt for the signer set `[pk2]` at epoch 1, and the approvals must reach the threshold before ledger 1,120,960.
 2. At ledger 1,010,000, Carol makes the same call. That is 2 of 3 approvals, so the delay starts: the attempt is executable from ledger 1,027,280 until just before ledger 1,148,240.
 3. During the delay, Alice can call `P.cancel(1, A)` if she still holds `pk1` and the recovery is not hers. The epoch becomes 2 and the attempt is dead.
-4. At ledger 1,027,280 or later, anyone submits `A.add_context_rule(Default, "owner", None, [pk2], {})` and selects rule 1 with no signatures. Rule 1 has no signers, so `A` defers to `P.enforce`. `P` checks the call against the template and the ready attempt, removes the attempt and moves the epoch to 2. `A` adds rule 2 with `pk2`.
+4. At ledger 1,027,280 or later, anyone submits `A.add_context_rule(Default, "recovered", None, [pk2], {})` and selects rule 1 with no signatures. Rule 1 has no signers, so `A` defers to `P.enforce`. `P` checks that the call adds exactly that rule for a ready attempt, removes the attempt and moves the epoch to 2. `A` adds rule 2 with `pk2`.
 5. Alice signs with `pk2` through rule 2 and removes rule 0. Rule 1 stays in place for any later recovery.
 
 ### Attempt States
@@ -67,7 +66,7 @@ NEW_KEY=04...          # the new passkey's public key and credential ID, hex
 
 ## 2. Add the Recovery Rule
 
-The owner calls `add_context_rule` on the account, authorized through its admin rule. The policy's install parameters are an untyped `Val` in the account's `policies` map, so the CLI takes them as raw `ScVal` JSON. Map keys are field names in sorted order, and the unit variant `ContextRuleType::Default` encodes as a one-element vector:
+The owner calls `add_context_rule` on the account, authorized through its admin rule. The policy's install parameters are an untyped `Val` in the account's `policies` map, so the CLI takes them as raw `ScVal` JSON, with the field names as map keys in sorted order:
 
 ```bash
 PARAMS='{"map":[
@@ -75,10 +74,6 @@ PARAMS='{"map":[
   {"key":{"symbol":"expiry_ledgers"},"val":{"u32":120960}},
   {"key":{"symbol":"guardians"},"val":{"vec":[
     {"address":"G...BOB"},{"address":"G...CAROL"},{"address":"C...DAVE"}]}},
-  {"key":{"symbol":"template"},"val":{"map":[
-    {"key":{"symbol":"context_type"},"val":{"vec":[{"symbol":"Default"}]}},
-    {"key":{"symbol":"name"},"val":{"string":"owner"}},
-    {"key":{"symbol":"policies"},"val":{"map":[]}}]}},
   {"key":{"symbol":"threshold"},"val":{"u32":2}}]}'
 
 stellar contract invoke --id $ACCOUNT -- add_context_rule \
@@ -101,11 +96,6 @@ account_client.add_context_rule(
         threshold: 2,
         delay_ledgers: 17_280,
         expiry_ledgers: 120_960,
-        template: RecoveryTemplate {
-            context_type: ContextRuleType::Default,
-            name: String::from_str(&e, "owner"),
-            policies: Map::new(&e),
-        },
     }
     .into_val(&e))],
 );
@@ -121,9 +111,6 @@ account_client.add_context_rule(
 | `delay_ledgers` | At least 1. This is the owner's veto window, and at ~5 seconds per ledger, 17,280 is about a day. |
 | `expiry_ledgers` | At least 1. Approvals must reach the threshold within it, and a ready attempt must complete within it. |
 | Ledger headroom | Current ledger + `delay_ledgers` + 2 × `expiry_ledgers` fits in a `u32` |
-| `template.context_type` | `Default` or `CallContract(smart_account)`, so the recovered rule can manage the account |
-| `template.name` | At most 20 bytes |
-| `template.policies` | At most 5, excluding the policy contract and the smart account |
 
 Leave the recovery rule's `valid_until` unset, since a recovery rule that expires turns recovery off with no event. Accounts built on `stellar-accounts` 0.8.0 or later can add the rule without an upgrade.
 
@@ -144,6 +131,15 @@ stellar contract invoke --id $POLICY --source bob -- approve \
 
 The guardian's signature covers all five arguments, so a relayer cannot swap the signer set, and an approval signed for an earlier epoch fails with `StaleEpoch` (3235). The other guardians make the same call with `signers` copied in the same order, ideally from the `signers` field of the `recovery_approval_recorded` event the first approval emitted. A guardian that is a smart account authorizes `approve` through one of its own rules that admits a call on `P`. A guardian contract that calls `approve` with its own address as `guardian` authorizes as the direct invoker.
 
+Before approving, the guardian's wallet checks each signer in the set. The policy cannot tell a genuine signer from a malicious verifier, or from a delegated signer that authorizes back into the account, and either one lets anyone use the recovered rule:
+
+- An `External` signer's verifier is a known deployment for the network, and its key parses in that verifier's format.
+- A `Delegated` signer is a `G…` address, or a `C…` address whose Wasm hash is a known smart account build.
+
+The guardians who approve later run the same checks on the `signers` of the opening event, and refuse or revoke when one fails.
+
+`approve` rejects an empty set, more than 15 signers, an external key over 256 bytes, a delegated signer that is the smart account or the policy contract, and repeated signers with `InvalidSigners` (3233). It then calls `batch_canonicalize_key` on each verifier the set names, and two keys with the same canonical form fail with `SmartAccountError::DuplicateSigner` (3007). A verifier that fails blocks approvals of every set that names it, with the verifier's own error, and of no other set.
+
 To read the attempt, hash the signer set the way the policy does, then query it:
 
 ```bash
@@ -156,7 +152,7 @@ stellar contract invoke --id $POLICY -- get_attempt \
 
 Rust clients get the same value from `stellar_accounts::policies::social_recovery::hash_signers`. Every approval event also carries `signers_hash`.
 
-A guardian withdraws an approval with `revoke_approval`, which takes the same five arguments.
+A guardian withdraws an approval with `revoke_approval`, which takes the same five arguments. It calls no verifier, so a revoke works even when a verifier in the set fails.
 
 ## 4. Veto a Recovery
 
@@ -170,7 +166,7 @@ stellar contract invoke --id $POLICY -- cancel --context_rule_id 1 --smart_accou
 
 ## 5. Complete the Recovery
 
-From `executable_after` until `expires_at`, anyone can submit the completion: a call to `add_context_rule` on the account with the template's context type, name and policies, `valid_until` set to `None`, and the approved signers in their approved order. The smart account's authorization entry carries `AuthPayload { signers: {}, context_rule_ids: [1] }`, with no signatures. The relayer pays the fee and signs only as the transaction source.
+From `executable_after` until `expires_at`, anyone can submit the completion: a call to `add_context_rule(Default, "recovered", None, signers, {})` on the account, with the approved signers in their approved order. The smart account's authorization entry carries `AuthPayload { signers: {}, context_rule_ids: [1] }`, with no signatures. The relayer pays the fee and signs only as the transaction source.
 
 The flow with `@stellar/stellar-sdk`: simulate to record the account's authorization entry, fill in the payload, simulate again so the footprint includes what `__check_auth` and the policy read, then submit.
 
@@ -196,12 +192,11 @@ const recoveryRuleId = 1; // the rule that carries the policy
 const verifier = "C..."; // verifier of the new key
 const newKey = Buffer.from("...", "hex"); // the new public key
 
-// `add_context_rule` arguments: the template's context type and name,
-// `valid_until = None`, the approved signers in their approved order, and the
-// template's policies.
+// `add_context_rule(Default, "recovered", None, signers, {})`, with the
+// approved signers in their approved order.
 const args = [
   xdr.ScVal.scvVec([xdr.ScVal.scvSymbol("Default")]),
-  xdr.ScVal.scvString("owner"),
+  xdr.ScVal.scvString("recovered"),
   xdr.ScVal.scvVoid(),
   xdr.ScVal.scvVec([
     xdr.ScVal.scvVec([
@@ -291,6 +286,8 @@ completeRecovery();
 
 When the policy rejects the completion inside `__check_auth`, simulation fails with `Error(Auth, InvalidAction)`, and the diagnostic events show the policy's code, usually `NotAllowed` (3238). The `authorize_completion` helper in the [account example's tests](../account/src/test.rs) builds the same authorization entry in Rust.
 
+After the policy admits the completion, the account checks the new signers for canonical duplicates again, which calls their verifiers. If a verifier in the set started failing after the approvals, the completion reverts with that verifier's error and the attempt stays as it was.
+
 A successful completion emits the policy's `recovery_authorized`, then the account's `signer_registered` for each new signer and `context_rule_added`. `recovery_authorized` alone does not mean a rule was added: a direct `enforce` call under the account's authorization retires the attempt without adding one. A recovery is complete only when `context_rule_added` follows in the same transaction.
 
 ## 6. Clean Up
@@ -303,142 +300,32 @@ stellar contract invoke --id $ACCOUNT -- remove_context_rule --context_rule_id 0
 
 Until then, anyone holding the old key keeps full authority over the account. Policy state keyed by the old rule's ID, such as a spending window, does not carry over to the new rule.
 
-## Composing the Policy into a Contract
-
-The library exposes free functions in `stellar_accounts::policies::social_recovery`, and [`src/contract.rs`](src/contract.rs) wires them into a deployable contract. It implements the `Policy` hooks and adds the guardian, owner and view entry points with the same names:
-
-```toml
-[dependencies]
-soroban-sdk = "=28.0.0"
-stellar-accounts = "=0.9.0"
-```
-
-```rust
-#[contract]
-pub struct SocialRecoveryPolicyContract;
-
-#[contractimpl]
-impl Policy for SocialRecoveryPolicyContract {
-    type AccountParams = SocialRecoveryAccountParams;
-
-    fn enforce(
-        e: &Env,
-        context: Context,
-        authenticated_signers: Vec<Signer>,
-        context_rule: ContextRule,
-        smart_account: Address,
-    ) {
-        social_recovery::enforce(e, &context, &authenticated_signers, &context_rule, &smart_account)
-    }
-
-    fn install(
-        e: &Env,
-        install_params: Self::AccountParams,
-        context_rule: ContextRule,
-        smart_account: Address,
-    ) {
-        social_recovery::install(e, &install_params, &context_rule, &smart_account)
-    }
-
-    fn uninstall(e: &Env, context_rule: ContextRule, smart_account: Address) {
-        social_recovery::uninstall(e, &context_rule, &smart_account)
-    }
-}
-
-#[contractimpl]
-impl SocialRecoveryPolicyContract {
-    pub fn approve(
-        e: &Env,
-        guardian: Address,
-        epoch: u32,
-        signers: Vec<Signer>,
-        context_rule_id: u32,
-        smart_account: Address,
-    ) {
-        social_recovery::approve(e, &guardian, epoch, &signers, context_rule_id, &smart_account)
-    }
-
-    // revoke_approval, cancel, set_config, get_config, get_epoch and
-    // get_attempt delegate the same way.
-}
-```
-
-Every function authorizes its caller itself: the hooks, `cancel` and `set_config` require the smart account, and `approve` and `revoke_approval` require the guardian. None needs a guard macro. Adding a constructor, an admin or an upgrade entry point gives that party control over recovery for every account using the deployment.
-
-## Calling from Another Contract
-
-A completion can come from a contract instead of a transaction's top-level call. This router, from the [account example's tests](../account/src/test.rs), calls `add_context_rule` on the account and reports whether it succeeded:
-
-```rust
-#[contract]
-struct RouterContract;
-
-#[contractimpl]
-impl RouterContract {
-    pub fn try_recover(
-        e: &Env,
-        account: Address,
-        template: RecoveryTemplate,
-        signers: Vec<Signer>,
-    ) -> bool {
-        MultisigContractClient::new(e, &account)
-            .try_add_context_rule(
-                &template.context_type,
-                &template.name,
-                &None,
-                &signers,
-                &template.policies,
-            )
-            .is_ok()
-    }
-}
-```
-
-The account's authorization entry is the same one a direct completion uses, rooted at `add_context_rule` on the account. A failed completion rolls back the policy's writes and events with it, so it never consumes the attempt, even when the caller catches the failure.
-
-## Errors
-
-| Code | Error | Raised when |
-|---|---|---|
-| 3230 | `NotInstalled` | No configuration for the smart account and rule |
-| 3231 | `AlreadyInstalled` | `install` on a rule that already has a configuration |
-| 3232 | `InvalidConfig` | Invalid install or `set_config` parameters, template or rule scope |
-| 3233 | `InvalidSigners` | `approve` with an empty, oversized or self-delegating signer set, an oversized key, or a duplicate |
-| 3234 | `NotGuardian` | `approve` or `revoke_approval` from an address that is not a guardian |
-| 3235 | `StaleEpoch` | `approve` or `revoke_approval` with an epoch other than the current one |
-| 3236 | `AlreadyApproved` | A second approval from the same guardian on a live attempt |
-| 3237 | `ApprovalNotFound` | `revoke_approval` on a missing or expired attempt, or without an approval |
-| 3238 | `NotAllowed` | Any call through the recovery rule other than an executable completion |
-| 3239 | `MathOverflow` | Epoch or ledger arithmetic overflow |
+The recovered rule has no policies, so every one of its signers must sign through it. The new owner adds any policies it should have, such as a threshold for a set of several keys, with `add_policy` through the same rule.
 
 ## Safety
 
 - **Lost keys only.** Anyone holding the owner's keys can remove the policy, cancel any attempt and replace the guardians immediately. The policy does not protect an account whose keys were stolen.
 - **Veto window.** The owner's veto lasts as long as `delay_ledgers` in practice, and only rules that admit a call on the policy contract can cast it.
-- **Rules on the policy contract.** A rule that admits a call on the policy contract can also call `set_config` and `uninstall`, so it can replace the guardians and the template and then recover the account. It holds the owner's full authority unless a policy on that rule limits it to `cancel`.
+- **Rules on the policy contract.** A rule that admits a call on the policy contract can also call `set_config` and `uninstall`, so it can replace the guardians and then recover the account. It holds the owner's full authority unless a policy on that rule limits it to `cancel`.
 - **Guardians.** A quorum of guardians acting together cannot be told apart from the owner, except by the owner's cancel. Guardians must confirm off-chain that a new key belongs to the person recovering.
+- **Signers.** The policy cannot tell a genuine signer from a malicious verifier, or from a delegated signer that authorizes back into the account, and either one lets anyone use the recovered rule. Guardian wallets check each signer before approving, as step 3 describes.
 - **The old rule.** A recovery adds a rule and removes nothing. The lost key keeps its authority until the new owner removes the old rule.
 - **Upgrades.** The example contract is not upgradeable. Whoever can upgrade a deployment of this policy controls recovery for every smart account that uses it.
 - **Guardian accounts.** A smart-account guardian with `Delegated` signers inherits the delegation caveats in the [Smart Accounts README](../../../packages/accounts/README.md#delegated-signers).
-- **Standards.** No SEP applies. A SEP-30 recovery server can act as an ordinary guardian address.
 
 ## Common Mistakes
 
 | Mistake | What happens | How to fix |
 |---|---|---|
-| Installing the policy on a `Default` rule or a rule for another contract | `install` fails with `InvalidConfig` (3232) | Scope the recovery rule to `CallContract(smart_account)` |
 | Giving the recovery rule signers or other policies | `install` accepts it; extra policies add checks that can block completion | Keep the rule at no signers and this policy alone |
 | Setting `valid_until` on the recovery rule | Recovery stops working after that ledger, with no event | Leave it `None` unless recovery should be time-boxed |
-| Changing the admin rule's policies without updating the template | A recovery adds a rule with the old shape, because the template does not follow the admin rule | Call `set_config` with the new template |
+| Approving a signer without checking its verifier or delegate | A malicious verifier, or a delegate that authorizes back into the account, lets anyone use the recovered rule | Resolve each signer to a known verifier deployment or account build before approving |
 | Guardians approving the same keys in a different order | Each order is its own attempt, and none reaches the threshold | Copy `signers` from the first `recovery_approval_recorded` event |
-| Approving with an old epoch | `StaleEpoch` (3235) | Read `get_epoch` just before signing |
-| Completing with a `name`, `policies`, context type or `valid_until` that differs from the template | `NotAllowed` (3238) inside `__check_auth`, surfaced as `Error(Auth, InvalidAction)` | Copy the template from `get_config` and pass `valid_until = None` |
-| Completing before `executable_after` or from `expires_at` on | `NotAllowed` (3238) | Submit within `[executable_after, expires_at)` from `recovery_quorum_reached` |
+| Completing with a context type, name, `valid_until` or policies other than `Default`, `"recovered"`, `None` and `{}` | `NotAllowed` (3238) inside `__check_auth`, surfaced as `Error(Auth, InvalidAction)` | Submit `add_context_rule(Default, "recovered", None, signers, {})` |
 | Adding signatures to the completion's `AuthPayload` | The account rejects signers that are not on the selected rule (`UnauthorizedSigner`, 3016) | Send an empty `signers` map and `context_rule_ids: [recovery rule]` |
-| Approving a signer set the template's policies cannot accept, such as one signer under a 2-of-n threshold policy | The completion reverts inside `add_context_rule`; the attempt is unchanged but can never complete | Approve a signer set that satisfies every template policy |
+| Expecting the recovered rule to carry the old rule's policies | The recovered rule has none, so every signer of a multi-key set must sign through it | Add policies with `add_policy` through the recovered rule after the recovery |
 | Treating `recovery_authorized` as a completed recovery | An indexer reports a rule that does not exist | Wait for the account's `context_rule_added` in the same transaction |
 | Leaving the old rule after recovery | Whoever finds the lost key keeps full control | Remove the old rule through the recovered one right away |
 | Not watching `recovery_quorum_reached` | The owner misses the veto window | Alert the owner on that event for their account |
 | Relying on a session key to cancel | `cancel` fails, because a `spending_limit` rule never admits a call on the policy | Cancel through the admin rule |
 | Using a deployment that someone can upgrade | The upgrader controls recovery for every account using it | Deploy this crate, which has no upgrade path, and verify a shared deployment's Wasm |
-| Letting the deployment's instance or Wasm entries archive | Calls need the entries restored first | Extend them with `stellar contract extend`, as for any shared contract |

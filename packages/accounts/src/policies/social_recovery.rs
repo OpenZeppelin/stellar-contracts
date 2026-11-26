@@ -20,17 +20,14 @@
 //!         threshold: 2,
 //!         delay_ledgers: 17_280,   // ~1 day
 //!         expiry_ledgers: 120_960, // ~7 days
-//!         template: RecoveryTemplate {
-//!             context_type: ContextRuleType::Default,
-//!             name: "owner",
-//!             policies: map![],
-//!         },
 //!     })],
 //! );
 //! ```
 //!
-//! The template fixes every argument of the rule a recovery adds except its
-//! signers, which the guardians approve.
+//! A recovery adds a `Default` rule named [`RECOVERED_RULE_NAME`], with no
+//! `valid_until` and no policies, whose signers the guardians approve. With no
+//! policies, the smart account requires every signer of that rule to sign
+//! through it.
 //!
 //! ## Recovery Flow
 //!
@@ -40,11 +37,11 @@
 //! 2. The approval that reaches `threshold` starts the delay. The attempt is
 //!    executable from `delay_ledgers` after that approval, for
 //!    `expiry_ledgers`.
-//! 3. Anyone calls `add_context_rule` on the smart account with the template's
-//!    arguments, `valid_until = None` and the approved signers, selecting the
-//!    recovery rule in the `AuthPayload` with no signatures. The smart account
-//!    defers to [`enforce`], which admits exactly that call, removes the
-//!    attempt and increments the epoch.
+//! 3. Anyone calls `add_context_rule(Default, RECOVERED_RULE_NAME, None,
+//!    signers, {})` on the smart account with the approved signers, selecting
+//!    the recovery rule in the `AuthPayload` with no signatures. The smart
+//!    account defers to [`enforce`], which admits exactly that call, removes
+//!    the attempt and increments the epoch.
 //! 4. The new owner removes the old rule through the new one.
 //!
 //! The epoch of a recovery rule increases on [`install`], [`set_config`],
@@ -80,11 +77,17 @@
 //!   practice the veto window is `delay_ledgers`.
 //! - **Rules on this policy contract.** The authorization that passes
 //!   [`cancel`] also passes [`set_config`] and [`uninstall`]. A rule admitting
-//!   calls on this policy contract can replace the guardians and the template
-//!   and then recover the account, so it holds the owner's full authority
-//!   unless a policy on that rule limits it to [`cancel`].
+//!   calls on this policy contract can replace the guardians and then recover
+//!   the account, so it holds the owner's full authority unless a policy on
+//!   that rule limits it to [`cancel`].
 //! - **Guardians.** A guardian quorum acting together is indistinguishable from
 //!   the owner, except through the owner's cancel.
+//! - **Signers.** This policy cannot tell a genuine signer from a malicious
+//!   verifier, or from a delegated signer that authorizes back into the smart
+//!   account, and either one lets anyone use the recovered rule. Guardians
+//!   check each signer before approving: an `External` verifier must be a known
+//!   deployment and the key must parse in its format, and a `Delegated` address
+//!   must be a G-address or a known smart account build.
 //! - **Upgrades.** Whoever can upgrade a deployment of this policy controls
 //!   recovery for every smart account that uses it.
 use soroban_sdk::{
@@ -95,23 +98,9 @@ use soroban_sdk::{
 };
 
 use crate::smart_account::{
-    ContextRule, ContextRuleType, Signer, MAX_EXTERNAL_KEY_SIZE, MAX_NAME_SIZE, MAX_POLICIES,
+    validate_no_canonical_duplicates, ContextRule, ContextRuleType, Signer, MAX_EXTERNAL_KEY_SIZE,
     MAX_SIGNERS,
 };
-
-/// The context rule a completed recovery adds, apart from its signers.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RecoveryTemplate {
-    /// Context type of the recovered rule, either `Default` or
-    /// `CallContract(smart_account)`.
-    pub context_type: ContextRuleType,
-    /// Name of the recovered rule.
-    pub name: String,
-    /// Policies of the recovered rule, mapped to their installation
-    /// parameters.
-    pub policies: Map<Address, Val>,
-}
 
 /// Installation parameters for the social recovery policy.
 #[contracttype]
@@ -127,8 +116,6 @@ pub struct SocialRecoveryAccountParams {
     /// Ledgers an attempt has to reach `threshold` after it opens, and to
     /// complete after it becomes executable.
     pub expiry_ledgers: u32,
-    /// The rule a completed recovery adds.
-    pub template: RecoveryTemplate,
 }
 
 /// A recovery attempt for one signer set at one epoch.
@@ -180,7 +167,7 @@ pub enum SocialRecoveryError {
     NotInstalled = 3230,
     /// The policy is already installed for the smart account and context rule.
     AlreadyInstalled = 3231,
-    /// The configuration, its template or the recovery rule is invalid.
+    /// The configuration or the recovery rule is invalid.
     InvalidConfig = 3232,
     /// The proposed signer set is invalid.
     InvalidSigners = 3233,
@@ -208,6 +195,9 @@ pub const SOCIAL_RECOVERY_TTL_THRESHOLD: u32 = SOCIAL_RECOVERY_EXTEND_AMOUNT - D
 
 /// Maximum number of guardians per recovery rule.
 pub const MAX_GUARDIANS: u32 = 32;
+
+/// Name of the rule a completed recovery adds.
+pub const RECOVERED_RULE_NAME: &str = "recovered";
 
 // ################## EVENTS ##################
 
@@ -670,9 +660,9 @@ pub fn get_attempt(
 /// executable attempt, then removes the attempt and increments the epoch.
 /// Requires authorization from the smart account.
 ///
-/// The context must be a call to `add_context_rule` on the smart account with
-/// the template's `context_type`, `name` and `policies`, `valid_until = None`,
-/// and signers whose hash identifies an attempt at the current epoch that has
+/// The context must be a call to `add_context_rule(Default,
+/// RECOVERED_RULE_NAME, None, signers, {})` on the smart account, where the
+/// hash of `signers` identifies an attempt at the current epoch that has
 /// reached the threshold, passed its delay and not expired.
 ///
 /// # Arguments
@@ -687,8 +677,8 @@ pub fn get_attempt(
 /// # Errors
 ///
 /// * [`SocialRecoveryError::NotAllowed`] - When the context is not a completion
-///   with the template's arguments, or no attempt for its signers is executable
-///   at the current epoch.
+///   of that shape, or no attempt for its signers is executable at the current
+///   epoch.
 /// * [`SocialRecoveryError::MathOverflow`] - When the epoch or a deadline
 ///   overflows.
 /// * refer to [`get_config`] errors.
@@ -698,6 +688,10 @@ pub fn get_attempt(
 /// * topics - `["recovery_authorized", smart_account: Address, context_rule_id:
 ///   u32]`
 /// * data - `[epoch: u32, signers_hash: BytesN<32>]`
+///
+/// # Notes
+///
+/// * Authorization for `smart_account` is required.
 pub fn enforce(
     e: &Env,
     context: &Context,
@@ -709,7 +703,7 @@ pub fn enforce(
 
     let config = get_config(e, context_rule.id, smart_account);
 
-    let signers = completion_signers(e, context, &config.template, smart_account)
+    let signers = completion_signers(e, context, smart_account)
         .unwrap_or_else(|| panic_with_error!(e, SocialRecoveryError::NotAllowed));
     let signers_hash = hash_signers(e, &signers);
     let epoch = get_epoch(e, context_rule.id, smart_account);
@@ -766,9 +760,10 @@ pub fn enforce(
 ///
 /// # Notes
 ///
-/// The rule is expected to have no signers and this policy as its only policy,
-/// but only its scope is checked: later `add_signer` or `add_policy` calls on
-/// the rule are not observed.
+/// * Authorization for `smart_account` is required.
+/// * The rule is expected to have no signers and this policy as its only
+///   policy, but only its scope is checked: later `add_signer` or `add_policy`
+///   calls on the rule are not observed.
 pub fn install(
     e: &Env,
     params: &SocialRecoveryAccountParams,
@@ -815,6 +810,10 @@ pub fn install(
 /// * topics - `["recovery_uninstalled", smart_account: Address,
 ///   context_rule_id: u32]`
 /// * data - `[]`
+///
+/// # Notes
+///
+/// * Authorization for `smart_account` is required.
 pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     smart_account.require_auth();
 
@@ -871,6 +870,13 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
 ///   context_rule_id: u32]`
 /// * data - `[epoch: u32, signers_hash: BytesN<32>, executable_after: u32,
 ///   expires_at: u32]`
+///
+/// # Notes
+///
+/// * Authorization for `guardian` is required.
+/// * Validating `signers` calls `batch_canonicalize_key` once on each verifier
+///   the set names. A verifier that fails blocks approvals of the sets that
+///   name it and of no other set.
 pub fn approve(
     e: &Env,
     guardian: &Address,
@@ -990,6 +996,12 @@ pub fn approve(
 /// * data - `[epoch: u32, signers_hash: BytesN<32>, guardian: Address,
 ///   approvals: u32, executable_after: Option<u32>]` (`executable_after` is
 ///   left out of the data when it is `None`)
+///
+/// # Notes
+///
+/// * Authorization for `guardian` is required.
+/// * `signers` only identifies the attempt. It is not validated and no verifier
+///   is called, so a revoke succeeds whatever the verifiers it names do.
 pub fn revoke_approval(
     e: &Env,
     guardian: &Address,
@@ -1073,18 +1085,21 @@ pub fn revoke_approval(
 ///
 /// # Notes
 ///
-/// The cancellation has no deadline or precondition, and works with no
-/// attempt open.
+/// * Authorization for `smart_account` is required.
+/// * The cancellation has no deadline or precondition, and works with no
+///   attempt open.
 pub fn cancel(e: &Env, context_rule_id: u32, smart_account: &Address) {
     smart_account.require_auth();
 
-    if !e
-        .storage()
-        .persistent()
-        .has(&SocialRecoveryStorageKey::Config(smart_account.clone(), context_rule_id))
-    {
+    let key = SocialRecoveryStorageKey::Config(smart_account.clone(), context_rule_id);
+    if !e.storage().persistent().has(&key) {
         panic_with_error!(e, SocialRecoveryError::NotInstalled)
     }
+    e.storage().persistent().extend_ttl(
+        &key,
+        SOCIAL_RECOVERY_TTL_THRESHOLD,
+        SOCIAL_RECOVERY_EXTEND_AMOUNT,
+    );
 
     let epoch = increment_epoch(e, context_rule_id, smart_account);
 
@@ -1117,7 +1132,8 @@ pub fn cancel(e: &Env, context_rule_id: u32, smart_account: &Address) {
 ///
 /// # Notes
 ///
-/// The new configuration takes effect immediately.
+/// * Authorization for `smart_account` is required.
+/// * The new configuration takes effect immediately.
 pub fn set_config(
     e: &Env,
     params: &SocialRecoveryAccountParams,
@@ -1130,6 +1146,11 @@ pub fn set_config(
     if !e.storage().persistent().has(&key) {
         panic_with_error!(e, SocialRecoveryError::NotInstalled)
     }
+    e.storage().persistent().extend_ttl(
+        &key,
+        SOCIAL_RECOVERY_TTL_THRESHOLD,
+        SOCIAL_RECOVERY_EXTEND_AMOUNT,
+    );
 
     validate_config(e, params, smart_account);
 
@@ -1155,22 +1176,17 @@ pub fn set_config(
 ///   exceeds [`MAX_GUARDIANS`], holds a duplicate, the smart account or this
 ///   policy contract; when the threshold is `0` or exceeds the guardian count;
 ///   when `delay_ledgers` or `expiry_ledgers` is `0`, or the current ledger
-///   plus `delay_ledgers` plus twice `expiry_ledgers` exceeds `u32::MAX`; or
-///   when the template has a context type other than `Default` or
-///   `CallContract(smart_account)`, a name over `MAX_NAME_SIZE` bytes, more
-///   than `MAX_POLICIES` policies, or this policy contract or the smart account
-///   among its policies.
+///   plus `delay_ledgers` plus twice `expiry_ledgers` exceeds `u32::MAX`.
 pub fn validate_config(e: &Env, params: &SocialRecoveryAccountParams, smart_account: &Address) {
     let policy = e.current_contract_address();
-    let SocialRecoveryAccountParams {
-        guardians,
-        threshold,
-        delay_ledgers,
-        expiry_ledgers,
-        template,
-    } = params;
+    let SocialRecoveryAccountParams { guardians, threshold, delay_ledgers, expiry_ledgers } =
+        params;
 
     let guardian_count = guardians.len();
+    if guardian_count > MAX_GUARDIANS {
+        panic_with_error!(e, SocialRecoveryError::InvalidConfig)
+    }
+
     let has_duplicate =
         guardians.iter().any(|g| guardians.first_index_of(&g) != guardians.last_index_of(&g));
     let ledger_headroom = e
@@ -1179,8 +1195,7 @@ pub fn validate_config(e: &Env, params: &SocialRecoveryAccountParams, smart_acco
         .checked_add(*delay_ledgers)
         .and_then(|ledger| ledger.checked_add(*expiry_ledgers))
         .and_then(|ledger| ledger.checked_add(*expiry_ledgers));
-    if guardian_count > MAX_GUARDIANS
-        || has_duplicate
+    if has_duplicate
         || guardians.contains(smart_account)
         || guardians.contains(&policy)
         || *threshold == 0
@@ -1191,20 +1206,11 @@ pub fn validate_config(e: &Env, params: &SocialRecoveryAccountParams, smart_acco
     {
         panic_with_error!(e, SocialRecoveryError::InvalidConfig)
     }
-
-    let context_type_allowed = template.context_type == ContextRuleType::Default
-        || template.context_type == ContextRuleType::CallContract(smart_account.clone());
-    if !context_type_allowed
-        || template.name.len() > MAX_NAME_SIZE
-        || template.policies.len() > MAX_POLICIES
-        || template.policies.contains_key(policy)
-        || template.policies.contains_key(smart_account.clone())
-    {
-        panic_with_error!(e, SocialRecoveryError::InvalidConfig)
-    }
 }
 
-/// Validates a proposed signer set for a smart account.
+/// Validates a proposed signer set for a smart account, then checks it for
+/// canonical duplicates, which calls `batch_canonicalize_key` once on each
+/// verifier the set names.
 ///
 /// # Arguments
 ///
@@ -1216,20 +1222,25 @@ pub fn validate_config(e: &Env, params: &SocialRecoveryAccountParams, smart_acco
 ///
 /// * [`SocialRecoveryError::InvalidSigners`] - When the set is empty, exceeds
 ///   `MAX_SIGNERS`, holds an external key over `MAX_EXTERNAL_KEY_SIZE` bytes, a
-///   delegated signer that is the smart account, or two equal signers.
+///   delegated signer that is the smart account or this policy contract, or two
+///   equal signers.
+/// * refer to [`validate_no_canonical_duplicates`] errors.
 pub fn validate_signers(e: &Env, signers: &Vec<Signer>, smart_account: &Address) {
+    let policy = e.current_contract_address();
     let invalid = signers.is_empty()
         || signers.len() > MAX_SIGNERS
         || signers.iter().any(|signer| {
             let invalid_signer = match &signer {
                 Signer::External(_, key_data) => key_data.len() > MAX_EXTERNAL_KEY_SIZE,
-                Signer::Delegated(address) => address == smart_account,
+                Signer::Delegated(address) => address == smart_account || *address == policy,
             };
             invalid_signer || signers.first_index_of(&signer) != signers.last_index_of(&signer)
         });
     if invalid {
         panic_with_error!(e, SocialRecoveryError::InvalidSigners)
     }
+
+    validate_no_canonical_duplicates(e, signers);
 }
 
 /// Returns the SHA-256 hash of the XDR-encoded signer set, which identifies
@@ -1244,21 +1255,16 @@ pub fn hash_signers(e: &Env, signers: &Vec<Signer>) -> BytesN<32> {
 }
 
 /// Returns the signers of a recovery completion, or `None` when `context` is
-/// not a call to `add_context_rule` on the smart account with the template's
-/// context type, name and policies and no `valid_until`.
+/// not a call to `add_context_rule` on the smart account with a `Default`
+/// context type, the name [`RECOVERED_RULE_NAME`], no `valid_until` and no
+/// policies.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context` - The authorization context.
-/// * `template` - The recovery template.
 /// * `smart_account` - The address of the smart account.
-fn completion_signers(
-    e: &Env,
-    context: &Context,
-    template: &RecoveryTemplate,
-    smart_account: &Address,
-) -> Option<Vec<Signer>> {
+fn completion_signers(e: &Env, context: &Context, smart_account: &Address) -> Option<Vec<Signer>> {
     let Context::Contract(ContractContext { contract, fn_name, args }) = context else {
         return None;
     };
@@ -1275,11 +1281,11 @@ fn completion_signers(
     let signers = Vec::<Signer>::try_from_val(e, &args.get(3)?).ok()?;
     let policies = Map::<Address, Val>::try_from_val(e, &args.get(4)?).ok()?;
 
-    (context_type == template.context_type
-        && name == template.name
+    (context_type == ContextRuleType::Default
+        && name == String::from_str(e, RECOVERED_RULE_NAME)
         && valid_until.is_none()
-        && policies == template.policies)
-        .then_some(signers)
+        && policies.is_empty())
+    .then_some(signers)
 }
 
 /// Returns the state of a stored attempt at the current ledger.
