@@ -267,7 +267,7 @@ Commitment equality is not freshness. A seizure of `alpha` from `(C, O)` leaves 
 
 ## RWA Profile
 
-The RWA profile is the configuration for regulated assets whose issuer must see every balance and may have to enforce rules on them. It is delivered as `RwaHooks`, a `Hooks` implementation a deployment wires instead of `ComplianceHooks`, plus the `ConfidentialRwa` trait and the opt-in `ConfidentialForcedTransfer` trait. It adds no circuit and changes no core entry point. [rwa.md](rwa.md) is the integrator guide: deployment models, the approver service, and the mapping to ERC-7984, ERC-8424 and ERC-3643.
+The RWA profile is the configuration for regulated assets whose issuer must see every balance and may have to enforce rules on them. It is delivered as `RwaHooks`, a `Hooks` implementation a deployment wires instead of `ComplianceHooks`, plus the `ConfidentialRwa` trait and the opt-in `ConfidentialForcedTransfer` trait. It adds no circuit and changes no core entry point.
 
 The profile splits compliance by what the chain can see. Rules over public addresses (eligibility, freeze) run on-chain. Rules over hidden balances and amounts are evaluated off-chain by the issuer's compliance service, which holds the designated auditor key and therefore decrypts every operation; it either monitors and remediates, or, when configured as the approver, authorizes each value-moving operation before it settles.
 
@@ -314,6 +314,8 @@ The approval is additional. The operation's own authorizer, its proof and every 
 - A detached address credential binds `args`, a nonce and an expiry ledger. This is the form an approver service should issue.
 - A transaction whose source account is the approver satisfies the gate through that account's signature on the envelope. The entry still carries `args`, but has no expiry of its own; such envelopes need time bounds.
 - A contract approver that itself invokes the token is authorized without `args` being matched and without its `__check_auth` running. Any path through which that contract calls the token must itself check the token address, the expected epoch, the entry point and the full `args`; a generic forwarding function, even one gated by the contract's own authorization, carries no epoch and is not voided by a bump.
+
+The approver signing key, the designated auditor's decryption key and the admin roles belong in separate custody, so that the approver's decisions are visible to someone who does not hold its key. While the approver is unavailable, the gated operations stop; the deployment's `set_rwa_config` role can replace the approver or disable the gate.
 
 ### Forced Transfer
 

@@ -27,8 +27,7 @@
 //! every account must bind to, an optional approver whose authorization
 //! every value-moving operation additionally requires, and — through the
 //! opt-in [`ConfidentialForcedTransfer`] — a forced transfer between
-//! confidential accounts. See `docs/compliance.md#rwa-profile` and
-//! `docs/rwa.md`.
+//! confidential accounts. See `docs/compliance.md#rwa-profile`.
 //!
 //! Deployments that never write a configuration pay one instance-storage read
 //! per operation: [`ComplianceHooks`] returns early when
@@ -643,7 +642,7 @@ impl Hooks for ComplianceHooks {
 /// 5. **Deposits.** The recipient of a deposit must be a registered account.
 ///
 /// The hooks enforce no balance or volume rule themselves; such rules are the
-/// approver's (`docs/rwa.md`).
+/// approver's (`docs/compliance.md#approval-gate`).
 pub struct RwaHooks;
 
 impl Hooks for RwaHooks {
