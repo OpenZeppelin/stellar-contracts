@@ -577,8 +577,6 @@ pub fn bump_approval_epoch(e: &Env) {
 ///   `from` or this contract's own address, or its destination field is zero.
 /// * refer to [`gate_account`] errors (for `to`).
 /// * refer to [`crate::storage::get_account`] errors (for `from` and `to`).
-/// * [`ComplianceError::AuditorMismatch`] - When `to` is bound to an auditor
-///   other than the designated one.
 /// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors.
 /// * [`crate::ConfidentialTokenError::NonCanonicalEncoding`] - When a stored
 ///   commitment or auditor key coordinate is not a canonical `Bn254Fr` value.
@@ -610,7 +608,7 @@ pub fn bump_approval_epoch(e: &Env) {
 /// [`crate::compliance::ConfidentialForcedTransfer::forced_transfer`] is
 /// responsible for authorizing `operator`.
 pub fn forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128, proof: &Bytes) {
-    let (config, rwa) = rwa_context(e);
+    let (config, _) = rwa_context(e);
 
     if !is_frozen(e, from) {
         panic_with_error!(e, ComplianceError::AccountNotFrozen);
@@ -629,7 +627,6 @@ pub fn forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128, proo
 
     let data = get_account(e, from);
     gate_account(e, to, &config);
-    check_auditor(e, &get_account(e, to), &rwa);
 
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud = auditor.get_key(&data.auditor_id);
@@ -685,24 +682,6 @@ pub fn rwa_context(e: &Env) -> (ComplianceConfig, RwaConfig) {
         panic_with_error!(e, ComplianceError::EligibilityRequired);
     }
     (config, rwa)
-}
-
-/// Asserts that `account` is bound to the designated auditor.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `account` - The stored account record.
-/// * `rwa` - The active [`RwaConfig`].
-///
-/// # Errors
-///
-/// * [`ComplianceError::AuditorMismatch`] - When `account.auditor_id` is not
-///   the designated auditor.
-pub fn check_auditor(e: &Env, account: &ConfidentialAccount, rwa: &RwaConfig) {
-    if account.auditor_id != rwa.auditor_id {
-        panic_with_error!(e, ComplianceError::AuditorMismatch);
-    }
 }
 
 /// Requires the approver's authorization for the current invocation with

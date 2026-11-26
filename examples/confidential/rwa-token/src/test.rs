@@ -224,7 +224,7 @@ fn constructor_writes_both_configurations() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3615)")]
+#[should_panic(expected = "Error(Contract, #3614)")]
 fn constructor_rejects_missing_eligibility_gate() {
     let e = Env::default();
     e.mock_all_auths();

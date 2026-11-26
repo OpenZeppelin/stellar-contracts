@@ -45,8 +45,8 @@ use soroban_sdk::{
 pub use storage::{ClawbackData, ComplianceConfig, ComplianceStorageKey, RwaConfig};
 
 use crate::{
-    storage::get_account, ConfidentialToken, Hooks, RegisterPayload, SetSpenderPayload,
-    SpenderTransferPayload, TransferPayload, WithdrawPayload,
+    ConfidentialToken, Hooks, RegisterPayload, SetSpenderPayload, SpenderTransferPayload,
+    TransferPayload, WithdrawPayload,
 };
 
 // ################## POLICY ##################
@@ -597,16 +597,15 @@ impl Hooks for ComplianceHooks {
 /// on a contract that implements [`ConfidentialToken`] and
 /// [`ConfidentialRwa`].
 ///
-/// It differs from [`ComplianceHooks`] in five ways:
+/// It differs from [`ComplianceHooks`] in four ways:
 ///
 /// 1. **Fails closed.** Every callback reverts unless both the
 ///    [`ComplianceConfig`] and the [`RwaConfig`] are set and the former keeps
 ///    an eligibility gate (a policy or SAC passthrough).
 /// 2. **Designated auditor.** `on_register` accepts only the designated auditor
-///    id. Sending, receiving and delegating require the confidential accounts
-///    involved to be bound to it. `on_merge`, `on_revoke_spender` and
-///    `on_withdraw` do not, so an account bound to another auditor (registered
-///    before the profile was adopted) can still exit.
+///    id. Because the hooks fail closed and the id is fixed, every account
+///    registered under them is bound to it; the other callbacks do not check
+///    the binding again.
 /// 3. **Approval gate.** When an approver is configured, `on_deposit`,
 ///    `on_withdraw`, `on_transfer` and `on_spender_transfer` additionally
 ///    require its authorization over the approval epoch, the parties and the
@@ -615,7 +614,6 @@ impl Hooks for ComplianceHooks {
 ///    and SAC gates, not the policy gate alone: a frozen or unauthorized party
 ///    must not direct regulated value. `on_revoke_spender` still gates only the
 ///    owner.
-/// 5. **Deposits.** The recipient of a deposit must be a registered account.
 ///
 /// The hooks enforce no balance or volume rule themselves; such rules are the
 /// approver's (`docs/compliance.md#approval-gate`).
@@ -635,7 +633,6 @@ impl Hooks for RwaHooks {
         let (config, rwa) = storage::rwa_context(e);
         storage::gate_account(e, from, &config);
         storage::gate_account(e, to, &config);
-        storage::check_auditor(e, &get_account(e, to), &rwa);
         storage::require_approval(
             e,
             &rwa,
@@ -665,8 +662,6 @@ impl Hooks for RwaHooks {
         let (config, rwa) = storage::rwa_context(e);
         storage::gate_account(e, from, &config);
         storage::gate_account(e, to, &config);
-        storage::check_auditor(e, &get_account(e, from), &rwa);
-        storage::check_auditor(e, &get_account(e, to), &rwa);
         storage::require_approval(
             e,
             &rwa,
@@ -686,8 +681,6 @@ impl Hooks for RwaHooks {
         storage::gate_account(e, from, &config);
         storage::gate_account(e, to, &config);
         storage::gate_account(e, spender, &config);
-        storage::check_auditor(e, &get_account(e, from), &rwa);
-        storage::check_auditor(e, &get_account(e, to), &rwa);
         storage::require_approval(
             e,
             &rwa,
@@ -703,10 +696,9 @@ impl Hooks for RwaHooks {
         _live_until_ledger: u32,
         _payload: &SetSpenderPayload,
     ) {
-        let (config, rwa) = storage::rwa_context(e);
+        let (config, _) = storage::rwa_context(e);
         storage::gate_account(e, account, &config);
         storage::gate_account(e, spender, &config);
-        storage::check_auditor(e, &get_account(e, account), &rwa);
     }
 
     fn on_revoke_spender(e: &Env, account: &Address, _spender: &Address) {
@@ -745,27 +737,24 @@ pub enum ComplianceError {
     /// Indicates a registration named an auditor other than the designated
     /// one.
     AuditorNotAllowed = 3608,
-    /// Indicates an operation named a confidential account bound to an
-    /// auditor other than the designated one.
-    AuditorMismatch = 3609,
     /// Indicates an attempt to change the designated auditor.
-    AuditorAlreadySet = 3610,
+    AuditorAlreadySet = 3609,
     /// Indicates the approver is this contract's own address.
-    InvalidApprover = 3611,
+    InvalidApprover = 3610,
     /// Indicates the approver is a party to the operation it would approve.
-    ApproverIsParty = 3612,
+    ApproverIsParty = 3611,
     /// Indicates the forced-transfer amount is not strictly positive.
-    InvalidForcedTransferAmount = 3613,
+    InvalidForcedTransferAmount = 3612,
     /// Indicates the forced-transfer destination is the source, this
     /// contract's own address, or maps to the zero field.
-    InvalidForcedTransferDestination = 3614,
+    InvalidForcedTransferDestination = 3613,
     /// Indicates a compliance configuration of an RWA deployment has neither
     /// a policy nor SAC passthrough.
-    EligibilityRequired = 3615,
+    EligibilityRequired = 3614,
     /// Indicates the approval epoch cannot advance past `u32::MAX`.
-    ApprovalEpochOverflow = 3616,
+    ApprovalEpochOverflow = 3615,
     /// Indicates the account's clawback nonce cannot advance past `u32::MAX`.
-    NonceOverflow = 3617,
+    NonceOverflow = 3616,
 }
 
 // ################## CONSTANTS ##################

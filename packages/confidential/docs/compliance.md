@@ -282,15 +282,12 @@ struct RwaConfig {
 
 - **Fails closed.** Every callback reverts with `RwaNotConfigured` without an `RwaConfig`, with `NotConfigured` without a `ComplianceConfig`, and with `EligibilityRequired` when the `ComplianceConfig` has neither a policy nor SAC passthrough. While an `RwaConfig` exists, `set_compliance_config` rejects a configuration with neither.
 - **Spender.** The spender of a delegated flow passes the freeze, policy and SAC gates, not the policy gate alone; under SAC passthrough it must therefore be an authorized holder of the base asset, which registration already requires. `revoke_spender` still gates only the owner.
-- **Deposits.** The recipient must be a registered account.
 
 ### Designated Auditor
 
 The compliance service can monitor, approve and seize only what it can decrypt, so every account of an RWA deployment is bound to one auditor. `RwaConfig.auditor_id` is fixed by the first `set_rwa_config` call, which requires the id to resolve in the auditor registry; a later call with another id reverts with `AuditorAlreadySet`. Auditor keys under that id still rotate ([Auditor Key Management and Rotation](protocol/auditing.md#auditor-key-management-and-rotation)).
 
-`register` reverts with `AuditorNotAllowed` for any other id. The confidential accounts named by `deposit` (`to`), `confidential_transfer` and `confidential_transfer_from` (`from`, `to`), `set_spender` (`account`) and `forced_transfer` (`to`) must be bound to the designated auditor, else `AuditorMismatch`. The spender's binding is not checked.
-
-`merge`, `revoke_spender` and `withdraw` carry no such check. An account bound to another auditor, which can exist only where a deployment adopted the profile after accounts had registered, can therefore fold its balances and leave publicly, and can be seized against a proof from the auditor it is bound to; it cannot send, receive or delegate. Such deployments should drain those accounts before adopting the profile.
+`register` reverts with `AuditorNotAllowed` for any other id. The binding is checked only there: `RwaHooks` fails closed and the id cannot change, so every account registered under it is bound to the designated auditor. An account bound to another auditor exists only where a deployment switched to `RwaHooks` after accounts had registered; its operations are not visible to the compliance service, so such a deployment drains those accounts before switching.
 
 ### Approval Gate
 
@@ -333,7 +330,7 @@ The circuit references `dest_f` in no gate, so the tag is what assigns a proof t
 
 `forced_transfer` runs, after the deployment's access-control check on `operator`:
 
-1. **Preconditions**, in this order. Both configurations valid, as for `RwaHooks`. `is_frozen(from)`, else `AccountNotFrozen`. `amount > 0`, else `InvalidForcedTransferAmount`. `to` is neither `from` nor this contract and its `dest_f` is non-zero, else `InvalidForcedTransferDestination`. `from` is registered. `to` passes the freeze, policy and SAC gates. `to` is registered and bound to the designated auditor, else `AuditorMismatch`. `from` passes no eligibility gate and may be bound to any auditor.
+1. **Preconditions**, in this order. Both configurations valid, as for `RwaHooks`. `is_frozen(from)`, else `AccountNotFrozen`. `amount > 0`, else `InvalidForcedTransferAmount`. `to` is neither `from` nor this contract and its `dest_f` is non-zero, else `InvalidForcedTransferDestination`. `from` is registered. `to` passes the freeze, policy and SAC gates. `to` is registered. `from` passes no eligibility gate and may be bound to any auditor.
 2. **Verification** against `CircuitType::Clawback`.
 3. **State update.** `from.C_spend <- C_spend + C_receive - amount·G`, `from.C_receive <- O`, then `to.C_receive <- to.C_receive + amount·G`. The sum of all commitments is unchanged and the pool's balance is untouched.
 4. **Nonce.** `ClawbackNonce(from) <- nonce + 1`, reverting with `NonceOverflow` instead of wrapping.
@@ -415,15 +412,14 @@ The RWA profile adds:
 |:---|:--|:---|
 | `RwaNotConfigured` | 3607 | `RwaHooks` or an RWA entry point runs without an `RwaConfig` |
 | `AuditorNotAllowed` | 3608 | `register` names an auditor other than the designated one |
-| `AuditorMismatch` | 3609 | an operation names a confidential account bound to another auditor |
-| `AuditorAlreadySet` | 3610 | `set_rwa_config` names an auditor other than the stored one |
-| `InvalidApprover` | 3611 | the approver is the contract's own address |
-| `ApproverIsParty` | 3612 | the approver is `from`, `to` or `spender` of the operation |
-| `InvalidForcedTransferAmount` | 3613 | `amount <= 0` |
-| `InvalidForcedTransferDestination` | 3614 | `to` is `from` or the contract's own address, or its `dest_f` is zero |
-| `EligibilityRequired` | 3615 | the compliance configuration of an RWA deployment has neither a policy nor SAC passthrough |
-| `ApprovalEpochOverflow` | 3616 | the approval epoch is `u32::MAX` |
-| `NonceOverflow` | 3617 | the clawback nonce is `u32::MAX` in `forced_transfer` |
+| `AuditorAlreadySet` | 3609 | `set_rwa_config` names an auditor other than the stored one |
+| `InvalidApprover` | 3610 | the approver is the contract's own address |
+| `ApproverIsParty` | 3611 | the approver is `from`, `to` or `spender` of the operation |
+| `InvalidForcedTransferAmount` | 3612 | `amount <= 0` |
+| `InvalidForcedTransferDestination` | 3613 | `to` is `from` or the contract's own address, or its `dest_f` is zero |
+| `EligibilityRequired` | 3614 | the compliance configuration of an RWA deployment has neither a policy nor SAC passthrough |
+| `ApprovalEpochOverflow` | 3615 | the approval epoch is `u32::MAX` |
+| `NonceOverflow` | 3616 | the clawback nonce is `u32::MAX` in `forced_transfer` |
 
 ---
 

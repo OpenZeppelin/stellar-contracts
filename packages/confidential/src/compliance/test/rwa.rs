@@ -495,7 +495,7 @@ fn set_rwa_config_requires_compliance_config() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3615)")]
+#[should_panic(expected = "Error(Contract, #3614)")]
 fn set_rwa_config_requires_eligibility_gate() {
     let h = setup();
     h.e.as_contract(&h.host, || {
@@ -525,14 +525,14 @@ fn set_rwa_config_rejects_unregistered_auditor() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3610)")]
+#[should_panic(expected = "Error(Contract, #3609)")]
 fn set_rwa_config_rejects_auditor_change() {
     let h = configured(None);
     h.e.as_contract(&h.host, || set_rwa_config(&h.e, LEGACY_AUDITOR, &None));
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3611)")]
+#[should_panic(expected = "Error(Contract, #3610)")]
 fn set_rwa_config_rejects_token_as_approver() {
     let h = setup();
     h.e.as_contract(&h.host, || {
@@ -607,7 +607,7 @@ fn bump_approval_epoch_increments_and_emits() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3616)")]
+#[should_panic(expected = "Error(Contract, #3615)")]
 fn approval_epoch_overflow_panics() {
     let h = configured(None);
     h.e.as_contract(&h.host, || {
@@ -617,7 +617,7 @@ fn approval_epoch_overflow_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3615)")]
+#[should_panic(expected = "Error(Contract, #3614)")]
 fn set_compliance_config_cannot_remove_eligibility_gate_under_rwa() {
     let h = configured(None);
     h.e.as_contract(&h.host, || {
@@ -691,7 +691,7 @@ fn every_hook_reverts_without_eligibility_gate() {
             &ComplianceConfig { policy: None, sac_passthrough: false },
         );
     });
-    assert_every_hook_reverts_with(&h, &a, &b, 3615);
+    assert_every_hook_reverts_with(&h, &a, &b, 3614);
 }
 
 #[test]
@@ -725,7 +725,7 @@ fn on_transfer_without_compliance_config_panics_not_configured() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3615)")]
+#[should_panic(expected = "Error(Contract, #3614)")]
 fn on_transfer_without_eligibility_gate_panics() {
     let h = configured(None);
     let a = account(&h, AUDITOR);
@@ -771,79 +771,7 @@ fn on_register_rejects_policy_denied_account() {
     });
 }
 
-#[test]
-#[should_panic(expected = "Error(Contract, #3609)")]
-fn on_transfer_rejects_legacy_sender() {
-    let h = configured(None);
-    let from = account(&h, LEGACY_AUDITOR);
-    let to = account(&h, AUDITOR);
-    run_hook(&h, 4, &from, &to);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3609)")]
-fn on_transfer_rejects_legacy_recipient() {
-    let h = configured(None);
-    let from = account(&h, AUDITOR);
-    let to = account(&h, LEGACY_AUDITOR);
-    run_hook(&h, 4, &from, &to);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3609)")]
-fn on_spender_transfer_rejects_legacy_owner() {
-    let h = configured(None);
-    let owner = account(&h, LEGACY_AUDITOR);
-    let to = account(&h, AUDITOR);
-    run_hook(&h, 5, &owner, &to);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3609)")]
-fn on_deposit_rejects_legacy_recipient() {
-    let h = configured(None);
-    let from = Address::generate(&h.e);
-    let to = account(&h, LEGACY_AUDITOR);
-    run_hook(&h, 1, &from, &to);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3609)")]
-fn on_set_spender_rejects_legacy_owner() {
-    let h = configured(None);
-    let owner = account(&h, LEGACY_AUDITOR);
-    let spender = account(&h, AUDITOR);
-    run_hook(&h, 6, &owner, &spender);
-}
-
-#[test]
-fn legacy_account_can_merge_revoke_and_withdraw() {
-    let h = configured(None);
-    let legacy = account(&h, LEGACY_AUDITOR);
-    let other = account(&h, AUDITOR);
-    run_hook(&h, 2, &legacy, &other);
-    run_hook(&h, 7, &legacy, &other);
-    run_hook(&h, 3, &legacy, &other);
-}
-
-#[test]
-fn spender_auditor_binding_is_not_checked() {
-    let h = configured(None);
-    let owner = account(&h, AUDITOR);
-    let legacy_spender = account(&h, LEGACY_AUDITOR);
-    run_hook(&h, 6, &owner, &legacy_spender);
-}
-
 // ################## ELIGIBILITY GATES ##################
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3501)")]
-fn on_deposit_rejects_unregistered_recipient() {
-    let h = configured(None);
-    let from = Address::generate(&h.e);
-    let to = Address::generate(&h.e);
-    run_hook(&h, 1, &from, &to);
-}
 
 #[test]
 fn on_deposit_accepts_unregistered_depositor() {
@@ -1008,18 +936,6 @@ fn on_spender_transfer_rejects_frozen_recipient() {
     let to = account(&h, AUDITOR);
     let spender = account(&h, AUDITOR);
     freeze_account(&h, &to);
-    h.e.as_contract(&h.host, || {
-        RwaHooks::on_spender_transfer(&h.e, &spender, &owner, &to, &spender_transfer_payload(&h.e));
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3609)")]
-fn on_spender_transfer_rejects_legacy_recipient() {
-    let h = configured(None);
-    let owner = account(&h, AUDITOR);
-    let to = account(&h, LEGACY_AUDITOR);
-    let spender = account(&h, AUDITOR);
     h.e.as_contract(&h.host, || {
         RwaHooks::on_spender_transfer(&h.e, &spender, &owner, &to, &spender_transfer_payload(&h.e));
     });
@@ -1640,7 +1556,7 @@ fn set_spender_merge_and_revoke_need_no_approval() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3612)")]
+#[should_panic(expected = "Error(Contract, #3611)")]
 fn approver_cannot_be_the_sender() {
     let h = setup();
     let alice = Address::generate(&h.e);
@@ -1651,7 +1567,7 @@ fn approver_cannot_be_the_sender() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3612)")]
+#[should_panic(expected = "Error(Contract, #3611)")]
 fn approver_cannot_be_the_depositor() {
     let h = setup();
     let alice = Address::generate(&h.e);
@@ -1661,7 +1577,7 @@ fn approver_cannot_be_the_depositor() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3612)")]
+#[should_panic(expected = "Error(Contract, #3611)")]
 fn approver_cannot_be_the_withdrawer() {
     let h = setup();
     let alice = Address::generate(&h.e);
@@ -1673,7 +1589,7 @@ fn approver_cannot_be_the_withdrawer() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3612)")]
+#[should_panic(expected = "Error(Contract, #3611)")]
 fn approver_cannot_be_the_spender() {
     let h = setup();
     let spender = Address::generate(&h.e);
@@ -1687,7 +1603,7 @@ fn approver_cannot_be_the_spender() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3612)")]
+#[should_panic(expected = "Error(Contract, #3611)")]
 fn approver_cannot_be_the_recipient() {
     let h = setup();
     let approver = Address::generate(&h.e);
@@ -1698,7 +1614,7 @@ fn approver_cannot_be_the_recipient() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3612)")]
+#[should_panic(expected = "Error(Contract, #3611)")]
 fn approver_cannot_be_the_deposit_recipient() {
     let h = setup();
     let approver = Address::generate(&h.e);
@@ -1709,7 +1625,7 @@ fn approver_cannot_be_the_deposit_recipient() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3612)")]
+#[should_panic(expected = "Error(Contract, #3611)")]
 fn approver_cannot_be_the_withdraw_recipient() {
     let h = setup();
     let approver = Address::generate(&h.e);
@@ -1719,7 +1635,7 @@ fn approver_cannot_be_the_withdraw_recipient() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3612)")]
+#[should_panic(expected = "Error(Contract, #3611)")]
 fn approver_cannot_be_the_delegating_owner() {
     let h = setup();
     let approver = Address::generate(&h.e);
@@ -1739,7 +1655,7 @@ fn approver_cannot_be_the_delegating_owner() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3612)")]
+#[should_panic(expected = "Error(Contract, #3611)")]
 fn approver_cannot_be_the_spender_transfer_recipient() {
     let h = setup();
     let approver = Address::generate(&h.e);
@@ -1772,7 +1688,7 @@ fn approver_may_take_part_in_operations_outside_the_gate() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3617)")]
+#[should_panic(expected = "Error(Contract, #3616)")]
 fn forced_transfer_nonce_overflow_panics() {
     let f = forced_flow(None);
     let e = &f.h.e;
@@ -2089,21 +2005,21 @@ fn forced_transfer_requires_frozen_source() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3613)")]
+#[should_panic(expected = "Error(Contract, #3612)")]
 fn forced_transfer_zero_amount_panics() {
     let f = forced_flow(None);
     force(&f, 0);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3613)")]
+#[should_panic(expected = "Error(Contract, #3612)")]
 fn forced_transfer_negative_amount_panics() {
     let f = forced_flow(None);
     force(&f, -1);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3614)")]
+#[should_panic(expected = "Error(Contract, #3613)")]
 fn forced_transfer_to_self_panics() {
     let f = forced_flow(None);
     let e = &f.h.e;
@@ -2117,7 +2033,7 @@ fn forced_transfer_to_self_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3614)")]
+#[should_panic(expected = "Error(Contract, #3613)")]
 fn forced_transfer_to_the_token_panics() {
     let f = forced_flow(None);
     let e = &f.h.e;
@@ -2159,21 +2075,6 @@ fn forced_transfer_to_policy_denied_account_panics() {
     let f = forced_flow(None);
     ListPolicyClient::new(&f.h.e, &f.h.policy).block(&f.to);
     force(&f, 40);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3609)")]
-fn forced_transfer_to_legacy_account_panics() {
-    let f = forced_flow(None);
-    let e = &f.h.e;
-    let legacy = account(&f.h, LEGACY_AUDITOR);
-    ConfidentialForcedTransferClient::new(e, &f.h.host).forced_transfer(
-        &f.from,
-        &legacy,
-        &40,
-        &proof_data(e),
-        &f.h.admin,
-    );
 }
 
 #[test]
@@ -2257,14 +2158,15 @@ fn rejected_hook_leaves_commitments_unchanged() {
     let h = configured(None);
     let alice = Address::generate(&h.e);
     store_account(&h, &alice, AUDITOR, 1_000, 0);
-    let legacy = account(&h, LEGACY_AUDITOR);
+    let frozen = account(&h, AUDITOR);
+    freeze_account(&h, &frozen);
     let token = ConfidentialTokenClient::new(&h.e, &h.host);
 
-    let res = token.try_confidential_transfer(&alice, &legacy, &transfer_data(&h.e));
+    let res = token.try_confidential_transfer(&alice, &frozen, &transfer_data(&h.e));
     assert!(res.is_err());
     h.e.as_contract(&h.host, || {
         assert_eq!(get_account(&h.e, &alice).spendable_commitment, g_times(&h.e, 1_000));
-        assert_eq!(get_account(&h.e, &legacy).receiving_commitment, Grumpkin::identity(&h.e));
+        assert_eq!(get_account(&h.e, &frozen).receiving_commitment, Grumpkin::identity(&h.e));
     });
 }
 
@@ -2835,7 +2737,7 @@ fn forced_transfer_checks_run_in_documented_order() {
         token_err(ConfidentialTokenError::AccountNotRegistered)
     );
 
-    // 5. Destination gates before its registration and auditor binding.
+    // 5. Destination gates before its registration.
     let legacy_frozen = account(h, LEGACY_AUDITOR);
     freeze_account(h, &legacy_frozen);
     assert_eq!(try_force(&f, &f.from, &legacy_frozen, 1), err(ComplianceError::AccountFrozen));
@@ -2937,7 +2839,7 @@ fn forced_transfer_from_source_with_unregistered_auditor_fails() {
 }
 
 // Pins branch: forced_transfer / stored configuration invalid / it reverts
-//   with EligibilityRequired #3615 or NotConfigured #3600
+//   with EligibilityRequired #3614 or NotConfigured #3600
 // Verifies: INV-1, INV-6
 #[test]
 fn forced_transfer_fails_closed_on_an_invalid_stored_configuration() {
@@ -3015,42 +2917,11 @@ fn hook_checks_run_in_documented_order() {
     policy.block(&p.to);
     assert_eq!(try_hook(&h, Op::Transfer, &p), err(ComplianceError::AccountFrozen));
 
-    // on_transfer: eligibility gates before the auditor binding.
-    let p = Parties {
-        from: account(&h, LEGACY_AUDITOR),
-        to: account(&h, AUDITOR),
-        spender: account(&h, AUDITOR),
-    };
-    freeze_account(&h, &p.to);
-    assert_eq!(try_hook(&h, Op::Transfer, &p), err(ComplianceError::AccountFrozen));
-
-    // on_deposit: policy on `to` before its registration and auditor checks.
-    let p = Parties {
-        from: Address::generate(&h.e),
-        to: Address::generate(&h.e),
-        spender: Address::generate(&h.e),
-    };
-    policy.block(&p.to);
-    assert_eq!(try_hook(&h, Op::Deposit, &p), err(ComplianceError::NotAuthorizedByPolicy));
-
     // on_spender_transfer: `to` gates before `spender` gates.
     let p = parties(&h);
     policy.block(&p.to);
     freeze_account(&h, &p.spender);
     assert_eq!(try_hook(&h, Op::SpenderTransfer, &p), err(ComplianceError::NotAuthorizedByPolicy));
-}
-
-// Pins branch: on_transfer / approver == from and from bound to another
-//   auditor / AuditorMismatch #3609 wins over ApproverIsParty #3612
-// Verifies: INV-3, INV-5
-#[test]
-fn auditor_binding_is_checked_before_the_approver_is_party_rule() {
-    let h = setup();
-    let alice = Address::generate(&h.e);
-    configure(&h, Some(alice.clone()));
-    store_account(&h, &alice, LEGACY_AUDITOR, 0, 0);
-    let p = Parties { from: alice, to: account(&h, AUDITOR), spender: account(&h, AUDITOR) };
-    assert_eq!(try_hook(&h, Op::Transfer, &p), err(ComplianceError::AuditorMismatch));
 }
 
 // ################## P5: HOOK VARIANTS ##################
@@ -3065,33 +2936,6 @@ fn spender_binding_and_registration_are_not_checked_on_spend() {
         let p = Parties { from: account(&h, AUDITOR), to: account(&h, AUDITOR), spender };
         assert_eq!(try_hook(&h, Op::SpenderTransfer, &p), Ok(()));
     }
-}
-
-// Pins branch: on_transfer, on_spender_transfer, on_set_spender / a
-//   confidential party is not registered / AccountNotRegistered #3501;
-//   on_withdraw accepts an unregistered recipient
-// Verifies: INV-5, INV-16
-#[test]
-fn hooks_reject_unregistered_confidential_parties() {
-    let h = configured(None);
-    let not_registered = token_err(ConfidentialTokenError::AccountNotRegistered);
-    let p = Parties {
-        from: Address::generate(&h.e),
-        to: account(&h, AUDITOR),
-        spender: account(&h, AUDITOR),
-    };
-    assert_eq!(try_hook(&h, Op::Transfer, &p), not_registered);
-    assert_eq!(try_hook(&h, Op::SpenderTransfer, &p), not_registered);
-    assert_eq!(try_hook(&h, Op::SetSpender, &p), not_registered);
-    let p = Parties {
-        from: account(&h, AUDITOR),
-        to: Address::generate(&h.e),
-        spender: account(&h, AUDITOR),
-    };
-    assert_eq!(try_hook(&h, Op::Transfer, &p), not_registered);
-    assert_eq!(try_hook(&h, Op::SpenderTransfer, &p), not_registered);
-    // A withdrawal pays out to a public address.
-    assert_eq!(try_hook(&h, Op::Withdraw, &p), Ok(()));
 }
 
 // Pins branch: on_register / the address carries a frozen flag / it
@@ -3167,7 +3011,7 @@ fn disabling_the_approver_emits_rwa_config_changed_without_approver() {
 }
 
 // Pins branch: set_compliance_config, set_rwa_config / rejected with
-//   EligibilityRequired #3615 or ApprovalEpochOverflow #3616 / the stored
+//   EligibilityRequired #3614 or ApprovalEpochOverflow #3615 / the stored
 //   configurations and the epoch are unchanged
 // Verifies: INV-7, INV-8, INV-9
 #[test]
