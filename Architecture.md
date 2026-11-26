@@ -16,6 +16,7 @@ stellar-contracts/
 │   ├── confidential/            # Confidential token (encrypted balances, ZK proofs, Noir circuits)
 │   ├── contract-utils/          # Utilities (pausable, upgradeable, cryptography, math, merkle distributor)
 │   ├── fee-abstraction/         # Fee forwarding (pay transaction fees in fungible tokens)
+│   ├── finance/                 # Vesting wallet
 │   ├── governance/              # Governor, votes, timelock
 │   ├── macros/                  # Procedural macros
 │   ├── tokens/                  # Token implementations (fungible, non-fungible, RWA, vault)
