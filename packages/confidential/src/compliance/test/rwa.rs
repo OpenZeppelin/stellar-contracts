@@ -2188,7 +2188,8 @@ fn recover_moves_the_whole_balance_and_emits() {
         r_tilde_aud_r: field(e, 4),
     };
     let events = e.events().all();
-    assert_eq!(events.events().last().unwrap(), &event.to_xdr(e, &r.h.host));
+    assert_eq!(events.events().len(), 1);
+    assert_eq!(events.events().first().unwrap(), &event.to_xdr(e, &r.h.host));
     e.as_contract(&r.h.host, || {
         let lost = get_account(e, &r.lost);
         assert_eq!(lost.spendable_commitment, Grumpkin::identity(e));
@@ -2336,6 +2337,28 @@ fn recover_with_exact_approval_succeeds() {
     });
     recover_with(&r, Some(args));
     assert_eq!(e.auths().len(), 2);
+}
+
+// The two tests below build the approval tuple by hand, so its wire shape is
+// pinned independently of `recover_approval_args`.
+
+#[test]
+fn recover_approval_tuple_is_from_to_payload() {
+    let r = recovery();
+    let e = &r.h.e;
+    let args: Vec<Val> = (r.lost.clone(), r.fresh.clone(), recover_payload(e)).into_val(e);
+    recover_with(&r, Some(args));
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn recover_approval_for_other_payload_fails() {
+    let r = recovery();
+    let e = &r.h.e;
+    let mut other = recover_payload(e);
+    other.v_tilde = field(e, 9);
+    let args: Vec<Val> = (r.lost.clone(), r.fresh.clone(), other).into_val(e);
+    recover_with(&r, Some(args));
 }
 
 #[test]

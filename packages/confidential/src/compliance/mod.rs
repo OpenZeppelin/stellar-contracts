@@ -320,14 +320,13 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
 /// Admin and read surface of the RWA profile
 /// (`docs/compliance.md#rwa-profile`).
 ///
-/// A contract that implements this trait MUST wire `type Hooks = RwaHooks;`
-/// on its [`ConfidentialToken`] impl: the configuration written here is
-/// enforced only by [`RwaHooks`].
+/// The configuration written here is enforced only by [`RwaHooks`], so the
+/// contract's [`ConfidentialToken::Hooks`] must implement [`RwaHooksType`].
 ///
 /// The implementor supplies the body of the admin entry point and thereby
 /// the access-control model, as for [`ConfidentialCompliance`].
 #[contracttrait]
-pub trait ConfidentialRwa: ConfidentialCompliance {
+pub trait ConfidentialRwa: ConfidentialCompliance + ConfidentialToken<Hooks: RwaHooksType> {
     /// Sets the designated auditor and the approver. The designated auditor is
     /// fixed by the first call.
     ///
@@ -653,6 +652,16 @@ impl Hooks for RwaHooks {
         storage::gate_account(e, account, &config);
     }
 }
+
+/// Marker for the [`Hooks`] implementations that enforce the RWA profile.
+/// [`ConfidentialRwa`] requires it of the contract's
+/// [`ConfidentialToken::Hooks`].
+///
+/// A custom [`Hooks`] type implements it only when it keeps every check of
+/// [`RwaHooks`].
+pub trait RwaHooksType {}
+
+impl RwaHooksType for RwaHooks {}
 
 // ################## ERRORS ##################
 
