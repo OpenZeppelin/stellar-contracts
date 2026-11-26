@@ -225,8 +225,8 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// cannot be submitted with another. `Some(d)` with `d` equal to this
     /// contract's own address is rejected; any other `d` is accepted without
     /// passing the freeze, policy, or SAC gates. The account's clawback nonce
-    /// is bound into it as well and advances on every seizure, so a proof
-    /// executes at most once.
+    /// is bound into it as well and advances on every seizure and recovery,
+    /// so a proof executes at most once and never after a recovery.
     ///
     /// `account` MUST be frozen: the freeze keeps `C_spend` and `C_receive`
     /// unchanged between proof construction and submission, which the proof's
@@ -303,8 +303,8 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// trait-level docstring explains why the method has no default body.
     fn force_revoke_spender(e: &Env, account: Address, spender: Address, operator: Address);
 
-    /// Returns the number of seizures executed against `account`, which the
-    /// auditor binds into the next clawback proof.
+    /// Returns the number of seizures and recoveries executed against
+    /// `account`, which the auditor binds into the next clawback proof.
     ///
     /// # Arguments
     ///

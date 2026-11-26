@@ -21,8 +21,9 @@ use crate::{
         RecoverPayload, Recovered, RwaConfig, RwaConfigChanged, RwaHooks,
     },
     storage::{
-        decode_data, get_account, get_address_as_field_element, get_auditor,
-        set_address_as_field_element, set_auditor, set_underlying_asset, set_verifier,
+        address_to_field, append_amount, append_field, append_point, decode_data, get_account,
+        get_address_as_field_element, get_auditor, set_address_as_field_element, set_auditor,
+        set_underlying_asset, set_verifier,
     },
     verifier::CircuitType,
     ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, ConfidentialTokenError,
@@ -156,6 +157,25 @@ impl crate::verifier::ConfidentialVerifier for RejectingVerifier {
 
     fn verify_proof(_e: &Env, _ct: CircuitType, _pi: Bytes, _proof: Bytes) -> bool {
         false
+    }
+}
+
+/// Models a clawback proof the auditor built but nobody has submitted: a
+/// clawback verifies only against the statement stored under `held`, as a
+/// real proof verifies only against the public inputs it absorbed. Every
+/// other circuit is accepted.
+#[contract]
+struct HeldClawbackProofVerifier;
+
+#[contractimpl(contracttrait)]
+impl crate::verifier::ConfidentialVerifier for HeldClawbackProofVerifier {
+    fn register_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn update_verification_key(_e: &Env, _ct: CircuitType, _vk: Bytes, _op: Address) {}
+
+    fn verify_proof(e: &Env, ct: CircuitType, pi: Bytes, _proof: Bytes) -> bool {
+        ct != CircuitType::Clawback
+            || e.storage().instance().get::<_, Bytes>(&symbol_short!("held")) == Some(pi)
     }
 }
 
@@ -2238,6 +2258,67 @@ fn recover_binds_the_documented_public_inputs() {
     assert_eq!(circuit, CircuitType::Recover);
     assert_eq!(pi.len(), 17 * 32);
     assert_eq!(pi, expected);
+}
+
+/// Builds the statement of a clawback of `amount` from `account`'s current
+/// state with no settlement, in the `docs/compliance.md#circuit` order, and
+/// hands it to [`HeldClawbackProofVerifier`] as the auditor's proof.
+fn hold_clawback_proof(h: &Harness, account: &Address, amount: i128) {
+    let e = &h.e;
+    let pi = e.as_contract(&h.host, || {
+        let acc = get_account(e, account);
+        let mut pi = Bytes::new(e);
+        append_point(&mut pi, &acc.spendable_commitment);
+        append_point(&mut pi, &acc.receiving_commitment);
+        append_point(&mut pi, &Grumpkin::generator(e));
+        append_amount(&mut pi, e, amount);
+        append_field(&mut pi, &get_address_as_field_element(e));
+        append_field(&mut pi, &address_to_field(e, account));
+        append_field(&mut pi, &BytesN::from_array(e, &[0u8; 32]));
+        append_amount(&mut pi, e, i128::from(storage::clawback_nonce(e, account)));
+        pi
+    });
+    e.as_contract(&h.verifier, || e.storage().instance().set(&symbol_short!("held"), &pi));
+}
+
+#[test]
+fn recover_invalidates_a_held_clawback_proof() {
+    // The auditor builds a clawback proof against `lost` at (O, 300G), which
+    // is never submitted; `lost` is recovered instead. An approved public
+    // deposit then restores (O, 300G), `lost` is refrozen, and the held proof
+    // is submitted.
+    let h = setup_with(|e| e.register(HeldClawbackProofVerifier, ()));
+    let approver = Address::generate(&h.e);
+    let r = recovery_with(h, Some(approver));
+    let e = &r.h.e;
+    store_account(&r.h, &r.lost, AUDITOR, 0, 300);
+    hold_clawback_proof(&r.h, &r.lost, 300);
+    let clawback = || storage::clawback(e, &r.lost, 300, &None, &Bytes::new(e));
+
+    ConfidentialRwaClient::new(e, &r.h.host).recover(
+        &r.lost,
+        &r.fresh,
+        &recover_data(e),
+        &r.h.admin,
+    );
+
+    let compliance = ConfidentialComplianceClient::new(e, &r.h.host);
+    let depositor = account(&r.h, AUDITOR);
+    r.h.sac.mint(&depositor, &300);
+    compliance.unfreeze(&r.lost, &r.h.admin);
+    ConfidentialTokenClient::new(e, &r.h.host).deposit(&depositor, &r.lost, &300);
+    compliance.freeze(&r.lost, &r.h.admin);
+    e.as_contract(&r.h.host, || {
+        let lost = get_account(e, &r.lost);
+        assert_eq!(lost.spendable_commitment, Grumpkin::identity(e));
+        assert_eq!(lost.receiving_commitment, g_times(e, 300));
+    });
+
+    assert_eq!(try_in_host(&r.h, clawback), token_err(ConfidentialTokenError::InvalidProof));
+
+    // A proof the auditor builds now verifies.
+    hold_clawback_proof(&r.h, &r.lost, 300);
+    assert_eq!(try_in_host(&r.h, clawback), Ok(()));
 }
 
 #[test]

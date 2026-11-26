@@ -95,8 +95,8 @@ pub enum ComplianceStorageKey {
     /// Per-account frozen flag. Persistent storage; only set when an account
     /// is frozen and removed on unfreeze.
     Frozen(Address),
-    /// Number of seizures executed against the account. Persistent storage;
-    /// absent until the first seizure.
+    /// Number of seizures and recoveries executed against the account.
+    /// Persistent storage; absent until the first.
     ClawbackNonce(Address),
     /// Singleton [`RwaConfig`]. Instance storage.
     RwaConfig,
@@ -136,8 +136,8 @@ pub fn is_frozen(e: &Env, account: &Address) -> bool {
     }
 }
 
-/// Returns the number of seizures executed against `account`, or `0` when it
-/// has never been seized from. The value is a public input of the next
+/// Returns the number of seizures and recoveries executed against `account`,
+/// or `0` when there has been none. The value is a public input of the next
 /// clawback proof (`docs/compliance.md#circuit`).
 ///
 /// # Arguments
@@ -285,9 +285,9 @@ pub fn unfreeze(e: &Env, account: &Address) {
 /// recompute, so the seized account stays spendable.
 ///
 /// The account's clawback nonce is a public input and advances on every
-/// seizure, so a proof executes at most once even if the commitments are
-/// later restored to the values it was built against
-/// (`docs/compliance.md#anti-replay-and-the-freeze`).
+/// seizure and every [`recover`], so a proof executes at most once and never
+/// after a recovery, even if the commitments are later restored to the values
+/// it was built against (`docs/compliance.md#anti-replay-and-the-freeze`).
 ///
 /// # Arguments
 ///
@@ -507,7 +507,12 @@ pub fn set_rwa_config(e: &Env, auditor_id: u32, approver: &Option<Address>) {
 }
 
 /// Moves the whole committed balance of the frozen `from` to `to` without
-/// revealing it, and resets `from` to the identity on both sides.
+/// revealing it, resets `from` to the identity on both sides, and advances
+/// `from`'s clawback nonce.
+///
+/// The nonce advance voids every clawback proof built against `from` before
+/// the recovery, which a public deposit could otherwise bring back into
+/// validity (`docs/compliance.md#anti-replay-and-the-freeze`).
 ///
 /// `to` is credited with `C_transfer`, which the proof shows holds `from`'s
 /// committed total under a blinding `to` derives as for an incoming transfer
@@ -584,6 +589,9 @@ pub fn recover(e: &Env, from: &Address, to: &Address, payload: &RecoverPayload, 
 
     let identity = Grumpkin::identity(e);
     set_commitments(e, from, &identity, &identity);
+    e.storage()
+        .persistent()
+        .set(&ComplianceStorageKey::ClawbackNonce(from.clone()), &(clawback_nonce(e, from) + 1));
     set_commitments(
         e,
         to,

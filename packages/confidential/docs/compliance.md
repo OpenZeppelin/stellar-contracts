@@ -232,7 +232,7 @@ No public input is prover-supplied ([Public Input Sources](protocol/operations/R
 2. **Public inputs.** Assembled in the [Circuit](#circuit) order through `append_point` / `append_field` / `append_amount`, so every coordinate and scalar passes the canonicality guards. `data` decodes to `ClawbackData { proof }`.
 3. **Verification** against `CircuitType::Clawback`.
 4. **State update.** `C_spend <- C_spend + C_receive - alpha·G` and `C_receive <- O`: the `Merge` rule ([Merge](protocol/operations/merge.md)) followed by a public debit, with no fresh randomness. The new opening is `(v_s + v_r - alpha, r_s + r_r)`, which the owner and the auditor recompute from the event's `amount` alone, so the seized account stays spendable. Re-randomizing under a prover-chosen blinding instead would leave the owner unable to open its own commitment.
-5. **Nonce.** `ClawbackNonce(account) <- nonce + 1`, where `nonce` is the value step 2 read into the public inputs. The entry is absent until the first seizure and reads as `0`; `clawback_nonce(account)` exposes it ([Interface Summary](#interface-summary)).
+5. **Nonce.** `ClawbackNonce(account) <- nonce + 1`, where `nonce` is the value step 2 read into the public inputs. The entry is absent until the first seizure or recovery and reads as `0`; `clawback_nonce(account)` exposes it ([Interface Summary](#interface-summary)).
 6. **Settlement**, by `destination`:
    - `None` — no underlying moves.
    - `Some(d)` — exactly `amount` is transferred to `d` in the same invocation. `d` passes no compliance gate ([Contract-Level Freeze](#contract-level-freeze), [Policy Contract](#policy-contract)): the auditor chooses it when building the proof ([Circuit](#circuit)) and the operator confirms it as an argument.
@@ -256,6 +256,8 @@ The owner and the auditor fold the event as they would an owner-initiated one ([
 `C_spend` and `C_receive` are public inputs, so any change to either between proof construction and submission — an inbound transfer, a merge, a revoke — fails verification with `InvalidProof`. The freeze holds the commitments still. An auditor key rotation in the same window fails the same way ([In-flight proofs across rotation](protocol/auditing.md#in-flight-proofs-across-rotation)).
 
 Commitment equality is not freshness. A seizure of `alpha` from `(C, O)` leaves `(C - alpha·G, O)`, and a zero-blinding credit of `alpha` restores `(C, O)` exactly — a public deposit followed by a merge once the account is unfrozen, or a `force_revoke_spender` fold of an allowance committed as `Com(alpha, 0)` while it is still frozen — with every other public input unchanged. The `nonce` input advances on every seizure ([Contract Flow](#contract-flow)) and never returns to an earlier value, so the retained proof cannot execute a second seizure the auditor did not approve.
+
+A recovery resets the source to `(O, O)` ([Recovery Flow](#recovery-flow)), from which public deposits and merges rebuild any zero-blinding state, so a proof built before the recovery and never submitted would verify again once its state is rebuilt. `recover` therefore advances the nonce as well.
 
 `ConfidentialClawback: ConfidentialCompliance` forces a `freeze` / `unfreeze` implementation but constrains nothing about the deployment's `Hooks`. Wiring `NoHooks` next to a `ConfidentialClawback` impl yields a `freeze` that writes the flag and an `is_frozen` that returns `true` while every token operation stays ungated, so the target spends out before the seizure lands and the admin's only signal is an `InvalidProof` once the commitments have moved. A deployment that enables clawback MUST wire `ComplianceHooks`, or a custom `Hooks` impl that gates the same seven positions ([Customizing the Hooks Trait](#customizing-the-hooks-trait)).
 
@@ -363,7 +365,7 @@ The recover circuit proves that `C_transfer` commits to the source's committed t
 1. **Preconditions.** Both configurations are set and keep an eligibility gate, as for `RwaHooks` ([RWA Profile](#rwa-profile)); an approver is configured, else `RecoveryRequiresApprover`; `is_frozen(from)`, else `AccountNotFrozen`; `to` passes the freeze, policy and SAC gates, which also rejects `to = from`; the approver authorizes `(from, to, payload)` and is neither `from` nor `to`, else `ApproverIsParty`.
 2. **Public inputs.** Assembled in the [Recovery Circuit](#recovery-circuit) order through `append_point` / `append_field`. `data` decodes to `RecoverData { payload, proof }`.
 3. **Verification** against `CircuitType::Recover`.
-4. **State update.** `from`: `C_spend <- O` and `C_receive <- O`. `to`: `C_receive <- C_receive + C_transfer`.
+4. **State update.** `from`: `C_spend <- O`, `C_receive <- O`, and `ClawbackNonce(from) <- ClawbackNonce(from) + 1` ([Anti-Replay and the Freeze](#anti-replay-and-the-freeze)). `to`: `C_receive <- C_receive + C_transfer`.
 5. **Event.** `Recovered { from, to, r_e_point, v_tilde, sigma, v_tilde_aud_r, r_tilde_aud_r }` ([Events](#events)).
 
 Like `clawback`, it invokes no `Hooks` callback.
