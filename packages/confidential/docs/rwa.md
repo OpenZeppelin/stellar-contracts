@@ -10,9 +10,8 @@ A confidential token for a regulated asset has to answer two kinds of rule. Rule
 |:---|:---|:---|
 | 0, monitor and remediate (`approver: None`) | Detected after settlement; remedied with `freeze` and `forced_transfer` | None |
 | 1, approval gate (`approver: Some`) | Enforced before settlement by the approver | The issuer's approval service, for every value-moving operation |
-| Hub mode (optional, with either tier) | Rules on what an investor may receive are enforced before settlement by the issuer as the sender of every credit | The issuer's distributor, which is the counterparty anyway |
 
-Tier 0 fits rules whose breach can be cured afterwards. A holder can pass an excess on to another eligible holder, or withdraw it where the public side is open, before the breach is detected. Tier 1 fits rules that must hold at every instant, at the price of an online dependency and of trusting the approver for the correctness of those rules. [Hub mode](#hub-mode) fits a fund whose flows are all subscriptions and redemptions against the issuer. In both tiers the proofs still guarantee that nobody, the issuer included, can create value, and that a holder's balance moves only by the holder's own proof or by an administrative override, which needs a role holder, the auditor's proof and a frozen account ([Overrides and recovery](#overrides-and-recovery)).
+Tier 0 fits rules whose breach can be cured afterwards. A holder can pass an excess on to another eligible holder, or withdraw it where the public side is open, before the breach is detected. Tier 1 fits rules that must hold at every instant, at the price of an online dependency and of trusting the approver for the correctness of those rules. In both tiers the proofs still guarantee that nobody, the issuer included, can create value, and that a holder's balance moves only by the holder's own proof or by an administrative override, which needs a role holder, the auditor's proof and a frozen account ([Overrides and recovery](#overrides-and-recovery)).
 
 ## Issuer
 
@@ -37,11 +36,11 @@ A token whose own compliance modules depend on balances (for example a SEP-57 to
 |:---|:---|:---|
 | Onboard | Pass the issuer's KYC | Same |
 | Register | `register` with the designated `auditor_id` from `rwa_config()` | Same |
-| Preflight | `can_send(from)`, `can_receive(to)`; `hub_mode()` and `is_distributor` for both parties | Same; `rwa_config().approver` tells the wallet an approval is needed |
+| Preflight | `can_send(from)`, `can_receive(to)` | Same; `rwa_config().approver` tells the wallet an approval is needed |
 | Send | Build the proof, sign, submit | Build the proof, sign a detached authorization entry, send both to the issuer's approval service |
 | Receive | Ingest the event; no signature or acceptance | Same |
 
-`can_send` and `can_receive` report public eligibility only. They cannot promise that an operation will settle: that also needs a valid proof, in Tier 1 an approval, and in hub mode a distributor as one of the parties.
+`can_send` and `can_receive` report public eligibility only. They cannot promise that an operation will settle: that also needs a valid proof and, in Tier 1, an approval.
 
 ### Tier 1 submission
 
@@ -59,28 +58,6 @@ A request the service cannot decide at once stays pending and holds its reservat
 
 Each refusal tells the sender one bit about the rule that refused it. Services should authenticate requests, prefer submitting themselves so that an approval is not handed out unused, and return generic reasons.
 
-## Hub mode
-
-Tokenised funds usually launch with subscriptions and redemptions against a transfer agent and no transfers between investors. [Hub Mode](compliance.md#hub-mode) makes that a contract rule: every credit to an investor, and every new delegation, needs a flagged distributor as a party. The issuer then enforces a holding cap or a holder count by not sending what would breach it, with no approver, no approval service and no change to how a wallet signs or proves.
-
-**Deployment.** Flag the distributor and turn hub mode on in the constructor, after `set_rwa_config`, as the reference example does when it is given a `distributor`. The treasury that deposits for itself must be a distributor, or its own deposit is rejected. An escrow or router contract is never a distributor, and cannot pay an investor while hub mode is on.
-
-**Keeping the distributor key cold.** A distributor that proves and signs for every subscription holds a hot key over the whole inventory. Two arrangements avoid that:
-
-- *Cold distributor, bounded hot spender.* Flag a cold treasury address and have it `set_spender` a bounded, expiring allowance to a hot component the issuer runs. The hot key moves at most the allowance, the cold key ends it with `revoke_spender`, and redemptions land in the cold account.
-- *Public-amount issuance.* Issue with `deposit(from = flagged treasury, to = investor, amount)`. The issuer needs no confidential key and no proof to issue. Each subscription amount is public, so an investor's holdings are public until it first transacts.
-
-**What the issuer must do itself.** The contract enforces the topology, not the rule. Credits prepared from the same view of a recipient, or of a global limit, both settle, so the issuer keeps the reservation ledger that [Hub Mode](compliance.md#hub-mode) requires across all its distributors, deposit signers and appointed spenders; one distributor that waits for each credit to settle is the simplest way to meet it. Before funding a contract-owned account, or turning hub mode on while one holds value, check that every payout it needs has a distributor as a party. A spender it appoints must be its own component. The identity policy must not admit an investor address whose control can change hands without a token operation.
-
-**Costs.**
-
-- No transfer, delivery-versus-payment or delegation between investors. Two investors can still trade through a router as two legs with the distributor as principal; the seller then learns whether the buyer's leg was accepted.
-- The distributor is a single point of failure for issuance, and its confidential key decrypts every subscription and redemption.
-- A compromised distributor moves its inventory, and pulls in every allowance investors granted to it. Freezing stops the loss; returning it needs `forced_transfer` ([Overrides and recovery](#overrides-and-recovery)).
-- Rules on what an investor sends, such as a lockup, are not enforced: a redemption lands and the distributor can only send it back.
-- Every subscription and redemption is publicly an edge to a known issuer address.
-- A change to hub mode or to a distributor flag voids every outstanding approval in a Tier 1 deployment.
-
 ## Approval service
 
 The service is the approver's signing component plus the auditor's ledger. Requirements for a correct one:
@@ -92,8 +69,6 @@ The service is the approver's signing component plus the auditor's ledger. Requi
 - **Keys.** Retain every historical key of the designated auditor id; a rotated key cannot open earlier ciphertexts ([Auditor Key Management and Rotation](protocol/auditing.md#auditor-key-management-and-rotation)).
 
 While the service is down, value-moving operations on a Tier 1 token stop. The `config_manager` can replace the approver or disable the gate; both void outstanding approvals.
-
-**Discovery.** `set_home_domain` publishes on-chain the host name under which the issuer serves its metadata ([Home Domain](compliance.md#home-domain)). A wallet should take the service's address from that domain and compare the approver it names with `rwa_config().approver`, not trust an address supplied by a server. The format of that metadata is not specified yet.
 
 ## Overrides and recovery
 
@@ -122,7 +97,6 @@ The base token's mapping to ERC-7984 is unchanged by the profile. The profile ad
 | ERC-3643 `forcedTransfer`, `recoveryAddress` | `forced_transfer` | The movement only; relinking the identity and carrying over restrictions are the issuer's procedure |
 | ERC-3643 compliance modules | Identity modules behind the policy; balance and volume modules in the approval service | Split by what the chain can see |
 | SEP-8 approval server | Approval service issuing Soroban authorization entries | Same role, different mechanism |
-| SEP-1 `home_domain` | `home_domain` on the token contract | Same purpose; a contract field, since a contract has no account entry |
 
 ERC-7984 and ERC-8424 are technology-agnostic. The differences above come from this implementation: it matches the names and the public-eligibility functions, and it cannot provide behaviours that need a party computing on hidden values. Describe the token as aligned with those standards, not as conforming to them.
 
@@ -131,8 +105,7 @@ ERC-7984 and ERC-8424 are technology-agnostic. The differences above come from t
 - Tier 1 trusts the approver for balance and volume rules, and makes it an online dependency.
 - Tier 0 detects a breach after it has settled.
 - `forced_transfer` and recovery reveal the amount.
-- With an open public side, public transfers bypass the approval gate and the hub rule.
-- Hub mode forbids transfers between investors and puts a spending key in the path of every subscription.
+- With an open public side, public transfers bypass the approval gate.
 - Wallets and custodians carry the base token's burden unchanged (proving, key derivation, event ingestion), plus the approval exchange in Tier 1.
 
 ---

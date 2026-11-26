@@ -37,7 +37,7 @@ Table order is reading order.
 
 | File | Owns |
 |:---|:---|
-| [compliance.md](compliance.md) | Freeze, SAC passthrough, policy contract, `Hooks` customisation, clawback and forced revocation, the RWA profile (designated auditor, approval gate, hub mode, forced transfer) |
+| [compliance.md](compliance.md) | Freeze, SAC passthrough, policy contract, `Hooks` customisation, clawback and forced revocation, the RWA profile (designated auditor, approval gate, forced transfer) |
 | [rwa.md](rwa.md) | Integrator guide to the RWA profile: deployment models, the approver service, standards mapping (non-normative) |
 | [selective-disclosure/README.md](selective-disclosure/README.md) | Motivation, goals, preliminaries, threat model of the disclosure layer |
 | [selective-disclosure/protocol.md](selective-disclosure/protocol.md) | Disclosure ciphertext, proof bundle, verifier protocol, on-chain read surface, end-to-end flow |

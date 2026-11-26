@@ -1,5 +1,5 @@
 use soroban_sdk::{
-    contracttype, panic_with_error, token, Address, Bytes, BytesN, Env, IntoVal, String, Val, Vec,
+    contracttype, panic_with_error, token, Address, Bytes, BytesN, Env, IntoVal, Val, Vec,
 };
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
@@ -7,11 +7,9 @@ use crate::{
     auditor::ConfidentialAuditorClient,
     compliance::{
         emit_approval_epoch_bumped, emit_clawback, emit_compliance_config_changed,
-        emit_distributor_changed, emit_forced_transfer, emit_frozen, emit_home_domain_changed,
-        emit_hub_mode_changed, emit_rwa_config_changed, emit_unfrozen, ComplianceError,
+        emit_forced_transfer, emit_frozen, emit_rwa_config_changed, emit_unfrozen, ComplianceError,
         PolicyClient, CLAWBACK_NONCE_EXTEND_AMOUNT, CLAWBACK_NONCE_TTL_THRESHOLD,
-        DELEGATION_COUNT_EXTEND_AMOUNT, DELEGATION_COUNT_TTL_THRESHOLD, DISTRIBUTOR_EXTEND_AMOUNT,
-        DISTRIBUTOR_TTL_THRESHOLD, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
+        FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
     storage::{
         account_exists, add_to_receiving, address_to_field, append_amount, append_field,
@@ -82,18 +80,6 @@ pub enum ComplianceStorageKey {
     /// Approval epoch, a `u32` that only increases. Instance storage; absent
     /// until the first bump and read as `0`.
     ApprovalEpoch,
-    /// Host name under which the deployment publishes its discovery metadata.
-    /// Instance storage; absent until set and after it is cleared.
-    HomeDomain,
-    /// Hub-mode flag. Instance storage; absent is read as `false`.
-    HubMode,
-    /// Per-address distributor flag. Persistent storage; only set while the
-    /// address is a distributor and removed when the flag is cleared.
-    Distributor(Address),
-    /// Number of delegations the account has granted and not yet deleted.
-    /// Persistent storage; written by [`initialize_delegation_count`] and
-    /// absent ("unknown", not zero) for an account it never ran for.
-    DelegationCount(Address),
 }
 
 // ################## QUERY STATE ##################
@@ -171,68 +157,6 @@ pub fn rwa_config(e: &Env) -> Option<RwaConfig> {
 /// * `e` - Access to the Soroban environment.
 pub fn approval_epoch(e: &Env) -> u32 {
     e.storage().instance().get(&ComplianceStorageKey::ApprovalEpoch).unwrap_or(0)
-}
-
-/// Returns the host name under which the deployment publishes its discovery
-/// metadata, or `None` when none is set (`docs/compliance.md#home-domain`).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-pub fn home_domain(e: &Env) -> Option<String> {
-    e.storage().instance().get(&ComplianceStorageKey::HomeDomain)
-}
-
-/// Returns whether hub mode is on (`docs/compliance.md#hub-mode`).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-pub fn hub_mode(e: &Env) -> bool {
-    e.storage().instance().get(&ComplianceStorageKey::HubMode).unwrap_or(false)
-}
-
-/// Returns whether `account` is flagged as a distributor. The flag is
-/// independent of [`hub_mode`]: it is kept while hub mode is off.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `account` - The address to query.
-pub fn is_distributor(e: &Env, account: &Address) -> bool {
-    let key = ComplianceStorageKey::Distributor(account.clone());
-    if e.storage().persistent().has(&key) {
-        e.storage().persistent().extend_ttl(
-            &key,
-            DISTRIBUTOR_TTL_THRESHOLD,
-            DISTRIBUTOR_EXTEND_AMOUNT,
-        );
-        true
-    } else {
-        false
-    }
-}
-
-/// Returns the number of delegations `account` has granted and not yet
-/// deleted, or `None` when the count was never initialized for it. `None`
-/// means "unknown", not zero: the account may hold delegations created before
-/// counting started (`docs/compliance.md#delegation-count`).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `account` - The delegating owner.
-pub fn delegation_count(e: &Env, account: &Address) -> Option<u32> {
-    let key = ComplianceStorageKey::DelegationCount(account.clone());
-    let count = e.storage().persistent().get::<_, u32>(&key);
-    if count.is_some() {
-        e.storage().persistent().extend_ttl(
-            &key,
-            DELEGATION_COUNT_TTL_THRESHOLD,
-            DELEGATION_COUNT_EXTEND_AMOUNT,
-        );
-    }
-    count
 }
 
 /// Returns whether `account` is publicly eligible to take part in
@@ -554,12 +478,6 @@ pub fn clawback(
 /// * topics - `["revoke_spender", account: Address, spender: Address]`
 /// * data - `[a_tilde: BytesN<32>, allowance_salt: BytesN<32>]`
 ///
-/// # Notes
-///
-/// The call runs no [`crate::Hooks`] callback, so it maintains the account's
-/// delegation count itself (see [`decrement_delegation_count`]). A count
-/// that was never initialized is left untouched.
-///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait entry
@@ -570,7 +488,6 @@ pub fn force_revoke_spender(e: &Env, account: &Address, spender: &Address) {
     if !is_frozen(e, account) {
         panic_with_error!(e, ComplianceError::AccountNotFrozen);
     }
-    decrement_delegation_count(e, account);
     revoke_spender(e, account, spender);
 }
 
@@ -595,7 +512,7 @@ pub fn force_revoke_spender(e: &Env, account: &Address, spender: &Address) {
 /// * [`ComplianceError::AuditorAlreadySet`] - When an [`RwaConfig`] exists and
 ///   `auditor_id` differs from the stored one.
 /// * [`ComplianceError::InvalidApprover`] - When `approver` is this contract's
-///   own address or a flagged distributor.
+///   own address.
 /// * [`ComplianceError::ApprovalEpochOverflow`] - When the approval epoch
 ///   cannot advance.
 /// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors (first
@@ -634,12 +551,8 @@ pub fn set_rwa_config(e: &Env, auditor_id: u32, approver: &Option<Address>) {
             ConfidentialAuditorClient::new(e, &get_auditor(e)).get_key(&auditor_id);
         }
     }
-    if let Some(approver) = approver {
-        // A distributor is a party to the operations it takes part in, and
-        // the approver must never be one (`ApproverIsParty`).
-        if *approver == e.current_contract_address() || is_distributor(e, approver) {
-            panic_with_error!(e, ComplianceError::InvalidApprover);
-        }
+    if approver.as_ref() == Some(&e.current_contract_address()) {
+        panic_with_error!(e, ComplianceError::InvalidApprover);
     }
 
     let rwa = RwaConfig { auditor_id, approver: approver.clone() };
@@ -675,200 +588,6 @@ pub fn bump_approval_epoch(e: &Env) {
     if rwa_config(e).is_none() {
         panic_with_error!(e, ComplianceError::RwaNotConfigured);
     }
-    let epoch = advance_approval_epoch(e);
-    emit_approval_epoch_bumped(e, epoch);
-}
-
-/// Sets or clears the host name under which the deployment publishes its
-/// discovery metadata (`docs/compliance.md#home-domain`).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `home_domain` - The host name, or `None` to clear it.
-///
-/// # Errors
-///
-/// * [`ComplianceError::RwaNotConfigured`] - When [`rwa_config`] returns
-///   `None`.
-/// * [`ComplianceError::InvalidHomeDomain`] - When `home_domain` is `Some` and
-///   breaks the host-name rule below.
-///
-/// # Events
-///
-/// * topics - `["home_domain_changed"]`
-/// * data - `[home_domain: Option<String>]` (the stored value after the call;
-///   left out of the data when it is `None`)
-///
-/// # Notes
-///
-/// A host name is 1 to 32 bytes of `a`-`z`, `0`-`9`, `-` and `.`, made of at
-/// least two non-empty labels separated by `.`. No label starts or ends with
-/// `-`, and the last label starts with a letter and is not `localhost`. The
-/// rule excludes a scheme, user information, a port, a path, upper case and
-/// every dotted-numeric form. It is a syntactic filter: a client must still
-/// refuse a name that resolves to a non-public address.
-///
-/// The event is emitted on every successful call, including one that leaves
-/// the stored value unchanged. The approval epoch does not advance.
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks and should
-/// only be used:
-/// - During contract initialization/construction
-/// - In admin functions that implement their own authorization logic
-///
-/// Using this function in public-facing methods may create significant
-/// security risks as it could allow unauthorized modifications: whoever sets
-/// the home domain decides which server wallets contact.
-pub fn set_home_domain(e: &Env, home_domain: &Option<String>) {
-    if rwa_config(e).is_none() {
-        panic_with_error!(e, ComplianceError::RwaNotConfigured);
-    }
-    match home_domain {
-        Some(domain) => {
-            if !is_valid_home_domain(domain) {
-                panic_with_error!(e, ComplianceError::InvalidHomeDomain);
-            }
-            e.storage().instance().set(&ComplianceStorageKey::HomeDomain, domain);
-        }
-        None => e.storage().instance().remove(&ComplianceStorageKey::HomeDomain),
-    }
-    emit_home_domain_changed(e, home_domain);
-}
-
-/// Turns hub mode on or off and advances the approval epoch. While hub mode
-/// is on, [`check_hub`] rejects every operation that brings value into a
-/// confidential account, and every new delegation, unless a distributor is a
-/// party (`docs/compliance.md#hub-mode`).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `enabled` - The new state.
-///
-/// # Errors
-///
-/// * [`ComplianceError::RwaNotConfigured`] - When [`rwa_config`] returns
-///   `None`.
-/// * [`ComplianceError::ApprovalEpochOverflow`] - When the approval epoch
-///   cannot advance.
-///
-/// # Events
-///
-/// * topics - `["hub_mode_changed"]`
-/// * data - `[enabled: bool]`
-///
-/// followed by:
-///
-/// * topics - `["approval_epoch_bumped"]`
-/// * data - `[epoch: u32]`
-///
-/// # Notes
-///
-/// A call that does not change the stored state is a no-op: it emits nothing
-/// and does not advance the epoch. Hub mode on with no distributor rejects
-/// every credit.
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks and should
-/// only be used:
-/// - During contract initialization/construction
-/// - In admin functions that implement their own authorization logic
-///
-/// Using this function in public-facing methods may create significant
-/// security risks as it could allow unauthorized modifications: turning hub
-/// mode off re-opens direct transfers between holders.
-pub fn set_hub_mode(e: &Env, enabled: bool) {
-    if rwa_config(e).is_none() {
-        panic_with_error!(e, ComplianceError::RwaNotConfigured);
-    }
-    if hub_mode(e) == enabled {
-        return;
-    }
-    e.storage().instance().set(&ComplianceStorageKey::HubMode, &enabled);
-    emit_hub_mode_changed(e, enabled);
-    // An approval issued under the previous topology must not execute under
-    // this one.
-    let epoch = advance_approval_epoch(e);
-    emit_approval_epoch_bumped(e, epoch);
-}
-
-/// Sets or clears the distributor flag of `account` and advances the
-/// approval epoch (`docs/compliance.md#hub-mode`).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `account` - The address to flag or unflag.
-/// * `enabled` - Whether `account` is a distributor after the call.
-///
-/// # Errors
-///
-/// * [`ComplianceError::RwaNotConfigured`] - When [`rwa_config`] returns
-///   `None`.
-/// * [`ComplianceError::InvalidDistributor`] - When `enabled` is `true` and
-///   `account` is this contract's own address, the configured approver, or an
-///   account whose delegation count is initialized and non-zero.
-/// * [`ComplianceError::ApprovalEpochOverflow`] - When the approval epoch
-///   cannot advance.
-///
-/// # Events
-///
-/// * topics - `["distributor_changed", account: Address]`
-/// * data - `[enabled: bool]`
-///
-/// followed by:
-///
-/// * topics - `["approval_epoch_bumped"]`
-/// * data - `[epoch: u32]`
-///
-/// # Notes
-///
-/// A call that does not change the stored flag is a no-op: it emits nothing
-/// and does not advance the epoch. The flag is on the address: `account`
-/// need not be a registered confidential account, so that a public payer of
-/// deposits can be a distributor.
-///
-/// An account that already granted delegations is rejected because its
-/// spenders could then credit any holder on their own authorization. The
-/// check cannot see delegations of an account whose count was never
-/// initialized ([`delegation_count`] returns `None`); the caller must rule
-/// those out from the event archive.
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks and should
-/// only be used:
-/// - During contract initialization/construction
-/// - In admin functions that implement their own authorization logic
-///
-/// Using this function in public-facing methods may create significant
-/// security risks as it could allow unauthorized modifications: a distributor
-/// may send to and receive from every holder while hub mode is on.
-pub fn set_distributor(e: &Env, account: &Address, enabled: bool) {
-    let Some(rwa) = rwa_config(e) else {
-        panic_with_error!(e, ComplianceError::RwaNotConfigured);
-    };
-    if is_distributor(e, account) == enabled {
-        return;
-    }
-    let key = ComplianceStorageKey::Distributor(account.clone());
-    if enabled {
-        if *account == e.current_contract_address()
-            || rwa.approver.as_ref() == Some(account)
-            || delegation_count(e, account).is_some_and(|count| count > 0)
-        {
-            panic_with_error!(e, ComplianceError::InvalidDistributor);
-        }
-        e.storage().persistent().set(&key, &true);
-    } else {
-        e.storage().persistent().remove(&key);
-    }
-    emit_distributor_changed(e, account, enabled);
-    // A change of who may credit whom voids outstanding approvals.
     let epoch = advance_approval_epoch(e);
     emit_approval_epoch_bumped(e, epoch);
 }
@@ -1035,116 +754,6 @@ pub fn check_auditor(e: &Env, account: &ConfidentialAccount, rwa: &RwaConfig) {
     }
 }
 
-/// Asserts the hub rule: while hub mode is on, `from` or `to` must be a
-/// distributor. A no-op while hub mode is off.
-///
-/// [`crate::compliance::RwaHooks`] calls it for every operation that brings
-/// value into a confidential account (`deposit`, `confidential_transfer`,
-/// `confidential_transfer_from`, where `from` is the owner and never the
-/// spender) and, with `(account, spender)`, for `set_spender`. An entry point
-/// that credits an account by another path must call it as well
-/// (`docs/compliance.md#hub-mode`).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `from` - The debited party, or the delegating owner.
-/// * `to` - The credited party, or the appointed spender.
-///
-/// # Errors
-///
-/// * [`ComplianceError::DistributorRequired`] - When hub mode is on and neither
-///   address is a distributor.
-pub fn check_hub(e: &Env, from: &Address, to: &Address) {
-    if hub_mode(e) && !is_distributor(e, from) && !is_distributor(e, to) {
-        panic_with_error!(e, ComplianceError::DistributorRequired);
-    }
-}
-
-/// Initializes `account`'s delegation count to zero unless it already has
-/// one. [`crate::compliance::RwaHooks`] calls it at registration, the only
-/// moment at which an account is known to have no delegation.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `account` - The account being registered.
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks, and calling it
-/// for an account that may already hold delegations records a false zero.
-/// Call it only from the registration hook.
-pub fn initialize_delegation_count(e: &Env, account: &Address) {
-    let key = ComplianceStorageKey::DelegationCount(account.clone());
-    if e.storage().persistent().has(&key) {
-        e.storage().persistent().extend_ttl(
-            &key,
-            DELEGATION_COUNT_TTL_THRESHOLD,
-            DELEGATION_COUNT_EXTEND_AMOUNT,
-        );
-    } else {
-        e.storage().persistent().set(&key, &0u32);
-    }
-}
-
-/// Records one delegation created by `account`. A count that was never
-/// initialized stays absent.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `account` - The delegating owner.
-///
-/// # Errors
-///
-/// * [`ComplianceError::DelegationCountOverflow`] - When the count is
-///   `u32::MAX`.
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks. The count is
-/// exact only if it is called once for every delegation created, in the same
-/// invocation.
-pub fn increment_delegation_count(e: &Env, account: &Address) {
-    let Some(count) = delegation_count(e, account) else {
-        return;
-    };
-    let Some(count) = count.checked_add(1) else {
-        panic_with_error!(e, ComplianceError::DelegationCountOverflow);
-    };
-    e.storage().persistent().set(&ComplianceStorageKey::DelegationCount(account.clone()), &count);
-}
-
-/// Records one delegation deleted from `account`. A count that was never
-/// initialized stays absent.
-///
-/// The call never fails, so that it cannot block a revocation. A decrement
-/// that finds an initialized zero, which exact counting from registration
-/// makes unreachable, removes the entry: the account returns to "unknown" and
-/// the fault can never read as zero delegations.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `account` - The delegating owner.
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks. The count is
-/// exact only if it is called once for every delegation deleted, in the same
-/// invocation.
-pub fn decrement_delegation_count(e: &Env, account: &Address) {
-    let Some(count) = delegation_count(e, account) else {
-        return;
-    };
-    let key = ComplianceStorageKey::DelegationCount(account.clone());
-    match count.checked_sub(1) {
-        Some(count) => e.storage().persistent().set(&key, &count),
-        None => e.storage().persistent().remove(&key),
-    }
-}
-
 /// Requires the approver's authorization for the current invocation with
 /// `args`. A no-op when `rwa.approver` is `None`.
 ///
@@ -1245,41 +854,6 @@ pub fn spender_transfer_approval_args(
     payload: &SpenderTransferPayload,
 ) -> Vec<Val> {
     (approval_epoch(e), spender.clone(), from.clone(), to.clone(), payload.clone()).into_val(e)
-}
-
-/// Maximum length of a home domain, in bytes.
-const HOME_DOMAIN_MAX_LEN: usize = 32;
-
-/// Returns whether `domain` satisfies the host-name rule documented on
-/// [`set_home_domain`].
-fn is_valid_home_domain(domain: &String) -> bool {
-    let len = domain.len() as usize;
-    if len == 0 || len > HOME_DOMAIN_MAX_LEN {
-        return false;
-    }
-    let mut buf = [0u8; HOME_DOMAIN_MAX_LEN];
-    let bytes = &mut buf[..len];
-    domain.copy_into_slice(bytes);
-
-    let mut labels = 0u32;
-    let mut last: &[u8] = &[];
-    for label in bytes.split(|b| *b == b'.') {
-        // An empty label is a leading, trailing or doubled `.`.
-        let (Some(first), Some(end)) = (label.first(), label.last()) else {
-            return false;
-        };
-        if *first == b'-' || *end == b'-' {
-            return false;
-        }
-        if !label.iter().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'-') {
-            return false;
-        }
-        labels += 1;
-        last = label;
-    }
-    // A single label is not a public host name, and a last label that starts
-    // with a digit lets URL parsers read the name as an IPv4 address.
-    labels >= 2 && last.first().is_some_and(u8::is_ascii_lowercase) && last != b"localhost"
 }
 
 /// Returns whether `config` keeps an eligibility gate: an external policy or

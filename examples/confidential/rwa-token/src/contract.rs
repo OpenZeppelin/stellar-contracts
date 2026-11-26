@@ -8,10 +8,7 @@
 //! exceptions listed on [`RwaHooks`]: registration skips the freeze gate and
 //! `revoke_spender` does not gate the spender), and — when an approver is
 //! configured — requires its authorization for every value-moving
-//! operation. With a `distributor` it also starts in hub mode, in which
-//! ordinary credits and new delegations need a distributor as a party
-//! (`packages/confidential/docs/compliance.md#hub-mode`). The contract
-//! implements [`ConfidentialCompliance`],
+//! operation. The contract implements [`ConfidentialCompliance`],
 //! [`ConfidentialClawback`], [`ConfidentialRwa`], and
 //! [`ConfidentialForcedTransfer`] on top.
 //!
@@ -27,7 +24,7 @@
 //! | Role | Entry points |
 //! |:---|:---|
 //! | `freezer` | `freeze`, `unfreeze` |
-//! | `config_manager` | `set_compliance_config`, `set_rwa_config`, `bump_approval_epoch`, `set_home_domain`, `set_hub_mode`, `set_distributor` |
+//! | `config_manager` | `set_compliance_config`, `set_rwa_config`, `bump_approval_epoch` |
 //! | `clawback` | `clawback`, `force_revoke_spender` |
 //! | `forced_transfer` | `forced_transfer` |
 //!
@@ -40,7 +37,7 @@
 //! auditor's secret key. Do not use either on a public network before the
 //! verifier accepts zero-knowledge proofs
 //! (`packages/confidential/docs/compliance.md#forced-transfer`).
-use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, String, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_confidential::{
     compliance::{
@@ -73,15 +70,10 @@ impl RwaTokenContract {
     ///   cannot be changed afterwards.
     /// * `approver` - The address whose authorization every value-moving
     ///   operation additionally requires, or `None`.
-    /// * `distributor` - When `Some`, the address is flagged as a distributor
-    ///   and the token starts in hub mode, so that it never passes through a
-    ///   state with direct transfers between holders open. `None` leaves hub
-    ///   mode off.
     ///
     /// # Errors
     ///
     /// * refer to [`compliance::set_rwa_config`] errors.
-    /// * refer to [`compliance::set_distributor`] errors.
     #[allow(clippy::too_many_arguments)]
     pub fn __constructor(
         e: &Env,
@@ -92,7 +84,6 @@ impl RwaTokenContract {
         compliance: ComplianceConfig,
         auditor_id: u32,
         approver: Option<Address>,
-        distributor: Option<Address>,
     ) {
         confidential::set_underlying_asset(e, &underlying_asset);
         confidential::set_verifier(e, &verifier);
@@ -101,10 +92,6 @@ impl RwaTokenContract {
         access_control::set_admin(e, &admin);
         compliance::set_compliance_config(e, &compliance);
         compliance::set_rwa_config(e, auditor_id, &approver);
-        if let Some(distributor) = distributor {
-            compliance::set_distributor(e, &distributor, true);
-            compliance::set_hub_mode(e, true);
-        }
     }
 }
 
@@ -141,21 +128,6 @@ impl ConfidentialRwa for RwaTokenContract {
     #[only_role(operator, "config_manager")]
     fn bump_approval_epoch(e: &Env, operator: Address) {
         compliance::bump_approval_epoch(e);
-    }
-
-    #[only_role(operator, "config_manager")]
-    fn set_home_domain(e: &Env, home_domain: Option<String>, operator: Address) {
-        compliance::set_home_domain(e, &home_domain);
-    }
-
-    #[only_role(operator, "config_manager")]
-    fn set_hub_mode(e: &Env, enabled: bool, operator: Address) {
-        compliance::set_hub_mode(e, enabled);
-    }
-
-    #[only_role(operator, "config_manager")]
-    fn set_distributor(e: &Env, account: Address, enabled: bool, operator: Address) {
-        compliance::set_distributor(e, &account, enabled);
     }
 }
 
