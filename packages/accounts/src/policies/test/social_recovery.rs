@@ -784,6 +784,31 @@ fn approve_policy_delegated_signer_panics() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #3233)")] // SocialRecoveryError::InvalidSigners
+fn approve_self_verifier_signer_panics() {
+    let f = Fixture::new();
+    let account = f.e.register(MockVerifier, ());
+    let rule = recovery_rule(&f.e, RULE_ID, &account, &f.policy);
+    let signers = vec![
+        &f.e,
+        f.signer(3),
+        Signer::External(account.clone(), Bytes::from_array(&f.e, &[2; 32])),
+    ];
+    f.e.as_contract(&f.policy, || {
+        install(&f.e, &f.params(), &rule, &account);
+        approve(&f.e, &f.bob, 1, &signers, RULE_ID, &account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3233)")] // SocialRecoveryError::InvalidSigners
+fn approve_policy_verifier_signer_panics() {
+    let f = Fixture::installed();
+    let signer = Signer::External(f.policy.clone(), Bytes::from_array(&f.e, &[2; 32]));
+    f.approve(&f.bob, &vec![&f.e, f.signer(3), signer]);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3233)")] // SocialRecoveryError::InvalidSigners
 fn approve_duplicate_signer_panics() {
     let f = Fixture::installed();
     f.approve(&f.bob, &f.signers(&[2, 3, 2]));

@@ -1229,8 +1229,8 @@ pub fn validate_config(e: &Env, params: &SocialRecoveryAccountParams, smart_acco
 ///
 /// * [`SocialRecoveryError::InvalidSigners`] - When the set is empty, exceeds
 ///   `MAX_SIGNERS`, holds an external key over `MAX_EXTERNAL_KEY_SIZE` bytes, a
-///   delegated signer that is the smart account or this policy contract, or two
-///   equal signers.
+///   delegated signer or a verifier that is the smart account or this policy
+///   contract, or two equal signers.
 /// * refer to [`validate_no_canonical_duplicates`] errors.
 pub fn validate_signers(e: &Env, signers: &Vec<Signer>, smart_account: &Address) {
     let policy = e.current_contract_address();
@@ -1238,7 +1238,11 @@ pub fn validate_signers(e: &Env, signers: &Vec<Signer>, smart_account: &Address)
         || signers.len() > MAX_SIGNERS
         || signers.iter().any(|signer| {
             let invalid_signer = match &signer {
-                Signer::External(_, key_data) => key_data.len() > MAX_EXTERNAL_KEY_SIZE,
+                Signer::External(verifier, key_data) => {
+                    key_data.len() > MAX_EXTERNAL_KEY_SIZE
+                        || verifier == smart_account
+                        || *verifier == policy
+                }
                 Signer::Delegated(address) => address == smart_account || *address == policy,
             };
             invalid_signer || signers.first_index_of(&signer) != signers.last_index_of(&signer)

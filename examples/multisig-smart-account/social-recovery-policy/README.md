@@ -139,7 +139,7 @@ Before approving, the guardian's wallet checks the set. The policy cannot tell a
 
 The guardians who approve later run the same checks on the `signers` of the opening event, and refuse or revoke when one fails.
 
-`approve` rejects an empty set, more than 15 signers, an external key over 256 bytes, a delegated signer that is the smart account or the policy contract, and repeated signers with `InvalidSigners` (3233). It then calls `batch_canonicalize_key` on each verifier the set names, and two keys with the same canonical form fail with `SmartAccountError::DuplicateSigner` (3007). A verifier that fails blocks approvals of every set that names it, with the verifier's own error, and of no other set.
+`approve` rejects an empty set, more than 15 signers, an external key over 256 bytes, a delegated signer or a verifier that is the smart account or the policy contract, and repeated signers with `InvalidSigners` (3233). It then calls `batch_canonicalize_key` on each verifier the set names, and two keys with the same canonical form fail with `SmartAccountError::DuplicateSigner` (3007). A verifier that fails blocks approvals of every set that names it, with the verifier's own error, and of no other set.
 
 To compute the hash locally and read the attempt:
 
