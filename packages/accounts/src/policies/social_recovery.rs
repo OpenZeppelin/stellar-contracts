@@ -94,12 +94,12 @@ use soroban_sdk::{
     auth::{Context, ContractContext},
     contracterror, contractevent, contracttype, panic_with_error,
     xdr::ToXdr,
-    Address, BytesN, Env, Map, String, Symbol, TryFromVal, Val, Vec,
+    Address, BytesN, Env, IntoVal, Map, String, Symbol, TryFromVal, Val, Vec,
 };
 
 use crate::smart_account::{
-    validate_no_canonical_duplicates, ContextRule, ContextRuleType, Signer, MAX_EXTERNAL_KEY_SIZE,
-    MAX_SIGNERS,
+    validate_no_canonical_duplicates, ContextRule, ContextRuleType, Signer, SmartAccountArgs,
+    MAX_EXTERNAL_KEY_SIZE, MAX_SIGNERS,
 };
 
 /// Installation parameters for the social recovery policy.
@@ -1268,24 +1268,20 @@ fn completion_signers(e: &Env, context: &Context, smart_account: &Address) -> Op
     let Context::Contract(ContractContext { contract, fn_name, args }) = context else {
         return None;
     };
-    if contract != smart_account
-        || *fn_name != Symbol::new(e, "add_context_rule")
-        || args.len() != 5
-    {
+    if contract != smart_account || *fn_name != Symbol::new(e, "add_context_rule") {
         return None;
     }
 
-    let context_type = ContextRuleType::try_from_val(e, &args.get(0)?).ok()?;
-    let name = String::try_from_val(e, &args.get(1)?).ok()?;
-    let valid_until = Option::<u32>::try_from_val(e, &args.get(2)?).ok()?;
     let signers = Vec::<Signer>::try_from_val(e, &args.get(3)?).ok()?;
-    let policies = Map::<Address, Val>::try_from_val(e, &args.get(4)?).ok()?;
-
-    (context_type == ContextRuleType::Default
-        && name == String::from_str(e, RECOVERED_RULE_NAME)
-        && valid_until.is_none()
-        && policies.is_empty())
-    .then_some(signers)
+    let expected: Vec<Val> = SmartAccountArgs::add_context_rule(
+        &ContextRuleType::Default,
+        &String::from_str(e, RECOVERED_RULE_NAME),
+        &None,
+        &signers,
+        &Map::new(e),
+    )
+    .into_val(e);
+    (*args == expected).then_some(signers)
 }
 
 /// Returns the state of a stored attempt at the current ledger.
