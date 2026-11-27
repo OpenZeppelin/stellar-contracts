@@ -12,4 +12,6 @@
 
 pub mod policies;
 pub mod smart_account;
+#[cfg(all(not(target_family = "wasm"), any(test, feature = "testutils")))]
+pub mod testutils;
 pub mod verifiers;

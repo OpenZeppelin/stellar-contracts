@@ -65,7 +65,8 @@ pub trait Policy {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `context` - The authorization context being enforced.
-    /// * `authenticated_signers` - List of signers that have been verified.
+    /// * `authenticated_signers` - The subset of the rule's signers whose
+    ///   authorization was verified by the smart account for this attempt.
     /// * `context_rule` - The context rule this policy is attached to.
     /// * `smart_account` - The address of the smart account being authorized.
     ///
@@ -82,6 +83,16 @@ pub trait Policy {
     /// time restrictions). See [`simple_threshold`],
     /// [`weighted_threshold`], and [`spending_limit`] for reference
     /// implementations.
+    ///
+    /// # Security Warning
+    ///
+    /// A context rule without policies requires every listed signer. Once
+    /// a rule has policies, those policies alone determine which signers
+    /// are required, and all attached policies must succeed. Check
+    /// `authenticated_signers` against the intended signer requirements, or
+    /// attach a policy that enforces them. If every policy accepts an empty
+    /// signer set and its other conditions are met, the rule authorizes the
+    /// call without signatures.
     fn enforce(
         e: &Env,
         context: Context,
