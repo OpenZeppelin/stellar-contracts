@@ -623,12 +623,15 @@ fn completion_below_threshold_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3238)")] // SocialRecoveryError::NotAllowed
-fn completion_with_reordered_signers_panics() {
+fn completion_with_reordered_signers_works() {
     let r = Recovery::new();
-    r.reach_quorum(&r.signers(&[2, 3]));
+    let signers = r.signers(&[2, 3]);
+    let reordered = r.signers(&[3, 2]);
+    r.reach_quorum(&signers);
     r.at(EXECUTABLE_AFTER);
-    r.complete(&r.signers(&[3, 2]));
+    let rule = r.complete(&reordered);
+    assert_eq!(rule.signers, reordered);
+    assert_eq!(r.attempt(1, &signers), None);
 }
 
 #[test]

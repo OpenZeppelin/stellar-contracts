@@ -34,7 +34,7 @@ A.add_context_rule(CallContract(A), "recovery", None, [], { P: {
 
 ### Attempt States
 
-An attempt is identified by `(smart_account, context_rule_id, epoch, signers_hash)`, where `signers_hash` is the SHA-256 hash of the XDR-encoded signer set. The signer order is part of the hash, so `[pk2, pk3]` and `[pk3, pk2]` are different attempts. `get_attempt` returns the stored fields, and the state follows from them, the configured `expiry_ledgers` (`x`) and the current ledger `L`:
+An attempt is identified by `(smart_account, context_rule_id, epoch, signers_hash)`, where `signers_hash` is the SHA-256 hash of the XDR-encoded signer set, sorted by each signer's XDR encoding. The order of the signers does not change the hash, so `[pk2, pk3]` and `[pk3, pk2]` are the same attempt. `get_attempt` returns the stored fields, and the state follows from them, the configured `expiry_ledgers` (`x`) and the current ledger `L`:
 
 | State | Condition | What can happen |
 |---|---|---|
@@ -129,7 +129,7 @@ stellar contract invoke --id $POLICY --source bob -- approve \
     --smart_account $ACCOUNT
 ```
 
-The guardian's signature covers all five arguments, so a relayer cannot swap the signer set, and an approval signed for an earlier epoch fails with `StaleEpoch` (3235). The other guardians make the same call with `signers` copied in the same order, ideally from the `signers` field of the `recovery_approval_recorded` event the first approval emitted. A guardian that is a smart account authorizes `approve` through one of its own rules that admits a call on `P`. A guardian contract that calls `approve` with its own address as `guardian` authorizes as the direct invoker.
+The guardian's signature covers all five arguments, so a relayer cannot swap the signer set, and an approval signed for an earlier epoch fails with `StaleEpoch` (3235). The other guardians make the same call with the same signers in any order, ideally copied from the `signers` field of the `recovery_approval_recorded` event the first approval emitted. A guardian that is a smart account authorizes `approve` through one of its own rules that admits a call on `P`. A guardian contract that calls `approve` with its own address as `guardian` authorizes as the direct invoker.
 
 Before approving, the guardian's wallet checks each signer in the set. The policy cannot tell a genuine signer from a malicious verifier, or from a delegated signer that authorizes back into the account, and either one lets anyone use the recovered rule:
 
@@ -150,7 +150,7 @@ stellar contract invoke --id $POLICY -- get_attempt \
     --epoch 1 --signers_hash $SIGNERS_HASH --context_rule_id 1 --smart_account $ACCOUNT
 ```
 
-Rust clients get the same value from `stellar_accounts::policies::social_recovery::hash_signers`. Every approval event also carries `signers_hash`.
+A set of several signers is sorted by each signer's XDR encoding before it is hashed. Rust clients get the same value from `stellar_accounts::policies::social_recovery::hash_signers`. Every approval event also carries `signers_hash`.
 
 A guardian withdraws an approval with `revoke_approval`, which takes the same five arguments. It calls no verifier, so a revoke works even when a verifier in the set fails.
 
@@ -166,7 +166,7 @@ stellar contract invoke --id $POLICY -- cancel --context_rule_id 1 --smart_accou
 
 ## 5. Complete the Recovery
 
-From `executable_after` until `expires_at`, anyone can submit the completion: a call to `add_context_rule(Default, "recovered", None, signers, {})` on the account, with the approved signers in their approved order. The smart account's authorization entry carries `AuthPayload { signers: {}, context_rule_ids: [1] }`, with no signatures. The relayer pays the fee and signs only as the transaction source.
+From `executable_after` until `expires_at`, anyone can submit the completion: a call to `add_context_rule(Default, "recovered", None, signers, {})` on the account, with the approved signers in any order. The smart account's authorization entry carries `AuthPayload { signers: {}, context_rule_ids: [1] }`, with no signatures. The relayer pays the fee and signs only as the transaction source.
 
 The flow with `@stellar/stellar-sdk`: simulate to record the account's authorization entry, fill in the payload, simulate again so the footprint includes what `__check_auth` and the policy read, then submit.
 
@@ -193,7 +193,7 @@ const verifier = "C..."; // verifier of the new key
 const newKey = Buffer.from("...", "hex"); // the new public key
 
 // `add_context_rule(Default, "recovered", None, signers, {})`, with the
-// approved signers in their approved order.
+// approved signers in any order.
 const args = [
   xdr.ScVal.scvVec([xdr.ScVal.scvSymbol("Default")]),
   xdr.ScVal.scvString("recovered"),
@@ -320,7 +320,6 @@ The recovered rule has no policies, so every one of its signers must sign throug
 | Giving the recovery rule signers or other policies | `install` accepts it; extra policies add checks that can block completion | Keep the rule at no signers and this policy alone |
 | Setting `valid_until` on the recovery rule | Recovery stops working after that ledger, with no event | Leave it `None` unless recovery should be time-boxed |
 | Approving a signer without checking its verifier or delegate | A malicious verifier, or a delegate that authorizes back into the account, lets anyone use the recovered rule | Resolve each signer to a known verifier deployment or account build before approving |
-| Guardians approving the same keys in a different order | Each order is its own attempt, and none reaches the threshold | Copy `signers` from the first `recovery_approval_recorded` event |
 | Completing with a context type, name, `valid_until` or policies other than `Default`, `"recovered"`, `None` and `{}` | `NotAllowed` (3238) inside `__check_auth`, surfaced as `Error(Auth, InvalidAction)` | Submit `add_context_rule(Default, "recovered", None, signers, {})` |
 | Adding signatures to the completion's `AuthPayload` | The account rejects signers that are not on the selected rule (`UnauthorizedSigner`, 3016) | Send an empty `signers` map and `context_rule_ids: [recovery rule]` |
 | Expecting the recovered rule to carry the old rule's policies | The recovered rule has none, so every signer of a multi-key set must sign through it | Add policies with `add_policy` through the recovered rule after the recovery |

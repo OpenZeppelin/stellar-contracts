@@ -32,8 +32,8 @@
 //! ## Recovery Flow
 //!
 //! 1. A guardian calls [`approve`] with the current epoch and a new signer set.
-//!    The first approval opens an attempt for that exact, ordered set, and the
-//!    approvals must reach `threshold` within `expiry_ledgers` of it.
+//!    The first approval opens an attempt for that set, and the approvals must
+//!    reach `threshold` within `expiry_ledgers` of it.
 //! 2. The approval that reaches `threshold` starts the delay. The attempt is
 //!    executable from `delay_ledgers` after that approval, for
 //!    `expiry_ledgers`.
@@ -52,8 +52,9 @@
 //!
 //! ## Notes
 //!
-//! - Attempts are keyed by the ordered signer set. Guardians approve the
-//!   `signers` emitted by the opening `RecoveryApprovalRecorded` event.
+//! - Attempts are keyed by the signer set in any order. Approvals of `[A, B]`
+//!   and `[B, A]` count toward one attempt, and a completion may list the
+//!   signers in either order.
 //! - A completion adds one rule and removes nothing. The old rule stays live
 //!   until the new owner removes it.
 //! - A `RecoveryAuthorized` event means this policy authorized a completion,
@@ -96,7 +97,7 @@ use soroban_sdk::{
     auth::{Context, ContractContext},
     contracterror, contractevent, contracttype, panic_with_error,
     xdr::ToXdr,
-    Address, BytesN, Env, IntoVal, Map, String, Symbol, TryFromVal, Val, Vec,
+    Address, Bytes, BytesN, Env, IntoVal, Map, String, Symbol, TryFromVal, Val, Vec,
 };
 
 use crate::smart_account::{
@@ -843,8 +844,7 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
 /// * `e` - Access to the Soroban environment.
 /// * `guardian` - The approving guardian.
 /// * `epoch` - The current epoch of the recovery rule.
-/// * `signers` - The signers of the rule a completion adds. Their order
-///   identifies the attempt.
+/// * `signers` - The signers of the rule a completion adds, in any order.
 /// * `context_rule_id` - The ID of the recovery rule.
 /// * `smart_account` - The address of the smart account.
 ///
@@ -1245,15 +1245,24 @@ pub fn validate_signers(e: &Env, signers: &Vec<Signer>, smart_account: &Address)
     validate_no_canonical_duplicates(e, signers);
 }
 
-/// Returns the SHA-256 hash of the XDR-encoded signer set, which identifies
-/// an attempt within an epoch. The hash depends on the order of the signers.
+/// Returns the SHA-256 hash of the XDR-encoded signer set, sorted by each
+/// signer's XDR encoding, which identifies an attempt within an epoch. The
+/// hash does not depend on the order of `signers`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `signers` - The signer set.
 pub fn hash_signers(e: &Env, signers: &Vec<Signer>) -> BytesN<32> {
-    e.crypto().sha256(&signers.clone().to_xdr(e)).to_bytes()
+    let mut encoded: Vec<Bytes> = Vec::new(e);
+    let mut sorted: Vec<Signer> = Vec::new(e);
+    for signer in signers.iter() {
+        let xdr = signer.clone().to_xdr(e);
+        let index = encoded.binary_search(&xdr).unwrap_or_else(|index| index);
+        encoded.insert(index, xdr);
+        sorted.insert(index, signer);
+    }
+    e.crypto().sha256(&sorted.to_xdr(e)).to_bytes()
 }
 
 /// Returns the signers of a recovery completion, or `None` when `context` is

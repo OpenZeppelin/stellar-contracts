@@ -829,13 +829,32 @@ fn approve_signers_at_limits_works() {
 }
 
 #[test]
-fn hash_signers_is_order_sensitive_sha256_of_xdr() {
+fn hash_signers_is_sha256_of_xdr_sorted_by_signer_xdr() {
     let f = Fixture::new();
-    let forward = f.signers(&[2, 3]);
-    let reversed = f.signers(&[3, 2]);
-    let xdr = soroban_sdk::xdr::ToXdr::to_xdr(forward.clone(), &f.e);
-    assert_eq!(f.hash(&forward), f.e.crypto().sha256(&xdr).to_bytes());
-    assert_ne!(f.hash(&forward), f.hash(&reversed));
+    let reversed = f.signers(&[3, 2, 1]);
+    let sorted = f.signers(&[1, 2, 3]);
+    let xdr = soroban_sdk::xdr::ToXdr::to_xdr(sorted.clone(), &f.e);
+    assert_eq!(f.hash(&reversed), f.e.crypto().sha256(&xdr).to_bytes());
+    assert_eq!(f.hash(&reversed), f.hash(&f.signers(&[2, 1, 3])));
+    assert_ne!(f.hash(&reversed), f.hash(&f.signers(&[1, 2])));
+}
+
+#[test]
+fn approve_reordered_signers_joins_attempt() {
+    let f = Fixture::installed();
+    let signers = f.signers(&[2, 3]);
+    let reordered = f.signers(&[3, 2]);
+    f.approve(&f.bob, &signers);
+    f.at(QUORUM);
+    f.approve(&f.carol, &reordered);
+    f.assert_events(&[
+        f.approval_recorded(1, &reordered, &f.carol, 2, QUORUM_DEADLINE),
+        f.quorum_reached(1, &signers, EXECUTABLE_AFTER, EXPIRES_AT),
+    ]);
+    assert_eq!(
+        f.attempt(&signers),
+        Some(attempt(&f.e, START, &[&f.bob, &f.carol], Some(EXECUTABLE_AFTER)))
+    );
 }
 
 // ################## ATTEMPT STATE MACHINE ##################
@@ -1187,14 +1206,15 @@ fn enforce_unapproved_signers_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3238)")] // SocialRecoveryError::NotAllowed
-fn enforce_reordered_signers_panics() {
+fn enforce_reordered_signers_works() {
     let f = Fixture::installed();
     let signers = f.signers(&[2, 3]);
     f.approve(&f.bob, &signers);
     f.approve(&f.carol, &signers);
     f.at(START + DELAY);
     f.complete(&f.signers(&[3, 2]));
+    assert_eq!(f.attempt_at(1, &signers), None);
+    assert_eq!(f.epoch(), 2);
 }
 
 #[test]
