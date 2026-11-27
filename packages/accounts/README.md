@@ -342,6 +342,21 @@ create_context_rule(
 )
 ```
 
+### 5. Social Recovery
+
+```rust
+// Guardian-approved recovery of a lost key
+create_context_rule(
+    context_type: CallContract(smart_account),
+    name: "Recovery",
+    valid_until: None,
+    signers: vec![&e],
+    policies: map![&e, (social_recovery_policy, recovery_params)]
+)
+```
+
+The `social_recovery` policy lets a quorum of guardians restore access when the owner's keys are lost. Guardians approve a new signer set on the policy contract, and once `threshold` of them agree and `delay_ledgers` pass, anyone can add a `Default` rule named `recovered` with those signers and no policies, selecting the recovery rule with no signatures. The owner can cancel during the delay. The policy covers lost keys only, since anyone holding the old keys can also cancel or remove it. See the [social recovery policy example](../../examples/multisig-smart-account/social-recovery-policy/README.md) for the full flow.
+
 ## Getting Started
 
 ### 1. Installation
@@ -645,5 +660,5 @@ This crate is organized into three submodules that provide building blocks for i
 - `ed25519` and `webauthn` (passkey authentication) utility functions for implementing the `Verifier` trait
 
 3. **policies**
-- `simple_threshold`, `weighted_threshold` and `spending_limit` utility functions for implementing the `Policy` trait
+- `simple_threshold`, `weighted_threshold`, `spending_limit` and `social_recovery` utility functions for implementing the `Policy` trait
 

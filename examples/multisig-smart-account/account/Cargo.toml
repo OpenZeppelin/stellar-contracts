@@ -22,4 +22,5 @@ stellar-contract-utils = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+stellar-test-utils = { workspace = true }
 

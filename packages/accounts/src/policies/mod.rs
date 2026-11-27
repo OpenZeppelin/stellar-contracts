@@ -3,8 +3,9 @@
 //! This module contains the core `Policy` trait and functions necessary to
 //! implement some authorization policies for smart accounts. It provides
 //! utility functions for `simple_threshold` (basic M-of-N multisig),
-//! `weighted_threshold` (complex weighted voting), and `spending_limit`
-//! (rolling window spending limits) that can be used to build policy contracts.
+//! `weighted_threshold` (complex weighted voting), `spending_limit` (rolling
+//! window spending limits), and `social_recovery` (guardian-approved recovery
+//! of a lost key) that can be used to build policy contracts.
 use soroban_sdk::{
     auth::{
         Context, ContractContext, ContractExecutable, ContractExecutableRef,
@@ -16,6 +17,7 @@ use soroban_sdk::{
 use crate::smart_account::{ContextRule, Signer};
 
 pub mod simple_threshold;
+pub mod social_recovery;
 pub mod spending_limit;
 #[cfg(test)]
 mod test;
