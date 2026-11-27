@@ -405,6 +405,9 @@ pub trait ConfidentialRwa: ConfidentialCompliance + ConfidentialToken<Hooks: Rwa
     /// Implementations MUST authorize `operator` before calling
     /// [`storage::recover`]. The method has no default body because the trait
     /// does not prescribe an access-control model.
+    ///
+    /// [`storage::recover`] does not compare `operator` with the approver, so
+    /// one address holding both recovers alone (`docs/compliance.md#recovery`).
     fn recover(e: &Env, from: Address, to: Address, data: Bytes, operator: Address);
 }
 

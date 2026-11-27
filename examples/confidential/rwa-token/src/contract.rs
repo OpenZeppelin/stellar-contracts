@@ -29,7 +29,8 @@
 //! The constructor grants none of them; the admin grants each role after
 //! deployment. The approver is not a role: it is the address set through
 //! `set_rwa_config`, and it must not be the sender, recipient, or spender
-//! of an operation it approves.
+//! of an operation it approves. An approver that also holds the `clawback`
+//! role recovers alone, so the two are best kept apart.
 //!
 //! `clawback` takes a proof whose witness includes the auditor's secret key.
 //! Do not use it on a public network before the verifier accepts
