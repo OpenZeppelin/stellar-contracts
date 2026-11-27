@@ -21,7 +21,7 @@ use crate::{
         add_context_rule, do_check_auth, AuthDigestPreimage, AuthPayload, ContextRule,
         ContextRuleType, Signer, SmartAccount, SmartAccountError,
     },
-    verifiers::{ed25519, Verifier},
+    testutils::TestEd25519Verifier,
 };
 
 const ACCOUNT_NONCE: i64 = 1;
@@ -78,27 +78,6 @@ impl CustomAccountInterface for ApprovingAccount {
         _auth_contexts: Vec<Context>,
     ) -> Result<(), Self::Error> {
         Ok(())
-    }
-}
-
-#[contract]
-struct Ed25519VerifierContract;
-
-#[contractimpl]
-impl Verifier for Ed25519VerifierContract {
-    type KeyData = BytesN<32>;
-    type SigData = BytesN<64>;
-
-    fn verify(e: &Env, hash: Bytes, key_data: BytesN<32>, sig_data: BytesN<64>) -> bool {
-        ed25519::verify(e, &hash, &key_data, &sig_data)
-    }
-
-    fn canonicalize_key(e: &Env, key_data: BytesN<32>) -> Bytes {
-        ed25519::canonicalize_key(e, &key_data)
-    }
-
-    fn batch_canonicalize_key(e: &Env, key_data: Vec<BytesN<32>>) -> Vec<Bytes> {
-        ed25519::batch_canonicalize_key(e, &key_data)
     }
 }
 
@@ -212,7 +191,7 @@ fn delegate_entry(delegate: &Address, account: &Address, arg: ScVal) -> SorobanA
 }
 
 fn external_signer(e: &Env) -> (Signer, SigningKey) {
-    let verifier = e.register(Ed25519VerifierContract, ());
+    let verifier = e.register(TestEd25519Verifier, ());
     let signing_key = SigningKey::from_bytes(&SECRET_KEY);
     let public_key = Bytes::from_array(e, signing_key.verifying_key().as_bytes());
     (Signer::External(verifier, public_key), signing_key)

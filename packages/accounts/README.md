@@ -154,11 +154,11 @@ pub trait Policy {
 
 Policies follow a well-defined lifecycle that integrates with context rule management and authorization.
 
-**Installation** occurs when a new context rule is created with attached policies. The smart account calls `install()` on each policy contract, passing account-specific and context-specific parameters. This initialization step allows policies to configure their logic (for example, a threshold policy might define the required number of signatures for that particular account and context rule, while a spending limit policy might set daily or per-transaction caps). Installation ensures that each policy has the necessary state and configuration ready before authorization checks begin.
+**Installation** occurs when a policy is attached to a new or existing context rule. The smart account calls `install()` with the rule and installation parameters so the policy can validate its configuration and initialize its state.
 
 **Enforcement** is triggered when a context rule is validated. The smart account calls `enforce()` on each policy in the matched rule. This hook validates authorization requirements (for example, that enough signers are present or that a spending limit is not exceeded) and applies any necessary state changes (for example, updating counters or emitting events). If a policy rejects the authorization attempt, the transaction is reverted.
 
-**Uninstallation** occurs when a context rule is removed from the smart account. The account calls `uninstall()` on each attached policy, allowing them to clean up any stored data associated with that specific account and context rule pairing. This ensures that policies do not leave orphaned state in storage.
+**Uninstallation** occurs when a policy is detached or its context rule is removed. The account attempts to call `uninstall()` so the policy can clean up state for that account and rule. Removal can succeed after a recoverable error from the hook, leaving policy state behind.
 
 #### Policy Examples
 
@@ -188,7 +188,11 @@ Once no valid rule covers calls to the account, nothing can authorize a manageme
 
 **`enforce()` Responsibilities**
 
-The `enforce()` function handles both validation and state mutation in a single step. It must reject invalid authorization by panicking (which reverts the transaction), and apply any necessary state changes (for example, decrementing a spending allowance or incrementing a counter). Because it runs after signature authentication and context type matching are already confirmed, the focus inside `enforce()` is on business-logic constraints.
+The `enforce()` function receives the current authorization context, the context rule, the smart account address, and the subset of rule signers whose authorization was verified. When a rule has policies, those policies decide which signers are required. If all attached policies accept an empty signer set and their other conditions are met, the call can proceed without signatures. Reject invalid authorization by panicking before applying state changes such as decrementing a spending allowance.
+
+The spending limit policy requires at least one authenticated rule signer. If the rule lists multiple signers, pair it with `simple_threshold` to require the intended quorum.
+
+To test a custom policy, enable the crate's `testutils` feature in your dev-dependencies and use `testutils::PolicyTestHarness` to exercise the smart account's authorization hook with selected Ed25519 signers.
 
 ### 6. Execution Entry Point
 
@@ -264,7 +268,7 @@ Each rule must:
 
 #### Example
 
-Consider a call in the `CallContract(dex_address)` context. The client presents an ed25519 key and a passkey signature. The smart account has a `CallContract(dex_address)` rule requiring both signers and a daily spending limit policy. The client sets `context_rule_ids = [rule_id]`. The account authenticates both keys, validates the rule, and then calls the spending limit policy’s `enforce()`, which checks the limit and updates counters. Authorization succeeds.
+Consider a token `transfer` under a `CallContract(token_address)` rule with two signers, a `simple_threshold` policy configured for two signatures, and a daily spending limit policy. The client sets `context_rule_ids = [rule_id]` and supplies both signatures. The account validates the rule and authenticates the signers. Authorization succeeds if the threshold is met and the transfer fits the spending limit.
 
 ### Authorizing from a Client
 

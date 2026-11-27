@@ -10,14 +10,23 @@ description = "Smart Account Contracts and Utilities."
 [package.metadata.stellar]
 cargo_inherit = true
 
+[package.metadata.docs.rs]
+features = ["testutils"]
+
 [lib]
 crate-type = ["lib", "cdylib"]
 doctest = false
+
+[features]
+testutils = ["soroban-sdk/testutils", "dep:ed25519-dalek"]
 
 [dependencies]
 soroban-sdk = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde-json-core = { workspace = true }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+ed25519-dalek = { workspace = true, optional = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

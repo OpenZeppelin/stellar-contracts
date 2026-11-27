@@ -4,6 +4,16 @@
 //! the specified amount are blocked. It intersects transfer operations and
 //! enforces spending limits over a configurable rolling time window.
 //!
+//! ## Signer requirements
+//!
+//! This policy requires at least one authenticated signer from the context
+//! rule. Any single rule signer satisfies this requirement, even if the rule
+//! lists multiple signers. An empty signer set is rejected with
+//! [`SpendingLimitError::NotAllowed`]. For a rule with multiple signers,
+//! pair this policy with
+//! [`simple_threshold`](crate::policies::simple_threshold) to enforce the
+//! intended quorum.
+//!
 //! ## Rolling window semantics
 //!
 //! The rolling window keeps only the last `period_ledgers` worth of ledger
