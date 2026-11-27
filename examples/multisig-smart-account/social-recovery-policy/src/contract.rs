@@ -130,4 +130,13 @@ impl SocialRecoveryPolicyContract {
     ) -> Option<RecoveryAttempt> {
         social_recovery::get_attempt(e, epoch, &signers_hash, context_rule_id, &smart_account)
     }
+
+    /// Get the hash that identifies an attempt for a signer set.
+    ///
+    /// A guardian's wallet computes the hash it compares with the person
+    /// recovering itself, since a simulated result is only as trustworthy as
+    /// the RPC that returns it.
+    pub fn hash_signers(e: &Env, signers: Vec<Signer>) -> BytesN<32> {
+        social_recovery::hash_signers(e, &signers)
+    }
 }

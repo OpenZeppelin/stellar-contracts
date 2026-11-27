@@ -131,16 +131,17 @@ stellar contract invoke --id $POLICY --source bob -- approve \
 
 The guardian's signature covers all five arguments, so a relayer cannot swap the signer set, and an approval signed for an earlier epoch fails with `StaleEpoch` (3235). The other guardians make the same call with the same signers in any order, ideally copied from the `signers` field of the `recovery_approval_recorded` event the first approval emitted. A guardian that is a smart account authorizes `approve` through one of its own rules that admits a call on `P`. A guardian contract that calls `approve` with its own address as `guardian` authorizes as the direct invoker.
 
-Before approving, the guardian's wallet checks each signer in the set. The policy cannot tell a genuine signer from a malicious verifier, or from a delegated signer that authorizes back into the account, and either one lets anyone use the recovered rule:
+Before approving, the guardian's wallet checks the set. The policy cannot tell a genuine signer from a malicious verifier, or from a delegated signer that authorizes back into the account, and either one lets anyone use the recovered rule:
 
 - An `External` signer's verifier is a known deployment for the network, and its key parses in that verifier's format.
 - A `Delegated` signer is a `G…` address, or a `C…` address whose Wasm hash is a known smart account build.
+- The set's hash matches the one the recovering person's wallet shows. The guardian compares at least the first 20 hex characters (80 bits) of the set's `hash_signers` value with that person, on the same call that confirms who they are.
 
 The guardians who approve later run the same checks on the `signers` of the opening event, and refuse or revoke when one fails.
 
 `approve` rejects an empty set, more than 15 signers, an external key over 256 bytes, a delegated signer that is the smart account or the policy contract, and repeated signers with `InvalidSigners` (3233). It then calls `batch_canonicalize_key` on each verifier the set names, and two keys with the same canonical form fail with `SmartAccountError::DuplicateSigner` (3007). A verifier that fails blocks approvals of every set that names it, with the verifier's own error, and of no other set.
 
-To read the attempt, hash the signer set the way the policy does, then query it:
+To compute the hash locally and read the attempt:
 
 ```bash
 SIGNERS_HASH=$(echo "{\"vec\":[{\"vec\":[{\"symbol\":\"External\"},{\"address\":\"$VERIFIER\"},{\"bytes\":\"$NEW_KEY\"}]}]}" \
@@ -150,7 +151,12 @@ stellar contract invoke --id $POLICY -- get_attempt \
     --epoch 1 --signers_hash $SIGNERS_HASH --context_rule_id 1 --smart_account $ACCOUNT
 ```
 
-A set of several signers is sorted by each signer's XDR encoding before it is hashed. Rust clients get the same value from `stellar_accounts::policies::social_recovery::hash_signers`. Every approval event also carries `signers_hash`.
+A set of several signers is sorted by each signer's XDR encoding before it is hashed. Rust clients get the same value from `stellar_accounts::policies::social_recovery::hash_signers`. Every approval event also carries `signers_hash`. The policy's `hash_signers` view returns the hash of any set for queries such as `get_attempt`, but the guardian's comparison does not rely on it:
+
+```bash
+stellar contract invoke --id $POLICY -- hash_signers \
+    --signers "[{\"External\":[\"$VERIFIER\",\"$NEW_KEY\"]}]"
+```
 
 A guardian withdraws an approval with `revoke_approval`, which takes the same five arguments. It calls no verifier, so a revoke works even when a verifier in the set fails.
 
@@ -307,8 +313,8 @@ The recovered rule has no policies, so every one of its signers must sign throug
 - **Lost keys only.** Anyone holding the owner's keys can remove the policy, cancel any attempt and replace the guardians immediately. The policy does not protect an account whose keys were stolen.
 - **Veto window.** The owner's veto lasts as long as `delay_ledgers` in practice, and only rules that admit a call on the policy contract can cast it.
 - **Rules on the policy contract.** A rule that admits a call on the policy contract can also call `set_config` and `uninstall`, so it can replace the guardians and then recover the account. It holds the owner's full authority unless a policy on that rule limits it to `cancel`.
-- **Guardians.** A quorum of guardians acting together cannot be told apart from the owner, except by the owner's cancel. Guardians must confirm off-chain that a new key belongs to the person recovering.
-- **Signers.** The policy cannot tell a genuine signer from a malicious verifier, or from a delegated signer that authorizes back into the account, and either one lets anyone use the recovered rule. Guardian wallets check each signer before approving, as step 3 describes.
+- **Guardians.** A quorum of guardians acting together cannot be told apart from the owner, except by the owner's cancel. Guardians must confirm off-chain that a new signer set belongs to the person recovering.
+- **Signers.** The policy cannot tell a genuine signer from a malicious verifier, or from a delegated signer that authorizes back into the account, and either one lets anyone use the recovered rule. Guardian wallets check each signer and compare the set's hash with the person recovering before approving, as step 3 describes.
 - **The old rule.** A recovery adds a rule and removes nothing. The lost key keeps its authority until the new owner removes the old rule.
 - **Upgrades.** The example contract is not upgradeable. Whoever can upgrade a deployment of this policy controls recovery for every smart account that uses it.
 - **Guardian accounts.** A smart-account guardian with `Delegated` signers inherits the delegation caveats in the [Smart Accounts README](../../../packages/accounts/README.md#delegated-signers).
@@ -320,6 +326,7 @@ The recovered rule has no policies, so every one of its signers must sign throug
 | Giving the recovery rule signers or other policies | `install` accepts it; extra policies add checks that can block completion | Keep the rule at no signers and this policy alone |
 | Setting `valid_until` on the recovery rule | Recovery stops working after that ledger, with no event | Leave it `None` unless recovery should be time-boxed |
 | Approving a signer without checking its verifier or delegate | A malicious verifier, or a delegate that authorizes back into the account, lets anyone use the recovered rule | Resolve each signer to a known verifier deployment or account build before approving |
+| Confirming only the new key with the person recovering | A verifier swapped on the way to the guardians passes the key check and lets anyone use the recovered rule | Compare at least 80 bits of `hash_signers`, computed by the guardian's own wallet, with that person |
 | Completing with a context type, name, `valid_until` or policies other than `Default`, `"recovered"`, `None` and `{}` | `NotAllowed` (3238) inside `__check_auth`, surfaced as `Error(Auth, InvalidAction)` | Submit `add_context_rule(Default, "recovered", None, signers, {})` |
 | Adding signatures to the completion's `AuthPayload` | The account rejects signers that are not on the selected rule (`UnauthorizedSigner`, 3016) | Send an empty `signers` map and `context_rule_ids: [recovery rule]` |
 | Expecting the recovered rule to carry the old rule's policies | The recovered rule has none, so every signer of a multi-key set must sign through it | Add policies with `add_policy` through the recovered rule after the recovery |

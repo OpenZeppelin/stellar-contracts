@@ -453,6 +453,23 @@ fn view_state_matches_enforce_at_each_boundary() {
 }
 
 #[test]
+fn hash_signers_view_identifies_attempt_in_any_order() {
+    let f = Fixture::installed();
+    let verifier = f.e.register(MockVerifier, (VerifierMode::Canonical,));
+    let mut signers = f.signers.clone();
+    signers.append(&f.signers_on(&verifier));
+    let reversed = vec![&f.e, signers.get_unchecked(1), signers.get_unchecked(0)];
+    f.client.approve(&f.bob, &1, &signers, &RULE_ID, &f.account);
+
+    let hash = f.client.hash_signers(&reversed);
+    assert_eq!(hash, hash_signers(&f.e, &signers));
+    assert_eq!(
+        f.client.get_attempt(&1, &hash, &RULE_ID, &f.account).unwrap().approvals,
+        vec![&f.e, f.bob.clone()]
+    );
+}
+
+#[test]
 fn failed_call_emits_no_events() {
     let f = Fixture::ready();
     assert_eq!(

@@ -90,7 +90,12 @@
 //!   account, and either one lets anyone use the recovered rule. Guardians
 //!   check each signer before approving: an `External` verifier must be a known
 //!   deployment and the key must parse in its format, and a `Delegated` address
-//!   must be a G-address or a known smart account build.
+//!   must be a G-address or a known smart account build. Each guardian also
+//!   compares at least the first 80 bits of the set's [`hash_signers`] hash
+//!   with the person recovering, which catches a set altered on its way to the
+//!   guardians, such as a swapped verifier with the original key. The
+//!   guardian's wallet computes the hash from the set it signs, and a shorter
+//!   prefix lets whoever altered the set grind a verifier address to match it.
 //! - **Upgrades.** Whoever can upgrade a deployment of this policy controls
 //!   recovery for every smart account that uses it.
 use soroban_sdk::{
