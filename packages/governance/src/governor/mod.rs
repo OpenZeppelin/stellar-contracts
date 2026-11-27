@@ -150,6 +150,30 @@
 //!   participates in each proposal
 //! - **Voting delay** ([`GovernorSettings::voting_delay`]) gives token holders
 //!   time to acquire more tokens or delegate before voting starts
+//!
+//! ## Prepared Votes Failing at Checkpoint Chunk Boundaries
+//!
+//! ### Vulnerability Overview
+//!
+//! [`Governor::cast_vote`] and [`Governor::propose`] read the voter's or
+//! proposer's past voting power from the token's checkpoints. Soroban
+//! transactions declare the storage keys they touch at simulation time, and
+//! any account can add a checkpoint to a delegate's history (for example by
+//! sending tokens to an account that delegates to it), at most one per ledger.
+//! A vote or proposal fails if the keys its lookup reads change between its
+//! simulation and its execution.
+//!
+//! ### Mitigation
+//!
+//! The [`crate::votes`] module stores checkpoints in chunks of
+//! [`crate::votes::CHECKPOINTS_PER_CHUNK`], so the keys a lookup reads change
+//! only when a new chunk is started. A third party can therefore push a
+//! prepared vote or proposal outside its footprint only if a new chunk is
+//! started between its simulation and its execution, which happens at most
+//! once every [`crate::votes::CHECKPOINTS_PER_CHUNK`] ledgers for each
+//! delegate. The vote or proposal can then be simulated and submitted again.
+//! See the "Checkpoint Storage and Transaction Footprints" section of the
+//! [`crate::votes`] module.
 
 pub mod queries;
 pub mod settings;

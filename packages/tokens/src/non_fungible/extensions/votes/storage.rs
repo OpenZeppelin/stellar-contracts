@@ -7,6 +7,12 @@ use crate::non_fungible::{
     Base, ContractOverrides,
 };
 
+/// Non-fungible token contract type that tracks voting power with
+/// [`stellar_governance::votes`].
+///
+/// See the "Checkpoint Storage and Transaction Footprints" section of
+/// [`stellar_governance::votes`] for how transfers by other accounts can make
+/// prepared transactions fail.
 pub struct NonFungibleVotes;
 
 impl ContractOverrides for NonFungibleVotes {
