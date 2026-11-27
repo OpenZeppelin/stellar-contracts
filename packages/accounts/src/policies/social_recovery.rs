@@ -46,7 +46,9 @@
 //!
 //! The epoch of a recovery rule increases on [`install`], [`set_config`],
 //! [`cancel`] and every completion. Approvals name the epoch, so each increment
-//! invalidates every open attempt and every signed approval not yet submitted.
+//! invalidates every open attempt and every approval signed for an earlier
+//! epoch. An approval signed in advance for a later epoch stays valid, so
+//! guardians sign only for the current epoch from [`get_epoch`].
 //!
 //! ## Notes
 //!
@@ -790,9 +792,9 @@ pub fn install(
 }
 
 /// Uninstalls the social recovery policy from a smart account's recovery rule.
-/// Removes the configuration and keeps the epoch, so approvals signed before
-/// the uninstall stay invalid after a reinstall. Requires authorization from
-/// the smart account.
+/// Removes the configuration and keeps the epoch, so approvals for the current
+/// or an earlier epoch stay invalid after a reinstall. Requires authorization
+/// from the smart account.
 ///
 /// # Arguments
 ///
@@ -1061,9 +1063,9 @@ pub fn revoke_approval(
     );
 }
 
-/// Cancels every open attempt and signed approval of a smart account's
-/// recovery rule by incrementing its epoch. Requires authorization from the
-/// smart account.
+/// Cancels every open attempt of a smart account's recovery rule by
+/// incrementing its epoch, so approvals signed for an earlier epoch fail.
+/// Requires authorization from the smart account.
 ///
 /// # Arguments
 ///

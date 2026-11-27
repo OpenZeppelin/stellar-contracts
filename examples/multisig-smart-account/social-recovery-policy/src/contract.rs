@@ -5,9 +5,9 @@
 //! deployed once and used by any number of smart accounts, each configuring
 //! its own guardians, threshold, delay and expiry per recovery rule.
 //!
-//! The contract has no constructor, admin or upgrade entry point. Whoever can
-//! upgrade a deployment of this policy controls recovery for every smart
-//! account that uses it.
+//! The contract has no constructor, admin or upgrade entry point, so its code
+//! cannot change once deployed. An upgradeable deployment would let its
+//! upgrader recover every smart account that uses it.
 use soroban_sdk::{auth::Context, contract, contractimpl, Address, BytesN, Env, Vec};
 use stellar_accounts::{
     policies::{
