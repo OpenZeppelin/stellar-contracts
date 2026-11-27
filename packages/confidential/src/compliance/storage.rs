@@ -1,12 +1,15 @@
-use soroban_sdk::{contracttype, panic_with_error, token, Address, Bytes, BytesN, Env};
+use soroban_sdk::{
+    contracttype, panic_with_error, token, Address, Bytes, BytesN, Env, IntoVal, Val, Vec,
+};
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
 use crate::{
     auditor::ConfidentialAuditorClient,
     compliance::{
-        emit_clawback, emit_compliance_config_changed, emit_frozen, emit_unfrozen, ComplianceError,
-        PolicyClient, CLAWBACK_NONCE_EXTEND_AMOUNT, CLAWBACK_NONCE_TTL_THRESHOLD,
-        FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
+        emit_clawback, emit_compliance_config_changed, emit_frozen, emit_recovered,
+        emit_rwa_config_changed, emit_unfrozen, ComplianceError, PolicyClient,
+        CLAWBACK_NONCE_EXTEND_AMOUNT, CLAWBACK_NONCE_TTL_THRESHOLD, FROZEN_EXTEND_AMOUNT,
+        FROZEN_TTL_THRESHOLD,
     },
     storage::{
         address_to_field, append_amount, append_field, append_point, get_account,
@@ -14,6 +17,7 @@ use crate::{
         set_commitments, verify,
     },
     verifier::CircuitType,
+    SpenderTransferPayload, TransferPayload, WithdrawPayload,
 };
 
 // ################## TYPES ##################
@@ -45,6 +49,45 @@ pub struct ClawbackData {
     pub proof: Bytes,
 }
 
+/// Prover-supplied public inputs of
+/// [`crate::compliance::ConfidentialRwa::recover`]
+/// (`docs/compliance.md#recovery-circuit`). Every field except `c_transfer`
+/// is emitted in the [`crate::compliance::Recovered`] event.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RecoverPayload {
+    pub c_transfer: BytesN<64>,
+    pub r_e_point: BytesN<64>,
+    pub v_tilde: BytesN<32>,
+    pub sigma: BytesN<32>,
+    pub v_tilde_aud_r: BytesN<32>,
+    pub r_tilde_aud_r: BytesN<32>,
+}
+
+/// Envelope decoded from the `data: Bytes` argument of
+/// [`crate::compliance::ConfidentialRwa::recover`].
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RecoverData {
+    pub payload: RecoverPayload,
+    pub proof: Bytes,
+}
+
+/// RWA profile configuration (`docs/compliance.md#rwa-profile`). Stored as
+/// an instance storage entry under its own key; [`ComplianceConfig`] is
+/// unchanged.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RwaConfig {
+    /// The only auditor id accounts of this token may be bound to. Set by
+    /// the first [`set_rwa_config`] call and immutable afterwards.
+    pub auditor_id: u32,
+    /// Address whose authorization deposits, withdrawals, transfers and
+    /// recoveries additionally require. `None` disables the approval gate and
+    /// recovery.
+    pub approver: Option<Address>,
+}
+
 /// Storage keys for the confidential token compliance extension.
 #[contracttype]
 pub enum ComplianceStorageKey {
@@ -53,9 +96,11 @@ pub enum ComplianceStorageKey {
     /// Per-account frozen flag. Persistent storage; only set when an account
     /// is frozen and removed on unfreeze.
     Frozen(Address),
-    /// Number of seizures executed against the account. Persistent storage;
-    /// absent until the first seizure.
+    /// Number of seizures and recoveries executed against the account.
+    /// Persistent storage; absent until the first.
     ClawbackNonce(Address),
+    /// Singleton [`RwaConfig`]. Instance storage.
+    RwaConfig,
 }
 
 // ################## QUERY STATE ##################
@@ -92,8 +137,8 @@ pub fn is_frozen(e: &Env, account: &Address) -> bool {
     }
 }
 
-/// Returns the number of seizures executed against `account`, or `0` when it
-/// has never been seized from. The value is a public input of the next
+/// Returns the number of seizures and recoveries executed against `account`,
+/// or `0` when there has been none. The value is a public input of the next
 /// clawback proof (`docs/compliance.md#circuit`).
 ///
 /// # Arguments
@@ -112,6 +157,16 @@ pub fn clawback_nonce(e: &Env, account: &Address) -> u32 {
     } else {
         0
     }
+}
+
+/// Returns the active [`RwaConfig`], or `None` when the RWA profile has not
+/// been configured for this deployment.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+pub fn rwa_config(e: &Env) -> Option<RwaConfig> {
+    e.storage().instance().get(&ComplianceStorageKey::RwaConfig)
 }
 
 // ################## CHANGE STATE ##################
@@ -231,9 +286,9 @@ pub fn unfreeze(e: &Env, account: &Address) {
 /// recompute, so the seized account stays spendable.
 ///
 /// The account's clawback nonce is a public input and advances on every
-/// seizure, so a proof executes at most once even if the commitments are
-/// later restored to the values it was built against
-/// (`docs/compliance.md#anti-replay-and-the-freeze`).
+/// seizure and every [`recover`], so a proof executes at most once and never
+/// after a recovery, even if the commitments are later restored to the values
+/// it was built against (`docs/compliance.md#anti-replay-and-the-freeze`).
 ///
 /// # Arguments
 ///
@@ -385,7 +440,327 @@ pub fn force_revoke_spender(e: &Env, account: &Address, spender: &Address) {
     revoke_spender(e, account, spender);
 }
 
+/// Writes the RWA profile configuration.
+///
+/// The first call fixes the designated auditor; later calls may only change
+/// the approver.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `auditor_id` - The only auditor id accounts of this token may be bound to.
+/// * `approver` - The address whose authorization deposits, withdrawals,
+///   transfers and recoveries additionally require, or `None` to disable the
+///   approval gate and recovery.
+///
+/// # Errors
+///
+/// * [`ComplianceError::NotConfigured`] - When [`compliance_config`] returns
+///   `None`.
+/// * [`ComplianceError::EligibilityRequired`] - When the compliance
+///   configuration has neither a policy nor SAC passthrough.
+/// * [`ComplianceError::AuditorAlreadySet`] - When an [`RwaConfig`] exists and
+///   `auditor_id` differs from the stored one.
+/// * [`ComplianceError::InvalidApprover`] - When `approver` is this contract's
+///   own address.
+/// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors (first
+///   call only).
+///
+/// # Events
+///
+/// * topics - `["rwa_config_changed"]`
+/// * data - `[auditor_id: u32, approver: Option<Address>]` (`approver` is left
+///   out of the data when it is `None`)
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should
+/// only be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant
+/// security risks as it could allow unauthorized modifications.
+pub fn set_rwa_config(e: &Env, auditor_id: u32, approver: &Option<Address>) {
+    let Some(config) = compliance_config(e) else {
+        panic_with_error!(e, ComplianceError::NotConfigured);
+    };
+    if !has_eligibility_gate(&config) {
+        panic_with_error!(e, ComplianceError::EligibilityRequired);
+    }
+    match rwa_config(e) {
+        Some(current) => {
+            if current.auditor_id != auditor_id {
+                panic_with_error!(e, ComplianceError::AuditorAlreadySet);
+            }
+        }
+        // The designated auditor must resolve to a registered key.
+        None => {
+            ConfidentialAuditorClient::new(e, &get_auditor(e)).get_key(&auditor_id);
+        }
+    }
+    if approver.as_ref() == Some(&e.current_contract_address()) {
+        panic_with_error!(e, ComplianceError::InvalidApprover);
+    }
+
+    let rwa = RwaConfig { auditor_id, approver: approver.clone() };
+    e.storage().instance().set(&ComplianceStorageKey::RwaConfig, &rwa);
+    emit_rwa_config_changed(e, auditor_id, approver);
+}
+
+/// Moves the whole committed balance of the frozen `from` to `to` without
+/// revealing it, resets `from` to the identity on both sides, and advances
+/// `from`'s clawback nonce.
+///
+/// The nonce advance voids every clawback proof built against `from` before
+/// the recovery, which a public deposit could otherwise bring back into
+/// validity (`docs/compliance.md#anti-replay-and-the-freeze`).
+///
+/// `to` is credited with `C_transfer`, which the proof shows holds `from`'s
+/// committed total under a blinding `to` derives as for an incoming transfer
+/// (`docs/compliance.md#recovery`).
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `from` - The frozen account whose balance moves.
+/// * `to` - The registered account credited with it.
+/// * `payload` - The decoded [`RecoverPayload`].
+/// * `proof` - The raw UltraHonk proof bytes.
+///
+/// # Errors
+///
+/// * [`ComplianceError::RecoveryRequiresApprover`] - When the [`RwaConfig`] has
+///   no approver.
+/// * [`ComplianceError::AccountNotFrozen`] - When `from` is not frozen.
+/// * refer to [`rwa_context`] errors.
+/// * refer to [`gate_account`] errors.
+/// * refer to [`require_approval`] errors.
+/// * refer to [`crate::storage::get_account`] errors.
+/// * refer to [`crate::auditor::ConfidentialAuditor::get_key`] errors.
+/// * [`crate::ConfidentialTokenError::NonCanonicalEncoding`] - When a point
+///   coordinate or field is not a canonical `Bn254Fr` value.
+/// * [`crate::ConfidentialTokenError::InvalidProof`] - When the proof fails
+///   verification.
+///
+/// # Events
+///
+/// * topics - `["recovered", from: Address, to: Address]`
+/// * data - `[r_e_point, v_tilde, sigma, v_tilde_aud_r, r_tilde_aud_r]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses the operator's authorization. The
+/// trait entry point [`crate::compliance::ConfidentialRwa::recover`] is
+/// responsible for authorizing `operator`.
+pub fn recover(e: &Env, from: &Address, to: &Address, payload: &RecoverPayload, proof: &Bytes) {
+    let (config, rwa) = rwa_context(e);
+    if rwa.approver.is_none() {
+        panic_with_error!(e, ComplianceError::RecoveryRequiresApprover);
+    }
+    if !is_frozen(e, from) {
+        panic_with_error!(e, ComplianceError::AccountNotFrozen);
+    }
+    // Also rejects `to == from`, which is frozen.
+    gate_account(e, to, &config);
+    require_approval(e, &rwa, &[from, to], recover_approval_args(e, from, to, payload));
+
+    let source = get_account(e, from);
+    let recipient = get_account(e, to);
+    let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
+    let k_aud_r = auditor.get_key(&recipient.auditor_id);
+    let addr_f = get_address_as_field_element(e);
+
+    // PI order (docs/compliance.md#recovery-circuit):
+    //   C_spend, C_receive, PVK_B, addr_f, K_aud_r, C_transfer, R_e, v_tilde,
+    //   sigma, v_tilde_aud_r, r_tilde_aud_r
+    let mut pi = Bytes::new(e);
+    append_point(&mut pi, &source.spendable_commitment);
+    append_point(&mut pi, &source.receiving_commitment);
+    append_point(&mut pi, &recipient.viewing_public_key);
+    append_field(&mut pi, &addr_f);
+    append_point(&mut pi, &k_aud_r);
+    append_point(&mut pi, &payload.c_transfer);
+    append_point(&mut pi, &payload.r_e_point);
+    append_field(&mut pi, &payload.v_tilde);
+    append_field(&mut pi, &payload.sigma);
+    append_field(&mut pi, &payload.v_tilde_aud_r);
+    append_field(&mut pi, &payload.r_tilde_aud_r);
+
+    verify(e, CircuitType::Recover, &pi, proof);
+
+    let identity = Grumpkin::identity(e);
+    set_commitments(e, from, &identity, &identity);
+    e.storage()
+        .persistent()
+        .set(&ComplianceStorageKey::ClawbackNonce(from.clone()), &(clawback_nonce(e, from) + 1));
+    set_commitments(
+        e,
+        to,
+        &recipient.spendable_commitment,
+        &Grumpkin::add(e, &recipient.receiving_commitment, &payload.c_transfer),
+    );
+
+    emit_recovered(e, from, to, payload);
+}
+
 // ################## LOW-LEVEL HELPERS ##################
+
+/// Returns both configurations of an RWA deployment, reverting unless the
+/// deployment is fully configured. Every [`crate::compliance::RwaHooks`]
+/// callback starts here, so an unconfigured deployment rejects every
+/// operation instead of passing it ungated.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * [`ComplianceError::RwaNotConfigured`] - When [`rwa_config`] returns
+///   `None`.
+/// * [`ComplianceError::NotConfigured`] - When [`compliance_config`] returns
+///   `None`.
+/// * [`ComplianceError::EligibilityRequired`] - When the compliance
+///   configuration has neither a policy nor SAC passthrough.
+pub fn rwa_context(e: &Env) -> (ComplianceConfig, RwaConfig) {
+    let Some(rwa) = rwa_config(e) else {
+        panic_with_error!(e, ComplianceError::RwaNotConfigured);
+    };
+    let Some(config) = compliance_config(e) else {
+        panic_with_error!(e, ComplianceError::NotConfigured);
+    };
+    if !has_eligibility_gate(&config) {
+        panic_with_error!(e, ComplianceError::EligibilityRequired);
+    }
+    (config, rwa)
+}
+
+/// Requires the approver's authorization for the current invocation with
+/// `args`. A no-op when `rwa.approver` is `None`.
+///
+/// The host binds the authorization to this contract and to the entry point
+/// being executed; `args` bind the parties and the operation's payload
+/// (`docs/compliance.md#approval-gate`).
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `rwa` - The active [`RwaConfig`].
+/// * `parties` - Every address the operation names (`from`, `to`, and `spender`
+///   for a delegated transfer).
+/// * `args` - The approval arguments.
+///
+/// # Errors
+///
+/// * [`ComplianceError::ApproverIsParty`] - When the approver is one of
+///   `parties`. A party cannot approve an operation it takes part in; this also
+///   keeps one address from authorizing the same invocation twice.
+pub fn require_approval(e: &Env, rwa: &RwaConfig, parties: &[&Address], args: Vec<Val>) {
+    if let Some(approver) = &rwa.approver {
+        if parties.contains(&approver) {
+            panic_with_error!(e, ComplianceError::ApproverIsParty);
+        }
+        approver.require_auth_for_args(args);
+    }
+}
+
+/// Approval arguments of a `deposit`: `(from, to, amount)`.
+///
+/// The tuple is a wire contract with the approver, which signs exactly
+/// these values (`docs/compliance.md#approval-gate`).
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `from` - The depositor.
+/// * `to` - The credited confidential account.
+/// * `amount` - The public amount.
+pub fn deposit_approval_args(e: &Env, from: &Address, to: &Address, amount: i128) -> Vec<Val> {
+    (from.clone(), to.clone(), amount).into_val(e)
+}
+
+/// Approval arguments of a `withdraw`: `(from, to, amount, payload)`.
+/// See [`deposit_approval_args`].
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `from` - The debited confidential account.
+/// * `to` - The address receiving the underlying asset.
+/// * `amount` - The public amount.
+/// * `payload` - The decoded withdraw payload.
+pub fn withdraw_approval_args(
+    e: &Env,
+    from: &Address,
+    to: &Address,
+    amount: i128,
+    payload: &WithdrawPayload,
+) -> Vec<Val> {
+    (from.clone(), to.clone(), amount, payload.clone()).into_val(e)
+}
+
+/// Approval arguments of a `confidential_transfer`:
+/// `(from, to, payload)`. See [`deposit_approval_args`].
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `from` - The sender.
+/// * `to` - The recipient.
+/// * `payload` - The decoded transfer payload.
+pub fn transfer_approval_args(
+    e: &Env,
+    from: &Address,
+    to: &Address,
+    payload: &TransferPayload,
+) -> Vec<Val> {
+    (from.clone(), to.clone(), payload.clone()).into_val(e)
+}
+
+/// Approval arguments of a `confidential_transfer_from`:
+/// `(spender, from, to, payload)`. See [`deposit_approval_args`].
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `spender` - The delegated spender.
+/// * `from` - The owner whose allowance is spent.
+/// * `to` - The recipient.
+/// * `payload` - The decoded spender-transfer payload.
+pub fn spender_transfer_approval_args(
+    e: &Env,
+    spender: &Address,
+    from: &Address,
+    to: &Address,
+    payload: &SpenderTransferPayload,
+) -> Vec<Val> {
+    (spender.clone(), from.clone(), to.clone(), payload.clone()).into_val(e)
+}
+
+/// Approval arguments of a `recover`: `(from, to, payload)`. See
+/// [`deposit_approval_args`].
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `from` - The frozen account whose balance moves.
+/// * `to` - The credited account.
+/// * `payload` - The decoded recover payload.
+pub fn recover_approval_args(
+    e: &Env,
+    from: &Address,
+    to: &Address,
+    payload: &RecoverPayload,
+) -> Vec<Val> {
+    (from.clone(), to.clone(), payload.clone()).into_val(e)
+}
+
+/// Returns whether `config` keeps an eligibility gate: an external policy or
+/// the SAC `authorized()` passthrough.
+fn has_eligibility_gate(config: &ComplianceConfig) -> bool {
+    config.policy.is_some() || config.sac_passthrough
+}
 
 /// Asserts that `account` passes every configured compliance gate against the
 /// given `config`: not frozen, authorized by the policy (when one is set),

@@ -11,7 +11,7 @@ The crate ships one token contract at its root (`src/lib.rs` / `src/storage.rs` 
 | `src/lib.rs`, `src/storage.rs` | The `ConfidentialToken` trait — eleven entry points, of which `revoke_spender` is proofless — and the storage/orchestration layer |
 | `src/verifier/` | Separate contract holding per-circuit UltraHonk verification keys |
 | `src/auditor/` | Separate contract holding the auditor key registry |
-| `src/compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract — plus the opt-in `ConfidentialClawback` trait (`clawback`, `force_revoke_spender`) |
+| `src/compliance/` | `ComplianceHooks` — freeze, SAC passthrough, policy contract — plus the opt-in `ConfidentialClawback` trait (`clawback`, `force_revoke_spender`); and the RWA profile: `RwaHooks` and `ConfidentialRwa`, including `recover` (tests in `test/rwa.rs`) |
 | `circuits/` | Noir workspace, compiled by `nargo`, not `cargo` |
 | `docs/` | The specification set; `docs/README.md` is its map (see below) |
 
@@ -23,7 +23,7 @@ Balances are Pedersen commitments on Grumpkin. Every operation that opens or re-
 
 ## Canonical encoding is a security boundary
 
-The public-input blob is a positional concatenation of 32-byte big-endian `Bn254Fr` representatives, in the order given by each operation's table under `docs/protocol/operations/` (`docs/compliance.md#circuit` for the clawback circuit). Grumpkin points contribute two limbs (`x` then `y`).
+The public-input blob is a positional concatenation of 32-byte big-endian `Bn254Fr` representatives, in the order given by each operation's table under `docs/protocol/operations/` (`docs/compliance.md#circuit` and `docs/compliance.md#recovery-circuit` for the compliance circuits). Grumpkin points contribute two limbs (`x` then `y`).
 
 Soroban's host silently reduces values `≥ r` modulo `r` rather than rejecting them, so `x` and `x + r` deserialise to the same field element. Every caller-supplied scalar and coordinate must therefore reach `verify_proof` through `append_field` / `append_point`, which call `Grumpkin::is_canonical_field` / `is_canonical_point`. Bypassing those helpers breaks byte-uniqueness of stored state and emitted events even though proofs still verify.
 
@@ -37,7 +37,7 @@ Beyond the root guide's conventions:
 
 - Proof verification is mocked. `MockVerifier` / `MockAuditor` in `src/test.rs` stand in for the real contracts, and proofs are empty `Bytes::new(e)`. Do not attempt to generate real proofs in Rust tests.
 - Use `fixture_point` / `fixture_field`, not arbitrary bytes. The fixtures are canonical and on-curve; random values fail the canonicality guards before reaching any logic under test.
-- Two mocks model proof semantics on purpose: the register mock in `src/test.rs` binds the first `acct_f` it sees, and `ClawbackReplayGuardVerifier` in `src/compliance/test.rs` binds the first whole blob, both standing in for UltraHonk's absorption of public inputs, so replay tests are meaningful. Keep that behaviour if either flow changes.
+- Three mocks model proof semantics on purpose: the register mock in `src/test.rs` binds the first `acct_f` it sees, `ClawbackReplayGuardVerifier` in `src/compliance/test/mod.rs` binds the first whole blob, and `HeldClawbackProofVerifier` in `src/compliance/test/rwa.rs` accepts only a clawback statement the test built before submission, all standing in for UltraHonk's absorption of public inputs, so replay tests are meaningful. Keep that behaviour if any of these flows changes.
 
 ## Noir circuits
 
@@ -75,7 +75,7 @@ Most facts now have exactly one owning section and are linked from everywhere el
 | Content | Owner | Copies live in |
 |:---|:---|:---|
 | `Clawback` is a `T₀` anchor alongside `Merge` | `docs/protocol/wallet-state.md#recovery` | `docs/compliance.md#wallet-and-auditor-consequences`, the role column of `docs/indexer.md#events-in-scope` |
-| Per-circuit public-input counts | the `Public inputs` heading of each `docs/protocol/operations/*.md` and `docs/compliance.md#circuit` | header comments of `circuits/*/src/main.nr` |
+| Per-circuit public-input counts | the `Public inputs` heading of each `docs/protocol/operations/*.md`, `docs/compliance.md#circuit` and `docs/compliance.md#recovery-circuit` | header comments of `circuits/*/src/main.nr` |
 | Domain-separation tag values | `docs/protocol/domain-separators.md` | `circuits/lib/src/lib.nr`, `circuits/lib/testdata/*.json` |
 
 The tags are a cross-language wire contract. `docs/protocol/domain-separators.md` is their only authoritative source: it assigns every value, states which layer absorbs each, and states which subset `circuits/lib/src/lib.nr` implements. Changing any assigned value is a new deployment, not an upgrade.

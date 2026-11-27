@@ -22,6 +22,8 @@ Each balance-modifying event updates the accumulators as follows:
 | Set spender (escrow amount $$a$$) | Proof outputs new commitment. $$W\_{\text{spend}} \leftarrow (v\_s - a, \\; \text{Poseidon}(\delta\_{\text{spend\\\_r}}, vk, \sigma))$$ |
 | Revoke spender | Proofless fold. $$W\_{\text{spend}} \mathrel{+}= (v\_a, r\_a)$$, the escrow opening recovered from the event per [Revoke Spender](operations/revoke-spender.md) |
 | Clawback (compliance extension) | The Merge row, then the event's public `amount` is subtracted from the spendable value ([Contract Flow](../compliance.md#contract-flow)) |
+| Recovered (compliance extension), as `to` | The incoming-transfer row, with the event's $$(R\_e, \tilde{v}, \sigma)$$ ([Recovery](../compliance.md#recovery)) |
+| Recovered (compliance extension), as `from` | $$W\_{\text{spend}} \leftarrow (0, 0)$$; $$W\_{\text{receive}} \leftarrow (0, 0)$$ |
 
 The Merge, Revoke spender, and Clawback rows fold openings the wallet already holds, leaving $$W\_{\text{spend}}.r$$ a sum; [Post-merge witness availability](proof-system.md#post-merge-witness-availability) covers the case where no circuit can witness it.
 
@@ -45,6 +47,8 @@ If the wallet loses local state, it recovers from **two anchors**: the account's
    - **Revoke spender**: skip if at or before the checkpoint of step 1, which absorbed it; otherwise fold as the table specifies.
    - **Self-transfer** (a `Transfer` whose `from` and `to` are both this account): simultaneously a checkpoint and an incoming transfer -- apply the incoming-transfer rule to $$W\_{\text{receive}}$$ as for any other.
 7. Verify consistency: $$C\_{\text{spend}} \stackrel{?}{=} W\_{\text{spend}}.v \cdot G + W\_{\text{spend}}.r \cdot H$$ and $$C\_{\text{receive}} \stackrel{?}{=} W\_{\text{receive}}.v \cdot G + W\_{\text{receive}}.r \cdot H$$.
+
+An account that is the `from` of a `Recovered` event restarts there as at `Register`: steps 1–6 read only the events after its latest one.
 
 The window's length is set by how recently the account merged before its latest checkpoint, not by how often it spends; the wallet merge policy that keeps it short in practice is [Merge policy](../sdk/wallet.md#merge-policy)'s. In the worst case (funds received but never merged), it extends back to registration.
 

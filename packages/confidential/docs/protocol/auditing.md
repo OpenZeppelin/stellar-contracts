@@ -49,7 +49,7 @@ The `lane[2]` escrow hands the sender-auditor the *blinding* of the account's po
 - **Carried through `revoke_spender`.** The revoke is a public homomorphic fold, $$C\_{\text{spend}}' = C\_{\text{spend}} + C\_a$$, emitting no new checkpoint ([Revoke Spender](operations/revoke-spender.md)). An auditor that decrypted the delegation's last state-changing event holds the opening of the $$C\_a$$ being folded ([Spender Allowance Auditing](#spender-allowance-auditing)) and advances its own opening by the same addition the contract performs.
 - **Rotation-scoped.** Both folds above depend on the auditor having decrypted the event that produced the addend; [Decryption capability across rotation](#decryption-capability-across-rotation) states what a rotated key can and cannot open.
 
-The clawback flow specified in [Clawback](../compliance.md#clawback) draws its witness from these bounded openings.
+The clawback flow specified in [Clawback](../compliance.md#clawback) and the recovery flow specified in [Recovery](../compliance.md#recovery) draw their witnesses from these bounded openings.
 
 ## Auditor Visibility Properties
 

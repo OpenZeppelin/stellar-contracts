@@ -20,6 +20,15 @@
 //!    denylist / KYC / sanctions registry.
 //! 5. Storage helpers in [`storage`].
 //!
+//! ## RWA profile
+//!
+//! A regulated deployment wires [`RwaHooks`] instead of [`ComplianceHooks`]
+//! and implements [`ConfidentialRwa`]. The profile adds a designated auditor
+//! every account must bind to, an optional approver whose authorization
+//! deposits, withdrawals and transfers additionally require, and the recovery
+//! of a frozen account's whole balance into another account without
+//! revealing it. See `docs/compliance.md#rwa-profile`.
+//!
 //! Deployments that never write a configuration pay one instance-storage read
 //! per operation: [`ComplianceHooks`] returns early when
 //! [`storage::compliance_config`] is `None`.
@@ -30,9 +39,12 @@ pub mod storage;
 mod test;
 
 use soroban_sdk::{
-    contractclient, contracterror, contractevent, contracttrait, Address, Bytes, Env,
+    contractclient, contracterror, contractevent, contracttrait, panic_with_error, Address, Bytes,
+    BytesN, Env,
 };
-pub use storage::{ClawbackData, ComplianceConfig, ComplianceStorageKey};
+pub use storage::{
+    ClawbackData, ComplianceConfig, ComplianceStorageKey, RecoverData, RecoverPayload, RwaConfig,
+};
 
 use crate::{
     ConfidentialToken, Hooks, RegisterPayload, SetSpenderPayload, SpenderTransferPayload,
@@ -213,8 +225,8 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// cannot be submitted with another. `Some(d)` with `d` equal to this
     /// contract's own address is rejected; any other `d` is accepted without
     /// passing the freeze, policy, or SAC gates. The account's clawback nonce
-    /// is bound into it as well and advances on every seizure, so a proof
-    /// executes at most once.
+    /// is bound into it as well and advances on every seizure and recovery,
+    /// so a proof executes at most once and never after a recovery.
     ///
     /// `account` MUST be frozen: the freeze keeps `C_spend` and `C_receive`
     /// unchanged between proof construction and submission, which the proof's
@@ -291,8 +303,8 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     /// trait-level docstring explains why the method has no default body.
     fn force_revoke_spender(e: &Env, account: Address, spender: Address, operator: Address);
 
-    /// Returns the number of seizures executed against `account`, which the
-    /// auditor binds into the next clawback proof.
+    /// Returns the number of seizures and recoveries executed against
+    /// `account`, which the auditor binds into the next clawback proof.
     ///
     /// # Arguments
     ///
@@ -301,6 +313,102 @@ pub trait ConfidentialClawback: ConfidentialCompliance {
     fn clawback_nonce(e: &Env, account: Address) -> u32 {
         storage::clawback_nonce(e, &account)
     }
+}
+
+// ################## RWA TRAITS ##################
+
+/// Admin and read surface of the RWA profile
+/// (`docs/compliance.md#rwa-profile`).
+///
+/// The configuration written here is enforced only by [`RwaHooks`], so the
+/// contract's [`ConfidentialToken::Hooks`] must implement [`RwaHooksType`].
+///
+/// The implementor supplies the body of the admin entry point and thereby
+/// the access-control model, as for [`ConfidentialCompliance`].
+#[contracttrait]
+pub trait ConfidentialRwa: ConfidentialCompliance + ConfidentialToken<Hooks: RwaHooksType> {
+    /// Sets the designated auditor and the approver. The designated auditor is
+    /// fixed by the first call.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `auditor_id` - The only auditor id accounts may be bound to.
+    /// * `approver` - The address whose authorization deposits, withdrawals,
+    ///   transfers and recoveries additionally require, or `None` to disable
+    ///   the approval gate and recovery.
+    /// * `operator` - The address authorizing this call.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`storage::set_rwa_config`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["rwa_config_changed"]`
+    /// * data - `[auditor_id: u32, approver: Option<Address>]`
+    ///
+    /// # Notes
+    ///
+    /// A contract approver is authorized automatically whenever it invokes
+    /// the token itself, without its `__check_auth` running. It must expose
+    /// no path through which a third party can make it call the token, and
+    /// any such path of its own must check the full approval arguments
+    /// (`docs/compliance.md#approval-gate`).
+    ///
+    /// # Security Warning
+    ///
+    /// Implementations MUST authorize `operator` before calling
+    /// [`storage::set_rwa_config`]. The method has no default body because
+    /// the trait does not prescribe an access-control model.
+    fn set_rwa_config(e: &Env, auditor_id: u32, approver: Option<Address>, operator: Address);
+
+    /// Returns the active [`RwaConfig`], or `None` when the profile has not
+    /// been configured.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn rwa_config(e: &Env) -> Option<RwaConfig> {
+        storage::rwa_config(e)
+    }
+
+    /// Moves the whole committed balance of the frozen `from` to `to`, whose
+    /// owner opens it as an incoming transfer. The amount is not revealed.
+    ///
+    /// Recovers a holder that lost its spending key into an account
+    /// registered under a new one. The approver must authorize
+    /// `(from, to, payload)`; deployments without an approver cannot recover.
+    /// Escrowed allowances stay with `from`'s delegations: revoke them with
+    /// [`ConfidentialClawback::force_revoke_spender`] first.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The frozen account whose balance moves.
+    /// * `to` - The registered account credited with it.
+    /// * `data` - XDR-encoded [`RecoverData`].
+    /// * `operator` - The address authorizing this call.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`crate::storage::decode_data`] errors.
+    /// * refer to [`storage::recover`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["recovered", from: Address, to: Address]`
+    /// * data - `[r_e_point, v_tilde, sigma, v_tilde_aud_r, r_tilde_aud_r]`
+    ///
+    /// # Security Warning
+    ///
+    /// Implementations MUST authorize `operator` before calling
+    /// [`storage::recover`]. The method has no default body because the trait
+    /// does not prescribe an access-control model.
+    ///
+    /// [`storage::recover`] does not compare `operator` with the approver, so
+    /// one address holding both recovers alone (`docs/compliance.md#recovery`).
+    fn recover(e: &Env, from: Address, to: Address, data: Bytes, operator: Address);
 }
 
 // ################## HOOKS IMPL ##################
@@ -433,6 +541,133 @@ impl Hooks for ComplianceHooks {
     }
 }
 
+/// [`Hooks`] implementation of the RWA profile
+/// (`docs/compliance.md#rwa-profile`). Wire it as `type Hooks = RwaHooks;`
+/// on a contract that implements [`ConfidentialToken`] and
+/// [`ConfidentialRwa`].
+///
+/// It differs from [`ComplianceHooks`] in four ways:
+///
+/// 1. **Fails closed.** Every callback reverts unless both the
+///    [`ComplianceConfig`] and the [`RwaConfig`] are set and the former keeps
+///    an eligibility gate (a policy or SAC passthrough).
+/// 2. **Designated auditor.** `on_register` accepts only the designated auditor
+///    id. Because the hooks fail closed and the id is fixed, every account
+///    registered under them is bound to it; the other callbacks do not check
+///    the binding again. A deployment that switches to these hooks after
+///    accounts registered must freeze those bound to another auditor first
+///    (`docs/compliance.md#designated-auditor`).
+/// 3. **Approval gate.** When an approver is configured, `on_deposit`,
+///    `on_withdraw`, `on_transfer` and `on_spender_transfer` additionally
+///    require its authorization over the parties and the operation's payload
+///    (see [`storage::require_approval`]).
+/// 4. **Spender.** The spender of a delegated flow passes the freeze, policy
+///    and SAC gates, not the policy gate alone: a frozen or unauthorized party
+///    must not direct regulated value. `on_revoke_spender` still gates only the
+///    owner.
+///
+/// The hooks enforce no balance or volume rule themselves; such rules are the
+/// approver's (`docs/compliance.md#approval-gate`).
+pub struct RwaHooks;
+
+impl Hooks for RwaHooks {
+    fn on_register(e: &Env, account: &Address, auditor_id: u32, _payload: &RegisterPayload) {
+        let (config, rwa) = storage::rwa_context(e);
+        if auditor_id != rwa.auditor_id {
+            panic_with_error!(e, ComplianceError::AuditorNotAllowed);
+        }
+        storage::check_policy(e, account, &config);
+        storage::check_sac(e, account, &config);
+    }
+
+    fn on_deposit(e: &Env, from: &Address, to: &Address, amount: i128) {
+        let (config, rwa) = storage::rwa_context(e);
+        storage::gate_account(e, from, &config);
+        storage::gate_account(e, to, &config);
+        storage::require_approval(
+            e,
+            &rwa,
+            &[from, to],
+            storage::deposit_approval_args(e, from, to, amount),
+        );
+    }
+
+    fn on_merge(e: &Env, account: &Address) {
+        let (config, _) = storage::rwa_context(e);
+        storage::gate_account(e, account, &config);
+    }
+
+    fn on_withdraw(e: &Env, from: &Address, to: &Address, amount: i128, payload: &WithdrawPayload) {
+        let (config, rwa) = storage::rwa_context(e);
+        storage::gate_account(e, from, &config);
+        storage::gate_account(e, to, &config);
+        storage::require_approval(
+            e,
+            &rwa,
+            &[from, to],
+            storage::withdraw_approval_args(e, from, to, amount, payload),
+        );
+    }
+
+    fn on_transfer(e: &Env, from: &Address, to: &Address, payload: &TransferPayload) {
+        let (config, rwa) = storage::rwa_context(e);
+        storage::gate_account(e, from, &config);
+        storage::gate_account(e, to, &config);
+        storage::require_approval(
+            e,
+            &rwa,
+            &[from, to],
+            storage::transfer_approval_args(e, from, to, payload),
+        );
+    }
+
+    fn on_spender_transfer(
+        e: &Env,
+        spender: &Address,
+        from: &Address,
+        to: &Address,
+        payload: &SpenderTransferPayload,
+    ) {
+        let (config, rwa) = storage::rwa_context(e);
+        storage::gate_account(e, from, &config);
+        storage::gate_account(e, to, &config);
+        storage::gate_account(e, spender, &config);
+        storage::require_approval(
+            e,
+            &rwa,
+            &[spender, from, to],
+            storage::spender_transfer_approval_args(e, spender, from, to, payload),
+        );
+    }
+
+    fn on_set_spender(
+        e: &Env,
+        account: &Address,
+        spender: &Address,
+        _live_until_ledger: u32,
+        _payload: &SetSpenderPayload,
+    ) {
+        let (config, _) = storage::rwa_context(e);
+        storage::gate_account(e, account, &config);
+        storage::gate_account(e, spender, &config);
+    }
+
+    fn on_revoke_spender(e: &Env, account: &Address, _spender: &Address) {
+        let (config, _) = storage::rwa_context(e);
+        storage::gate_account(e, account, &config);
+    }
+}
+
+/// Marker for the [`Hooks`] implementations that enforce the RWA profile.
+/// [`ConfidentialRwa`] requires it of the contract's
+/// [`ConfidentialToken::Hooks`].
+///
+/// A custom [`Hooks`] type implements it only when it keeps every check of
+/// [`RwaHooks`].
+pub trait RwaHooksType {}
+
+impl RwaHooksType for RwaHooks {}
+
 // ################## ERRORS ##################
 
 #[contracterror]
@@ -457,6 +692,23 @@ pub enum ComplianceError {
     InvalidClawbackAmount = 3605,
     /// Indicates `destination` names this contract's own address.
     InvalidClawbackDestination = 3606,
+    /// Indicates an RWA operation was invoked before
+    /// [`storage::set_rwa_config`] established an [`RwaConfig`].
+    RwaNotConfigured = 3607,
+    /// Indicates a registration named an auditor other than the designated
+    /// one.
+    AuditorNotAllowed = 3608,
+    /// Indicates an attempt to change the designated auditor.
+    AuditorAlreadySet = 3609,
+    /// Indicates the approver is this contract's own address.
+    InvalidApprover = 3610,
+    /// Indicates the approver is a party to the operation it would approve.
+    ApproverIsParty = 3611,
+    /// Indicates a compliance configuration of an RWA deployment has neither
+    /// a policy nor SAC passthrough.
+    EligibilityRequired = 3612,
+    /// Indicates a recovery in a deployment that has no approver.
+    RecoveryRequiresApprover = 3613,
 }
 
 // ################## CONSTANTS ##################
@@ -523,4 +775,49 @@ pub struct ComplianceConfigChanged {
 /// Emits a [`ComplianceConfigChanged`] event.
 pub fn emit_compliance_config_changed(e: &Env, policy: &Option<Address>, sac_passthrough: bool) {
     ComplianceConfigChanged { policy: policy.clone(), sac_passthrough }.publish(e);
+}
+
+/// Event emitted when the RWA profile configuration is set or changed.
+/// `approver` is `None` when the approval gate is disabled.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RwaConfigChanged {
+    pub auditor_id: u32,
+    pub approver: Option<Address>,
+}
+
+/// Emits an [`RwaConfigChanged`] event.
+pub fn emit_rwa_config_changed(e: &Env, auditor_id: u32, approver: &Option<Address>) {
+    RwaConfigChanged { auditor_id, approver: approver.clone() }.publish(e);
+}
+
+/// Event emitted when a frozen account's balance is recovered into another
+/// account. The recipient and its auditor read the data as that of an
+/// incoming `Transfer`.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Recovered {
+    #[topic]
+    pub from: Address,
+    #[topic]
+    pub to: Address,
+    pub r_e_point: BytesN<64>,
+    pub v_tilde: BytesN<32>,
+    pub sigma: BytesN<32>,
+    pub v_tilde_aud_r: BytesN<32>,
+    pub r_tilde_aud_r: BytesN<32>,
+}
+
+/// Emits a [`Recovered`] event.
+pub fn emit_recovered(e: &Env, from: &Address, to: &Address, payload: &RecoverPayload) {
+    Recovered {
+        from: from.clone(),
+        to: to.clone(),
+        r_e_point: payload.r_e_point.clone(),
+        v_tilde: payload.v_tilde.clone(),
+        sigma: payload.sigma.clone(),
+        v_tilde_aud_r: payload.v_tilde_aud_r.clone(),
+        r_tilde_aud_r: payload.r_tilde_aud_r.clone(),
+    }
+    .publish(e);
 }

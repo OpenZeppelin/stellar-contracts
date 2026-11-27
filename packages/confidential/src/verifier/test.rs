@@ -45,6 +45,7 @@ fn register_each_circuit_round_trips() {
             CircuitType::SpenderTransfer,
             CircuitType::SetSpender,
             CircuitType::Clawback,
+            CircuitType::Recover,
         ]
         .into_iter()
         .enumerate()

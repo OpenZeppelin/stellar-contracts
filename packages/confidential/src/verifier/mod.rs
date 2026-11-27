@@ -111,6 +111,7 @@ pub enum CircuitType {
     SpenderTransfer = 3,
     SetSpender = 4,
     Clawback = 100,
+    Recover = 101,
 }
 
 /// Trait for managing UltraHonk verification keys used by the confidential

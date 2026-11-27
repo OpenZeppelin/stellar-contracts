@@ -64,7 +64,7 @@ mod tests;
 //                                    computed per-call.
 //   10   _nonce        nonce       The target's clawback nonce, loaded from
 //                                    storage; the contract increments it on
-//                                    every seizure (docs/compliance.md#contract-flow).
+//                                    every seizure and recovery.
 //
 // `addr_f`, `_acct_f`, `_dest_f`, and `_nonce` are referenced by no gate and
 // look like dead parameters: their presence in the public-input set is the

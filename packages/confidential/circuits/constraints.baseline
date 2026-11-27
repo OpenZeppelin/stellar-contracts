@@ -22,6 +22,11 @@
 | circuit_clawback            | lte_hint         | N/A                  | N/A          | 33              |
 | circuit_clawback            | main             | Bounded { width: 4 } | 84           | 91              |
 | circuit_clawback            | point_hint       | N/A                  | N/A          | 28              |
+| circuit_recover             | decompose_hint   | N/A                  | N/A          | 30              |
+| circuit_recover             | directive_invert | N/A                  | N/A          | 9               |
+| circuit_recover             | lte_hint         | N/A                  | N/A          | 33              |
+| circuit_recover             | main             | Bounded { width: 4 } | 141          | 100             |
+| circuit_recover             | point_hint       | N/A                  | N/A          | 28              |
 | circuit_register            | decompose_hint   | N/A                  | N/A          | 30              |
 | circuit_register            | directive_invert | N/A                  | N/A          | 9               |
 | circuit_register            | lte_hint         | N/A                  | N/A          | 33              |

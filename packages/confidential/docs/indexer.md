@@ -52,6 +52,7 @@ All events emitted by the confidential token ([Event Schema](protocol/interface.
 | `SpenderTransfer` (recipient side) | Receiving-side replay, as above. |
 | `Merge` | Anchor: folds the receiving opening into the spendable opening; resets the receiving side. |
 | `Clawback` | Anchor, as `Merge`, less the public `amount` on the spendable side; not a checkpoint. Emitted only by deployments that enable the compliance extension ([Wallet and Auditor Consequences](compliance.md#wallet-and-auditor-consequences)). |
+| `Recovered` | For `to`, receiving-side replay, as a `Transfer` received; for `from`, the start of its history, as `Register`. Emitted only by deployments that enable the compliance extension ([Recovery](compliance.md#recovery)). |
 | `Withdraw`, `Transfer` (sender side), `SetSpender` | **Checkpoints**: publish `(b_tilde, sigma)` for the owner's spendable balance. `SetSpender` is in scope as an owner checkpoint only — a spender recovers allowance state from the on-chain delegation entry (`allowance_commitment`, `a_tilde`, `escrowed_dvk`, `allowance_salt`), not from the archive. |
 | `RevokeSpender` | Spendable-side fold, not a checkpoint: the owner adds the reclaimed allowance opening to the spendable opening, deriving it from the event's `a_tilde` and `allowance_salt` ([Revoke Spender](protocol/operations/revoke-spender.md)). May be emitted by the compliance extension's `force_revoke_spender` without an owner-signed transaction; the fold is the same ([Forced Revocation](compliance.md#forced-revocation)). |
 
