@@ -59,9 +59,13 @@
 //!   until the new owner removes it.
 //! - A `RecoveryAuthorized` event means this policy authorized a completion,
 //!   not that a rule was added. A direct [`enforce`] call under the smart
-//!   account's authorization retires the attempt without adding a rule. A
-//!   recovery is complete only when the smart account emits
-//!   `context_rule_added` in the same transaction.
+//!   account's authorization retires the attempt without adding a rule, and the
+//!   same transaction can add a different one. A recovery is complete when the
+//!   smart account itself emits `context_rule_added` in the same transaction
+//!   for a `Default` rule named [`RECOVERED_RULE_NAME`], with no `valid_until`,
+//!   no policies and the approved signers. That event carries signer IDs, which
+//!   the smart account's `signer_registered` events map to signers, and the
+//!   approval events carry the signers behind each `signers_hash`.
 //! - A `valid_until` on the recovery rule turns recovery off after that ledger.
 //!
 //! # Security Warning
@@ -529,7 +533,8 @@ pub fn emit_recovery_cancelled(e: &Env, smart_account: &Address, context_rule_id
 
 /// Event emitted when the policy authorizes a recovery completion. The
 /// recovery is complete only when the smart account emits `context_rule_added`
-/// in the same transaction.
+/// in the same transaction for the rule the completion describes, with the
+/// approved signers.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RecoveryAuthorized {

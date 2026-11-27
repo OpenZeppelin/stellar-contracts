@@ -294,7 +294,7 @@ When the policy rejects the completion inside `__check_auth`, simulation fails w
 
 After the policy admits the completion, the account checks the new signers for canonical duplicates again, which calls their verifiers. If a verifier in the set started failing after the approvals, the completion reverts with that verifier's error and the attempt stays as it was.
 
-A successful completion emits the policy's `recovery_authorized`, then the account's `signer_registered` for each new signer and `context_rule_added`. `recovery_authorized` alone does not mean a rule was added: a direct `enforce` call under the account's authorization retires the attempt without adding one. A recovery is complete only when `context_rule_added` follows in the same transaction.
+A successful completion emits the policy's `recovery_authorized`, then the account's `signer_registered` for each new signer and `context_rule_added`. `recovery_authorized` alone does not mean a rule was added: a direct `enforce` call under the account's authorization retires the attempt without adding one, and the same transaction can add a different rule. An indexer confirms a recovery by finding, in the same transaction, a `context_rule_added` emitted by the account for a `Default` rule named `"recovered"` with no `valid_until`, no policies and the approved signers. That event carries signer IDs, which the account's `signer_registered` events map to signers, and the approval events carry the signers behind each `signers_hash`.
 
 ## 6. Clean Up
 
@@ -330,7 +330,7 @@ The recovered rule has no policies, so every one of its signers must sign throug
 | Completing with a context type, name, `valid_until` or policies other than `Default`, `"recovered"`, `None` and `{}` | `NotAllowed` (3238) inside `__check_auth`, surfaced as `Error(Auth, InvalidAction)` | Submit `add_context_rule(Default, "recovered", None, signers, {})` |
 | Adding signatures to the completion's `AuthPayload` | The account rejects signers that are not on the selected rule (`UnauthorizedSigner`, 3016) | Send an empty `signers` map and `context_rule_ids: [recovery rule]` |
 | Expecting the recovered rule to carry the old rule's policies | The recovered rule has none, so every signer of a multi-key set must sign through it | Add policies with `add_policy` through the recovered rule after the recovery |
-| Treating `recovery_authorized` as a completed recovery | An indexer reports a rule that does not exist | Wait for the account's `context_rule_added` in the same transaction |
+| Treating `recovery_authorized`, or any `context_rule_added` beside it, as a completed recovery | An indexer reports approved keys that do not control the account | Match a `context_rule_added` from the account for the `"recovered"` rule with the approved signers |
 | Leaving the old rule after recovery | Whoever finds the lost key keeps full control | Remove the old rule through the recovered one right away |
 | Not watching `recovery_quorum_reached` | The owner misses the veto window | Alert the owner on that event for their account |
 | Relying on a session key to cancel | `cancel` fails, because a `spending_limit` rule never admits a call on the policy | Cancel through the admin rule |
