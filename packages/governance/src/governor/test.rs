@@ -18,13 +18,19 @@ use crate::governor::{
 pub(crate) struct MockContract;
 
 /// A mock token contract that implements `get_votes_at_checkpoint`.
-/// The voting power to return is stored under the `"power"` key.
+/// The voting power to return is stored under the `"power"` key. It is only
+/// returned for ledgers at or after the one stored under `"since"` (0 if
+/// unset), so tests can tell which ledger was queried.
 #[contract]
 pub(crate) struct MockTokenContract;
 
 #[contractimpl]
 impl MockTokenContract {
-    pub fn get_votes_at_checkpoint(e: &Env, _account: Address, _ledger: u32) -> u128 {
+    pub fn get_votes_at_checkpoint(e: &Env, _account: Address, ledger: u32) -> u128 {
+        let since: u32 = e.storage().instance().get(&Symbol::new(e, "since")).unwrap_or(0);
+        if ledger < since {
+            return 0;
+        }
         e.storage().instance().get(&Symbol::new(e, "power")).unwrap_or(0)
     }
 }
@@ -76,6 +82,14 @@ pub(crate) fn default_state(e: &Env, proposal_id: &BytesN<32>) -> ProposalState 
 pub(crate) fn set_mock_voting_power(e: &Env, token_address: &Address, power: u128) {
     e.as_contract(token_address, || {
         e.storage().instance().set(&Symbol::new(e, "power"), &power);
+    });
+}
+
+/// Makes the mock token contract return its voting power only for ledgers at
+/// or after `since`, as if the votes were gained in ledger `since`.
+pub(crate) fn set_mock_voting_power_since(e: &Env, token_address: &Address, since: u32) {
+    e.as_contract(token_address, || {
+        e.storage().instance().set(&Symbol::new(e, "since"), &since);
     });
 }
 
@@ -657,6 +671,39 @@ fn propose_with_exact_threshold() {
         let pid =
             propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e));
         assert_eq!(default_state(&e, &pid), ProposalState::Pending);
+    });
+}
+
+#[test]
+fn propose_counts_votes_from_the_previous_ledger() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    // Votes gained in ledger 99, the ledger before the proposal
+    set_mock_voting_power(&e, &token_address, 100);
+    set_mock_voting_power_since(&e, &token_address, e.ledger().sequence() - 1);
+
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, description) = simple_proposal(&e);
+
+    e.as_contract(&contract_address, || {
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4202)")]
+fn propose_ignores_votes_gained_in_the_same_ledger() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    // Votes gained in ledger 100, the proposal's own ledger, do not count
+    set_mock_voting_power(&e, &token_address, 100);
+    set_mock_voting_power_since(&e, &token_address, e.ledger().sequence());
+
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, description) = simple_proposal(&e);
+
+    e.as_contract(&contract_address, || {
+        propose(&e, targets, functions, args, description, &proposer, &stored_settings(&e));
     });
 }
 

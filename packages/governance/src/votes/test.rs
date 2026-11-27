@@ -963,16 +963,20 @@ fn historical_reads_can_move_when_a_new_chunk_starts() {
 }
 
 #[test]
-fn proposal_reads_move_when_a_new_chunk_starts_in_its_ledger() {
-    // A proposal reads the proposer's votes at the previous ledger. If a third
-    // party starts a new chunk earlier in the same ledger, that read misses the
-    // latest chunk and searches the older ones.
+fn lookup_at_the_proposal_snapshot_moves_when_a_new_chunk_starts_in_its_ledger() {
+    // A proposal in ledger `L` reads the proposer's votes at `L - 1`. If a
+    // third party starts a new chunk earlier in ledger `L`, that lookup misses
+    // the latest chunk and searches the older ones. This test runs the lookup
+    // at snapshot `L - 1` directly. Which chunks a lookup reads depends only on
+    // the snapshot and the stored checkpoints, not on the current ledger, so
+    // `chunks_read` advancing the ledger to age TTLs does not change the
+    // result. That `propose` uses `L - 1` is tested in the governor tests.
     let count = 3 * CHECKPOINTS_PER_CHUNK;
     let snapshot = 10 * count;
 
-    // Returns the chunks read by a proposal in ledger `snapshot + 1`, after
-    // `appended` third-party checkpoints in that ledger. Each case uses its own
-    // environment, as both happen in the same ledger.
+    // Returns the chunks read by the lookup at `snapshot`, after `appended`
+    // third-party checkpoints in ledger `snapshot + 1`. Each case uses its own
+    // environment, as both describe the same ledger.
     let proposal_reads = |appended| {
         let (e, contract_address) = setup_env();
         let alice = Address::generate(&e);

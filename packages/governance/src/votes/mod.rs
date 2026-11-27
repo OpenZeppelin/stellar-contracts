@@ -33,8 +33,10 @@
 //! ledgers per history.
 //!
 //! For writes (transfers, delegations, mints and burns), clients can rule this
-//! out for gaps of up to [`CHECKPOINTS_PER_CHUNK`] ledgers by also declaring
-//! the next chunk and one chunk's worth of extra write bytes.
+//! out for gaps of up to [`CHECKPOINTS_PER_CHUNK`] ledgers. For each history
+//! written, they declare the chunk after the one written to, and add room for
+//! starting it: one chunk's size in write bytes, plus the instructions and
+//! resource fee for creating a new chunk.
 //!
 //! This does not always work for historical reads ([`get_votes_at_checkpoint`]
 //! and [`get_total_supply_at_checkpoint`]): once a new chunk is started, the
