@@ -82,8 +82,9 @@ pub struct RwaConfig {
     /// The only auditor id accounts of this token may be bound to. Set by
     /// the first [`set_rwa_config`] call and immutable afterwards.
     pub auditor_id: u32,
-    /// Address whose authorization every value-moving operation
-    /// additionally requires. `None` disables the approval gate.
+    /// Address whose authorization deposits, withdrawals, transfers and
+    /// recoveries additionally require. `None` disables the approval gate and
+    /// recovery.
     pub approver: Option<Address>,
 }
 
@@ -448,8 +449,9 @@ pub fn force_revoke_spender(e: &Env, account: &Address, spender: &Address) {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `auditor_id` - The only auditor id accounts of this token may be bound to.
-/// * `approver` - The address whose authorization every value-moving operation
-///   additionally requires, or `None` to disable the approval gate.
+/// * `approver` - The address whose authorization deposits, withdrawals,
+///   transfers and recoveries additionally require, or `None` to disable the
+///   approval gate and recovery.
 ///
 /// # Errors
 ///

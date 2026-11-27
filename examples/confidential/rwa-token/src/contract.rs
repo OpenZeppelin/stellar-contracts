@@ -7,10 +7,10 @@
 //! policy, and SAC gates on the parties of every operation (with two
 //! exceptions: registration skips the freeze gate and `revoke_spender` does
 //! not gate the spender), and — when an approver is configured — requires its
-//! authorization for every value-moving operation. The contract implements
-//! [`ConfidentialCompliance`], [`ConfidentialClawback`] and [`ConfidentialRwa`]
-//! on top. `recover`, which moves a frozen account's whole balance into a new
-//! account without revealing it, requires an approver.
+//! authorization for deposits, withdrawals and transfers. The contract
+//! implements [`ConfidentialCompliance`], [`ConfidentialClawback`] and
+//! [`ConfidentialRwa`] on top. `recover`, which moves a frozen account's whole
+//! balance into a new account without revealing it, requires an approver.
 //!
 //! Wiring [`RwaHooks`] is what satisfies the deployment obligation of
 //! [`ConfidentialClawback`]: a frozen account cannot move its balance between
@@ -65,8 +65,8 @@ impl RwaTokenContract {
     ///   eligibility gate: a policy, SAC passthrough, or both.
     /// * `auditor_id` - The designated auditor every account binds to. It
     ///   cannot be changed afterwards.
-    /// * `approver` - The address whose authorization every value-moving
-    ///   operation additionally requires, or `None`.
+    /// * `approver` - The address whose authorization deposits, withdrawals,
+    ///   transfers and recoveries additionally require, or `None`.
     ///
     /// # Errors
     ///

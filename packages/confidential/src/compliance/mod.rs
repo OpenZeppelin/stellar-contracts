@@ -25,9 +25,9 @@
 //! A regulated deployment wires [`RwaHooks`] instead of [`ComplianceHooks`]
 //! and implements [`ConfidentialRwa`]. The profile adds a designated auditor
 //! every account must bind to, an optional approver whose authorization
-//! every value-moving operation additionally requires, and the recovery of a
-//! frozen account's whole balance into another account without revealing it.
-//! See `docs/compliance.md#rwa-profile`.
+//! deposits, withdrawals and transfers additionally require, and the recovery
+//! of a frozen account's whole balance into another account without
+//! revealing it. See `docs/compliance.md#rwa-profile`.
 //!
 //! Deployments that never write a configuration pay one instance-storage read
 //! per operation: [`ComplianceHooks`] returns early when
@@ -334,9 +334,9 @@ pub trait ConfidentialRwa: ConfidentialCompliance + ConfidentialToken<Hooks: Rwa
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `auditor_id` - The only auditor id accounts may be bound to.
-    /// * `approver` - The address whose authorization every value-moving
-    ///   operation additionally requires, or `None` to disable the approval
-    ///   gate.
+    /// * `approver` - The address whose authorization deposits, withdrawals,
+    ///   transfers and recoveries additionally require, or `None` to disable
+    ///   the approval gate and recovery.
     /// * `operator` - The address authorizing this call.
     ///
     /// # Errors

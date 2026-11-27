@@ -271,7 +271,7 @@ A recovery resets the source to `(O, O)` ([Recovery Flow](#recovery-flow)), from
 
 The RWA profile is the configuration for regulated assets whose issuer must see every balance and may have to enforce rules on them. It is delivered as `RwaHooks`, a `Hooks` implementation a deployment wires instead of `ComplianceHooks`, plus the `ConfidentialRwa` trait, which accepts only a `Hooks` type that implements the `RwaHooksType` marker. It adds one circuit, for [Recovery](#recovery), and changes no core entry point.
 
-The profile splits compliance by what the chain can see. Rules over public addresses (eligibility, freeze) run on-chain. Rules over hidden balances and amounts are evaluated off-chain by the issuer's compliance service, which holds the designated auditor key and therefore decrypts every operation; it either monitors and remediates, or, when configured as the approver, authorizes each value-moving operation before it settles.
+The profile splits compliance by what the chain can see. Rules over public addresses (eligibility, freeze) run on-chain. Rules over hidden balances and amounts are evaluated off-chain by the issuer's compliance service, which holds the designated auditor key and therefore decrypts every operation; it either monitors and remediates, or, when configured as the approver, authorizes each deposit, withdrawal and transfer before it settles.
 
 ```rust
 struct RwaConfig {
