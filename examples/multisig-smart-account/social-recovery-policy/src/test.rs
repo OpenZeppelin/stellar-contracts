@@ -487,7 +487,8 @@ fn unusable_verifiers_fail_approval() {
         f.e.register(CallingVerifier, (f.policy.clone(), f.dave.clone(), f.account.clone()));
     let cases = [
         ("failing verifier", failing, contract_error(VERIFIER_FAILURE)),
-        ("policy as verifier", f.policy.clone(), host_error()),
+        // SocialRecoveryError::InvalidSigners
+        ("policy as verifier", f.policy.clone(), contract_error(3233)),
         ("address without a contract", Address::generate(&f.e), host_error()),
         ("verifier calling the policy", calling_policy, host_error()),
     ];
@@ -547,13 +548,6 @@ fn approve_signed_by_other_guardian_panics() {
     let args = (f.bob.clone(), 1u32, f.signers.clone(), RULE_ID, f.account.clone());
     f.mock_auth(&f.carol, "approve", args.into_val(&f.e));
     f.client.approve(&f.bob, &1, &f.signers, &RULE_ID, &f.account);
-}
-
-#[test]
-#[should_panic(expected = "Contract re-entry is not allowed")]
-fn policy_as_verifier_panics() {
-    let f = Fixture::installed();
-    f.client.approve(&f.bob, &1, &f.signers_on(&f.policy), &RULE_ID, &f.account);
 }
 
 #[test]
