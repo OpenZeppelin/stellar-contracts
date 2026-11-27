@@ -143,7 +143,7 @@ pub enum SocialRecoveryStorageKey {
     /// Epoch of a smart account's recovery rule. Never removed.
     Epoch(Address, u32), // Persistent
     /// Attempt of a smart account's recovery rule, keyed by epoch and the
-    /// SHA-256 hash of the XDR-encoded signer set.
+    /// hash of the signer set returned by [`hash_signers`].
     Attempt(Address, u32, u32, BytesN<32>), // Persistent
 }
 
@@ -632,7 +632,7 @@ pub fn get_epoch(e: &Env, context_rule_id: u32, smart_account: &Address) -> u32 
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `epoch` - The epoch of the attempt.
-/// * `signers_hash` - The SHA-256 hash of the XDR-encoded signer set.
+/// * `signers_hash` - The hash of the signer set returned by [`hash_signers`].
 /// * `context_rule_id` - The ID of the recovery rule.
 /// * `smart_account` - The address of the smart account.
 pub fn get_attempt(
